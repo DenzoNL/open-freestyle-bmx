@@ -23,7 +23,9 @@ def norm(m):
 
 def main():
     bundles = {}
-    for f in sorted((ROOT / "work/bundles").glob("*.json")):
+    import os
+
+    for f in sorted(Path(os.environ.get("BMX_BUNDLES", ROOT / "work/bundles")).glob("*.json")):
         b = json.loads(f.read_text())
         bundles[int(b["addr"], 16)] = b
     addrs = sorted(bundles)
