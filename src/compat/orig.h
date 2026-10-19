@@ -14,6 +14,17 @@
 
 #define BMX_ADDR(addr) /* original address: addr */
 
+/*
+ * Function pointer that ported code stores into exe-owned data. In the hook build it is the original
+ * address (so old and new code see identical bytes and the in-game hook redirects the call); natively
+ * it is the function itself.
+ */
+#if defined(BMX_HOOK)
+#define BMX_FNPTR(type, addr, fn) ((type)(uintptr_t)(addr))
+#else
+#define BMX_FNPTR(type, addr, fn) ((type)(fn))
+#endif
+
 /* Macro arguments are types and parameter lists, which cannot be parenthesised. */
 // NOLINTBEGIN(bugprone-macro-parentheses)
 #if defined(BMX_HOOK)

@@ -39,13 +39,19 @@ void *memset(void *dst, int c, size_t n)
     return dst;
 }
 
+/* The MSVC6 comparison routines return -1, 0 or 1 rather than the byte difference. */
+static int sign(int d)
+{
+    return (d > 0) - (d < 0);
+}
+
 int memcmp(const void *a, const void *b, size_t n)
 {
     const unsigned char *x = a;
     const unsigned char *y = b;
     for (; n; n--, x++, y++) {
         if (*x != *y) {
-            return *x - *y;
+            return sign(*x - *y);
         }
     }
     return 0;
@@ -66,14 +72,14 @@ int strcmp(const char *a, const char *b)
         a++;
         b++;
     }
-    return (unsigned char)*a - (unsigned char)*b;
+    return sign((unsigned char)*a - (unsigned char)*b);
 }
 
 int strncmp(const char *a, const char *b, size_t n)
 {
     for (; n; n--, a++, b++) {
         if (*a != *b || !*a) {
-            return (unsigned char)*a - (unsigned char)*b;
+            return sign((unsigned char)*a - (unsigned char)*b);
         }
     }
     return 0;

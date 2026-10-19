@@ -7,6 +7,7 @@
 #ifndef BMX_COMPAT_CRT_H
 #define BMX_COMPAT_CRT_H
 
+#include <stdarg.h>
 #include <stddef.h>
 
 #if defined(BMX_HOOK)
@@ -25,10 +26,26 @@ int tolower(int c);
 
 #include "compat/orig.h"
 ORIG_FN(0x004a50d2, void *, malloc, (size_t n));
+/* Locale- or format-dependent CRT routines stay in the exe. */
+ORIG_FN(0x004a5338, int, vsprintf, (char *dst, const char *fmt, va_list args));
+ORIG_FN(0x004a56fe, unsigned long, strtoul, (const char *s, char **end, int base));
+ORIG_FN(0x0051d2f0, char *, _strupr, (char *s));
+ORIG_FN(0x0051d390, int, _stricmp, (const char *a, const char *b));
 #else
 #include <ctype.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
+
+#define _stricmp strcasecmp
+static inline char *_strupr(char *s)
+{
+    for (char *p = s; *p; p++) {
+        *p = (char)toupper((unsigned char)*p);
+    }
+    return s;
+}
 #endif
 
 #endif

@@ -11,6 +11,7 @@ Checks: >
   -cert-dcl51-cpp,
   -cert-err33-c,
   clang-analyzer-*,
+  -clang-analyzer-core.FixedAddressDereference,
   -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
   misc-redundant-expression,
   readability-braces-around-statements,

@@ -4,14 +4,14 @@
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root"
-mapfile -t sources < <(git ls-files 'src/*.c' 'src/*.h' 'tests/cases/*.c' 'tests/cases/*.h')
+mapfile -t sources < <(git ls-files -co --exclude-standard 'src/*.c' 'src/*.h' 'tests/cases/*.c' 'tests/cases/*.h')
 echo "== clang-format"
 clang-format --dry-run -Werror "${sources[@]}"
 echo "== build (hook preset)"
 cmake --preset hook >/dev/null
 cmake --build --preset hook
 echo "== clang-tidy"
-mapfile -t units < <(git ls-files 'src/*.c' 'tests/cases/*.c')
+mapfile -t units < <(git ls-files -co --exclude-standard 'src/*.c' 'tests/cases/*.c')
 clang-tidy --quiet -p build/hook "${units[@]}"
 echo "== functions.csv"
 python3 -I tools/progress.py --check >/dev/null
