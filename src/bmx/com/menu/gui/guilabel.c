@@ -201,11 +201,11 @@ int BMX_CDECL guiLabelProc(int msg, GuiElement *el, int arg3, int arg4)
     int16_t w = el->w;
     int16_t h = el->h;
     if (arg3 != 0 && el->spriteFocused != NULL) {
-        w = zspriteWidth(el->spriteFocused, el->frame);
-        h = zspriteHeight(el->spriteFocused, el->frame);
+        w = zprimSpriteFrameWidth(el->spriteFocused, el->frame);
+        h = zprimSpriteFrameHeight(el->spriteFocused, el->frame);
     } else if (el->sprite != NULL) {
-        w = zspriteWidth(el->sprite, el->frame);
-        h = zspriteHeight(el->sprite, el->frame);
+        w = zprimSpriteFrameWidth(el->sprite, el->frame);
+        h = zprimSpriteFrameHeight(el->sprite, el->frame);
     }
     const uint16_t flags = el->flags;
     if ((flags & kGuiFlagScaled) != 0) {
@@ -234,29 +234,29 @@ int BMX_CDECL guiLabelProc(int msg, GuiElement *el, int arg3, int arg4)
         if ((el->animFlags & kGuiAnimPlaying) != 0) {
             guiLabelAnimate(el);
         }
-        zprimSetState(8, (el->animFlags & kGuiAnimBit4) != 0);
+        zprimSet(8, (el->animFlags & kGuiAnimBit4) != 0);
         if ((el->animFlags & kGuiAnimBit8) != 0) {
-            zprimSetState(7, 1);
-            zprimSetState(0xf, el->alpha);
+            zprimSet(7, 1);
+            zprimSet(0xf, el->alpha);
         } else {
-            zprimSetState(7, 0);
+            zprimSet(7, 0);
         }
-        zprimSetState(0xe, (int)el->palette);
-        zprimSetSprite((arg3 != 0 && el->spriteFocused != NULL) ? el->spriteFocused : el->sprite);
+        zprimSet(0xe, (int)el->palette);
+        zprimSetPicture((arg3 != 0 && el->spriteFocused != NULL) ? el->spriteFocused : el->sprite);
         if (guiPadMultiMode() == 0 && (el->flags & kGuiFlagHighlight) != 0) {
             zprimSetColor(0xde, 0xde, 0x9c, 0x11);
-            zprimSetState(0x10, gGuiPulse);
+            zprimSet(0x10, gGuiPulse);
         }
         if ((el->flags & kGuiFlagTinted) != 0) {
-            zprimSetState(0x11, (int)el->tintRgb);
-            zprimSetState(0x10, (int)el->tintAlpha);
+            zprimSet(0x11, (int)el->tintRgb);
+            zprimSet(0x10, (int)el->tintAlpha);
         }
         zprimDrawSprite(el->frame, (int16_t)(el->spriteX + x), (int16_t)(el->spriteY + y));
         if (scaled != 0) {
-            zprimResetScale();
+            zprimStateReset();
         }
         if ((el->flags & (kGuiFlagTinted | kGuiFlagHighlight)) != 0) {
-            zprimSetState(0x10, 0);
+            zprimSet(0x10, 0);
         }
     }
 
@@ -269,32 +269,32 @@ int BMX_CDECL guiLabelProc(int msg, GuiElement *el, int arg3, int arg4)
             if (newline != NULL) {
                 *newline = '\0';
             }
-            zprimSetState(0x13, (el->textFlags & kGuiTextBit4) != 0);
+            zprimSet(0x13, (el->textFlags & kGuiTextBit4) != 0);
             if ((el->textFlags & kGuiTextColored) != 0) {
-                zprimSetState(0x14, 1);
+                zprimSet(0x14, 1);
                 zprimSetColor(el->textRgb[0], el->textRgb[1], el->textRgb[2], 0x16);
             } else {
-                zprimSetState(0x14, 0);
+                zprimSet(0x14, 0);
             }
-            const int savedAlpha = zprimGetState(0xf);
-            const int savedTint = zprimGetState(0x11);
-            const int savedTintAlpha = zprimGetState(0x10);
+            const int savedAlpha = zprimGet(0xf);
+            const int savedTint = zprimGet(0x11);
+            const int savedTintAlpha = zprimGet(0x10);
             if ((el->textFlags & kGuiTextBit8) != 0) {
-                zprimSetState(0x12, 1);
-                zprimSetState(0xf, el->alpha);
-                zprimSetState(0x11, (int)el->tintRgb);
-                zprimSetState(0x10, (int)el->tintAlpha);
+                zprimSet(0x12, 1);
+                zprimSet(0xf, el->alpha);
+                zprimSet(0x11, (int)el->tintRgb);
+                zprimSet(0x10, (int)el->tintAlpha);
             } else {
-                zprimSetState(0x12, 0);
+                zprimSet(0x12, 0);
             }
-            zprimSetState(0x17, (int)el->textStyle);
-            zprimSetState(0x18, el->textSpacing);
+            zprimSet(0x17, (int)el->textStyle);
+            zprimSet(0x18, el->textSpacing);
             int tx = el->textX;
             int ty = el->textY;
             zprimSetFont(el->font);
             if (line[0] == '!') {
-                zprimSetSprite(el->sprite);
-                zprimSetState(8, 1);
+                zprimSetPicture(el->sprite);
+                zprimSet(8, 1);
                 guiParseMarkup(line, tx + xEl, ty + lineY);
             } else {
                 if ((el->textFlags & kGuiTextCenterX) != 0) {
@@ -302,32 +302,32 @@ int BMX_CDECL guiLabelProc(int msg, GuiElement *el, int arg3, int arg4)
                         const uint32_t len = (uint32_t)strlen(text);
                         tx += (int)((uint32_t)(w - (int)len * el->textSpacing) >> 1);
                     } else {
-                        tx += (w - (int)zfontTextWidth(el->font, text)) / 2;
+                        tx += (w - (int)zprimTextWidth(el->font, (const uint8_t *)text)) / 2;
                     }
                 }
                 if ((el->textFlags & kGuiTextCenterY) != 0) {
-                    ty += (h - (int)zfontHeight(el->font)) / 2;
+                    ty += (h - (int)zprimFontFlags(el->font)) / 2;
                 }
                 if ((el->textFlags & kGuiTextRight) != 0) {
                     if ((el->textFlags & kGuiTextFixedPitch) != 0) {
                         const uint16_t span = (uint16_t)((uint32_t)strlen(text) * (uint16_t)el->textSpacing);
                         tx += w - span;
                     } else {
-                        tx += w - (int)zfontTextWidth(el->font, text);
+                        tx += w - (int)zprimTextWidth(el->font, (const uint8_t *)text);
                     }
                 }
                 if ((el->textFlags & kGuiTextFixedPitch) != 0) {
-                    zfontDrawFixed(line, tx + xEl, ty + lineY);
+                    zprimDrawTextMono((const uint8_t *)line, tx + xEl, ty + lineY);
                 } else {
-                    zfontDraw(line, tx + xEl, ty + lineY);
+                    zprimDrawText((const uint8_t *)line, tx + xEl, ty + lineY);
                 }
             }
-            zprimSetState(0x18, 0);
-            zprimSetState(0x17, 0);
-            zprimSetState(0xf, savedAlpha);
-            zprimSetState(0x11, savedTint);
-            zprimSetState(0x10, savedTintAlpha);
-            lineY = lineY + (int)zfontHeight(el->font) + 1;
+            zprimSet(0x18, 0);
+            zprimSet(0x17, 0);
+            zprimSet(0xf, savedAlpha);
+            zprimSet(0x11, savedTint);
+            zprimSet(0x10, savedTintAlpha);
+            lineY = lineY + (int)zprimFontFlags(el->font) + 1;
             if (newline != NULL) {
                 *newline = '\n';
                 line = newline + 1;

@@ -16,6 +16,7 @@ ORIG_FN(0x0046b030, int, zmemdmmAlloc, (uint32_t size));
 ORIG_FN(0x0046b140, void, zmemdmmFree, (int handle));
 ORIG_FN(0x0046b470, void *, zmemdmmLock, (int handle));
 ORIG_FN(0x0046b4f0, void, zmemdmmUnlock, (int handle));
-ORIG_FN(0x0046b570, void, zmemdmmCompact, (void));
+/* Compacts the pool; returns non-zero on failure. */
+ORIG_FN(0x0046b570, int, zmemdmmOptimize, (void));
 
 #endif

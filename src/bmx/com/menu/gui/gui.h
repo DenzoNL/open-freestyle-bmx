@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "bmx/com/zge/zprim.h"
 #include "compat/orig.h"
 
 enum { kGuiMaxElements = 100 };
@@ -130,7 +131,7 @@ struct GuiElement {
     uint16_t textFlags;       /* 0xc8 */
     int16_t textSpacing;      /* 0xca */
     int16_t textX, textY;     /* 0xcc */
-    void *font;               /* 0xd0 */
+    ZPrimAsset *font;         /* 0xd0 */
     uint32_t textStyle;       /* 0xd4 */
     int textHandle;           /* 0xd8: handle of the NUL-terminated text, 0 = none */
     uint32_t textCapacity;    /* 0xdc: bytes allocated for the text */
@@ -151,7 +152,7 @@ typedef int(BMX_CDECL *GuiHookFn)(int msg, GuiElement *element, int arg3, int ar
 
 /* Backdrop, selection fonts/colours and the hook, one block of six dwords. */
 typedef struct GuiScreenState {
-    int backdrop; /* 0x00: sprite handle, 0 = none */
+    ZPrimAsset *backdrop; /* 0x00: backdrop picture, NULL = none */
     uint32_t unknown4;
     uint16_t focusFont;  /* 0x08: font id for focused text, 0 = leave alone */
     uint8_t focusRgb[3]; /* 0x0a */

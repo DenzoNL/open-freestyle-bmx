@@ -64,8 +64,8 @@ int guiModeInit(void)
         guiDebug("GUIMAIN: Failed to initialize ZPRIM\n");
         return 1;
     }
-    zprimSetAssetFile(gGuiAssetFile);
-    if (zassetLoadGroup(0, 0xe000) != 0) {
+    zprimOpenLibrary(gGuiAssetFile);
+    if (zprimLoadGroup(0, 0xe000) != 0) {
         guiDebug("GUIMAIN: Failed to load permanent screen assets\n");
         return 1;
     }
@@ -90,9 +90,9 @@ void guiModeShutdown(void)
                 guiDestroyElement(&gGuiElements[i]);
             }
         }
-        zassetUnloadScreen(gGuiScreen.backdrop);
+        zprimAssetFree(gGuiScreen.backdrop);
         guiDestroyAll();
-        zassetUnloadGroup(0);
+        zprimFreeGroup(0);
         zprimShutdown();
         zmemdmmShutdown();
         gGuiModeReady = 0;
@@ -122,14 +122,14 @@ void guiDestroyAll(void)
         guiDebug("GUIMAIN: Failed to destroy all elements\n");
         return;
     }
-    const int backdrop = gGuiScreen.backdrop;
+    ZPrimAsset *const backdrop = gGuiScreen.backdrop;
     memset(&gGuiScreen, 0, sizeof gGuiScreen);
     gGuiScreen.backdrop = backdrop;
     if (gGuiAssetsLoaded != 0) {
-        zassetUnloadGroup(1);
+        zprimFreeGroup(1);
         gGuiAssetsLoaded = 0;
     }
-    zmemdmmCompact();
+    zmemdmmOptimize();
 }
 
 /* Remembers the screen to show and loads it now, or after a short delay if one is on display. */
@@ -161,10 +161,10 @@ void guiLoadScreen(void)
 {
     guiScreenLoadHook();
     guiDestroyAll();
-    zprimClear();
+    zprimFlush();
     gGuiScreen.hook = gGuiDefaultHook;
     if (gGuiScreenId != 0) {
-        if (zassetLoadGroup(1, (uint32_t)(gGuiScreenId & 0xfff) | 0xe000) != 0) {
+        if (zprimLoadGroup(1, (uint32_t)(gGuiScreenId & 0xfff) | 0xe000) != 0) {
             guiDebug("GUISFILE: Failed to load screen assets\n");
             return;
         }
@@ -351,12 +351,12 @@ int guiUpdate(void)
         gGuiScreenLoaded = 0;
         guiLoadScreen();
     }
-    if (gGuiScreen.backdrop != 0) {
-        zprimSetState(1, gGuiScreen.backdrop);
+    if (gGuiScreen.backdrop != NULL) {
+        zprimSet(1, (int)(intptr_t)gGuiScreen.backdrop);
     } else {
-        zprimSetState(4, 0);
+        zprimSet(4, 0);
     }
-    zprimBeginFrame();
+    zprimClear();
     if (gGuiScreenLoaded != 0 && gGuiSkipUpdate == 0 && gGuiReloadPending == 0) {
         if (gGuiIdleMode != 0) {
             guiPostToVisible(kGuiMsgIdle, 0, 0);

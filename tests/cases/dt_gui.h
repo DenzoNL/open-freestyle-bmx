@@ -53,7 +53,7 @@ int dtGuiTextHandle(const char *text);
  */
 void dtGuiMakeToggleData(GuiElement *el, int withChoices, int withText);
 
-/* Fake asset record (what zassetFindSprite returns) backed by a handle; `data` is copied into it. */
+/* Fake asset record (what zprimLoadAsset returns) backed by a handle; `data` is copied into it. */
 void *dtGuiMakeAsset(uint16_t id, const void *data, uint32_t size);
 /* Sprite sheet asset with `frames` frames of random size; fills sizes[] with width/height pairs. */
 void *dtGuiMakeSprite(uint16_t id, int frames);

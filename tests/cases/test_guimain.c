@@ -162,7 +162,7 @@ static void setup_destroy_all(DtCtx *c)
         give_handles(gGuiSorted[i]);
     }
     gGuiScreen.hook = c->seed % 3 == 0 ? NULL : dtGuiHook;
-    gGuiScreen.backdrop = (int)dt_u32();
+    gGuiScreen.backdrop = (ZPrimAsset *)(uintptr_t)dt_u32();
     gGuiScreen.focusFont = (uint16_t)dt_u32();
     gGuiAssetsLoaded = (int)(dt_u32() & 1);
     if (c->seed % 7 == 6) { /* a list entry that is not a table slot survives */
@@ -215,7 +215,7 @@ static void setup_mode_init(DtCtx *c)
     setup_nop(c);
     gGuiInitialized = c->seed % 3 != 0;
     gGuiModeReady = c->seed % 3 == 1;
-    gGuiScreen.backdrop = (int)dt_u32();
+    gGuiScreen.backdrop = (ZPrimAsset *)(uintptr_t)dt_u32();
     for (int i = 0; i < 4; i++) {
         gGuiSorted[i] = (GuiElement *)(uintptr_t)dt_u32();
     }
@@ -230,7 +230,7 @@ static void setup_mode_shutdown(DtCtx *c)
         give_handles(gGuiSorted[i]);
     }
     gGuiModeReady = c->seed % 4 != 3;
-    gGuiScreen.backdrop = (int)(intptr_t)dtGuiMakeSprite(0x123, 2);
+    gGuiScreen.backdrop = (ZPrimAsset *)dtGuiMakeSprite(0x123, 2);
     gGuiAssetsLoaded = (int)(dt_u32() & 1);
     gGuiScreen.hook = c->seed % 3 == 0 ? NULL : dtGuiHook;
 }
@@ -244,7 +244,7 @@ static void setup_load_screen(DtCtx *c)
     }
     gGuiDefaultHook = c->seed % 3 == 0 ? NULL : dtGuiHook;
     gGuiScreen.hook = dtGuiProc;
-    gGuiScreen.backdrop = (int)dt_u32();
+    gGuiScreen.backdrop = (ZPrimAsset *)(uintptr_t)dt_u32();
     gGuiAssetsLoaded = c->seed % 2;
     if (c->seed % 5 == 4) { /* a screen is requested but its asset group is "already loaded" */
         gGuiScreenId = (uint16_t)dt_range(1, 0xfff);

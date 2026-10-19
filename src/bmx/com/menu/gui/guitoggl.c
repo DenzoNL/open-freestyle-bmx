@@ -65,7 +65,7 @@ void guiToggleSetTextStyle(GuiElement *el, uint32_t style)
 BMX_ADDR(0x0043b6e0)
 void guiToggleSetFont(GuiElement *el, uint32_t fontId)
 {
-    void *font = zassetFindSprite(fontId);
+    void *font = zprimLoadAsset(fontId);
     if (font == NULL) {
         (*gGuiDebugPrint)("GUITOGGL: Error - failed to load font %04.4X\n", fontId & 0xffff);
         return;
@@ -251,11 +251,11 @@ static void guiToggleDraw(GuiElement *el, int arg3, int arg4, const GuiToggleVar
     int16_t w = el->w;
     int16_t h = el->h;
     if (arg3 != 0 && el->spriteFocused != NULL) {
-        w = zspriteWidth(el->spriteFocused, el->frame);
-        h = zspriteHeight(el->spriteFocused, el->frame);
+        w = zprimSpriteFrameWidth(el->spriteFocused, el->frame);
+        h = zprimSpriteFrameHeight(el->spriteFocused, el->frame);
     } else if (el->sprite != NULL) {
-        w = zspriteWidth(el->sprite, el->frame);
-        h = zspriteHeight(el->sprite, el->frame);
+        w = zprimSpriteFrameWidth(el->sprite, el->frame);
+        h = zprimSpriteFrameHeight(el->sprite, el->frame);
     }
     const uint16_t flags = el->flags;
     if ((flags & kGuiFlagScaled) != 0) {
@@ -289,36 +289,36 @@ static void guiToggleDraw(GuiElement *el, int arg3, int arg4, const GuiToggleVar
             if (newline != NULL) {
                 *newline = '\0';
             }
-            zprimSetState(0x13, (data->textFlags & kGuiTextBit4) != 0);
+            zprimSet(0x13, (data->textFlags & kGuiTextBit4) != 0);
             if ((data->textFlags & kGuiTextColored) != 0) {
-                zprimSetState(0x14, 1);
+                zprimSet(0x14, 1);
                 zprimSetColor(data->textRgb[0], data->textRgb[1], data->textRgb[2], 0x16);
             } else {
-                zprimSetState(0x14, 0);
+                zprimSet(0x14, 0);
             }
             if (variant->styleFirst) {
-                zprimSetState(0x17, (int)data->textStyle);
-                zprimSetState(0x18, data->textSpacing);
+                zprimSet(0x17, (int)data->textStyle);
+                zprimSet(0x18, data->textSpacing);
             } else {
-                zprimSetState(0x18, data->textSpacing);
-                zprimSetState(0x17, (int)data->textStyle);
+                zprimSet(0x18, data->textSpacing);
+                zprimSet(0x17, (int)data->textStyle);
             }
             int tx = data->textX;
             int ty = data->textY;
             if ((data->textFlags & kGuiTextCenterX) != 0) {
-                tx += (w - (int)zfontTextWidth(data->font, text)) / 2;
+                tx += (w - (int)zprimTextWidth(data->font, (const uint8_t *)text)) / 2;
             }
             if ((data->textFlags & kGuiTextCenterY) != 0) {
-                ty += (h - (int)zfontHeight(data->font)) / 2;
+                ty += (h - (int)zprimFontFlags(data->font)) / 2;
             }
             if ((data->textFlags & kGuiTextRight) != 0) {
-                tx += w - (int)zfontTextWidth(data->font, text);
+                tx += w - (int)zprimTextWidth(data->font, (const uint8_t *)text);
             }
             zprimSetFont(data->font);
-            zfontDraw(line, tx + x, ty + lineY);
-            zprimSetState(0x18, 0);
-            zprimSetState(0x17, 0);
-            lineY = lineY + (int)zfontHeight(data->font) + 1;
+            zprimDrawText((const uint8_t *)line, tx + x, ty + lineY);
+            zprimSet(0x18, 0);
+            zprimSet(0x17, 0);
+            lineY = lineY + (int)zprimFontFlags(data->font) + 1;
             if (newline != NULL) {
                 *newline = '\n';
                 line = newline + 1;

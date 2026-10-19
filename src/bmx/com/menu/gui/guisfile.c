@@ -66,16 +66,16 @@ static void guiApplyTogglePart(GuiElement *el, const GuiScreenFileElement *rec, 
 BMX_ADDR(0x00439a00)
 int guiBuildScreen(uint32_t id)
 {
-    const int asset = (int)(intptr_t)zassetFindSprite(id);
-    if (asset == 0) {
+    ZPrimAsset *const asset = zprimLoadAsset(id);
+    if (asset == NULL) {
         (*gGuiDebugPrint)("GUISFILE: Error - failed to load screen %x\n", id & 0xffff);
         return 1;
     }
-    const uint8_t *base = zassetLock(asset);
+    const uint8_t *base = zprimAssetData(asset);
     const GuiScreenFile *file = (const GuiScreenFile *)base;
     if (file->magic != gGuiScreenMagic) {
         (*gGuiDebugPrint)("GUISFILE: Error - bad screen %04.4X\n", id & 0xffff);
-        zassetRelease(asset);
+        zprimAssetRelease(asset);
         return 1;
     }
     if (file->backdrop != 0) {
@@ -94,13 +94,13 @@ int guiBuildScreen(uint32_t id)
         for (int i = 0; i < (int)file->elementCount; i++, rec++) {
             if (rec->magic != gGuiElementMagic) {
                 (*gGuiDebugPrint)("GUISFILE: Error - bad screen element def %04.4X\n", id & 0xffff);
-                zassetRelease(asset);
+                zprimAssetRelease(asset);
                 return 1;
             }
             GuiElement *el = guiCreateElement((int16_t)rec->type, (int16_t)rec->order, rec->id);
             if (el == NULL) {
                 (*gGuiDebugPrint)("GUISFILE: Error - failed to allocate element\n");
-                zassetRelease(asset);
+                zprimAssetRelease(asset);
                 return 1;
             }
             if ((rec->flags & 0x10) != 0) {
@@ -137,6 +137,6 @@ int guiBuildScreen(uint32_t id)
             guiSend(kGuiMsgFocus, focused, 0, 0);
         }
     }
-    zassetRelease(asset);
+    zprimAssetRelease(asset);
     return 0;
 }

@@ -247,7 +247,7 @@ void guiSetSpriteOffset(GuiElement *el, int16_t x, int16_t y)
 BMX_ADDR(0x00438a60)
 void guiSetSprite(GuiElement *el, uint32_t spriteId)
 {
-    void *sprite = zassetFindSprite(spriteId);
+    void *sprite = zprimLoadAsset(spriteId);
     if (sprite == NULL) {
         (*gGuiDebugPrint)("GUIMAIN: Error - failed to load sprite %04.4X\n", spriteId & 0xffff);
         return;
@@ -264,7 +264,7 @@ void guiSetSpritePtr(GuiElement *el, void *sprite)
 BMX_ADDR(0x00438ad0)
 void guiSetSpriteFocused(GuiElement *el, uint32_t spriteId)
 {
-    void *sprite = zassetFindSprite(spriteId);
+    void *sprite = zprimLoadAsset(spriteId);
     if (sprite == NULL) {
         (*gGuiDebugPrint)("GUIMAIN: Error - failed to load selected sprite %04.4X\n", spriteId & 0xffff);
         return;
@@ -356,7 +356,7 @@ uint32_t guiGetTextStyle(const GuiElement *el)
 BMX_ADDR(0x00438d60)
 void guiSetFont(GuiElement *el, uint32_t fontId)
 {
-    void *font = zassetFindSprite(fontId);
+    void *font = zprimLoadAsset(fontId);
     if (font == NULL) {
         (*gGuiDebugPrint)("GUIMAIN: Error - failed to load font %04.4X\n", fontId & 0xffff);
         return;
@@ -441,7 +441,7 @@ BMX_ADDR(0x004390e0)
 uint16_t guiGetTextWidth(const GuiElement *el)
 {
     const char *text = zmemdmmLock(el->textHandle);
-    const uint16_t width = zfontTextWidth(el->font, text);
+    const uint16_t width = zprimTextWidth(el->font, (const uint8_t *)text);
     zmemdmmUnlock(el->textHandle);
     return width;
 }
@@ -499,37 +499,37 @@ const char *guiResolveText(const char *text)
 BMX_ADDR(0x00439130)
 void guiDrawBackdropSprites(uint32_t spriteId, uint32_t backdropId, int arg3, int arg4)
 {
-    void *sprite = zassetFindSprite(spriteId);
+    void *sprite = zprimLoadAsset(spriteId);
     if (sprite == NULL) {
         (*gGuiDebugPrint)("GUIMAIN: Error - failed to load sprite %04.4X\n", spriteId & 0xffff);
         return;
     }
-    void *backdrop = zassetFindSprite(backdropId);
+    void *backdrop = zprimLoadAsset(backdropId);
     if (backdrop == NULL) {
         (*gGuiDebugPrint)("GUIMAIN: Error - failed to load backdrop %04.4X\n", backdropId & 0xffff);
         return;
     }
-    zprimDrawBackdrop(sprite, backdrop, arg3, arg4);
+    zprimNop2(sprite, backdrop, arg3, arg4);
 }
 
 /* Loads screen asset `id` as the backdrop and builds its sprite sheet, replacing the previous one. */
 BMX_ADDR(0x004391c0)
 void guiLoadBackdrop(uint16_t id, int arg)
 {
-    const int handle = zassetLoadScreen((uint16_t)((id & 0xfff) | 0xe000), arg);
-    if (gGuiScreen.backdrop != 0) {
-        zassetUnloadScreen(gGuiScreen.backdrop);
+    ZPrimAsset *const handle = zprimLoadGroupPicture((uint16_t)((id & 0xfff) | 0xe000), arg);
+    if (gGuiScreen.backdrop != NULL) {
+        zprimAssetFree(gGuiScreen.backdrop);
     }
     gGuiScreen.backdrop = handle;
-    uint8_t *asset = zassetLock(handle);
+    uint8_t *asset = zprimAssetData(handle);
     if (*(void **)(asset + 0x20) != NULL) {
         guiFreeBackdropSprites(*(void **)(asset + 0x20));
     }
     *(int *)(asset + 0x20) =
-        zprimBuildSprites(*(uint16_t *)(asset + 4), *(uint16_t *)(asset + 6), *(uint16_t *)(asset + 0x10),
-                          asset + *(int *)(asset + 8), asset + *(int *)(asset + 0xc));
-    zassetRelease(handle);
-    zmemdmmCompact();
+        zprimCreateTexture(*(uint16_t *)(asset + 4), *(uint16_t *)(asset + 6), *(uint16_t *)(asset + 0x10),
+                           asset + *(int *)(asset + 8), (const uint16_t *)(asset + *(int *)(asset + 0xc)));
+    zprimAssetRelease(handle);
+    zmemdmmOptimize();
 }
 
 BMX_ADDR(0x00439280)
@@ -541,12 +541,12 @@ void guiFreeBackdropSprites(void *sprites)
 BMX_ADDR(0x004392a0)
 void guiSetBackdrop(uint32_t spriteId)
 {
-    void *backdrop = zassetFindSprite(spriteId);
+    void *backdrop = zprimLoadAsset(spriteId);
     if (backdrop == NULL) {
         (*gGuiDebugPrint)("GUIMAIN: Error - failed to load backdrop %04.4X\n", spriteId & 0xffff);
         return;
     }
-    gGuiScreen.backdrop = (int)(intptr_t)backdrop;
+    gGuiScreen.backdrop = backdrop;
 }
 
 BMX_ADDR(0x004392e0)
@@ -673,8 +673,8 @@ int BMX_CDECL guiRectProc(int msg, GuiElement *el, int arg3, int arg4)
     const int16_t y1 = el->spriteY;
     const int16_t y0 = el->y;
     zprimSetColor(el->textRgb[0], el->textRgb[1], el->textRgb[2], 5);
-    zprimSetState(6, 1);
-    zprimLine(x0, y0, x1, y1);
+    zprimSet(6, 1);
+    zprimDrawLine(x0, y0, x1, y1);
     return 1;
 }
 
@@ -690,17 +690,17 @@ int BMX_CDECL guiBoxProc(int msg, GuiElement *el, int arg3, int arg4)
     int16_t y1 = el->spriteY;
     int16_t y0 = el->y;
     zprimSetColor(el->textRgb[0], el->textRgb[1], el->textRgb[2], 5);
-    zprimLine(x0, y0, x1, y0);
-    zprimLine(x1, y0, x1, y1);
-    zprimLine(x1, y1, x0, y1);
-    zprimLine(x0, y1, x0, y0);
+    zprimDrawLine(x0, y0, x1, y0);
+    zprimDrawLine(x1, y0, x1, y1);
+    zprimDrawLine(x1, y1, x0, y1);
+    zprimDrawLine(x0, y1, x0, y0);
     y0++;
     x1--;
     x0++;
-    zprimLine(x0, y0, x1, y0);
+    zprimDrawLine(x0, y0, x1, y0);
     y1--;
-    zprimLine(x1, y0, x1, y1);
-    zprimLine(x1, y1, x0, y1);
-    zprimLine(x0, y1, x0, y0);
+    zprimDrawLine(x1, y0, x1, y1);
+    zprimDrawLine(x1, y1, x0, y1);
+    zprimDrawLine(x0, y1, x0, y0);
     return 1;
 }
