@@ -18,6 +18,11 @@ import struct
 import sys
 from dataclasses import dataclass, field
 
+import os
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
+
 import pefile
 from unicorn import UC_ARCH_X86, UC_HOOK_CODE, UC_MODE_32, UC_PROT_ALL, Uc, UcError
 from unicorn.x86_const import (
@@ -36,6 +41,8 @@ HEAP_BASE, HEAP_SIZE = 0x20000000, 0x04000000
 TRAP_BASE, TRAP_SIZE = 0x7FF00000, 0x00010000
 RET_MAGIC = TRAP_BASE + TRAP_SIZE - 0x10
 
+CRT_ENTRY, WINMAIN = 0x004A51F9, 0x0048A460
+
 # MSVC6 CRT heap entry points inside NgBMX.exe
 CRT_MALLOC, CRT_FREE, CRT_CALLOC, CRT_REALLOC = 0x004A50D2, 0x004A4D7F, 0x004AD2E4, 0x0051D67E
 
@@ -47,6 +54,7 @@ ABORT_FUNCS = (0x0047ED10,)
 RET_MASK = 0x0F
 RET_VOID, RET_INT, RET_FLOAT, RET_DOUBLE, RET_INT64, RET_INT16, RET_INT8 = 0, 1, 2, 3, 4, 5, 6
 F_FLOAT_MEM = 0x10  # compare differing aligned dwords in memory as floats (ULP tolerance)
+F_NEEDS_ASSETS = 0x40  # case reads original game files
 
 
 @dataclass
@@ -67,6 +75,7 @@ class Capture:
     edx: int = 0
     st0: float = 0.0
     abort: tuple = None
+    files: tuple = None
     mem: dict = field(default_factory=dict)
 
 
@@ -92,7 +101,9 @@ def ulp_dist32(a, b):
 
 
 class Machine:
-    def __init__(self, exe_path, dll_path):
+    stack_bottom, stack_top = STACK_BASE, STACK_BASE + STACK_SIZE
+
+    def __init__(self, exe_path, dll_path, game_root=None):
         self.uc = Uc(UC_ARCH_X86, UC_MODE_32)
         self.writable = []  # (base, size)
         self.trap_names = {}
@@ -112,6 +123,9 @@ class Machine:
             self.uc.hook_add(UC_HOOK_CODE, self._on_abort, begin=addr, end=addr)
         self.sizes = {}
         self.abort = None
+        from win32 import Win32
+
+        self.win32 = Win32(self, game_root)
 
     def _load(self, path, trap_imports):
         pe = pefile.PE(path)
@@ -185,8 +199,39 @@ class Machine:
         if addr == RET_MAGIC:
             uc.emu_stop()
             return
-        self.unexpected_import = self.trap_names.get(addr, hex(addr))
+        name = self.trap_names.get(addr, hex(addr))
+        from win32 import ProcessExit
+
+        try:
+            if self.win32.call(name):
+                return
+        except ProcessExit as e:
+            self.abort = ("exit", str(e), 0)
+            uc.emu_stop()
+            return
+        self.unexpected_import = name
         uc.emu_stop()
+
+    def crt_startup(self):
+        """Run the exe's real MSVC6 startup (heap, stdio, argv, environment, initialisers) and stop
+        on entry to WinMain, leaving a properly initialised process."""
+
+        def on_winmain(uc, addr, size, _):
+            uc.emu_stop()
+
+        h = self.uc.hook_add(UC_HOOK_CODE, on_winmain, begin=WINMAIN, end=WINMAIN)
+        sp = STACK_BASE + STACK_SIZE - 0x1000 - 4
+        self.uc.mem_write(sp, struct.pack("<I", RET_MAGIC))
+        self.uc.reg_write(UC_X86_REG_ESP, sp)
+        self.uc.reg_write(UC_X86_REG_FPCW, 0x027F)
+        try:
+            self.uc.emu_start(CRT_ENTRY, RET_MAGIC, count=50_000_000)
+        finally:
+            self.uc.hook_del(h)
+        if self.unexpected_import:
+            raise RuntimeError(f"CRT startup called unemulated import {self.unexpected_import}")
+        if self.uc.reg_read(UC_X86_REG_EIP) != WINMAIN:
+            raise RuntimeError(f"CRT startup did not reach WinMain (eip={self.uc.reg_read(UC_X86_REG_EIP):#x})")
 
     # --- execution --------------------------------------------------------------------------
     def snapshot(self):
@@ -195,6 +240,7 @@ class Machine:
             "mem": {b: bytes(self.uc.mem_read(b, s)) for b, s in regions if s},
             "heap_ptr": self.heap_ptr,
             "sizes": dict(self.sizes),
+            "win32": self.win32.snapshot(),
         }
 
     def restore(self, snap):
@@ -205,6 +251,7 @@ class Machine:
             self.uc.mem_write(snap["heap_ptr"], b"\0" * (self.heap_ptr - snap["heap_ptr"]))
         self.heap_ptr = snap["heap_ptr"]
         self.sizes = dict(snap["sizes"])
+        self.win32.restore(snap["win32"])
 
     def call(self, fn, args, budget=50_000_000):
         sp = STACK_BASE + STACK_SIZE - 0x1000
@@ -234,6 +281,7 @@ class Machine:
     def capture(self, flags):
         c = Capture(self.uc.reg_read(UC_X86_REG_EAX), self.uc.reg_read(UC_X86_REG_EDX))
         c.abort = self.abort
+        c.files = (self.win32.state["overlay"], {h: f["pos"] for h, f in self.win32.state["files"].items()})
         if c.abort is None and flags & RET_MASK in (RET_FLOAT, RET_DOUBLE):
             c.st0 = self.st0()
         c.mem = self.snapshot()["mem"]
@@ -278,6 +326,8 @@ def diff(case, a, b):
     problems = []
     if a.abort != b.abort:
         problems.append(f"assert orig={a.abort} ours={b.abort}")
+    if a.files != b.files:
+        problems.append(f"file state differs: orig={a.files!r:.200} ours={b.files!r:.200}")
     rk = case.flags & RET_MASK if a.abort is None else RET_VOID
     if rk == RET_INT16 and (a.eax & 0xFFFF) != (b.eax & 0xFFFF):
         problems.append(f"ax orig={a.eax & 0xFFFF:#x} ours={b.eax & 0xFFFF:#x}")
@@ -325,16 +375,29 @@ def diff(case, a, b):
     return problems
 
 
-def run(exe, dll, only=None, iters_override=None, verbose=False):
+def default_game_root(exe):
+    """Install root: the exe's directory, or the unshield extraction root for .../Program_Files."""
+    d = Path(exe).resolve().parent
+    return d.parent if d.name.lower() == "program_files" else d
+
+
+def run(exe, dll, only=None, iters_override=None, verbose=False, game_root=None):
     digest = hashlib.sha256(open(exe, "rb").read()).hexdigest()
-    m = Machine(exe, dll)
+    m = Machine(exe, dll, game_root or os.environ.get("BMX_GAME_DIR") or default_game_root(exe))
     cases, ctx, init = load_cases(m, dll)
+    m.crt_startup()
     for fn in init:
         m.call(fn, [])
     baseline = m.snapshot()
-    failed = 0
+    have_assets = m.win32.game_root is not None and (m.win32.game_root / "Assets").is_dir()
+    failed = skipped = 0
     for case in cases:
         if only and not any(o in case.name for o in only):
+            continue
+        if case.flags & F_NEEDS_ASSETS and not have_assets:
+            skipped += 1
+            if verbose:
+                print(f"skip {case.name} (no game assets)")
             continue
         iters = iters_override or case.iters or 1
         errors = []
@@ -367,7 +430,9 @@ def run(exe, dll, only=None, iters_override=None, verbose=False):
         for e in errors:
             print(f"     {e}")
     total = len([c for c in cases if not only or any(o in c.name for o in only)])
-    print(f"{total - failed}/{total} cases passed (exe sha256 {digest[:12]})")
+    total -= skipped
+    extra = f", {skipped} skipped without game assets" if skipped else ""
+    print(f"{total - failed}/{total} cases passed{extra} (exe sha256 {digest[:12]})")
     return failed == 0
 
 

@@ -5,6 +5,10 @@
  * arguments in DtCtx from a per-iteration seed. The harness runs both from identical memory and
  * compares return value + every writable byte. Setup code may allocate (malloc goes to the exe CRT,
  * which the harness intercepts) and may poke ORIG_VAR globals.
+ *
+ * The baseline is a real process state: the exe's own CRT startup has run (heap, stdio, locale) up to
+ * WinMain. File APIs see the original install read-only (paths relative to the install root, case-
+ * insensitive); writes stay in memory and are compared between both sides like memory.
  */
 #ifndef DT_H
 #define DT_H
@@ -19,7 +23,8 @@ enum {
     DT_RET_INT64 = 4,
     DT_RET_INT16 = 5,
     DT_RET_INT8 = 6,
-    DT_FLOAT_MEM = 0x10, /* tolerate `ulps` difference in float-typed memory */
+    DT_FLOAT_MEM = 0x10,    /* tolerate `ulps` difference in float-typed memory */
+    DT_NEEDS_ASSETS = 0x40, /* reads original game files; skipped when no install is available */
 };
 
 typedef struct DtCtx {

@@ -69,6 +69,12 @@ value held in an x87 register behaves exactly like a C `double`. A value the ori
   functions only set `AX` or `AL`.
 - Functions that need engine state set it up in `setup()` through `ORIG_VAR` globals or by calling original
   initialisers. Process-wide initialisers belong in `dt_init[]` in `tests/cases/dt.c`.
+- The baseline is a real process: the exe's CRT startup has run up to `WinMain` under a small
+  deterministic Win32 layer (`tests/oracle/win32.py`). That layer covers heap, time, registry ("not
+  found") and files, and anything else traps loudly.
+- File code can and should be tested on **real game files**. Paths are relative to the install root
+  (`Assets\Tables.ZAL`, `bin\audio\...`) and resolved case-insensitively. Writes stay in memory and
+  are compared like memory. Mark such cases `DT_NEEDS_ASSETS`, because CI has the exe but no assets.
 
 ## Style
 
