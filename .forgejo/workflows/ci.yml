@@ -1,0 +1,18 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: docker
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Nix
+        run: |
+          curl -fsSL https://install.determinate.systems/nix | sh -s -- install linux \
+            --init none --no-confirm --extra-conf "sandbox = false"
+          echo /nix/var/nix/profiles/default/bin >> "$GITHUB_PATH"
+      - name: Check
+        run: nix develop .#ci -c tools/check.sh

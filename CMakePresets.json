@@ -1,0 +1,14 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "hook",
+      "displayName": "i686 hook/oracle build (against original NgBMX.exe)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/hook",
+      "toolchainFile": "${sourceDir}/cmake/i686-windows-freestanding.cmake",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "BMX_HOOK": "ON" }
+    }
+  ],
+  "buildPresets": [{ "name": "hook", "configurePreset": "hook" }]
+}
