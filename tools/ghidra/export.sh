@@ -10,7 +10,7 @@ mkdir -p "$work/ghidra"
 headless=$(command -v ghidra-analyzeHeadless || command -v analyzeHeadless)
 post=(-postScript SeedILT.java -postScript SeedPtrs.java -postScript SeedPtrs.java)
 if [[ -n $labels ]]; then post+=(-postScript ApplyLabels.java "$labels"); fi
-post+=(-postScript ExportBundles.java "$work/bundles" 401000 4a4a80)
-"$headless" "$work/ghidra" ngbmx -import "$exe" -overwrite -scriptPath "$root/tools/ghidra" "${post[@]}" \
+post+=(-postScript ExportBundles.java "${BUNDLES_OUT:-$work/bundles}" 401000 4a4a80)
+"$headless" "$work/ghidra" "${GHIDRA_PROJECT:-ngbmx}" -import "$exe" -overwrite -scriptPath "$root/tools/ghidra" "${post[@]}" \
     >"$work/ghidra/export.log" 2>&1
 grep -E '> (Seed|Apply|Export)' "$work/ghidra/export.log"

@@ -43,16 +43,18 @@
           # Lean shell for CI: hook build, lint, differential tests.
           ci = pkgs.mkShellNoCC ({ packages = core; } // crossEnv);
 
-          default = pkgs.mkShell {
-            packages =
-              core
-              ++ [
-                pkgs.cppcheck
-                pkgs.sdl3
-              ]
-              ++ pkgs.lib.optional pkgs.stdenv.hostPlatform.isDarwin pkgs.ghidra;
-          }
-          // crossEnv;
+          default = pkgs.mkShell (
+            {
+              packages =
+                core
+                ++ [
+                  pkgs.cppcheck
+                  pkgs.sdl3
+                ]
+                ++ pkgs.lib.optional pkgs.stdenv.hostPlatform.isDarwin pkgs.ghidra;
+            }
+            // crossEnv
+          );
         }
       );
     };
