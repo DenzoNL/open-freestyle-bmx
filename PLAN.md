@@ -4,8 +4,9 @@ Goal: a C17 + SDL3 reimplementation of `NgBMX.exe` (sha256 in `tools/known_exe.t
 original, then gains ultrawide / high-fps / gamepad / renderer upgrades behind options. No original code or
 assets in the repo; everything is loaded from the user's install.
 
-Scope (from `functions_final.tsv`): ~1,765 game + ~773 engine functions to port; RenderWare 3, CRT, zlib,
-libpng (~1,300) are replaced, not decompiled.
+Scope (`data/functions.csv`): 2,115 functions to port, 1,403 game and 712 engine (492 KB). RenderWare 3,
+the CRT, zlib and libpng (~1,300) are replaced, not decompiled. The first estimate (2,537) included jump
+tables, padding and switch-case fragments the seeding mistook for functions. That was fixed on 2026-10-19.
 
 ## Strategy: incremental hook-replacement, with the original as the test oracle
 
@@ -65,7 +66,14 @@ round floats (so the hook build uses SSE2, not x87). Rules are in CONTRIBUTING.m
    retries, then escalate). No human or Opus in the inner loop.
 5. **Prompt caching:** a stable shared prefix (style guide + `types.h` + conventions) and the per-function
    bundle last.
-6. **Pilot before scaling:** run `zquat.c`, `zstring.c`, `zlist.c` and part of `physics.c` end to end. Measure
+6. **Slice by difficulty, not only by file** (learned 2026-10-19):
+   - Sonnet ported a 62-function utility slice bit-exact on its first test run, at ~4.4k tokens per
+     function.
+   - The same model spent 453k tokens on `physics.c` (76 rows, 45 KB, FP-heavy, packet ~148k tokens) and
+     ported nothing.
+   - Rules: cap packets at ~50k tokens. Give the large FP functions (≥1 KB with x87, 88 of them) to Opus
+     in small groups after their callees are ported. Give Sonnet everything else in big slices.
+7. **Pilot before scaling:** run `zquat.c`, `zstring.c`, `zlist.c` and part of `physics.c` end to end. Measure
    tokens per function, first-try pass rate and wall time, then extrapolate and tune the ladder. Rough prior:
    ~2,100 LLM-handled functions × ~10–15k tokens ≈ 20–30M tokens for the bulk pass.
 
