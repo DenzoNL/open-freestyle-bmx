@@ -14,5 +14,14 @@ jobs:
           curl -fsSL https://install.determinate.systems/nix | sh -s -- install linux \
             --init none --no-confirm --extra-conf "sandbox = false"
           echo /nix/var/nix/profiles/default/bin >> "$GITHUB_PATH"
+      - name: Fetch original exe (private oracle branch)
+        run: |
+          # The exe lives only on the orphan branch `oracle` (private instance). Without it the
+          # differential tests are skipped.
+          if git fetch --depth 1 origin oracle; then
+            mkdir -p work
+            git show FETCH_HEAD:NgBMX.exe > work/NgBMX.exe
+            echo "$(cat tools/known_exe.txt)  work/NgBMX.exe" | sha256sum -c
+          fi
       - name: Check
         run: nix develop .#ci -c tools/check.sh
