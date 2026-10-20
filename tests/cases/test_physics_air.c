@@ -8,6 +8,7 @@
  */
 #include "bmx/com/action/physics_air.h"
 #include "bmx/com/zge/bmx/bmxsound.h"
+#include "bmx/com/zge/ngif/ngifzbsp.h"
 #include "compat/crt.h"
 #include "dt.h"
 #include "dt_zactor.h"
@@ -327,8 +328,8 @@ static void hooksOn(void)
     dt_stub(0x0042dad0, (void *)physTakeContact, (void *)stubContactFromHit);
     dt_stub(0x0042ef60, NULL, (void *)stubFaceTrigger);
     dt_stub(0x0042eec0, NULL, (void *)stubObjectTouch);
-    dt_stub(0x004665c0, NULL, (void *)stubObjectInfo);
-    dt_stub(0x00469530, NULL, (void *)stubObjectState);
+    dt_stub(0x004665c0, (void *)zbspGetShape, (void *)stubObjectInfo);
+    dt_stub(0x00469530, (void *)zbspGetShapeKind, (void *)stubObjectState);
     dt_stub(0x00420cb0, (void *)physSetState, (void *)stubSetState);
     dt_stub(0x00463710, NULL, (void *)stubDebugLine);
     dt_stub(0x0044e300, NULL, (void *)stubSound);

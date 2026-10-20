@@ -89,6 +89,11 @@ float dt_float_edgy(float lo, float hi)
  */
 __declspec(dllexport) void *const dt_accel[] = {(void *)memset, (void *)memcpy, (void *)memmove, 0};
 
+/* Every ported function (original address -> our port), so dt_stub() can stub both sides on its own. */
+#include "hook/hook.h"
+__declspec(dllexport) const BmxHook *const dt_ports = bmxHooks;
+__declspec(dllexport) const uint32_t *const dt_port_count = &bmxHookCount;
+
 /* Harness hypercall (tests/oracle/oracle.py HYPER_FILL): random bytes keyed to the iteration. */
 #define DT_HYPER_FILL 0x7ff0ffe0u
 

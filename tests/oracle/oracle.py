@@ -344,6 +344,7 @@ class Machine:
         saved = []
         for i in range(count):
             orig, ours, stub = struct.unpack("<3I", self.uc.mem_read(table + 12 * i, 12))
+            ours = ours or getattr(self, "ports", {}).get(orig, 0)
             for at in (orig, ours):
                 if at:
                     saved.append((at, bytes(self.uc.mem_read(at, 5))))
@@ -389,6 +390,12 @@ def load_cases(m, dll_path):
         init.append(fn)
         at += 4
     m.stub_table = (exports["dt_stubs"], exports["dt_stub_count"])
+    m.ports = {}
+    if "dt_ports" in exports:
+        table, count = m.read_u32(exports["dt_ports"]), m.read_u32(m.read_u32(exports["dt_port_count"]))
+        for i in range(count):
+            orig, ours = struct.unpack("<2I", m.uc.mem_read(table + 8 * i, 8))
+            m.ports[orig] = ours
     if "dt_accel" in exports:
         names = ["memset", "memcpy", "memmove"]
         at = exports["dt_accel"]

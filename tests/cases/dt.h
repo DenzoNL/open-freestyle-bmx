@@ -82,7 +82,8 @@ void dt_fill(void *p, uint32_t n);
 /*
  * Replaces a callee for the current iteration, on both sides: the harness patches `jmp stub` over the
  * original entry `orig` and over our port `ours` (NULL if not ported yet), then restores both after the
- * run. Use it for callees that need a loaded level, a renderer or other state the emulator lacks. The
+ * run. `ours` may be NULL: the harness then stubs our port of `orig` automatically if one exists, so
+ * tests keep working as callees get ported. Use it for callees that need a loaded level, a renderer or other state the emulator lacks. The
  * stub must have the callee's signature. Anything it records into DLL globals is compared like any other
  * memory, so log arguments by value and return deterministic results (e.g. from dt_u32()).
  */

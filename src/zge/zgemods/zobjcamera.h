@@ -21,12 +21,16 @@ ORIG_FN(0x004812f0, void, zvec3Negate, (ZVec3 * out, const ZVec3 *in));
 ORIG_FN(0x00481340, void, zvec3RotateX, (ZVec3 * out, const ZVec3 *in, ZAngle angle));
 ORIG_FN(0x00481390, void, zvec3RotateY, (ZVec3 * out, const ZVec3 *in, ZAngle angle));
 ORIG_FN(0x004813e0, void, zvec3RotateZ, (ZVec3 * out, const ZVec3 *in, ZAngle angle));
+/* Rotates a vector about x, then y, then z (every caller passes the same vector as `out` and `in`). */
+ORIG_FN(0x00481430, void, zvec3RotateEuler, (ZVec3 * out, const ZVec3 *in, const ZAngle3 *angles));
 ORIG_FN(0x00481540, double, zvec3Dot, (const ZVec3 *a, const ZVec3 *b));
 /* out = (b - a) x (c - b). */
 ORIG_FN(0x004815b0, void, zvec3Cross3, (ZVec3 * out, const ZVec3 *a, const ZVec3 *b, const ZVec3 *c));
 /* out = m * v, including the translation row. */
 ORIG_FN(0x00481640, void, zmatrixTransformPoint, (ZVec3 * out, const ZMatrix *m, const ZVec3 *v));
 ORIG_FN(0x00481880, void, zmatrixIdentity, (ZMatrix * m));
+/* Clears the position row. */
+ORIG_FN(0x004818b0, void, zmatrixZeroPos, (ZMatrix * m));
 /* Matrix rotations about X / Y / Z; only the low 16 bits of the angle are read. */
 ORIG_FN(0x00481930, void, zmatrixRotateX, (ZMatrix * out, const ZMatrix *in, ZAngle angle));
 ORIG_FN(0x00481a00, void, zmatrixRotateY, (ZMatrix * out, const ZMatrix *in, ZAngle angle));

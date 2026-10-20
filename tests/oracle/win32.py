@@ -105,7 +105,9 @@ class Win32:
         return copy.deepcopy(self.state)
 
     def restore(self, s):
-        self.state = copy.deepcopy(s)
+        # In place: the stubs built in _build_stubs hold a reference to this dict (tick, valloc, ...).
+        self.state.clear()
+        self.state.update(copy.deepcopy(s))
 
     # --- helpers ---------------------------------------------------------------------------------
     def _u32(self, a):

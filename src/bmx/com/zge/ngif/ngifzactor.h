@@ -16,5 +16,7 @@ ORIG_FN(0x004646f0, void, zactorClearPoseTables, (void));
 /* Finishes a freshly created rider / bike actor (limb setup). */
 ORIG_FN(0x00465130, void, zactorSetupRider, (void *actor));
 ORIG_FN(0x00465340, void, zactorSetupBike, (void *actor));
+/* Length of model part `part` of an actor (a vector length, returned unrounded on the x87 stack). */
+ORIG_FN(0x00464ea0, double, zactorGetPartLength, (void *actor, int part));
 
 #endif

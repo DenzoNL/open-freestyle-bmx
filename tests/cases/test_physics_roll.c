@@ -7,6 +7,7 @@
 #include <stdarg.h>
 
 #include "bmx/com/action/physics_roll.h"
+#include "bmx/com/zge/ngif/ngifzbsp.h"
 #include "dt.h"
 #include "zge/zdebug.h"
 #include "zge/zquat.h"
@@ -196,9 +197,9 @@ static void install_stubs(void)
     dt_stub(0x0042d950, (void *)physFindNearestTaggedEdge, (void *)stubQpEdge);
     dt_stub(0x0042eec0, NULL, (void *)stubPropTouch);
     dt_stub(0x0042ef60, NULL, (void *)stubPropHitFace);
-    dt_stub(0x004665c0, NULL, (void *)stubBspGetInfo);
-    dt_stub(0x00469530, NULL, (void *)stubObjectValid);
-    dt_stub(0x00466610, NULL, (void *)stubBspObjectHit);
+    dt_stub(0x004665c0, (void *)zbspGetShape, (void *)stubBspGetInfo);
+    dt_stub(0x00469530, (void *)zbspGetShapeKind, (void *)stubObjectValid);
+    dt_stub(0x00466610, (void *)zbspObjectSignal, (void *)stubBspObjectHit);
     dt_stub(0x00409250, NULL, (void *)stubSkidMark);
     dt_stub(0x00408c90, NULL, (void *)stubSparks);
     dt_stub(0x0044e300, NULL, (void *)stubSound);

@@ -33,6 +33,9 @@ ORIG_FN(0x00464220, void, ngifDrawSprite,
 ORIG_FN(0x00464420, void, ngifFillRect, (int color, int a, int x0, int y0, int x1, int y1));
 ORIG_FN(0x004645d0, void, ngifDrawLine, (int color, int unused, int x0, int y0, int x1, int y1));
 
+/* Draws one glyph of an overlay text from the scratch record at 0x55b960 (x is passed zero extended). */
+ORIG_FN(0x00462940, void, ngifDrawTextGlyph, (uint32_t x, int y, const void *record));
+
 /* Letterbox fill used by the overlay: colour, x, y, width and a pointer to an ordering table entry. */
 ORIG_FN(0x004623a0, void, ngifFillScreenBar,
         (uint32_t color, uint32_t x, int y, uint32_t width, const void *ot));

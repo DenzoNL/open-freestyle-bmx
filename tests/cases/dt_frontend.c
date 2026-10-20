@@ -1,4 +1,5 @@
 #include "dt_frontend.h"
+#include "bmx/com/zge/ngif/ngifzroller.h"
 
 #include "bmx/com/menu/frontend.h"
 #include "bmx/com/menu/gui/guiinput.h"
@@ -507,11 +508,11 @@ void dtFrontendStub(uint32_t groups)
     }
     if (groups & DT_FS_INIT) {
         dt_stub(0x0045a1c0, NULL, (void *)stubAppLog);
-        dt_stub(0x0046cbc0, NULL, (void *)stubInitA);
-        dt_stub(0x0046cc50, NULL, (void *)stubInitB);
-        dt_stub(0x0046c310, NULL, (void *)stubInitC);
-        dt_stub(0x0046d3a0, NULL, (void *)stubInitD);
-        dt_stub(0x0046d3c0, NULL, (void *)stubInitE);
+        dt_stub(0x0046cbc0, (void *)zrollerDisplayLoadingScreen, (void *)stubInitA);
+        dt_stub(0x0046cc50, (void *)zrollerLoadCodeModule, (void *)stubInitB);
+        dt_stub(0x0046c310, (void *)zrollerStartup, (void *)stubInitC);
+        dt_stub(0x0046d3a0, (void *)zrollerNop1, (void *)stubInitD);
+        dt_stub(0x0046d3c0, (void *)zrollerNop2, (void *)stubInitE);
         dt_stub(0x004375d0, guiInit, (void *)stubGuiInit);
         dt_stub(0x00437200, guiPadInit, (void *)stubPadInit);
         dt_stub(0x00480240, NULL, (void *)stubDebugPrint);

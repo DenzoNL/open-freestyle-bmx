@@ -21,9 +21,15 @@ if(BMX_HOOK)
 endif()
 
 if(BMX_HOOK)
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/hooks_table.c
+    COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tools/gen_hooks.py ${CMAKE_BINARY_DIR}/hooks_table.c
+            ${CMAKE_SOURCE_DIR}/src
+    DEPENDS ${BMX_GAME_SOURCES} ${CMAKE_SOURCE_DIR}/tools/gen_hooks.py)
+
   # Differential-test DLL: ported code + test cases, loaded next to NgBMX.exe in the Unicorn harness.
   file(GLOB_RECURSE BMX_TEST_SOURCES CONFIGURE_DEPENDS tests/cases/*.c)
-  add_library(bmxtest SHARED ${BMX_TEST_SOURCES} $<TARGET_OBJECTS:bmx_game>)
+  add_library(bmxtest SHARED ${BMX_TEST_SOURCES} ${CMAKE_BINARY_DIR}/hooks_table.c $<TARGET_OBJECTS:bmx_game>)
   target_include_directories(bmxtest PRIVATE src tests/cases)
   target_compile_definitions(bmxtest PRIVATE BMX_HOOK=1)
   # Test code is unoptimised on purpose: stub logs written to file-static arrays that nothing reads
@@ -33,11 +39,6 @@ if(BMX_HOOK)
   target_link_options(bmxtest PRIVATE -Wl,-base:0x10000000 -Wl,-fixed)
 
   # In-game hook DLL (dev only): dinput.dll proxy that redirects ported functions.
-  find_package(Python3 REQUIRED COMPONENTS Interpreter)
-  add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/hooks_table.c
-    COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tools/gen_hooks.py ${CMAKE_BINARY_DIR}/hooks_table.c
-            ${CMAKE_SOURCE_DIR}/src
-    DEPENDS ${BMX_GAME_SOURCES} ${CMAKE_SOURCE_DIR}/tools/gen_hooks.py)
   add_library(bmxhook SHARED src/hook/hook.c ${CMAKE_BINARY_DIR}/hooks_table.c $<TARGET_OBJECTS:bmx_game>)
   target_include_directories(bmxhook PRIVATE src)
   target_compile_definitions(bmxhook PRIVATE BMX_HOOK=1)
