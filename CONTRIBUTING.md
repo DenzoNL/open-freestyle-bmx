@@ -72,6 +72,9 @@ value held in an x87 register behaves exactly like a C `double`. A value the ori
   functions only set `AX` or `AL`.
 - Functions that need engine state set it up in `setup()` through `ORIG_VAR` globals or by calling original
   initialisers. Process-wide initialisers belong in `dt_init[]` in `tests/cases/dt.c`.
+- Callees that need a loaded level, a renderer or other missing state: stub them for the iteration with
+  `dt_stub(orig, ourPortOrNULL, stub)` in `setup()`. The harness patches both the original entry and our
+  port, so the two sides stay comparable. Don't patch code by hand.
 - The baseline is a real process: the exe's CRT startup has run up to `WinMain` under a small
   deterministic Win32 layer (`tests/oracle/win32.py`). That layer covers heap, time, registry ("not
   found") and files, and anything else traps loudly.

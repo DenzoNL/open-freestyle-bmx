@@ -1,3 +1,5 @@
+#include <stddef.h>
+
 #include "dt.h"
 
 #include "zge/zquat.h"
@@ -94,6 +96,24 @@ static void setup_to_euler(DtCtx *c)
     DT_ARG_INT(c, 2, 0);
 }
 
+/* Stubbed zmatrixToEuler: records the matrix it was given and returns fixed angles. */
+static ZMatrix stubMatrix;
+static int stubOrder;
+static void BMX_CDECL stub_matrix_to_euler(ZAngle3 *out, const ZMatrix *m, int order)
+{
+    stubMatrix = *m;
+    stubOrder = order;
+    out->x = 0x1234;
+    out->y = -0x0567;
+    out->z = 0x7ff0;
+}
+
+static void setup_to_euler_stubbed(DtCtx *c)
+{
+    setup_to_euler(c);
+    dt_stub(0x00481fc0, NULL, (void *)stub_matrix_to_euler);
+}
+
 static void setup_to_matrix(DtCtx *c)
 {
     dt_seed(c);
@@ -123,6 +143,7 @@ DT_CASES(zquat_cases) = {
      200, 1},
     {"zquatFromEuler", 0x004832b0, zquatFromEuler, 3, DT_RET_VOID | DT_FLOAT_MEM, setup_from_euler, 200, 1},
     {"zquatToEuler", 0x00483420, zquatToEuler, 3, DT_RET_VOID | DT_FLOAT_MEM, setup_to_euler, 200, 1},
+    {"zquatToEuler_stubbed", 0x00483420, zquatToEuler, 3, DT_RET_VOID, setup_to_euler_stubbed, 50, 0},
     {"zquatToMatrix", 0x00483470, zquatToMatrix, 2, DT_RET_VOID | DT_FLOAT_MEM, setup_to_matrix, 200, 1},
     {"zquatFromMatrix", 0x00483610, zquatFromMatrix, 2, DT_RET_INT | DT_FLOAT_MEM, setup_from_matrix, 200, 1},
     {"zquatNormalize", 0x00483670, zquatNormalize, 1, DT_RET_FLOAT | DT_FLOAT_MEM, setup_normalize, 200, 1},

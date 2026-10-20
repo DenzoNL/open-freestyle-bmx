@@ -18,6 +18,26 @@ __declspec(dllexport) const uint32_t dt_init[] = {
     0,
 };
 
+typedef struct DtStub {
+    uint32_t orig;
+    void *ours;
+    void *stub;
+} DtStub;
+
+#define DT_MAX_STUBS 32
+__declspec(dllexport) DtStub dt_stubs[DT_MAX_STUBS];
+__declspec(dllexport) uint32_t dt_stub_count;
+
+void dt_stub(uint32_t orig, void *ours, void *stub)
+{
+    if (dt_stub_count < DT_MAX_STUBS) {
+        dt_stubs[dt_stub_count].orig = orig;
+        dt_stubs[dt_stub_count].ours = ours;
+        dt_stubs[dt_stub_count].stub = stub;
+    }
+    dt_stub_count++; /* the harness rejects overflow */
+}
+
 static uint32_t dt_state;
 static uint32_t dt_iter;
 

@@ -69,4 +69,13 @@ float dt_float(float lo, float hi);
 float dt_float_edgy(float lo, float hi);
 void *dt_alloc(uint32_t size);
 
+/*
+ * Replaces a callee for the current iteration, on both sides: the harness patches `jmp stub` over the
+ * original entry `orig` and over our port `ours` (NULL if not ported yet), then restores both after the
+ * run. Use it for callees that need a loaded level, a renderer or other state the emulator lacks. The
+ * stub must have the callee's signature. Anything it records into DLL globals is compared like any other
+ * memory, so log arguments by value and return deterministic results (e.g. from dt_u32()).
+ */
+void dt_stub(uint32_t orig, void *ours, void *stub);
+
 #endif

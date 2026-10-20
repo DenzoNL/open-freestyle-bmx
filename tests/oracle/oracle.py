@@ -287,6 +287,25 @@ class Machine:
         c.mem = self.snapshot()["mem"]
         return c
 
+    def apply_stubs(self):
+        """Patch `jmp stub` over every entry registered with dt_stub(); returns the bytes to restore."""
+        table, count_addr = self.stub_table
+        count = self.read_u32(count_addr)
+        if count > 32:
+            raise RuntimeError(f"dt_stub: {count} stubs registered, at most 32 supported")
+        saved = []
+        for i in range(count):
+            orig, ours, stub = struct.unpack("<3I", self.uc.mem_read(table + 12 * i, 12))
+            for at in (orig, ours):
+                if at:
+                    saved.append((at, bytes(self.uc.mem_read(at, 5))))
+                    self.uc.mem_write(at, b"\xe9" + struct.pack("<i", stub - (at + 5)))
+        return saved
+
+    def remove_stubs(self, saved):
+        for at, data in reversed(saved):
+            self.uc.mem_write(at, data)
+
     def read_u32(self, addr):
         return struct.unpack("<I", self.uc.mem_read(addr, 4))[0]
 
@@ -319,6 +338,7 @@ def load_cases(m, dll_path):
     while fn := m.read_u32(at):
         init.append(fn)
         at += 4
+    m.stub_table = (exports["dt_stubs"], exports["dt_stub_count"])
     return cases, exports["dt_ctx"], init
 
 
@@ -408,12 +428,16 @@ def run(exe, dll, only=None, iters_override=None, verbose=False, game_root=None)
                 if case.setup:
                     m.call(case.setup, [ctx])
                 args = [m.read_u32(ctx + 4 + 4 * i) for i in range(case.argc)]
-                pre = m.snapshot()
-                m.call(case.orig, args)
-                a = m.capture(case.flags)
-                m.restore(pre)
-                m.call(case.impl, args)
-                b = m.capture(case.flags)
+                saved = m.apply_stubs()
+                try:
+                    pre = m.snapshot()
+                    m.call(case.orig, args)
+                    a = m.capture(case.flags)
+                    m.restore(pre)
+                    m.call(case.impl, args)
+                    b = m.capture(case.flags)
+                finally:
+                    m.remove_stubs(saved)
             except RuntimeError as e:
                 errors.append(f"iter {it}: {e}")
                 break
