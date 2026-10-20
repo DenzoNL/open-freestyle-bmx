@@ -256,9 +256,9 @@ addr,size,file,confidence,name,status
 00420f30,281,bmx/com/action/physics.c,contiguous,FUN_00420f30,ported
 004210a0,5,bmx/com/action/physics.c,contiguous,FUN_004210a0,ported
 004210c0,145,bmx/com/action/physics.c,contiguous,FUN_004210c0,ported
-00421190,4611,bmx/com/action/physics.c,contiguous,FUN_00421190,orig
+00421190,4611,bmx/com/action/physics.c,contiguous,FUN_00421190,ported
 00422830,1235,bmx/com/action/physics.c,contiguous,FUN_00422830,ported
-00422e50,4330,bmx/com/action/physics.c,contiguous,MainPhysFunc,orig
+00422e50,4330,bmx/com/action/physics.c,contiguous,MainPhysFunc,ported
 004243b0,667,bmx/com/action/physics.c,contiguous,FUN_004243b0,ported
 00424740,140,bmx/com/action/physics.c,contiguous,FUN_00424740,ported
 00424800,404,bmx/com/action/physics.c,contiguous,FUN_00424800,ported

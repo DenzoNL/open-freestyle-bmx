@@ -2,12 +2,9 @@
  * Tests for the airborne update and the actor pose sync (physics_air.c).
  *
  * Both functions call deep engine code (world raycasts, sound, actor skeletons and IK) that needs a
- * loaded level. Those callees are intercepted: setup() patches a jump into their first bytes that leads
- * to a dispatcher in this DLL. While gHookOn is set (it lives in .data, so the harness resets it before
- * every case) the dispatcher runs a stub that logs its arguments and answers from the test's random
- * stream; otherwise it runs the saved prologue and continues in the original, so other tests are not
- * affected. The patch and the dispatchers live outside the harness's snapshot (exe .text and the
- * .dthook section), so they persist once installed. The log is compared like any other memory.
+ * loaded level. Those callees are replaced per iteration with dt_stub() by stubs that log their
+ * arguments and answer from the test's random stream; ported callees are stubbed on both sides. The
+ * log is compared like any other memory.
  */
 #include "bmx/com/action/physics_air.h"
 #include "bmx/com/zge/bmx/bmxsound.h"
@@ -16,69 +13,6 @@
 #include "dt_zactor.h"
 #include "zge/zdebug.h"
 #include "zge/zquat.h"
-
-/* ---- callee interception ----------------------------------------------------------------------- */
-
-typedef struct DtHook {
-    uint32_t addr;
-    uint32_t len;
-    uint8_t prologue[12]; /* original first instructions; position independent */
-    uintptr_t stub;
-} DtHook;
-
-enum { kHookCodeSize = 48 };
-
-static uint8_t gHookOn;
-
-#pragma section(".dthook", read, execute)
-__declspec(allocate(".dthook")) static uint8_t gHookCode[16][kHookCodeSize] = {{0}};
-
-static void put32(volatile uint8_t *p, uint32_t v)
-{
-    p[0] = (uint8_t)v;
-    p[1] = (uint8_t)(v >> 8);
-    p[2] = (uint8_t)(v >> 16);
-    p[3] = (uint8_t)(v >> 24);
-}
-
-/*
- * Dispatcher: cmp byte [gHookOn],0 / je tramp / push stub / ret / tramp: prologue / push addr+len / ret.
- * Installing is idempotent; a function whose first bytes are neither the expected prologue nor our jump
- * is left alone (the case then fails on the missing log entries rather than corrupting code).
- */
-static void hookInstall(const DtHook *h, int slot)
-{
-    volatile uint8_t *code = gHookCode[slot];
-    volatile uint8_t *fn = (volatile uint8_t *)(uintptr_t)h->addr;
-    const uint32_t rel = (uint32_t)((uintptr_t)gHookCode[slot] - (h->addr + 5));
-    uint32_t i;
-    int original = 1;
-
-    for (i = 0; i < h->len; i++) {
-        original &= fn[i] == h->prologue[i];
-    }
-    if (!original && !(fn[0] == 0xe9 && fn[1] == (uint8_t)rel && fn[2] == (uint8_t)(rel >> 8) &&
-                       fn[3] == (uint8_t)(rel >> 16) && fn[4] == (uint8_t)(rel >> 24))) {
-        return;
-    }
-    code[0] = 0x80;
-    code[1] = 0x3d;
-    put32(code + 2, (uint32_t)(uintptr_t)&gHookOn);
-    code[6] = 0x00;
-    code[7] = 0x74;
-    code[8] = 0x06;
-    code[9] = 0x68;
-    put32(code + 10, (uint32_t)h->stub);
-    code[14] = 0xc3;
-    for (i = 0; i < h->len; i++) {
-        code[15 + i] = h->prologue[i];
-    }
-    code[15 + h->len] = 0x68;
-    put32(code + 16 + h->len, h->addr + h->len);
-    code[20 + h->len] = 0xc3;
-    fn[0] = 0xe9;
-    put32(fn + 1, rel);
-}
 
 /* ---- call log ------------------------------------------------------------------------------------ */
 
@@ -386,28 +320,21 @@ static void BMX_CDECL stubPrint(const char *fmt, ...)
     va_end(ap);
 }
 
-static const DtHook kHooks[] = {
-    {0x00469b00, 6, {0x81, 0xec, 0x5c, 0x01, 0x00, 0x00}, (uintptr_t)stubRaycast},
-    {0x0042d950, 7, {0x83, 0xec, 0x20, 0x8b, 0x44, 0x24, 0x28}, (uintptr_t)stubFindEdge},
-    {0x0042dad0, 6, {0x56, 0x57, 0x8b, 0x7c, 0x24, 0x10}, (uintptr_t)stubContactFromHit},
-    {0x0042ef60, 5, {0x83, 0xec, 0x10, 0x33, 0xc0}, (uintptr_t)stubFaceTrigger},
-    {0x0042eec0, 7, {0x53, 0x56, 0x57, 0x8b, 0x7c, 0x24, 0x14}, (uintptr_t)stubObjectTouch},
-    {0x004665c0, 9, {0x8b, 0x44, 0x24, 0x04, 0x25, 0xff, 0xff, 0x00, 0x00}, (uintptr_t)stubObjectInfo},
-    {0x00469530, 5, {0x8b, 0x44, 0x24, 0x04, 0x50}, (uintptr_t)stubObjectState},
-    {0x00420cb0, 7, {0x53, 0x56, 0x57, 0x8b, 0x7c, 0x24, 0x10}, (uintptr_t)stubSetState},
-    {0x00463710, 5, {0xa1, 0xe0, 0xeb, 0x68, 0x00}, (uintptr_t)stubDebugLine},
-    {0x0044e300, 5, {0xa1, 0x30, 0xb5, 0x55, 0x00}, (uintptr_t)stubSound},
-    {0x0042d050, 6, {0x81, 0xec, 0xa0, 0x00, 0x00, 0x00}, (uintptr_t)stubPlaceActors},
-    {0x00464b50, 5, {0x83, 0xec, 0x10, 0x53, 0x56}, (uintptr_t)stubPartPosition},
-    {0x00456120, 6, {0x55, 0x56, 0x8b, 0x74, 0x24, 0x10}, (uintptr_t)stubApplyIk},
-};
-
 static void hooksOn(void)
 {
-    for (int i = 0; i < (int)(sizeof kHooks / sizeof kHooks[0]); i++) {
-        hookInstall(&kHooks[i], i);
-    }
-    gHookOn = 1;
+    dt_stub(0x00469b00, NULL, (void *)stubRaycast);
+    dt_stub(0x0042d950, (void *)physFindNearestTaggedEdge, (void *)stubFindEdge);
+    dt_stub(0x0042dad0, (void *)physTakeContact, (void *)stubContactFromHit);
+    dt_stub(0x0042ef60, NULL, (void *)stubFaceTrigger);
+    dt_stub(0x0042eec0, NULL, (void *)stubObjectTouch);
+    dt_stub(0x004665c0, NULL, (void *)stubObjectInfo);
+    dt_stub(0x00469530, NULL, (void *)stubObjectState);
+    dt_stub(0x00420cb0, (void *)physSetState, (void *)stubSetState);
+    dt_stub(0x00463710, NULL, (void *)stubDebugLine);
+    dt_stub(0x0044e300, NULL, (void *)stubSound);
+    dt_stub(0x0042d050, (void *)physPoseActorsGrind, (void *)stubPlaceActors);
+    dt_stub(0x00464b50, NULL, (void *)stubPartPosition);
+    dt_stub(0x00456120, NULL, (void *)stubApplyIk);
     gZdebugPrint = stubPrint;
     worldInit();
 }

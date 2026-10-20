@@ -30,8 +30,10 @@ enum {
     kPhysQuarterPipe = 0x2000,
     kPhysNoPipeAlign = 0x4000,
     kPhysLanding = 0x8000,
-    kPhysFakie = 0x40000, /* rolling backwards */
+    kPhysGrindRequest = 0x20000, /* leaving the ground over a lip or rail tries the grind state first */
+    kPhysFakie = 0x40000,        /* rolling backwards */
     kPhysGrindReverse = 0x80000,
+    kPhysAirBackwards = 0x10000000, /* took off rolling backwards */
 };
 
 /* Per-state handlers: exit/enter get (rider, from, to); enter returns the state actually entered. */
@@ -59,10 +61,17 @@ typedef PhysRider PhysRiderArray[4];
 #define gPhysRollYawDamp      ORIG_VAR(0x00557804, float, gPhysRollYawDamp)
 #define gPhysGrindYawDamp     ORIG_VAR(0x0055780c, float, gPhysGrindYawDamp)
 #define gPhysGravity          ORIG_VAR(0x00557810, float, gPhysGravity)
+#define gPhysAirSpeedCap      ORIG_VAR(0x0055782c, float, gPhysAirSpeedCap)
+#define gPhysPipeLaunchScale  ORIG_VAR(0x00557834, float, gPhysPipeLaunchScale)
 #define gPhysRollSpinSpeed    ORIG_VAR(0x00557828, float, gPhysRollSpinSpeed)
 #define gPhysGrindMinSpeed    ORIG_VAR(0x00557838, float, gPhysGrindMinSpeed)
 #define gPhysRailAngleLimit   ORIG_VAR(0x0055784e, int16_t, gPhysRailAngleLimit)
 #define gPhysPipeAngleLimit   ORIG_VAR(0x00557856, int16_t, gPhysPipeAngleLimit)
+#define gPhysPipeTiltLimit    ORIG_VAR(0x00557858, int16_t, gPhysPipeTiltLimit)
+#define gPhysGrindInSteps     ORIG_VAR(0x0055785c, uint32_t, gPhysGrindInSteps)
+#define gPhysStallInSteps     ORIG_VAR(0x00557860, uint32_t, gPhysStallInSteps)
+#define gPhysAirAlignFrames   ORIG_VAR(0x00557864, int32_t, gPhysAirAlignFrames)
+#define gPhysGrindInRadius    ORIG_VAR(0x00557868, float, gPhysGrindInRadius)
 #define gPhysEdgeSearchRadius ORIG_VAR(0x00557870, float, gPhysEdgeSearchRadius)
 #define gPhysGrindBalance     ORIG_VAR(0x00557874, float, gPhysGrindBalance)
 #define gPhysRollSteer        ORIG_VAR(0x0055787c, float, gPhysRollSteer)
@@ -83,6 +92,9 @@ typedef PhysRider PhysRiderArray[4];
 #define gPhysBestEdge  ORIG_VAR(0x0056c200, PhysEdge, gPhysBestEdge)
 #define gPhysNearEdge  ORIG_VAR(0x0056c2c0, PhysEdge, gPhysNearEdge)
 #define gPhysEdgeProbe ORIG_VAR(0x0056c2f8, PhysEdge, gPhysEdgeProbe)
+#define gPhysGrindEdge ORIG_VAR(0x0056c330, PhysEdge, gPhysGrindEdge) /* nearest edge on the flight path */
+#define gPhysAlignEdge ORIG_VAR(0x0056c238, PhysEdge, gPhysAlignEdge) /* edge best aligned with the bike */
+#define gPhysLipFace   ORIG_VAR(0x0056c3b8, PhysFace, gPhysLipFace)
 
 /* Canned motions of the scripted state, indexed by PhysRider.motionIndex. */
 typedef const void *PhysMotionTable[1];
@@ -106,6 +118,8 @@ int physExitGrind(PhysRider *r, int from, int to);
 int physExitAir(PhysRider *r, int from, int to);
 int physExitScripted(PhysRider *r, int from, int to);
 int physEnterRoll(PhysRider *r, int from, int to);
+int physEnterGrindIn(PhysRider *r, int from, int to);
+int physEnterAir(PhysRider *r, int from, int to);
 int physEnterGrind(PhysRider *r, int from, int to);
 int physEnterStall(PhysRider *r, int from, int to);
 int physEnterScripted(PhysRider *r, int from, int to);

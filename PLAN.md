@@ -121,10 +121,5 @@ round floats (so the hook build uses SSE2, not x87). Rules are in CONTRIBUTING.m
 
 ## Open
 
-- **Harness-level callee stubs.** Tests that need a loaded level stub deep callees by patching the
-  original entry points (physics_air/roll tests do this by hand). That only intercepts the original
-  side. A harness feature should stub a callee on both sides: the exe entry point and our port's entry.
-  Until then physics_air.h and physics_roll.h keep 10 ORIG_FN declarations for functions that physics.c
-  now ports (set/get state, contact copy, edge lookup, …). Remove them once stubs cover both sides.
 
 - How CI gets the original exe for the differential tests. Until then CI skips them and they run locally.

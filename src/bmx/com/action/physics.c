@@ -13,8 +13,10 @@
 #include "bmx/com/zge/ngif/ngifzcollide.h"
 #include "bmx/com/zge/ngif/ngifzroller.h"
 #include "bmx/com/zge/zactor.h"
+#include "compat/crt.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zobjcamera.h"
+#include "zge/zquat.h"
 #include "zge/zstring.h"
 
 /*
@@ -474,6 +476,378 @@ int physEnterRoll(PhysRider *r, int from, int to)
     r->groundGap = 0.0f;
     zoverLimbsBegin(r->actor, r->ik);
     zoverResetLimbs(r->ik);
+    return to;
+}
+
+/* Squared length of an integer offset, with the original's 32-bit wrap-around. */
+static int32_t dist2i(int32_t dx, int32_t dy, int32_t dz)
+{
+    return (int32_t)((uint32_t)dz * (uint32_t)dz + (uint32_t)dy * (uint32_t)dy + (uint32_t)dx * (uint32_t)dx);
+}
+
+/* Contact normal of a prop: the horizontal facing of its scene rotation, reversed. */
+static void propNormal(const PhysPropObject *obj, ZVec3 *normal)
+{
+    ZMatrix m;
+    ZAngle3 ang;
+    ZQuat q;
+    const PhysPropFrame *f = obj->node->frame;
+
+    zmatrixIdentity(&m);
+    ang.x = obj->rot.x;
+    ang.y = (ZAngle)-obj->rot.y;
+    ang.z = obj->rot.z;
+    q.x = f->rot.x;
+    q.y = -f->rot.y;
+    q.z = f->rot.z;
+    q.w = f->rot.w;
+    zquatToMatrix(&m, &q);
+    zmatrixRotateEuler(&m, &m, &ang);
+    zmatrixRotateEuler(&m, &m, &obj->rot);
+    m.at.y = 0.0f;
+    zvec3NormalizeScaled(&m.at, &m.at);
+    normal->x = -m.at.x;
+    normal->y = -m.at.y;
+    normal->z = -m.at.z;
+}
+
+/*
+ * Enter handler of the grind-in and stall-in states (3, 5). Follows the rider's flight path (gravity
+ * applied, gPhysGrindInSteps or gPhysStallInSteps steps) looking for something to land on: the nearest
+ * grind edge (surface 9), or for lip tricks (surface 11) a steep lip face or a prop (surface 12). Sets
+ * up the contact frame, the frame count and the air velocity that reaches the target in that many
+ * frames. Returns `from` when nothing is in reach; a slow grind becomes a stall-in (5).
+ */
+BMX_ADDR(0x00421190)
+int physEnterGrindIn(PhysRider *r, int from, int to)
+{
+    uint32_t trick;
+    uint8_t kind = 9;
+    int32_t radius2, bestD2, dx, dy, dz;
+    uint32_t steps, frames;
+    float radius, step = 10.0f, bestY = 32767.0f;
+    ZVec3 probe, vel, tmp, bestPoint, alignedPoint, propN;
+    PhysEdge *best = NULL, *aligned = NULL;
+    const ZVec3 *contact = NULL; /* lip face record, or the prop normal */
+    PhysPropObject *propHit = NULL;
+    ZAngle bestAngle = 0x7fff;
+    void **list;
+    ZMatrix m, rot;
+
+    if (to == kPhysStateGrindIn) {
+        trick = riderGetTrickA(r);
+    } else {
+        trick = riderGetTrickKind(r);
+        if (trick >= 0x2a && trick <= 0x2b) {
+            kind = 11;
+        }
+    }
+    radius2 = bmxFtol(gPhysGrindInRadius);
+    bestD2 = (int32_t)((uint32_t)radius2 * (uint32_t)radius2);
+    probe = r->center;
+    vel = r->vel;
+    if (kind == 11) {
+        step = 30.0f;
+    }
+    radius = physGetState(r) == kPhysStateAir ? gPhysEdgeSearchRadius : 50.0f;
+    steps = to == kPhysStateGrindIn ? gPhysGrindInSteps : gPhysStallInSteps;
+    list = kind == 9 ? zbspFindEdgesNear(&r->center, 400.0f) : zbspFindPropsNear(10, 13);
+    gPhysDebugEdges = (PhysEdge **)list;
+
+    for (uint32_t i = 0; i < steps && propHit == NULL; i++) {
+        const int32_t reach = bmxFtol(radius);
+        const int32_t reach2 = (int32_t)((uint32_t)reach * (uint32_t)reach);
+
+        if (kind == 9) {
+            for (void **p = list; p != NULL && *p != NULL; p++) {
+                PhysEdge *e = *p;
+                ZVec3 cp;
+                int32_t d2;
+                ZAngle a;
+
+                physClosestPointOnEdge(&probe, e, &cp);
+                tmp.x = (float)((double)cp.x - r->center.x);
+                tmp.y = (float)((double)cp.y - r->center.y);
+                tmp.z = (float)((double)cp.z - r->center.z);
+                if (fpuBelow(zvec3Dot(&tmp, &r->vel), 0.0f)) {
+                    continue;
+                }
+                dx = bmxFtol((double)cp.x - probe.x);
+                dy = bmxFtol((double)cp.y - probe.y);
+                dz = bmxFtol((double)cp.z - probe.z);
+                d2 = dist2i(dx, dy, dz);
+                if ((uint32_t)d2 > (uint32_t)reach2) {
+                    continue;
+                }
+                if (d2 < bestD2) {
+                    zmemCopy(&gPhysGrindEdge, e, sizeof(PhysEdge));
+                    e = &gPhysGrindEdge;
+                    best = e;
+                    bestD2 = d2;
+                    bestPoint = cp;
+                }
+                a = zmathAcos((float)__builtin_fabs(zvec3Dot(&e->dir, &r->fwd)));
+                if (a < bestAngle) {
+                    zmemCopy(&gPhysAlignEdge, e, sizeof(PhysEdge));
+                    aligned = &gPhysAlignEdge;
+                    bestAngle = a;
+                    alignedPoint = cp;
+                }
+            }
+        } else if (kind > 9 && kind <= 11 && (i & 3) == 0) {
+            const ZbspFaceQuery *q;
+
+            for (void **p = list; p != NULL && *p != NULL; p++) {
+                PhysPropObject *obj = *p;
+                int32_t d2;
+
+                dx = obj->pos[0] - bmxFtol(probe.x);
+                dy = obj->pos[1] - bmxFtol(probe.y);
+                dz = obj->pos[2] - bmxFtol(probe.z);
+                d2 = dist2i(dx, dy, dz);
+                if (d2 > reach2) {
+                    continue;
+                }
+                tmp.x = (float)((double)obj->pos[0] - probe.x);
+                tmp.y = (float)((double)obj->pos[1] - probe.y);
+                tmp.z = (float)((double)obj->pos[2] - probe.z);
+                if (obj->prop == NULL || zvec3Dot(&obj->prop->facing, &tmp) > 0.0f) {
+                    continue;
+                }
+                tmp.x = (float)(int16_t)dx;
+                tmp.y = 0.0f;
+                tmp.z = (float)(int16_t)dz;
+                if (fpuBelow(zvec3Dot(&tmp, &vel), 0.0f)) {
+                    continue;
+                }
+                contact = &propN;
+                bestPoint.x = (float)obj->pos[0];
+                bestPoint.y = (float)obj->pos[1];
+                bestPoint.z = (float)obj->pos[2];
+                bestY = bestPoint.y;
+                bestD2 = d2;
+                propHit = obj;
+                propNormal(obj, &propN);
+                kind = 12;
+                break;
+            }
+            q = propHit == NULL ? zbspFindFaceNear(&probe, radius, 1.0f) : NULL;
+            for (const ZbspFaceHit *h = q != NULL ? q->hits : NULL; h != NULL && h->face != NULL; h++) {
+                const PhysFace *f = h->face;
+                int32_t d2;
+
+                if (kind == 10) {
+                    if (zmathAcos(__builtin_fabsf(f->normal.y)) >= 0x18e3) {
+                        continue;
+                    }
+                } else if (kind == 11) {
+                    tmp = f->normal;
+                    if (h->object != 0 || (f->flags & 0x10) ||
+                        zmathAcos(__builtin_fabsf(f->normal.y)) <= 0x3555 || zvec3Dot(&tmp, &vel) > 0.0f ||
+                        !(h->dist > 0.0f) || (f->flags & 0x30)) {
+                        continue;
+                    }
+                } else {
+                    continue;
+                }
+                dx = bmxFtol((double)h->point.x - probe.x);
+                dy = bmxFtol((double)h->point.y - probe.y);
+                dz = bmxFtol((double)h->point.z - probe.z);
+                d2 = dist2i(dx, dy, dz);
+                if (d2 >= bestD2 || !fpuBelow(h->point.y, bestY)) {
+                    continue;
+                }
+                zmemCopy(&gPhysLipFace, f, sizeof(PhysFace));
+                contact = &gPhysLipFace.normal;
+                bestPoint = h->point;
+                bestD2 = d2;
+                bestY = h->point.y;
+            }
+        }
+        vel.y = (float)((double)gPhysGravity + vel.y);
+        zvec3Add(&probe, &probe, &vel);
+        radius = (float)((double)radius + step);
+    }
+
+    /* A slightly farther edge that lines up better with the bike wins. */
+    if (kind == 9 && aligned != NULL && best != NULL) {
+        const int32_t near2 =
+            dist2i(bmxFtol((double)bestPoint.x - r->center.x), bmxFtol((double)bestPoint.y - r->center.y),
+                   bmxFtol((double)bestPoint.z - r->center.z));
+        const int32_t far2 = dist2i(bmxFtol((double)alignedPoint.x - r->center.x),
+                                    bmxFtol((double)alignedPoint.y - r->center.y),
+                                    bmxFtol((double)alignedPoint.z - r->center.z));
+        const uint32_t diff = (uint32_t)near2 - (uint32_t)far2;
+        const uint32_t sign = (uint32_t)((int32_t)diff >> 31);
+
+        if ((int32_t)((diff ^ sign) - sign) < 0x9c4) {
+            best = aligned;
+            bestPoint = alignedPoint;
+        }
+    }
+    if (best == NULL && contact == NULL) {
+        return from;
+    }
+
+    /* Frames to the target: from the vertical speed when the flight is steep, else horizontally. */
+    dx = bmxFtol((double)bestPoint.x - r->center.x);
+    dy = bmxFtol((double)bestPoint.y - r->center.y);
+    dz = bmxFtol((double)bestPoint.z - r->center.z);
+    {
+        const float vy = r->vel.y;
+        float hlen;
+
+        tmp.x = r->vel.x;
+        tmp.y = 0.0f;
+        tmp.z = r->vel.z;
+        hlen = (float)zvec3Length(&tmp);
+        if (!fpuBelow(hlen, __builtin_fabsf(vy))) {
+            if (!(hlen < 0.0f || hlen > 0.0f)) {
+                frames = steps;
+            } else {
+                const int32_t h2 = (int32_t)((uint32_t)dz * (uint32_t)dz + (uint32_t)dx * (uint32_t)dx);
+                frames = (uint32_t)bmxFtol((double)(int16_t)bmxFtol(__builtin_sqrt((double)h2)) / hlen);
+            }
+        } else {
+            const double disc = (((double)bestPoint.y - r->center.y) * gPhysGravity) * 2.0 + (double)vy * vy;
+
+            if (fpuBelow(disc, 0.0f)) {
+                frames = steps;
+            } else {
+                const double s = __builtin_sqrt(disc);
+                const double rise = -(double)vy;
+
+                if (s > rise) {
+                    frames = (uint32_t)bmxFtol((s - r->vel.y) / gPhysGravity);
+                } else {
+                    frames = (uint32_t)bmxFtol((rise - s) / gPhysGravity);
+                }
+            }
+        }
+    }
+    if (frames > steps) {
+        frames = steps;
+    }
+    if (frames < 6) {
+        frames = 6;
+    }
+
+    if (kind >= 10 && kind <= 12) {
+        /*
+         * Lip face or prop: up is the surface normal, right runs along it (the original first picks a
+         * heading from side/fwd here and then overwrites it).
+         */
+        m.up = *contact;
+        zvec3Cross3(&m.right, &m.up, &gZmathOrigin, &gPhysDown);
+        zvec3NormalizeScaled(&m.right, &m.right);
+        if (fpuBelow(zvec3Dot(&m.right, &r->fwd), 0.0f)) {
+            zvec3Negate(&m.right, &m.right);
+        }
+        zvec3Cross3(&m.at, &m.right, &gZmathOrigin, &m.up);
+        zvec3NormalizeScaled(&m.at, &m.at);
+        zvec3Zero(&m.pos);
+        if (kind != 10) {
+            zmatrixIdentity(&rot);
+            zmatrixRotateX(&rot, &rot, m.at.y > 0.0f ? -0x2000 : 0x2000);
+            zmatrixMul(&m, &m, &rot);
+        }
+        r->surface = kind;
+        r->contact = kind == 12 ? (void *)propHit : (void *)contact;
+        physContactCopy(r);
+        r->contactPos = bestPoint;
+        zmatrixCopyRotation(contactAxes(r), &m);
+        if (fpuBelow(m.at.y, 0.0f)) {
+            r->flags |= kPhysGrindReverse;
+        } else {
+            r->flags &= ~(uint32_t)kPhysGrindReverse;
+        }
+        if (kind != 12 && trick == 0x2b) {
+            tmp.x = (float)((double)m.right.x * 30.0f + bestPoint.x);
+            tmp.y = (float)((double)m.right.y * 30.0f + bestPoint.y);
+            tmp.z = (float)((double)m.right.z * 30.0f + bestPoint.z);
+            fxSkidMark(&bestPoint, &tmp, 0, contact);
+        }
+    } else {
+        uint32_t move = trick;
+        int reverse;
+
+        if (fpuBelow(__builtin_fabs(zvec3Dot(&best->dir, &r->vel)), gPhysGrindMinSpeed)) {
+            to = kPhysStateStallIn;
+            move = riderGetTrickB(r);
+        }
+        if (move >= 0x27 && move <= 0x29) {
+            /* Tail tricks: the bike points across the edge. */
+            m.at = best->dir;
+            if (fpuBelow(zvec3Dot(&r->side, &m.at), 0.0f)) {
+                zvec3Negate(&m.at, &m.at);
+            }
+            zvec3Cross3(&m.right, &gPhysDown, &gZmathOrigin, &m.at);
+            zvec3NormalizeScaled(&m.right, &m.right);
+            zvec3Cross3(&m.up, &m.at, &gZmathOrigin, &m.right);
+            zvec3Zero(&m.pos);
+            reverse = 0;
+        } else {
+            /* Along the edge; which way round the rider sits depends on the solid side of the edge. */
+            const int flip = fpuBelow(zvec3Dot(&r->fwd, &best->dir), 0.0f);
+            const uint32_t held = (r->fieldBA4 >> 3) & 1;
+            int solid, ahead;
+            float across;
+
+            m.right = best->dir;
+            if (flip) {
+                zvec3Negate(&m.right, &m.right);
+            }
+            zvec3Cross3(&m.at, &m.right, &gZmathOrigin, &gPhysDown);
+            zvec3NormalizeScaled(&m.at, &m.at);
+            zvec3Cross3(&m.up, &m.at, &gZmathOrigin, &m.right);
+            zvec3Zero(&m.pos);
+            tmp.x = (float)(int16_t)dx;
+            tmp.y = (float)(int16_t)dy;
+            tmp.z = (float)(int16_t)dz;
+            across = (float)zvec3Dot(&m.at, &tmp);
+            if (to == kPhysStateGrindIn && from == kPhysStateRoll) {
+                zmatrixIdentity(&rot);
+                zmatrixRotateX(&rot, &rot, fpuBelow(across, 0.0f) ? 0x1555 : -0x1555);
+                zmatrixMul(&m, &m, &rot);
+            }
+            ahead = !fpuBelow(across, 0.0f);
+            solid = zbspEdgeSide(best);
+            if (solid == 0) {
+                reverse = (int)(held ^ (uint32_t)ahead);
+            } else {
+                ZVec3 at = m.at;
+
+                if ((solid < 0) == flip) {
+                    zvec3Negate(&at, &at);
+                }
+                reverse = (int)(held ^ (uint32_t)ahead ^ (uint32_t)!fpuBelow(zvec3Dot(&at, &tmp), 0.0f));
+            }
+        }
+        if (reverse) {
+            r->flags |= kPhysGrindReverse;
+        } else {
+            r->flags &= ~(uint32_t)kPhysGrindReverse;
+        }
+        r->surface = 9;
+        r->contact = best;
+        physContactCopy(r);
+        r->contactPos = bestPoint;
+        zmatrixCopyRotation(contactAxes(r), &m);
+    }
+
+    if (to != from) {
+        double n;
+
+        r->timer = (int16_t)frames;
+        r->pos.x = (float)((double)r->pos.x + r->step.x);
+        r->pos.y = (float)((double)r->step.y + r->pos.y);
+        r->pos.z = (float)((double)r->step.z + r->pos.z);
+        zvec3Zero(&r->step);
+        n = (double)(int32_t)frames;
+        r->airVel.x = (float)(((double)bestPoint.x - r->pos.x) / n);
+        r->airVel.y = (float)(((double)bestPoint.y - r->pos.y) / n - (double)gPhysGravity * 0.5f * n);
+        r->airVel.z = (float)(((double)bestPoint.z - r->pos.z) / n);
+    }
     return to;
 }
 
@@ -1051,6 +1425,430 @@ int physEnterGrind(PhysRider *r, int from, int to)
     }
     r->groundGap = 0.0f;
     bmxSoundPlayAt(0xbba, &r->pos, (int)((uint32_t)r->player << 28 | kind | 0x200), 0x7f, 0);
+    return to;
+}
+
+/* Leaving a grind or stall onto a lip face: lean the frame into the lip over 6 frames. */
+static void leanIntoLip(PhysRider *r)
+{
+    int32_t a;
+
+    zmatrixCopyRotation(&r->orientA, orient(r));
+    a = zmathAcos(-r->up.y) / 6;
+    r->orientARot.y = (ZAngle)a;
+    if (r->side.y > 0.0f) {
+        r->orientARot.y = (ZAngle)-a;
+    }
+    r->timer = 6;
+}
+
+/* Moves the rider out along its up axis by the front wheel radius. */
+static void liftByWheel(PhysRider *r)
+{
+    ZVec3 d;
+
+    d.x = (float)((double)r->up.x * r->wheel[0].radius);
+    d.y = (float)((double)r->up.y * r->wheel[0].radius);
+    d.z = (float)((double)r->up.z * r->wheel[0].radius);
+    zvec3Add(&r->pos, &r->pos, &d);
+    zvec3Add(&r->center, &r->center, &d);
+}
+
+/*
+ * Launch off a quarter-pipe lip (surfaces 1, 3) while rolling up it: aligns to the pipe and, when the
+ * flight is long enough, plans a flip about the lip (kPhysAirFlip) that lands facing back down.
+ */
+static void launchFromPipe(PhysRider *r, const ZVec3 *n)
+{
+    uint32_t frames;
+    ZMatrix f;
+    ZVec3 t;
+    float d1;
+    double d2;
+    int32_t q;
+
+    physAlignToQuarterPipe(r, r->contact, 1);
+    if (r->surface == 3) {
+        r->vel.x = 0.0f;
+        r->vel.z = 0.0f;
+    }
+    if (zmathAcos((float)zvec3Dot(&r->up, n)) < gPhysPipeAngleLimit &&
+        !fpuBelow(zvec3Dot(&r->vel, &r->fwd), 0.0f)) {
+        frames = (uint32_t)bmxFtol((double)r->vel.y * -2.0f / gPhysGravity);
+        if (frames > 15) {
+            frames -= 7;
+            zmatrixCopyRotation(&r->orientA, orient(r));
+            r->orientARot.x = 0;
+            r->orientARot.z = 0;
+            zmatrixCopyRotation(&f, orient(r));
+            zvec3Cross3(&f.right, &gPhysDown, &gZmathOrigin, &f.up);
+            zvec3NormalizeScaled(&f.right, &f.right);
+            zvec3Cross3(&f.at, &f.right, &gZmathOrigin, &f.up);
+            d1 = (float)zvec3Dot(&r->fwd, &f.right);
+            d2 = zvec3Dot(&r->fwd, &f.at);
+            t.x = (float)(-((double)f.at.x * d2) + (double)f.right.x * d1);
+            t.y = (float)(-((double)f.at.y * d2) + (double)f.right.y * d1);
+            t.z = (float)(-((double)f.at.z * d2) + (double)f.right.z * d1);
+            zvec3NormalizeScaled(&t, &t);
+            q = zmathAcos((float)zvec3Dot(&t, &r->fwd)) / (int32_t)frames;
+            r->orientARot.y = (ZAngle)q;
+            if (r->side.y > 0.0f) {
+                r->orientARot.y = (ZAngle)-q;
+            }
+            r->timer = (int16_t)frames;
+            r->flags |= kPhysAirFlip;
+        }
+    }
+    r->flags |= kPhysQuarterPipe;
+}
+
+/*
+ * Launch off a lip face (surface 2): lifts the rider to just above the lip, pushes it out to 120 units
+ * from the edge and aims a jump straight back down the face, with a half turn over the flight.
+ */
+static void launchFromLip(PhysRider *r, const ZVec3 *n, float dist, double lipY, ZVec3 *down)
+{
+    uint32_t frames;
+    double k, f;
+    ZVec3 t;
+    int32_t q;
+
+    if (lipY < r->pos.y) {
+        r->pos.y = (float)lipY;
+    }
+    down->y = -3.0f;
+    k = 120.0f - (double)dist;
+    r->pos.x = (float)(k * n->x + r->pos.x);
+    r->pos.z = (float)(k * n->z + r->pos.z);
+    r->center.z = r->pos.z;
+    down->x = -n->x;
+    down->z = -n->z;
+    r->center.x = r->pos.x;
+    r->center.y = r->pos.y;
+    zvec3NormalizeScaled(down, down);
+    frames = (uint32_t)bmxFtol((double)gPhysPipeLaunchScale * r->vel.y * -2.0f / gPhysGravity);
+    if (frames < 15) {
+        frames = 15;
+    }
+    k = (double)frames;
+    r->vel.y = (float)-(k * gPhysGravity * 0.5f);
+    f = ((double)dist + 150.0f) / k;
+    r->vel.x = (float)-((double)n->x * f);
+    r->vel.z = (float)-((double)n->z * f);
+    r->speed = (float)zvec3Length(&r->vel);
+    t.x = r->fwd.x;
+    t.y = -r->fwd.y;
+    t.z = r->fwd.z;
+    r->orientARot.y = 0;
+    r->orientARot.x = 0;
+    zmatrixCopyRotation(&r->orientA, orient(r));
+    q = zmathAcos((float)zvec3Dot(&t, &r->fwd)) / (int32_t)(frames - 3);
+    r->orientARot.z = (ZAngle)q;
+    if (!fpuBelow(zvec3Dot(&r->vel, &r->fwd), 0.0f)) {
+        r->orientARot.z = (ZAngle)-r->orientARot.z;
+    }
+    r->timer = (int16_t)(frames - 3);
+}
+
+/*
+ * Leaving a quarter-pipe lip with kPhysNoPipeAlign: keeps the rider moving away from the lip plane at
+ * 10+ units/frame and falling at 25+, and holds it at least 120 units in front of the edge.
+ */
+static void driftOffPipe(PhysRider *r, const PhysEdge *e, const ZVec3 *n)
+{
+    const double d = -zvec3Dot(&r->vel, n);
+    ZVec3 p;
+
+    if (fpuBelow(d, 10.0f)) {
+        const double k = 10.0f - d;
+
+        r->vel.x = (float)((double)r->vel.x - k * n->x);
+        r->vel.y = (float)((double)r->vel.y - k * n->y);
+        r->vel.z = (float)((double)r->vel.z - k * n->z);
+    }
+    r->vel.y = fpuBelow(r->vel.y, -25.0f) ? r->vel.y : -25.0f;
+    r->speed = (float)zvec3Length(&r->vel);
+    physClosestPointOnEdge(&r->pos, e, &p);
+    p.x = (float)((double)n->x * 120.0f + p.x);
+    p.y = (float)((double)n->y * 120.0f + p.y);
+    p.z = (float)((double)n->z * 120.0f + p.z);
+    if (r->pos.y > p.y) {
+        r->pos = p;
+        r->center = p;
+    }
+}
+
+/*
+ * Enter handler of the air state (bmxphysStateInitAir). Snapshots the contact, measures the drop below
+ * the hips, applies the pending step and sets up the flight: lip and quarter-pipe launches, a capped
+ * take-off speed, or a hop off a grind or stall. Leaving the ground over a lip or rail with
+ * kPhysGrindRequest tries the grind state first and returns its state when it sticks.
+ */
+BMX_ADDR(0x00422e50)
+int physEnterAir(PhysRider *r, int from, int to)
+{
+    PhysRayHit hit;
+    ZVec3 hip, below;
+    ZMatrix m; /* m.up starts as the down vector */
+    ZMatrix rot;
+    uint32_t kind = 0xffffffffu; /* surface kind of the face under the hips */
+    void *target = NULL;
+
+    r->snapAPos = r->pos;
+    r->snapA.surface = r->surface;
+    r->snapA.contact = r->contact;
+    physContactSnapshotFix(&r->snapA);
+    r->snapBPos = r->pos;
+    r->snapB.contact = r->contact;
+    r->snapB.surface = r->surface;
+    physContactSnapshotFix(&r->snapB);
+    r->flags &= ~(uint32_t)kPhysQuarterPipe;
+    hip.x = (float)((double)r->up.x * 100.0f + r->pos.x);
+    hip.y = (float)((double)r->up.y * 100.0f + r->pos.y);
+    hip.z = (float)((double)r->up.z * 100.0f + r->pos.z);
+    below.x = hip.x;
+    below.y = (float)((double)hip.y + 10000.0f);
+    below.z = hip.z;
+    if (!zcollideRay(&hip, &below, &hit)) {
+        gZdebugPrint("bmxphysStateInitAir: no valid terrain found under rider's hips (pos X: %d, Z: %d)\n",
+                     bmxFtol(hip.x), bmxFtol(hip.z));
+    } else {
+        r->groundGap = (float)((double)hit.point.y - hip.y);
+        if ((hit.flags & 1) && hit.face != NULL) {
+            const PhysFace *face = hit.face;
+
+            kind = (uint32_t)face->tag >> 12;
+            if (kind - 1 > 7) {
+                kind = 0;
+                target = (void *)face;
+            } else if (kind <= 3) {
+                /* quarter-pipe faces resolve to their lip edge */
+                target = physFindNearestTaggedEdge(hit.id, face->tag & 0xfff, &r->pos);
+                kind = (uint32_t)face->tag >> 12;
+                if (target == NULL) {
+                    gZdebugPrint("bmxphysStateInitAir: quarterpipe face with no assigned edge, ID=%d\n",
+                                 face->tag & 0xfff);
+                    target = (void *)face;
+                    kind = 0;
+                }
+            } else {
+                target = (void *)face;
+            }
+        } else if ((hit.flags & 2) && hit.objectData != NULL) {
+            r->surface = 12;
+            kind = (kind & ~0xffu) | 12; /* only the low byte is written */
+            target = hit.objectData;
+            r->contact = target;
+            physContactCopy(r);
+        }
+    }
+    r->pos.x = (float)((double)r->step.x + r->pos.x);
+    r->pos.y = (float)((double)r->step.y + r->pos.y);
+    r->pos.z = (float)((double)r->step.z + r->pos.z);
+    zvec3Zero(&r->step);
+    r->rot.x = 0;
+    r->rot.y = 0;
+    r->rot.z = 0;
+    r->yawTrim = 0;
+    r->orientARot.x = 0;
+    r->orientARot.y = 0;
+    r->orientARot.z = 0;
+    r->timer = 0;
+    m.up = gPhysDown;
+    r->flags &= ~(uint32_t)kPhysAirFlip;
+    if (from == kPhysStateRoll && fpuBelow(zvec3Dot(&r->vel, &r->fwd), 0.0f)) {
+        r->flags |= kPhysAirBackwards;
+    } else {
+        r->flags &= ~(uint32_t)kPhysAirBackwards;
+    }
+
+    switch (from) {
+    case kPhysStateRoll:
+        if (r->surface >= 1 && r->surface <= 3) {
+            const PhysEdge *e = r->contact;
+            ZVec3 n = e->normal;
+            float plane[4];
+            float dist, ax, ay;
+            double d;
+            int launch = 0;
+
+            plane[0] = e->normal.x;
+            plane[1] = e->normal.y;
+            plane[2] = e->normal.z;
+            plane[3] = e->d;
+            d = physPlaneDistance(&r->pos, plane);
+            dist = (float)d;
+            if (fpuBelow(d, 0.0f)) {
+                zvec3Negate(&n, &n);
+                dist = -dist;
+            }
+            ax = (float)e->a[0];
+            ay = (float)e->a[1];
+            if (fpuBelow(r->vel.y, 0.0f) && zmathAsin(__builtin_fabsf(r->side.y)) < gPhysPipeTiltLimit) {
+                launch = ((r->surface == 1 || r->surface == 3) &&
+                          zmathAcos((float)zvec3Dot(&r->up, &n)) < gPhysPipeTiltLimit) ||
+                         (r->surface == 2 && fpuBelow((double)r->pos.y - ((double)ay - 50.0f), 250.0f) &&
+                          fpuBelow(dist, 300.0f));
+            }
+            if (!launch) {
+                r->flags |= kPhysNoPipeAlign;
+                goto align;
+            }
+            if (r->flags & kPhysGrindRequest) {
+                const uint8_t s = physSetState(r, kPhysStateGrind);
+
+                if (s == kPhysStateGrind || s == kPhysStateStall) {
+                    return physGetState(r);
+                }
+            }
+            if (r->surface == 2) {
+                launchFromLip(r, &n, dist, (double)ay + 50.0f, &m.up);
+                break;
+            }
+            if (r->flags & kPhysNoPipeAlign) {
+                ZVec3 lip, out;
+
+                lip.x = (float)((double)n.x * 50.0f + ax);
+                lip.y = (float)((double)ay - 50.0f);
+                lip.z = (float)((double)n.z * 50.0f + (double)e->a[2]);
+                out.x = (float)((double)n.x * -100.0f + lip.x);
+                out.y = lip.y;
+                out.z = (float)((double)n.z * -100.0f + lip.z);
+                if (zcollideRay(&lip, &out, &hit)) {
+                    r->flags &= ~(uint32_t)kPhysNoPipeAlign;
+                } else {
+                    physClosestPointOnEdge(&r->pos, e, &lip);
+                    if (!fpuBelow(((double)r->pos.y + r->vel.y) - lip.y, 150.0f)) {
+                        r->flags &= ~(uint32_t)kPhysNoPipeAlign;
+                    }
+                }
+                if (r->flags & kPhysNoPipeAlign) {
+                    driftOffPipe(r, e, &n);
+                    goto align;
+                }
+            }
+            launchFromPipe(r, &n);
+            break;
+        }
+        if (kind - 1 < 3) {
+            if (r->flags & kPhysGrindRequest) {
+                uint8_t s;
+
+                r->contact = target;
+                r->surface = (uint8_t)kind;
+                physContactCopy(r);
+                s = physSetState(r, kPhysStateGrind);
+                if (s == kPhysStateGrind || s == kPhysStateStall) {
+                    return physGetState(r);
+                }
+            }
+        }
+        {
+            /* Cap the take-off speed: the steeper the ground, the faster the rider may leave it. */
+            float cap;
+            int32_t tilt;
+
+            switch (r->surface) {
+            case 4:
+                cap = 11.0f;
+                break;
+            case 5:
+                cap = 15.0f;
+                break;
+            case 6:
+                cap = 21.0f;
+                break;
+            case 7:
+                cap = 23.0f;
+                break;
+            case 8:
+                cap = 35.0f;
+                break;
+            default:
+                cap = gPhysAirSpeedCap;
+                break;
+            }
+            tilt = (int32_t)zmathAcos(-r->up.y) - 0x2000;
+            if (tilt < 0) {
+                tilt = -tilt;
+            }
+            if ((int16_t)tilt < 0x1555) {
+                ZVec3 h;
+                float limit;
+                double len;
+
+                h.x = r->vel.x;
+                h.y = 0.0f;
+                h.z = r->vel.z;
+                limit = (float)((zmathSin((ZAngle)tilt) + 1.0f) * cap);
+                len = zvec3Length(&h);
+                if (len > limit) {
+                    const double k = limit / len;
+
+                    r->vel.x = (float)(k * h.x);
+                    r->vel.z = (float)(k * h.z);
+                }
+            }
+        }
+        if (kind - 1 < 3) {
+            break;
+        }
+    align:
+        /* Ease the frame upright over gPhysAirAlignFrames frames. */
+        zvec3Cross3(&m.at, &r->fwd, &gZmathOrigin, &m.up);
+        zvec3NormalizeScaled(&m.at, &m.at);
+        zvec3Cross3(&m.right, &m.up, &gZmathOrigin, &m.at);
+        zmatrixCopyRotation(&r->orientA, orient(r));
+        physRelativeAngles(orient(r), &m, gPhysAirAlignFrames, &r->orientARot);
+        r->timer = (int16_t)gPhysAirAlignFrames;
+        break;
+    case kPhysStateGrind:
+        liftByWheel(r);
+        if (kind - 1 < 3) {
+            leanIntoLip(r);
+        }
+        break;
+    case kPhysStateStall:
+        liftByWheel(r);
+        if (r->surface != 11 && r->surface != 12) {
+            r->vel.x = (float)((double)r->fwd.x * 5.0f + r->vel.x);
+            r->vel.y = (float)((double)r->fwd.y * 5.0f + r->vel.y);
+            r->vel.z = (float)((double)r->fwd.z * 5.0f + r->vel.z);
+            if (kind - 1 < 3 && !(r->anim >= 0x27 && r->anim <= 0x29)) {
+                leanIntoLip(r);
+            }
+            break;
+        }
+        /* Hop off the top of a lip or prop: forwards and up, turned round and tilted back. */
+        r->vel.x = (float)((double)r->fwd.x * 5.0f + (double)r->up.x * 15.0f);
+        r->vel.y = (float)((double)r->fwd.y * 5.0f + (double)r->up.y * 15.0f);
+        r->vel.z = (float)((double)r->fwd.z * 5.0f + (double)r->up.z * 15.0f);
+        zvec3Cross3(&m.at, &r->fwd, &gZmathOrigin, &m.up);
+        zvec3NormalizeScaled(&m.at, &m.at);
+        zvec3Cross3(&m.right, &m.up, &gZmathOrigin, &m.at);
+        zmatrixIdentity(&rot);
+        zmatrixRotateY(&rot, &rot, fpuBelow(r->side.y, 0.0f) ? 0x2aaa : -0x2aaa);
+        zmatrixMul(&m, &m, &rot);
+        zmatrixIdentity(&rot);
+        zmatrixRotateZ(&rot, &rot, -0x238e);
+        zmatrixMul(&m, &m, &rot);
+        zmatrixCopyRotation(&r->orientA, orient(r));
+        physRelativeAngles(orient(r), &m, gPhysAirAlignFrames, &r->orientARot);
+        r->timer = (int16_t)gPhysAirAlignFrames;
+        break;
+    default:
+        break;
+    }
+
+    if (from == kPhysStateRoll) {
+        if (r->surface >= 1 && r->surface <= 3 && zmathAcos(__builtin_fabsf(r->up.y)) > 0x2aaa &&
+            zmathAcos(__builtin_fabsf(r->fwd.y)) < 0x2000) {
+            bmxSoundPlayAt(0xbb9, &r->pos, (int)((uint32_t)r->player << 28 | 0x102), 0x7f, 0);
+        }
+    } else if ((from == kPhysStateGrind || from == kPhysStateStall) && r->surface == 9 &&
+               ((const PhysEdge *)r->contact)->kind == 1) {
+        bmxSoundPlayAt(0xbb9, &r->pos, (int)((uint32_t)r->player << 28 | 0x207), 0x7f, 0);
+    }
     return to;
 }
 

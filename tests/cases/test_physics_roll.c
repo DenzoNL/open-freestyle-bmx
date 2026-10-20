@@ -1,11 +1,8 @@
 /*
  * bmxphysUpdatePositionRoll needs a loaded level (collision, props, sound, effects, the state
- * machine). Those callees are replaced by scripted stubs: setup() patches a JMP at each original
- * entry point into the stubs below, which (while armed) log their arguments by value into DLL data
- * that the harness compares, and return scripted results. Disarmed, a stub forwards to a trampoline
- * holding the original prologue, so other test cases see the original functions unchanged. The
- * trampolines live in a non-writable section the harness does not snapshot, so they survive the
- * per-iteration memory restore just like the patched exe code.
+ * machine). Those callees are replaced per iteration with dt_stub() by the scripted stubs below, which
+ * log their arguments by value into DLL data that the harness compares and return scripted results.
+ * Ported callees (physSetState, physFindNearestTaggedEdge) are stubbed on both sides.
  */
 #include <stdarg.h>
 
@@ -15,22 +12,6 @@
 #include "zge/zquat.h"
 
 /* ---- stubs ------------------------------------------------------------------------------------- */
-
-enum {
-    kStubSetState,
-    kStubCollideLine,
-    kStubQpEdge,
-    kStubPropTouch,
-    kStubPropHitFace,
-    kStubBspGetInfo,
-    kStubObjectValid,
-    kStubBspObjectHit,
-    kStubSkidMark,
-    kStubSparks,
-    kStubSound,
-    kStubDrawLine,
-    kStubCount,
-};
 
 #define MAX_RAYS 16
 #define LOG_SIZE 1024
@@ -46,19 +27,15 @@ typedef struct RollScript {
     uint32_t rayN;
     int32_t state[4]; /* physSetState results in call order; -1: the requested state */
     uint32_t stateN;
-    PhysQpEdge *edge;
+    PhysEdge *edge;
     int32_t propTouch;
     const uint8_t *bspInfo;
     int32_t objectValid;
 } RollScript;
 
-static int32_t armed;
 static RollScript script;
 static uint32_t logBuf[LOG_SIZE];
 static uint32_t logN;
-
-#pragma section(".dttramp", read, execute)
-__declspec(allocate(".dttramp")) static uint8_t trampolines[kStubCount][16];
 
 static void logU32(uint32_t v)
 {
@@ -82,14 +59,9 @@ static void logVec(const ZVec3 *v)
     logF(v->z);
 }
 
-#define TRAMP(id, type) ((type)(void *)trampolines[id])
-
 static int stubSetState(PhysRider *r, int state)
 {
     int32_t res;
-    if (!armed) {
-        return TRAMP(kStubSetState, int (*)(PhysRider *, int))(r, state);
-    }
     logU32(0x5e7a7e00u + (uint32_t)state);
     res = script.stateN < 4 ? script.state[script.stateN] : -1;
     script.stateN++;
@@ -103,9 +75,6 @@ static int stubSetState(PhysRider *r, int state)
 static int stubCollideLine(const ZVec3 *from, const ZVec3 *to, PhysRayHit *hit)
 {
     const RollRay *ray;
-    if (!armed) {
-        return TRAMP(kStubCollideLine, int (*)(const ZVec3 *, const ZVec3 *, PhysRayHit *))(from, to, hit);
-    }
     logU32(0xc0111de0u);
     logVec(from);
     logVec(to);
@@ -120,11 +89,8 @@ static int stubCollideLine(const ZVec3 *from, const ZVec3 *to, PhysRayHit *hit)
     return ray->result;
 }
 
-static PhysQpEdge *stubQpEdge(int section, int edgeId, const ZVec3 *pos)
+static PhysEdge *stubQpEdge(int section, int edgeId, const ZVec3 *pos)
 {
-    if (!armed) {
-        return TRAMP(kStubQpEdge, PhysQpEdge * (*)(int, int, const ZVec3 *))(section, edgeId, pos);
-    }
     logU32(0x0e06e000u);
     logU32((uint32_t)section);
     logU32((uint32_t)edgeId);
@@ -134,9 +100,6 @@ static PhysQpEdge *stubQpEdge(int section, int edgeId, const ZVec3 *pos)
 
 static int stubPropTouch(int player, int propId)
 {
-    if (!armed) {
-        return TRAMP(kStubPropTouch, int (*)(int, int))(player, propId);
-    }
     logU32(0x9709e000u);
     logU32((uint32_t)player);
     logU32((uint32_t)propId);
@@ -145,10 +108,6 @@ static int stubPropTouch(int player, int propId)
 
 static void stubPropHitFace(int player, PhysFace *face)
 {
-    if (!armed) {
-        TRAMP(kStubPropHitFace, void (*)(int, PhysFace *))(player, face);
-        return;
-    }
     logU32(0x9709f000u);
     logU32((uint32_t)player);
     logU32((uint32_t)(uintptr_t)face);
@@ -156,9 +115,6 @@ static void stubPropHitFace(int player, PhysFace *face)
 
 static const uint8_t *stubBspGetInfo(int object)
 {
-    if (!armed) {
-        return TRAMP(kStubBspGetInfo, const uint8_t *(*)(int))(object);
-    }
     logU32(0xb5910000u);
     logU32((uint32_t)object);
     return script.bspInfo;
@@ -166,9 +122,6 @@ static const uint8_t *stubBspGetInfo(int object)
 
 static int stubObjectValid(int object)
 {
-    if (!armed) {
-        return TRAMP(kStubObjectValid, int (*)(int))(object);
-    }
     logU32(0xb5920000u);
     logU32((uint32_t)object);
     return script.objectValid;
@@ -176,10 +129,6 @@ static int stubObjectValid(int object)
 
 static void stubBspObjectHit(PhysCollObject *object, int a)
 {
-    if (!armed) {
-        TRAMP(kStubBspObjectHit, void (*)(PhysCollObject *, int))(object, a);
-        return;
-    }
     logU32(0xb5930000u);
     logU32((uint32_t)(uintptr_t)object);
     logU32((uint32_t)a);
@@ -187,11 +136,6 @@ static void stubBspObjectHit(PhysCollObject *object, int a)
 
 static void stubSkidMark(const ZVec3 *from, const ZVec3 *to, int flags, const ZVec3 *normal)
 {
-    if (!armed) {
-        TRAMP(kStubSkidMark, void (*)(const ZVec3 *, const ZVec3 *, int, const ZVec3 *))(from, to, flags,
-                                                                                         normal);
-        return;
-    }
     logU32(0x5c1d0000u);
     logVec(from);
     logVec(to);
@@ -201,10 +145,6 @@ static void stubSkidMark(const ZVec3 *from, const ZVec3 *to, int flags, const ZV
 
 static void stubSparks(const ZVec3 *pos, const ZVec3 *vel)
 {
-    if (!armed) {
-        TRAMP(kStubSparks, void (*)(const ZVec3 *, const ZVec3 *))(pos, vel);
-        return;
-    }
     logU32(0x59a4c000u);
     logVec(pos);
     logVec(vel);
@@ -212,9 +152,6 @@ static void stubSparks(const ZVec3 *pos, const ZVec3 *vel)
 
 static int stubSound(int id, const void *position, int a, int volume, int b)
 {
-    if (!armed) {
-        return TRAMP(kStubSound, int (*)(int, const void *, int, int, int))(id, position, a, volume, b);
-    }
     logU32(0x50d00000u);
     logU32((uint32_t)id);
     logVec(position);
@@ -226,10 +163,6 @@ static int stubSound(int id, const void *position, int a, int volume, int b)
 
 static void stubDrawLine(int mode, const PhysDebugVertex *a, const PhysDebugVertex *b)
 {
-    if (!armed) {
-        TRAMP(kStubDrawLine, void (*)(int, const PhysDebugVertex *, const PhysDebugVertex *))(mode, a, b);
-        return;
-    }
     logU32(0xd7a10000u + (uint32_t)mode);
     logVec(&a->pos);
     logU32((uint32_t)a->rgb[0] | (uint32_t)a->rgb[1] << 8 | (uint32_t)a->rgb[2] << 16);
@@ -256,55 +189,20 @@ static void stubPrint(const char *fmt, ...)
     va_end(ap);
 }
 
-typedef struct StubPatch {
-    uint32_t addr;
-    uint32_t prologue; /* bytes of whole instructions copied to the trampoline */
-    void *stub;
-} StubPatch;
-
-static const StubPatch patches[kStubCount] = {
-    [kStubSetState] = {0x00420cb0, 7, (void *)stubSetState},
-    [kStubCollideLine] = {0x00469b00, 6, (void *)stubCollideLine},
-    [kStubQpEdge] = {0x0042d950, 7, (void *)stubQpEdge},
-    [kStubPropTouch] = {0x0042eec0, 7, (void *)stubPropTouch},
-    [kStubPropHitFace] = {0x0042ef60, 5, (void *)stubPropHitFace},
-    [kStubBspGetInfo] = {0x004665c0, 9, (void *)stubBspGetInfo},
-    [kStubObjectValid] = {0x00469530, 5, (void *)stubObjectValid},
-    [kStubBspObjectHit] = {0x00466610, 5, (void *)stubBspObjectHit},
-    [kStubSkidMark] = {0x00409250, 6, (void *)stubSkidMark},
-    [kStubSparks] = {0x00408c90, 8, (void *)stubSparks},
-    [kStubSound] = {0x0044e300, 5, (void *)stubSound},
-    [kStubDrawLine] = {0x00463710, 5, (void *)stubDrawLine},
-};
-
-static void put32(uint8_t *p, uint32_t v)
-{
-    p[0] = (uint8_t)v;
-    p[1] = (uint8_t)(v >> 8);
-    p[2] = (uint8_t)(v >> 16);
-    p[3] = (uint8_t)(v >> 24);
-}
-
-/* Installs the JMP patches once per process (exe code is not part of the restored snapshot). */
 static void install_stubs(void)
 {
-    for (unsigned i = 0; i < kStubCount; i++) {
-        uint8_t *code = (uint8_t *)(uintptr_t)patches[i].addr;
-        volatile uint8_t *t = trampolines[i];
-        const uint32_t rel = (uint32_t)(uintptr_t)patches[i].stub - (patches[i].addr + 5);
-        if (code[0] == 0xe9 && code[1] == (uint8_t)rel && code[2] == (uint8_t)(rel >> 8) &&
-            code[3] == (uint8_t)(rel >> 16) && code[4] == (uint8_t)(rel >> 24)) {
-            continue;
-        }
-        for (uint32_t k = 0; k < patches[i].prologue; k++) {
-            t[k] = code[k];
-        }
-        t[patches[i].prologue] = 0x68; /* push imm32 ; ret */
-        put32((uint8_t *)&t[patches[i].prologue + 1], patches[i].addr + patches[i].prologue);
-        t[patches[i].prologue + 5] = 0xc3;
-        code[0] = 0xe9;
-        put32(code + 1, rel);
-    }
+    dt_stub(0x00420cb0, (void *)physSetState, (void *)stubSetState);
+    dt_stub(0x00469b00, NULL, (void *)stubCollideLine);
+    dt_stub(0x0042d950, (void *)physFindNearestTaggedEdge, (void *)stubQpEdge);
+    dt_stub(0x0042eec0, NULL, (void *)stubPropTouch);
+    dt_stub(0x0042ef60, NULL, (void *)stubPropHitFace);
+    dt_stub(0x004665c0, NULL, (void *)stubBspGetInfo);
+    dt_stub(0x00469530, NULL, (void *)stubObjectValid);
+    dt_stub(0x00466610, NULL, (void *)stubBspObjectHit);
+    dt_stub(0x00409250, NULL, (void *)stubSkidMark);
+    dt_stub(0x00408c90, NULL, (void *)stubSparks);
+    dt_stub(0x0044e300, NULL, (void *)stubSound);
+    dt_stub(0x00463710, NULL, (void *)stubDrawLine);
 }
 
 /* ---- state ------------------------------------------------------------------------------------- */
@@ -445,7 +343,6 @@ static void setup_roll(DtCtx *c, Scenario sc)
 
     dt_seed(c);
     install_stubs();
-    armed = 1;
     logN = 0;
     gZdebugPrint = (ZDebugPrintFn)stubPrint;
     gPhysDebugDraw = (int32_t)(dt_u32() & 1);
@@ -525,7 +422,7 @@ static void setup_roll(DtCtx *c, Scenario sc)
     /* Scripted callee results. */
     script.edge = dt_u32() % 4 ? alloc_contact() : NULL;
     if (script.edge) {
-        script.edge->dir = dt_u32() & 1 ? r->basis.right : rand_unit();
+        script.edge->normal = dt_u32() & 1 ? r->basis.right : rand_unit();
     }
     hitPct = sc == kScAir ? 15 : (sc == kScGround || sc == kScSurface ? 75 : 50);
     for (unsigned k = 0; k < MAX_RAYS; k++) {
@@ -565,7 +462,7 @@ static void setup_roll(DtCtx *c, Scenario sc)
         r->up.y = -1.0f;
         r->up.z = 0.0f;
         if (script.edge) {
-            script.edge->dir = r->fwd;
+            script.edge->normal = r->fwd;
         }
     }
     if (sc == kScGround || sc == kScSurface) {

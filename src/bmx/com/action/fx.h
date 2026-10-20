@@ -9,5 +9,6 @@
 
 /* Spawns effect `kind` at a world position for an actor. */
 ORIG_FN(0x00408aa0, void, fxSpawn, (void *actor, int kind, const ZVec3 *pos, uint32_t seed));
+ORIG_FN(0x00409250, void, fxSkidMark, (const ZVec3 *from, const ZVec3 *to, int flags, const ZVec3 *normal));
 
 #endif

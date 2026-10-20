@@ -1,13 +1,14 @@
 /*
  * Airborne rider update and actor pose sync (C:\zaxis\Bmx\src\com\action\physics.c, part).
  * Kept apart from physics.h while the rest of physics.c is ported in parallel; the ORIG_FN callees
- * below belong to physics.c, rider.c and the world/collision modules.
+ * below belong to rider.c and the world/collision modules.
  */
 #ifndef BMX_COM_ACTION_PHYSICS_AIR_H
 #define BMX_COM_ACTION_PHYSICS_AIR_H
 
 #include <stdint.h>
 
+#include "bmx/com/action/physics.h"
 #include "bmx/com/action/physics_hit.h"
 #include "bmx/com/action/physics_types.h"
 #include "compat/orig.h"
@@ -22,12 +23,6 @@ typedef struct PhysDebugVertex {
 } PhysDebugVertex;
 
 _Static_assert(sizeof(PhysDebugVertex) == 0x14, "debug vertex size");
-
-/* Rider states (PhysRider.state). */
-enum {
-    kPhysStateRoll = 0,
-    kPhysStateBail = 2,
-};
 
 /* Draws collision probes as debug lines when non-zero. */
 #define gPhysDebugDraw ORIG_VAR(0x0056c444, int32_t, gPhysDebugDraw)
@@ -51,15 +46,6 @@ typedef uint8_t RiderAnimFlags[256];
 typedef uint32_t PhysIkLimbMasks[256];
 #define gPhysIkLimbMasks ORIG_VAR(0x0055907c, PhysIkLimbMasks, gPhysIkLimbMasks)
 
-/* physics.c, not ported yet. */
-ORIG_FN(0x00420c90, int, physGetState, (const PhysRider *r));
-ORIG_FN(0x00420cb0, int, physSetState, (PhysRider * r, int state));
-ORIG_FN(0x0042d050, void, physPlaceActors, (PhysRider * r));
-ORIG_FN(0x0042d250, void, physMatrixToAngles,
-        (const ZMatrix *ref, const ZMatrix *m, int divisor, ZAngle3 *out));
-ORIG_FN(0x0042d950, void *, physFindQuarterpipeEdge, (int faceIndex, int id, const ZVec3 *pos));
-ORIG_FN(0x0042dad0, int, physContactFromHit, (PhysRider * r, PhysRayHit *hit));
-ORIG_FN(0x0042dda0, void, physSnapshotContact, (PhysRider * r));
 /* Game object touches (0x42eec0 returns 0 when the object is not solid for this player). */
 ORIG_FN(0x0042eec0, int, physObjectTouch, (int player, void *info));
 ORIG_FN(0x0042ef60, void, physFaceTrigger, (int player, void *face));

@@ -16,6 +16,37 @@ typedef struct PhysCollObject {
 
 _Static_assert(sizeof(PhysCollObject) == 0x1f0, "PhysCollObject size");
 
+/* Prop record behind a collision object: facing direction at +0x3c. */
+typedef struct PhysPropInfo {
+    uint8_t pad00[0x3c];
+    ZVec3 facing;
+} PhysPropInfo;
+
+/* Scene frame of a prop: rotation quaternion at +0x14 (y stored negated relative to the world). */
+typedef struct PhysPropFrame {
+    uint8_t pad00[0x14];
+    ZQuat rot;
+} PhysPropFrame;
+
+typedef struct PhysPropNode {
+    uint8_t pad00[0x1c];
+    const PhysPropFrame *frame;
+} PhysPropNode;
+
+/* Prop collision object, the contact of surface 12 (listed by zbspFindPropsNear). */
+typedef struct PhysPropObject {
+    uint8_t pad000[0x4];
+    ZAngle3 rot;
+    int16_t pos[3];
+    uint8_t pad010[0x1dc];
+    const PhysPropInfo *prop; /* NULL when the object is not a prop */
+    const PhysPropNode *node;
+} PhysPropObject;
+
+_Static_assert(offsetof(PhysPropObject, pos) == 0xa, "PhysPropObject.pos");
+_Static_assert(offsetof(PhysPropObject, prop) == 0x1ec, "PhysPropObject.prop");
+_Static_assert(offsetof(PhysPropObject, node) == 0x1f0, "PhysPropObject.node");
+
 /*
  * Line test / ray result (cleared to 0xd8 bytes by zcollideRay; the global copy at 0x56c128 uses the
  * first 0x44). Bit 0 of the first word: terrain face hit, bit 1: object/edge hit. Some callers test the

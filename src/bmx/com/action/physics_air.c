@@ -88,7 +88,7 @@ static void tiltBike(PhysRider *r, int angle)
     zmatrixRotateY(&tilt, &tilt, (ZAngle)angle);
     zmatrixRotateX(&tilt, &tilt, (ZAngle)-0xaaa);
     zmatrixIdentity(&ref);
-    physMatrixToAngles(&ref, &tilt, 1, &joint);
+    physRelativeAngles(&ref, &tilt, 1, &joint);
     zactorSetJointAngles(r->bikeObj, 1, &joint);
 }
 
@@ -120,7 +120,7 @@ void bmxphysUpdatePose(PhysRider *r)
     } else {
         zvec3Zero(&r->step);
     }
-    physPlaceActors(r);
+    physPoseActorsGrind(r);
 
     if ((r->flags & 0x400) != 0) {
         uint32_t mask = gPhysIkLimbMasks[r->ikPose];
@@ -388,7 +388,7 @@ void bmxphysUpdatePositionAir(PhysRider *r)
 
         /* Landing on this wheel. Only the front wheel takes over the contact surface here. */
         if ((i & 1) == 0) {
-            physContactFromHit(r, &hit);
+            physTakeContact(r, &hit);
         }
         material = 0;
         if ((hit.flags & 1) != 0) {
@@ -430,7 +430,7 @@ void bmxphysUpdatePositionAir(PhysRider *r)
             bmxSoundPlayAt(0xbba, &hit.point, (int)(((uint32_t)r->player << 28) | snd | 0x100), vol, 0);
         }
         if (!((double)gPhysLandCrashSpeed * r->field6E0 > speed)) {
-            physSetState(r, kPhysStateBail);
+            physSetState(r, kPhysStateScripted);
             r->bailReason = 2;
             riderAddImpact(r, 0, speed);
             goto signalObject;
@@ -486,7 +486,7 @@ void bmxphysUpdatePositionAir(PhysRider *r)
         {
             const double slip = zvec3Dot(&w->side, &w->vel);
             if ((slip < 0 ? -slip : slip) >= gPhysWheelSideSlip) {
-                physSetState(r, kPhysStateBail);
+                physSetState(r, kPhysStateScripted);
                 r->bailReason = 4;
                 return;
             }
@@ -514,7 +514,7 @@ void bmxphysUpdatePositionAir(PhysRider *r)
             if (kind == 0 || kind > 3) {
                 continue;
             }
-            contact = physFindQuarterpipeEdge(hit.id, (int)(faceWord(hit.face) & 0xfff), &r->pos);
+            contact = physFindNearestTaggedEdge(hit.id, (int)(faceWord(hit.face) & 0xfff), &r->pos);
             surface = faceWord(hit.face) >> 12;
             if (contact == NULL) {
                 gZdebugPrint("bmxphysUpdatePositionAir: quarterpipe face with no assigned edge, ID=%d\n",
@@ -524,11 +524,11 @@ void bmxphysUpdatePositionAir(PhysRider *r)
             }
             r->surface = (uint8_t)surface;
             r->contact = contact;
-            physSnapshotContact(r);
+            physContactCopy(r);
         } else if ((hit.flags & 2) != 0 && hit.objectData != NULL) {
             r->surface = 0xc;
             r->contact = hit.objectData;
-            physSnapshotContact(r);
+            physContactCopy(r);
         }
         continue;
 
@@ -559,7 +559,7 @@ void bmxphysUpdatePositionAir(PhysRider *r)
             bail = (unsigned)riderGetStateLevel(r, 2) < 3;
         }
         if (bail) {
-            physSetState(r, kPhysStateBail);
+            physSetState(r, kPhysStateScripted);
             if (r->fieldED <= 1 && (riderGetStateLevel(r, 2) != 2 || (r->flags & 0x100) == 0)) {
                 r->bailReason = 7;
             } else {
@@ -774,7 +774,7 @@ bodyProbe: {
             }
         }
         if (!((double)gPhysAirCrashSpeed * r->field6E0 > speed)) {
-            physSetState(r, kPhysStateBail);
+            physSetState(r, kPhysStateScripted);
             r->bailReason = (uint8_t)((zmathAcos(-n.y) < 0x2aaa) + 1);
             riderAddImpact(r, 0, speed);
             goto signalObject;
@@ -834,7 +834,7 @@ bodyProbe: {
                 zvec3Cross3(&m.at, &m.right, &gPhysZero, &m.up);
                 zvec3NormalizeScaled(&m.at, &m.at);
                 zvec3Cross3(&m.right, &m.up, &gPhysZero, &m.at);
-                physMatrixToAngles(riderBasis(r), &m, gPhysAirTurnSteps, &r->orientARot);
+                physRelativeAngles(riderBasis(r), &m, gPhysAirTurnSteps, &r->orientARot);
                 zmatrixCopyRotation(&r->orientA, riderBasis(r));
                 r->timer = (int16_t)gPhysAirTurnSteps;
                 r->flags &= ~0x1000u;
@@ -851,7 +851,7 @@ bodyProbe: {
     to.x = h.x;
     to.y = GROUND_PROBE_Y;
     to.z = h.z;
-    if (worldRaycast(&h, &to, &hit) != 0 && physContactFromHit(r, &hit) != 0) {
+    if (worldRaycast(&h, &to, &hit) != 0 && physTakeContact(r, &hit) != 0) {
         r->groundGap = (float)((double)hit.point.y - h.y);
         return;
     }
@@ -862,12 +862,12 @@ bodyProbe: {
 }
 
 tooSteep:
-    physSetState(r, kPhysStateBail);
+    physSetState(r, kPhysStateScripted);
     r->bailReason = 5;
     return;
 
 deadly:
-    physSetState(r, kPhysStateBail);
+    physSetState(r, kPhysStateScripted);
     r->bailReason = 10;
     r->surface = 0xd;
     padRumble(r->player, 1, 0xff);

@@ -8,17 +8,12 @@
 
 #include <stdint.h>
 
+#include "bmx/com/action/physics.h"
 #include "bmx/com/action/physics_hit.h"
 #include "bmx/com/action/physics_types.h"
 #include "compat/orig.h"
 #include "zge/zgemods/zobjcamera.h"
 #include "zge/zmath.h"
-
-/* Quarterpipe edge found by physFindQuarterpipeEdge; only the edge direction is read here. */
-typedef struct PhysQpEdge {
-    uint8_t pad00[0x24];
-    ZVec3 dir;
-} PhysQpEdge;
 
 /* Vertex of a debug line: position and an RGB colour; the other bytes are left unset. */
 typedef struct PhysDebugVertex {
@@ -29,13 +24,6 @@ typedef struct PhysDebugVertex {
 } PhysDebugVertex;
 
 _Static_assert(sizeof(PhysDebugVertex) == 0x14, "PhysDebugVertex size");
-
-/* physics.c, not ported yet. */
-/* Switches the rider's state machine; returns the (byte) state now active. */
-ORIG_FN(0x00420cb0, int, physSetState, (PhysRider * r, int state));
-ORIG_FN(0x0042d950, PhysQpEdge *, physFindQuarterpipeEdge, (int section, int edgeId, const ZVec3 *pos));
-/* Copies the record r->contact points at into r->contactData (size by r->surface). */
-ORIG_FN(0x0042dda0, void, physContactCopy, (PhysRider * r));
 
 /* TODO(file): rider.c. */
 ORIG_FN(0x00431dd0, int, riderGetStateLevel, (PhysRider * r, unsigned level));
@@ -65,7 +53,6 @@ ORIG_FN(0x00481f80, uint32_t, zmathRand, (void));
 typedef float PhysFrictionTable[5]; /* indexed 0, 2 and 4 by surface class */
 #define gPhysDebugDraw        ORIG_VAR(0x0056c444, int32_t, gPhysDebugDraw)
 #define gPhysRollFriction     ORIG_VAR(0x005577ec, PhysFrictionTable, gPhysRollFriction)
-#define gPhysGravity          ORIG_VAR(0x00557810, float, gPhysGravity)
 #define gPhysRestSpeed        ORIG_VAR(0x00557814, float, gPhysRestSpeed)
 #define gPhysLeanSpeedMax     ORIG_VAR(0x00557818, float, gPhysLeanSpeedMax)
 #define gPhysBailImpact       ORIG_VAR(0x0055781c, float, gPhysBailImpact)
@@ -76,9 +63,7 @@ typedef float PhysFrictionTable[5]; /* indexed 0, 2 and 4 by surface class */
 #define gPhysSuspGravityScale ORIG_VAR(0x00557878, float, gPhysSuspGravityScale)
 #define gPhysUpBlend          ORIG_VAR(0x00557880, float, gPhysUpBlend)
 #define gPhysLeanMax          ORIG_VAR(0x00557884, float, gPhysLeanMax)
-#define gPhysDown             ORIG_VAR(0x00557888, ZVec3, gPhysDown)
 #define gPhysLeanRange        ORIG_VAR(0x00558890, float, gPhysLeanRange)
-#define gZmathOrigin          ORIG_VAR(0x006702d8, ZVec3, gZmathOrigin)
 
 void bmxphysUpdatePositionRoll(PhysRider *r);
 

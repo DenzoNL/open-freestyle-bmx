@@ -331,8 +331,8 @@ static int rollSurface(PhysRider *r, RollState *s)
         case 1:
         case 2:
         case 3: {
-            PhysQpEdge *edge = physFindQuarterpipeEdge(hit->id, face->tag & 0xfff, &r->pos);
-            ZVec3 edgeDir;
+            PhysEdge *edge = physFindNearestTaggedEdge(hit->id, face->tag & 0xfff, &r->pos);
+            ZVec3 edgeNormal;
 
             type = face->tag >> 12;
             if (!edge) {
@@ -342,7 +342,7 @@ static int rollSurface(PhysRider *r, RollState *s)
                 break;
             }
             contact = edge;
-            edgeDir = edge->dir;
+            edgeNormal = edge->normal;
             if (r->surface == 0 && type != 0) {
                 if (r->flags & 0x20000) {
                     r->surface = (uint8_t)type;
@@ -353,7 +353,7 @@ static int rollSurface(PhysRider *r, RollState *s)
                         return kRollStop;
                     }
                 }
-                if (zmathAcos((float)__builtin_fabs(zvec3Dot(&r->fwd, &edgeDir))) < 0x1555 &&
+                if (zmathAcos((float)__builtin_fabs(zvec3Dot(&r->fwd, &edgeNormal))) < 0x1555 &&
                     zmathAcos(-r->up.y) < 0xaaa && r->speed > 15.0f) {
                     bmxSoundPlayAt(0xbbb, &hit->point, (int)((uint32_t)r->player << 28 | 0x102), 0x7f, 0);
                 }

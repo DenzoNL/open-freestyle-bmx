@@ -300,11 +300,13 @@ class Machine:
                 if at:
                     saved.append((at, bytes(self.uc.mem_read(at, 5))))
                     self.uc.mem_write(at, b"\xe9" + struct.pack("<i", stub - (at + 5)))
+                    self.uc.ctl_remove_cache(at, at + 5)  # code translated by an earlier case is stale
         return saved
 
     def remove_stubs(self, saved):
         for at, data in reversed(saved):
             self.uc.mem_write(at, data)
+            self.uc.ctl_remove_cache(at, at + len(data))
 
     def read_u32(self, addr):
         return struct.unpack("<I", self.uc.mem_read(addr, 4))[0]
