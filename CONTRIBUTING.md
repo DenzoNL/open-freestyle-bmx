@@ -75,6 +75,15 @@ value held in an x87 register behaves exactly like a C `double`. A value the ori
 - Callees that need a loaded level, a renderer or other missing state: stub them for the iteration with
   `dt_stub(orig, ourPortOrNULL, stub)` in `setup()`. The harness patches both the original entry and our
   port, so the two sides stay comparable. Don't patch code by hand.
+- Stub logs are compared byte for byte (tests compile at `-O0`, so nothing is optimised away). Pass logged
+  words through `dt_canon()`, which makes emulated-stack pointers comparable. Mask narrow arguments to the
+  width the callee reads (16-bit handles often carry garbage in the upper half). Never log uninitialised
+  bytes.
+- Fixtures must be well-formed where the code relies on it: terminate every table the code scans for a
+  terminator, keep indices in range and seed (`dt_seed`) before drawing random values. A scan that runs
+  past a fixture reads memory the stubs are changing, and the two sides diverge at random.
+- Run your module's cases with `-n 2000` before declaring done. Rare paths (and rare fixture bugs) often
+  only show up after a few hundred iterations.
 - The baseline is a real process: the exe's CRT startup has run up to `WinMain` under a small
   deterministic Win32 layer (`tests/oracle/win32.py`). That layer covers heap, time, registry ("not
   found") and files, and anything else traps loudly.
