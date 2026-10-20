@@ -29,7 +29,8 @@ public class SeedPtrs extends GhidraScript {
                 byte p = getByte(t.subtract(1));
                 byte first = getByte(t);
                 if (!(p == (byte)0xCC || p == (byte)0x90 || p == (byte)0xC3)) continue;
-                if (first == (byte)0xCC || first == (byte)0x90 || first == 0) continue;
+                // Padding is not a function, but `int3; ret` (a debug-break helper) is.
+                if ((first == (byte)0xCC && getByte(t.add(1)) != (byte)0xC3) || first == (byte)0x90 || first == 0) continue;
                 if (L.getInstructionContaining(t) != null && L.getInstructionAt(t) == null) continue;
                 seen++;
                 Data d = L.getDefinedDataContaining(t);

@@ -75,6 +75,16 @@ def main():
             assigned[a], conf[a] = fp, "affinity"
         for a in run[best:]:
             assigned[a], conf[a] = fn, "affinity"
+    manual = ROOT / "data/manual_functions.csv"
+    if manual.exists():
+        with manual.open() as fh:
+            for r in csv.DictReader(fh):
+                a = int(r["addr"], 16)
+                if a not in bundles:
+                    bundles[a] = {"name": r["name"], "size": int(r["size"])}
+                    assigned[a], conf[a] = r["file"], "manual"
+                    addrs.append(a)
+        addrs.sort()
     out = ROOT / "data/functions.csv"
     with out.open("w", newline="") as fh:
         w = csv.writer(fh)

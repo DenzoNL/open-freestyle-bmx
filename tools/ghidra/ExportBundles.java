@@ -43,7 +43,8 @@ public class ExportBundles extends GhidraScript {
         int n = 0;
         for (Function f : currentProgram.getFunctionManager().getFunctions(true)) {
             long a = f.getEntryPoint().getOffset();
-            if (a < lo || a >= hi || f.isThunk()) continue;
+            // Skip only the incremental-link table stubs; other thunks (tail-call wrappers) are real functions.
+            if (a < lo || a >= hi || (f.isThunk() && a < 0x403c30L)) continue;
             Set<String> strs = new LinkedHashSet<>(), globals = new TreeSet<>();
             StringBuilder dis = new StringBuilder();
             for (Instruction ins : L.getInstructions(f.getBody(), true)) {

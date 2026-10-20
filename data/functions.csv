@@ -1,6 +1,7 @@
 addr,size,file,confidence,name,status
 0040249b,5,bmx/com/action/action.c,edge,FUN_0040249b,orig
 00403c30,99,bmx/com/action/action.c,assert,FUN_00403c30,orig
+00403cc0,5,bmx/com/action/action.c,contiguous,thunk_FUN_00475000,orig
 00403ce0,32,bmx/com/action/action.c,contiguous,FUN_00403ce0,orig
 00403d10,751,bmx/com/action/action.c,assert,FUN_00403d10,orig
 004040c0,8,bmx/com/action/action.c,contiguous,FUN_004040c0,orig
@@ -838,6 +839,7 @@ addr,size,file,confidence,name,status
 004646b0,6,bmx/com/zge/ngif/ngifzactor.c,affinity,FUN_004646b0,orig
 004646d0,6,bmx/com/zge/ngif/ngifzactor.c,affinity,FUN_004646d0,orig
 004646f0,23,bmx/com/zge/ngif/ngifzactor.c,affinity,FUN_004646f0,orig
+00464720,5,bmx/com/zge/ngif/ngifzactor.c,affinity,thunk_FUN_00407600,orig
 00464740,477,bmx/com/zge/ngif/ngifzactor.c,affinity,FUN_00464740,orig
 004649a0,326,bmx/com/zge/ngif/ngifzactor.c,affinity,FUN_004649a0,orig
 00464b50,313,bmx/com/zge/ngif/ngifzactor.c,assert,FUN_00464b50,orig
@@ -1267,7 +1269,7 @@ addr,size,file,confidence,name,status
 004763b0,69,bmx/com/zge/zactor.c,affinity,FUN_004763b0,ported
 00476420,657,bmx/com/zge/zactor.c,affinity,FUN_00476420,ported
 00476770,201,bmx/com/zge/zactor.c,affinity,FUN_00476770,ported
-00476850,2,bmx/com/zge/zactor.c,contiguous,zactorBreak,ported
+00476850,2,bmx/com/zge/zactor.c,manual,zactorBreak,ported
 00476880,71,bmx/com/zge/zactor.c,affinity,FUN_00476880,ported
 004768f0,41,bmx/com/zge/zactor.c,affinity,FUN_004768f0,ported
 00476930,175,bmx/com/zge/zactor.c,affinity,FUN_00476930,ported
@@ -1280,6 +1282,7 @@ addr,size,file,confidence,name,status
 00477b50,61,bmx/com/zge/zprim.c,affinity,FUN_00477b50,ported
 00477ba0,47,bmx/com/zge/zprim.c,affinity,FUN_00477ba0,ported
 00477be0,193,bmx/com/zge/zprim.c,affinity,FUN_00477be0,ported
+00477d00,5,bmx/com/zge/zprim.c,affinity,thunk_FUN_00463b00,orig
 00477d20,86,bmx/com/zge/zprim.c,assert,FUN_00477d20,ported
 00477da0,58,bmx/com/zge/zprim.c,contiguous,FUN_00477da0,ported
 00477df0,98,bmx/com/zge/zprim.c,contiguous,FUN_00477df0,ported
@@ -1435,6 +1438,7 @@ addr,size,file,confidence,name,status
 004802f0,74,zge/zinput.c,assert,zinput_c_ZInputCreate,orig
 00480370,74,zge/zasset.c,affinity,FUN_00480370,orig
 004803c0,33,zge/zasset.c,affinity,FUN_004803c0,orig
+004803f0,5,zge/zasset.c,affinity,thunk_FUN_00493910,orig
 00480400,57,zge/zasset.c,affinity,FUN_00480400,orig
 00480450,128,zge/zasset.c,affinity,FUN_00480450,orig
 004804d0,492,zge/zasset.c,assert,OPEN_LIBRARY,orig
@@ -1687,6 +1691,7 @@ addr,size,file,confidence,name,status
 00489ba0,56,zge/com/zglrw/zrwmat.c,assert,FUN_00489ba0,orig
 00489be0,173,zge/com/zglrw/zrwmat.c,assert,zrwMat_c_EndFunction,orig
 00489c90,27,zge/com/zglrw/zrwzgl.c,affinity,FUN_00489c90,orig
+00489cb0,6,zge/com/zglrw/zrwzgl.c,affinity,timeGetTime,orig
 00489cc0,25,zge/com/zglrw/zrwzgl.c,affinity,ApplicationError,orig
 00489ce0,12,zge/com/zglrw/zrwzgl.c,affinity,FUN_00489ce0,orig
 00489cf0,127,zge/com/zglrw/zrwzgl.c,affinity,EpicFail,orig
