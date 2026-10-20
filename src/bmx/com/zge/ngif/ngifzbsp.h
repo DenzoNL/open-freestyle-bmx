@@ -1,32 +1,180 @@
-/* Level geometry queries (C:\zaxis\Bmx\src\com\zge\NgIF\NgIFzbsp.c). Not ported yet; callees only. */
+/* Level geometry queries (C:\zaxis\Bmx\src\com\zge\NgIF\NgIFzbsp.c). */
 #ifndef BMX_COM_ZGE_NGIF_NGIFZBSP_H
 #define BMX_COM_ZGE_NGIF_NGIFZBSP_H
 
 #include <stdint.h>
 
+#include "bmx/com/action/physics_hit.h"
 #include "compat/orig.h"
 #include "zge/zmath.h"
+#include "zge/zmem.h"
 
-/* Centroid of the three float vertices of a face (at +0x30, stride 0x10). */
-ORIG_FN(0x00466c50, void, zbspFaceCentroid, (const void *face, ZVec3 *out));
+/* ---- level data --------------------------------------------------------------------------------- */
+
+/* Tag of a level edge: `id` selects the kind of edge, `kind` (non-zero) is copied into the edge record. */
+typedef struct ZbspEdgeTag {
+    uint16_t id;
+    uint8_t kind;
+    uint8_t pad03;
+} ZbspEdgeTag;
+
+/*
+ * Triangle of the level mesh (0x6c bytes, array at gZbspFaces). The three vertices are float points padded
+ * to 16 bytes. Face and edge records (PhysFace / PhysEdge) are built from it on demand and cached.
+ */
+typedef struct ZbspLevelFace {
+    ZVec3 v0;
+    float pad0c;
+    ZVec3 v1;
+    float pad1c;
+    ZVec3 v2;
+    float pad2c;
+    uint8_t pad30[0x10];
+    const uint16_t *tag;           /* low 12 bits: tag id (0xfa1..0xfa4 respawn faces, ...) */
+    const ZbspEdgeTag *edgeTag[3]; /* tag of the edge from vertex k to vertex k + 1 */
+    uint8_t pad50[0xc];
+    PhysEdge *edge[3]; /* cached by zbspFindTaggedEdges */
+    PhysFace *face;    /* cached by zbspFindTaggedFaces */
+} ZbspLevelFace;
+
+_Static_assert(sizeof(ZbspLevelFace) == 0x6c, "ZbspLevelFace size");
+_Static_assert(offsetof(ZbspLevelFace, v1) == 0x10, "ZbspLevelFace.v1");
+_Static_assert(offsetof(ZbspLevelFace, tag) == 0x40, "ZbspLevelFace.tag");
+_Static_assert(offsetof(ZbspLevelFace, edgeTag) == 0x44, "ZbspLevelFace.edgeTag");
+_Static_assert(offsetof(ZbspLevelFace, edge) == 0x5c, "ZbspLevelFace.edge");
+_Static_assert(offsetof(ZbspLevelFace, face) == 0x68, "ZbspLevelFace.face");
+
+/* Source definition of a tree object; `kind` 1..4 maps to the shape kind (see zbspBuildShape). */
+typedef struct ZbspObjectDef {
+    uint8_t flags; /* bit 0: the prop's collision edges are loaded with the level */
+    uint8_t pad01[0x15];
+    uint8_t kind;
+} ZbspObjectDef;
+
+/* Collision shape of a tree object (0x38 bytes, built lazily by zbspBuildShape). */
+typedef struct ZbspShape {
+    uint16_t flags; /* bits 0-8 cleared when built */
+    uint8_t byte2;
+    uint8_t pad03;
+    uint16_t word4;
+    uint8_t byte6;
+    uint8_t byte7;
+    uint8_t pad08[0x1c];
+    uint8_t kind; /* 0 none, 2: four edges, 3 and 4: one edge (1 is unimplemented) */
+    uint8_t pad25[0x3];
+    float box[4];
+} ZbspShape;
+
+_Static_assert(sizeof(ZbspShape) == 0x38, "ZbspShape size");
+_Static_assert(offsetof(ZbspShape, kind) == 0x24, "ZbspShape.kind");
+_Static_assert(offsetof(ZbspShape, box) == 0x28, "ZbspShape.box");
+
+/* Static object of the level file (list head at 0x6722b8); its payload starts at +8 of the list node. */
+typedef struct ZbspTreeObject {
+    uint8_t pad00[0x20];
+    const ZbspObjectDef *def;
+    uint8_t pad24[0x4];
+    ZbspShape *shape; /* built on first use */
+    uint8_t pad2c[0x4];
+    float size[3]; /* extents: width, height, depth */
+    uint8_t pad3c[0x4];
+    float lift;
+    uint8_t pad44[0x4];
+    float base;
+} ZbspTreeObject;
+
+typedef struct ZbspTreeNode {
+    struct ZbspTreeNode *next;
+    uint8_t pad04[0x4];
+    ZbspTreeObject object;
+} ZbspTreeNode;
+
+_Static_assert(offsetof(ZbspTreeObject, def) == 0x20, "ZbspTreeObject.def");
+_Static_assert(offsetof(ZbspTreeObject, shape) == 0x28, "ZbspTreeObject.shape");
+_Static_assert(offsetof(ZbspTreeObject, size) == 0x30, "ZbspTreeObject.size");
+_Static_assert(offsetof(ZbspTreeObject, lift) == 0x40, "ZbspTreeObject.lift");
+_Static_assert(offsetof(ZbspTreeObject, base) == 0x48, "ZbspTreeObject.base");
+
+/* Flags of a prop collision object (PhysPropObject.flags), set by zbspObjectSignal. */
+enum {
+    kZbspObjGroupMask = 0x1f,
+    kZbspObjFlagged = 0x40,
+    kZbspObjSignalled = 0x80,
+    kZbspObjTouched = 0x100,
+    kZbspObjHidden = 0x200,
+};
+
+/* Level mesh (ztaginf.c getters) and the pools the face / edge records come from. */
+typedef void *ZbspHitList[257];
+#define gZbspHits          ORIG_VAR(0x005f0c68, ZbspHitList, gZbspHits)
+#define gZbspFacePool      ORIG_VAR(0x005f34ac, ZMemFreeList *, gZbspFacePool)
+#define gZbspEdgePool      ORIG_VAR(0x005f34b0, ZMemFreeList *, gZbspEdgePool)
+#define gZbspPropFaceCount ORIG_VAR(0x005f34bc, uint32_t, gZbspPropFaceCount)
+typedef PhysFace ZbspPropFaceTable[1];
+#define gZbspPropFaces   ORIG_VAR(0x005e7fe0, ZbspPropFaceTable, gZbspPropFaces)
+#define gZbspEdgeRecord  ORIG_VAR(0x005f1070, PhysEdge, gZbspEdgeRecord)
+#define gZbspMatRefValue ORIG_VAR(0x005e7fd8, uint32_t, gZbspMatRefValue)
+#define gZbspNoShapeKind ORIG_VAR(0x005f8d68, uint8_t, gZbspNoShapeKind)
+/* Renderer entry used by zbspGetMatRef (0x561038). */
+typedef const uint32_t *(BMX_CDECL *ZbspMaterialFn)(const void *material);
+#define gZbspMaterialFn ORIG_VAR(0x00561038, ZbspMaterialFn, gZbspMaterialFn)
+
+/* ---- queries ------------------------------------------------------------------------------------ */
+
+/* Centroid of the three float vertices of a face record (at +0x30, stride 0x10). */
+void zbspFaceCentroid(const void *face, ZVec3 *out);
 /* Null-terminated list of edges within `radius` of p (static buffer). */
 ORIG_FN(0x00466ed0, void **, zbspFindEdgesNear, (const ZVec3 *p, float radius));
-/* The `index`-th edge tagged `id`, rebuilt in a static record, or NULL. */
-ORIG_FN(0x00467410, void *, zbspFindEdge, (int unused, int id, int index, int unused2));
+/*
+ * The `index`-th edge tagged `id` (only the low 16 bits count), rebuilt in a static record, or NULL. The
+ * first and last parameters are unused.
+ */
+void *zbspFindEdge(int unused, int id, int index, int unused2);
 /* Point of the segment a-b (int16 coordinates, direction dir) closest to p. */
-ORIG_FN(0x00468920, void, zbspClosestPointOnEdge,
-        (const int16_t *a, const int16_t *b, const ZVec3 *dir, const ZVec3 *p, ZVec3 *out));
-/* Null-terminated list of faces whose tag id lies in [lo, hi] (static buffer). */
-ORIG_FN(0x00468ef0, void **, zbspFindTaggedFaces, (int lo, int hi));
+void zbspClosestPointOnEdge(const int16_t *a, const int16_t *b, const ZVec3 *dir, const ZVec3 *p, ZVec3 *out);
+/* Null-terminated list of faces whose tag id lies in [lo, hi] (static buffer), plus prop faces. */
+void **zbspFindTaggedFaces(int lo, int hi);
 /*
  * Faces near p (within `radius`, |normal.y| within `cosLimit`) as a ZbspFaceQuery in a static record, or
  * NULL.
  */
 ORIG_FN(0x00468070, void *, zbspFindFaceNear, (const ZVec3 *p, float radius, float cosLimit));
 /* Null-terminated list of the collision objects of props whose class lies in [lo, hi] (static buffer). */
-ORIG_FN(0x00468e30, void **, zbspFindPropsNear, (int lo, int hi));
+void **zbspFindPropsNear(int lo, int hi);
 /* Which side of an edge is solid: 1 (flag 1), -1 (flag 2) or 0. */
-ORIG_FN(0x00467690, int, zbspEdgeSide, (const void *edge));
+int zbspEdgeSide(const void *edge);
+
+/* Null-terminated list of edge records whose tag id lies in [lo, hi] (static buffer). */
+void **zbspFindTaggedEdges(int lo, int hi);
+/* Fills `out` with the face record of a level face (corners, plane, int16 copies). */
+void zbspBuildFace(ZbspLevelFace *src, const uint16_t *tag, PhysFace *out);
+/* Point (x, y, z) inside the face's outline, tested in the plane's dominant axis. */
+int zbspPointInFace(const PhysFace *face, float x, float y, float z);
+/* Point of the segment a-b closest to p. */
+void zbspClosestPointOnSegment(const ZVec3 *a, const ZVec3 *b, const ZVec3 *p, ZVec3 *out);
+
+/* ---- props ---------------------------------------------------------------------------------------- */
+
+void zbspBuildShape(ZbspTreeObject *obj);
+int zbspTreeObjectIndex(const ZbspTreeObject *obj);
+ZbspTreeObject *zbspTreeObjectAt(int index);
+/* Shape of the tree object `index` (low 16 bits), or NULL. */
+ZbspShape *zbspGetShape(int index);
+/* Pointer to the shape kind byte of tree object `index`; a static zero byte when it has no shape. */
+uint8_t *zbspGetShapeKind(int index);
+/* Builds the collision object of a prop node (on first use). */
+void zbspBuildCollObject(PhysPropNode *node);
+void zbspFreeCollObject(PhysPropObject *object);
+void zbspPropSetRotation(PhysPropObject *object, const ZAngle3 *rot);
+void zbspPropRotate(PhysPropObject *object, const ZAngle3 *delta);
+void zbspPropSetPosition(PhysPropObject *object, const ZVec3 *pos);
+/* Reacts to a prop event 0..5 (set flags, show / hide). */
+void zbspObjectSignal(PhysPropObject *object, int signal);
+const uint32_t *zbspGetMatRef(const void *obj);
+int zbspReturnZero(void);
+
+/* TODO(ngifzactor): this belongs to NgIFzactor.c (it is the tail of that file). */
+void zactorSyncRiderActors(void);
 
 /* One face of a zbspFindFaceNear result; the list ends with a NULL face. */
 typedef struct ZbspFaceHit {
@@ -43,5 +191,122 @@ typedef struct ZbspFaceQuery {
 } ZbspFaceQuery;
 
 _Static_assert(sizeof(ZbspFaceHit) == 0x1c, "ZbspFaceHit size");
+
+/* ---- debug-print stubs ---------------------------------------------------------------------------
+ * The original build left these hooks as empty bodies that only print their name (file, line, name).
+ */
+int zbspInit(void);
+void zbspUpdate(void);
+int zbspShutdown(void);
+int zbspInitializeScene(void);
+int zbspLoadScene(void);
+void zbspLoadAndProcessMap(void);
+int zbspAllocAndLoadMap(void);
+void zbspFreeMap(void);
+int zbspSetTreeVisible(void);
+void *zbspConvertTreeFromLoad(void *tree);
+void zbspRelativeLodZ(void);
+void zbspPreProcessScene(void);
+void zbspPreProcessTerrainNode(void);
+void zbspPreProcessFaceList(void);
+int zbspViewerInPosSide(void);
+void zbspSndRegister(void);
+void zbspSndSetState(void);
+int zbspSndGetHandle(void);
+int zbspDvliteHandle(void);
+int zbspDvliteGetColor(void);
+void zbspDvliteLite(void);
+void zbspDvliteInitialize(void);
+void zbspDvliteAttachToProps(void);
+void zbspPropActivate(void);
+void zbspPropDeactivate(void);
+void zbspActivateTree(void);
+void zbspDeactivateTree(void);
+int zbspInitializeTreeRef(void);
+int16_t zbspCreateTreeRef(void);
+void zbspDestroyTreeRef(void);
+void zbspPropAddTreeRef(void);
+void zbspRemoveTreeRef(void);
+void zbspUpdateTreeRef(void);
+void zbspAddToTree(void);
+void zbspRemoveFromTree(void);
+int zbspTotallyWithinTree(void);
+int zbspOverlapsTree(void);
+int zbspFindTagged(void);
+void zbspPropMove(void);
+int zbspGetNumDefs(void);
+int zbspGetTypeFromHash(void);
+void zbspFxCreateTree(void);
+void zbspDestroyTree(void);
+void zbspDrawTerrain(void);
+void zbspDrawTerrainNode(void);
+void zbspDrawFaceList(void);
+void zbspSetDebug(void);
+void zbspDrawLineZ(void);
+void zbspDrawFaceNormal(void);
+void zbspDrawFaceFlat(void);
+void zbspShowBoundingBox(void);
+void zbspShowEdges(void);
+void zbspShowPropVolume(void);
+int zbspGetFaceNum(void);
+void zbspTrnDumpTree(void);
+void zbspShowPartition(void);
+void zbspShowPartition2(void);
+void zbspDrawPartition(void);
+int zbspGetTerrainFaces(void);
+int zbspGetTreeObject(void);
+int zbspPointWithinTreeObject(void);
+int zbspGetTreeObjects(void);
+void zbspGetTerrainNode(void);
+int zbspGetMaterialInfo(void);
+int zbspGetMatRefData(void);
+int zbspGetMatIdx(void);
+int zbspMatRefList(void);
+int zbspFindTagged2(void);
+int zbspDoesVertExist(void);
+int zbspFacesAtSamePos(void);
+int zbspSceneSaveState(void);
+void zbspSceneRestoreState(void);
+void zbspGetNormalVector(void);
+int zbspGetSideVector(void);
+int zbspCollide(void);
+void zbspCreateSpanPlanes(void);
+void zbspAddToFacelist(void);
+void zbspGetTerrainHeightinf(void);
+void zbspTestRayCollision(void);
+void zbspTest(void);
+void zbspTestResetFaceColors(void);
+void zbspHighlightNodeFaces(void);
+void zbspSetFaceRgb(void);
+void zbspPrintFaceListInf(void);
+int zbspTrnTestRayCollision(void);
+void zbspCreateNodesHit(void);
+void zbspAddToNodeslist(void);
+void zbspAddToFacesList(void);
+int zbspLineToNodes(void);
+int zbspLineToFaces(void);
+int zbspLinePlaneIntersection(void);
+int zbspClipRayToObject(void);
+int zbspClipLineToProps(void);
+int zbspClipLineToProp(void);
+void zbspBuildRayBoundingBox(void);
+uint8_t *zbspAddPropFaces(uint8_t *prop);
+void zbspComputeFacePlaneEq(void);
+void zbspTagInitialize(void);
+void zbspTagRegisterProFunc(void);
+int zbspFaceTagRegister(void);
+int zbspFaceTagPreProcess(void);
+int zbspFaceTagProcess(void);
+int zbspFaceTagFindDef(void);
+int zbspFaceTagRegRegister(void);
+int zbspFaceTagPreAttachAsRef(void);
+int zbspFaceTagPreAttachSmPosAsRef(void);
+int zbspFaceTagProSwapWindow(void);
+void zbspColSphereCreateNodesHit(void);
+int zbspHitNodeslist(void);
+int zbspTestWithFacelist(void);
+void *zbspFaceBoundingBox(void *face, void *box);
+void zbspColSphereDraw(void);
+int zbspFindFaceByType(void);
 
 #endif

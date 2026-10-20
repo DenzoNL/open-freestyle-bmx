@@ -170,7 +170,7 @@ static void install_stubs(void)
     bigLog = 0;
     bigCalls = 0;
     dt_stub(0x00466ed0, NULL, (void *)stubEdgesNear);
-    dt_stub(0x00468e30, NULL, (void *)stubPropsNear);
+    dt_stub(0x00468e30, (void *)zbspFindPropsNear, (void *)stubPropsNear);
     dt_stub(0x00468070, NULL, (void *)stubFaceNear);
     dt_stub(0x00435ea0, NULL, (void *)stubTrickA);
     dt_stub(0x00435ef0, NULL, (void *)stubTrickB);
@@ -178,7 +178,7 @@ static void install_stubs(void)
     dt_stub(0x00409250, NULL, (void *)stubSkidMark);
     dt_stub(0x00469b00, NULL, (void *)stubRay);
     dt_stub(0x0044e300, NULL, (void *)stubSound);
-    dt_stub(0x00467410, NULL, (void *)stubFindEdge);
+    dt_stub(0x00467410, (void *)zbspFindEdge, (void *)stubFindEdge);
     gZdebugPrint = stubPrint;
     for (int i = 0; i < kPhysStateCount; i++) {
         gPhysStateExit[i] = (dt_u32() & 3) ? stubExit : NULL;

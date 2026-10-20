@@ -95,6 +95,7 @@
 # grind sounds; a/b are the end points (world units), dir the unit vector a -> b, normal/d the plane of
 # the edge; tag: top nibble surface kind, low 12 bits id; prop: owner whose +0x1ec goes to the prop module.
 @PhysEdge 0x38
+0x000 uint8_t side /* bit 0 / bit 1: the solid side of the edge (see zbspEdgeSide) */
 0x004 int8_t kind
 0x008 int16_t a[3]
 0x00e int16_t b[3]
@@ -110,9 +111,17 @@
 @PhysFace 0x88
 0x000 ZVec3 normal
 0x00c float d
+0x014 uint8_t kind /* always 0 in records built by zbspBuildFace */
 0x015 uint8_t flags
 0x016 uint16_t tag
-0x01c void_ptr vert[4]
+0x01c void_ptr vert[4] /* vert[0..2] point at q0..q2; for triangles slot 3 holds the level face it was built from */
+0x02c int32_t object /* owning prop's collision object, 0 for level geometry */
+0x030 ZVec3 p0 /* the three corners in world units */
+0x040 ZVec3 p1
+0x050 ZVec3 p2
+0x060 int16_t q0[3]
+0x06c int16_t q1[3]
+0x078 int16_t q2[3]
 
 # Result of physProbeGround (flags 1: edge hit).
 @PhysGroundHit 0x30

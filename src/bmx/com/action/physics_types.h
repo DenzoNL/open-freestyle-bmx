@@ -237,7 +237,8 @@ _Static_assert(offsetof(PhysRider, bikeObj2) == 0xd94, "PhysRider.bikeObj2");
 _Static_assert(offsetof(PhysRider, ik) == 0xd98, "PhysRider.ik");
 
 typedef struct PhysEdge {
-    uint8_t pad000[0x4];
+    uint8_t side; /* bit 0 / bit 1: the solid side of the edge (see zbspEdgeSide) */
+    uint8_t pad001[0x3];
     int8_t kind;
     uint8_t pad005[0x3];
     int16_t a[3];
@@ -251,6 +252,7 @@ typedef struct PhysEdge {
 } PhysEdge;
 
 _Static_assert(sizeof(PhysEdge) == 0x38, "PhysEdge size");
+_Static_assert(offsetof(PhysEdge, side) == 0x0, "PhysEdge.side");
 _Static_assert(offsetof(PhysEdge, kind) == 0x4, "PhysEdge.kind");
 _Static_assert(offsetof(PhysEdge, a) == 0x8, "PhysEdge.a");
 _Static_assert(offsetof(PhysEdge, b) == 0xe, "PhysEdge.b");
@@ -264,20 +266,42 @@ _Static_assert(offsetof(PhysEdge, prop) == 0x34, "PhysEdge.prop");
 typedef struct PhysFace {
     ZVec3 normal;
     float d;
-    uint8_t pad010[0x5];
+    uint8_t pad010[0x4];
+    uint8_t kind; /* always 0 in records built by zbspBuildFace */
     uint8_t flags;
     uint16_t tag;
     uint8_t pad018[0x4];
-    void *vert[4];
-    uint8_t pad02c[0x5c];
+    void *
+        vert[4]; /* vert[0..2] point at q0..q2; for triangles slot 3 holds the level face it was built from */
+    int32_t object; /* owning prop's collision object, 0 for level geometry */
+    ZVec3 p0;       /* the three corners in world units */
+    uint8_t pad03c[0x4];
+    ZVec3 p1;
+    uint8_t pad04c[0x4];
+    ZVec3 p2;
+    uint8_t pad05c[0x4];
+    int16_t q0[3];
+    uint8_t pad066[0x6];
+    int16_t q1[3];
+    uint8_t pad072[0x6];
+    int16_t q2[3];
+    uint8_t pad07e[0xa];
 } PhysFace;
 
 _Static_assert(sizeof(PhysFace) == 0x88, "PhysFace size");
 _Static_assert(offsetof(PhysFace, normal) == 0x0, "PhysFace.normal");
 _Static_assert(offsetof(PhysFace, d) == 0xc, "PhysFace.d");
+_Static_assert(offsetof(PhysFace, kind) == 0x14, "PhysFace.kind");
 _Static_assert(offsetof(PhysFace, flags) == 0x15, "PhysFace.flags");
 _Static_assert(offsetof(PhysFace, tag) == 0x16, "PhysFace.tag");
 _Static_assert(offsetof(PhysFace, vert) == 0x1c, "PhysFace.vert");
+_Static_assert(offsetof(PhysFace, object) == 0x2c, "PhysFace.object");
+_Static_assert(offsetof(PhysFace, p0) == 0x30, "PhysFace.p0");
+_Static_assert(offsetof(PhysFace, p1) == 0x40, "PhysFace.p1");
+_Static_assert(offsetof(PhysFace, p2) == 0x50, "PhysFace.p2");
+_Static_assert(offsetof(PhysFace, q0) == 0x60, "PhysFace.q0");
+_Static_assert(offsetof(PhysFace, q1) == 0x6c, "PhysFace.q1");
+_Static_assert(offsetof(PhysFace, q2) == 0x78, "PhysFace.q2");
 
 typedef struct PhysGroundHit {
     uint32_t flags;

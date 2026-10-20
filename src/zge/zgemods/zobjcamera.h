@@ -13,6 +13,8 @@
 
 ORIG_FN(0x00481120, void, zvec3Zero, (ZVec3 * v));
 ORIG_FN(0x00481130, void, zvec3Add, (ZVec3 * out, const ZVec3 *a, const ZVec3 *b));
+/* out = a - b. */
+ORIG_FN(0x00481160, void, zvec3Sub, (ZVec3 * out, const ZVec3 *a, const ZVec3 *b));
 ORIG_FN(0x00481210, void, zvec3Scale, (ZVec3 * out, const ZVec3 *in, float s));
 ORIG_FN(0x004812f0, void, zvec3Negate, (ZVec3 * out, const ZVec3 *in));
 /* out = in rotated about the X / Y / Z axis. Only the low 16 bits of the angle are read. */

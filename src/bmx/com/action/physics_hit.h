@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include "bmx/com/action/physics_types.h"
+#include "compat/orig.h"
 #include "zge/zmath.h"
 
 /* Dynamic collision object (props). */
@@ -22,37 +23,75 @@ typedef struct PhysPropInfo {
     ZVec3 facing;
 } PhysPropInfo;
 
-/* Scene frame of a prop: rotation quaternion at +0x14 (y stored negated relative to the world). */
+/* Scene frame of a prop: position at +4, rotation quaternion at +0x14 (y stored negated relative to the
+ * world). */
 typedef struct PhysPropFrame {
-    uint8_t pad00[0x14];
+    uint8_t pad00[0x4];
+    ZVec3 pos;
+    uint8_t pad10[0x4];
     ZQuat rot;
+    uint8_t pad24[0x8];
+    void *model; /* renderer handle (flags are set through the pointer at 0x560ed8) */
 } PhysPropFrame;
 
+_Static_assert(offsetof(PhysPropFrame, rot) == 0x14, "PhysPropFrame.rot");
+_Static_assert(offsetof(PhysPropFrame, model) == 0x2c, "PhysPropFrame.model");
+
+/* Placement record of a prop in the level file (bytes 4-7 and the word at 8 feed the collision object). */
+typedef struct PhysPropTag {
+    uint8_t pad00[0x4];
+    uint8_t flag4, flag5, flag6;
+    uint8_t group;  /* low 5 bits go into the collision object's flags */
+    uint16_t range; /* low 12 bits: id compared against zbspFindTaggedFaces ranges */
+} PhysPropTag;
+
+struct ZbspTreeObject;
+
+/* Node of the prop list (head at 0x6722c4); its collision object is built on first use. */
 typedef struct PhysPropNode {
-    uint8_t pad00[0x1c];
-    const PhysPropFrame *frame;
+    struct PhysPropNode *next;
+    uint8_t pad04[0x18];
+    PhysPropFrame *frame;
+    const struct ZbspTreeObject *source;
+    const PhysPropTag *tag;
+    uint8_t pad28[0x4];
+    struct PhysPropObject *object;
+    void(BMX_CDECL *destroy)(struct PhysPropObject *object); /* frees the object (0x468d20) */
 } PhysPropNode;
 
-/* Prop collision object, the contact of surface 12 (listed by zbspFindPropsNear). */
+_Static_assert(offsetof(PhysPropNode, frame) == 0x1c, "PhysPropNode.frame");
+_Static_assert(offsetof(PhysPropNode, destroy) == 0x30, "PhysPropNode.destroy");
+
+/* Prop collision object (500 bytes), the contact of surface 12 (listed by zbspFindPropsNear). */
 typedef struct PhysPropObject {
-    uint8_t pad000[0x4];
+    uint16_t index; /* position of the source in the tree object list */
+    uint16_t flags; /* low 5 bits: tag group; see kZbspObj* */
     ZAngle3 rot;
     int16_t pos[3];
-    uint8_t pad010[0x1dc];
+    float scale[3];
+    uint8_t pad01c[0x8];
+    PhysEdge *edges; /* collision edges of the shape, allocated by zcollideBuildPropEdges */
+    uint8_t pad028[0x1c4];
     const PhysPropInfo *prop; /* NULL when the object is not a prop */
-    const PhysPropNode *node;
+    PhysPropNode *node;
 } PhysPropObject;
 
 _Static_assert(offsetof(PhysPropObject, pos) == 0xa, "PhysPropObject.pos");
+_Static_assert(offsetof(PhysPropObject, scale) == 0x10, "PhysPropObject.scale");
+_Static_assert(offsetof(PhysPropObject, edges) == 0x24, "PhysPropObject.edges");
 _Static_assert(offsetof(PhysPropObject, prop) == 0x1ec, "PhysPropObject.prop");
 _Static_assert(offsetof(PhysPropObject, node) == 0x1f0, "PhysPropObject.node");
 
 /*
  * Line test / ray result (cleared to 0xd8 bytes by zcollideRay; the global copy at 0x56c128 uses the
- * first 0x44). Bit 0 of the first word: terrain face hit, bit 1: object/edge hit. Some callers test the
- * byte, others compare the whole dword, hence the union.
- * TODO: the pointer at 0x40 is read as a collision object by the roll/air updates and as a grind edge by
- * the contact code; find out whether flag 2 means both.
+ * first 0x44). First word: 1 = terrain face hit (the face record at +0x30 is valid), 2 = prop hit. A prop
+ * hit whose placement tag carries a surface type is reported as kind 1 so that it acts as terrain (quarter
+ * pipes); the object pointer is still set. Some callers test the byte, others compare the whole dword,
+ * hence the union.
+ * The pointer at +0x40 is always the hit prop's collision object (PhysPropObject, 500 bytes, built by
+ * zbspBuildCollObject; its first word is the handle stored at +0x3c) and NULL for terrain hits. Nothing ever
+ * stores an edge record there: `edge` is the same pointer, kept for the contact code that only forwards it
+ * (surface 12 keeps the object itself in the rider's contact).
  */
 typedef struct PhysRayHit {
     union {
