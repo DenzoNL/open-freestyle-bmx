@@ -949,6 +949,9 @@ static void randomState(void)
             gOvlGoalRows[r][k] = (uint16_t)(r < 3 || dt_u32() % 2 ? 0x2000 + r * 4 + k : kOvlNoHandle);
         }
     }
+    /* The draw loops scan rows until a terminator: real tables always end within the 5 rows. Without
+     * it they walk into memory the stub logs are changing, and the two sides stop at different places. */
+    gOvlGoalRows[4][0] = kOvlNoHandle;
     for (int r = 0; r < 10; r++) {
         randHandles(gOvlRunTimes[r], 4);
     }
