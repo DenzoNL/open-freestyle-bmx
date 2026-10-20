@@ -24,7 +24,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 
 import pefile
-from unicorn import UC_ARCH_X86, UC_HOOK_CODE, UC_MODE_32, UC_PROT_ALL, Uc, UcError
+from unicorn import UC_ARCH_X86, UC_HOOK_CODE, UC_MODE_32, UC_PROT_ALL, UC_PROT_EXEC, UC_PROT_READ, Uc, UcError
 from unicorn.x86_const import (
     UC_X86_REG_EAX,
     UC_X86_REG_EDX,
@@ -117,6 +117,8 @@ class Machine:
         self.uc.mem_write(TRAP_BASE, b"\xc3" * TRAP_SIZE)
         self.writable.append((HEAP_BASE, None))  # sized dynamically by heap_ptr
         self.uc.hook_add(UC_HOOK_CODE, self._on_trap, begin=TRAP_BASE, end=TRAP_BASE + TRAP_SIZE - 1)
+        for at, size in self._protect_later:
+            self.uc.mem_protect(at, size, UC_PROT_READ | UC_PROT_EXEC)
         for addr in (CRT_MALLOC, CRT_FREE, CRT_CALLOC, CRT_REALLOC):
             self.uc.hook_add(UC_HOOK_CODE, self._on_crt, begin=addr, end=addr)
         for addr in ABORT_FUNCS:
@@ -133,12 +135,20 @@ class Machine:
         size = (pe.OPTIONAL_HEADER.SizeOfImage + 0xFFF) & ~0xFFF
         self.uc.mem_map(base, size, UC_PROT_ALL)
         self.uc.mem_write(base, pe.header)
+        protect = []
         for s in pe.sections:
             data = s.get_data()
             self.uc.mem_write(base + s.VirtualAddress, data)
+            if not s.Characteristics & 0x80000000:  # not IMAGE_SCN_MEM_WRITE: code, .rdata, headers
+                vsize = (max(s.Misc_VirtualSize, s.SizeOfRawData) + 0xFFF) & ~0xFFF
+                protect.append((base + s.VirtualAddress, vsize))
             if s.Characteristics & 0x80000000:  # IMAGE_SCN_MEM_WRITE
                 vsize = max(s.Misc_VirtualSize, s.SizeOfRawData)
                 self.writable.append((base + s.VirtualAddress, (vsize + 0xFFF) & ~0xFFF))
+        # Guest writes to code or read-only data fault (a test that pokes a constant would otherwise
+        # corrupt every later case, since only writable sections are snapshotted). The harness itself
+        # still patches code (dt_stub) through host-side writes. Import tables are patched below first.
+        self._protect_later = getattr(self, "_protect_later", []) + protect
         imports = getattr(pe, "DIRECTORY_ENTRY_IMPORT", [])
         if imports and not trap_imports:
             names = [e.dll.decode() for e in imports]
@@ -291,8 +301,8 @@ class Machine:
         """Patch `jmp stub` over every entry registered with dt_stub(); returns the bytes to restore."""
         table, count_addr = self.stub_table
         count = self.read_u32(count_addr)
-        if count > 32:
-            raise RuntimeError(f"dt_stub: {count} stubs registered, at most 32 supported")
+        if count > 128:
+            raise RuntimeError(f"dt_stub: {count} stubs registered, at most 128 supported")
         saved = []
         for i in range(count):
             orig, ours, stub = struct.unpack("<3I", self.uc.mem_read(table + 12 * i, 12))

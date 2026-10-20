@@ -43,6 +43,8 @@ _Static_assert(sizeof(GuiPad) == 0x28, "GuiPad layout");
 /* Controller layer (zge/zasset.c), not ported yet. */
 ORIG_FN(0x00480370, GuiPadDevice *, zpadCreateDevice, (int kind));
 ORIG_FN(0x004803c0, void, zpadDestroyDevice, (GuiPadDevice * device));
+/* The n-th device of the controller list, or NULL (used by the key binding screen). */
+ORIG_FN(0x00480400, GuiPadDevice *, zpadGetDevice, (int index));
 
 GuiPad *guiPadGet(uint32_t index);
 void guiPadInit(void);

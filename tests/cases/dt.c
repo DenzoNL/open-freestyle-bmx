@@ -24,7 +24,7 @@ typedef struct DtStub {
     void *stub;
 } DtStub;
 
-#define DT_MAX_STUBS 32
+#define DT_MAX_STUBS 128
 __declspec(dllexport) DtStub dt_stubs[DT_MAX_STUBS];
 __declspec(dllexport) uint32_t dt_stub_count;
 
