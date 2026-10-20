@@ -12,6 +12,8 @@ struct ZbspLevelFace;
 #define gZtaginfFaces     ORIG_VAR(0x006728c0, struct ZbspLevelFace *, gZtaginfFaces)
 #define gZtaginfFaceCount ORIG_VAR(0x006728bc, uint32_t, gZtaginfFaceCount)
 
+/* Frees the level tag tables. */
+ORIG_FN(0x0048d8d0, void, ztaginfRelease, (void));
 ORIG_FN(0x0048d980, struct ZbspLevelFace *, ztaginfGetFaces, (void));
 ORIG_FN(0x0048d990, uint32_t, ztaginfGetFaceCount, (void));
 

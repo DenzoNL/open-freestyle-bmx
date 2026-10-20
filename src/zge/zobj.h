@@ -10,6 +10,13 @@
 struct ZbspTreeNode;
 struct PhysPropNode;
 
+/* Allocates a zeroed-by-zobjInit object slot (0x3c bytes used) from the object free list; NULL on failure. */
+ORIG_FN(0x00487370, void *, zobjAlloc, (void));
+/* Clears an object, resets its rotation to the identity and sets its type (0-7). */
+ORIG_FN(0x004873a0, void *, zobjInit, (void *object, uint32_t type));
+/* Calls the destroy hook of the object's type, then frees it. */
+ORIG_FN(0x00487400, int, zobjFree, (void *object));
+
 /* Shows or hides an object handle and notifies its owner. */
 ORIG_FN(0x00487600, void, zobjSetVisible, (int32_t object, int visible));
 

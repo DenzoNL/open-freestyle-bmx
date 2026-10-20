@@ -33,6 +33,9 @@ ORIG_FN(0x004a56fe, unsigned long, strtoul, (const char *s, char **end, int base
 ORIG_FN(0x0051d2f0, char *, _strupr, (char *s));
 ORIG_FN(0x0051d390, int, _stricmp, (const char *a, const char *b));
 ORIG_FN(0x004a51c8, int, printf, (const char *fmt, ...));
+ORIG_FN(0x004a6391, int, sscanf, (const char *s, const char *fmt, ...));
+/* The CRT's assert handler: (expression text, file, line). */
+ORIG_FN(0x004a4de8, void, _assert, (const char *expr, const char *file, unsigned line));
 ORIG_FN(0x004a4aa7, void, qsort, (void *base, size_t n, size_t size, int (*cmp)(const void *, const void *)));
 #else
 #include <ctype.h>

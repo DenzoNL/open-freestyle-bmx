@@ -121,5 +121,11 @@ round floats (so the hook build uses SSE2, not x87). Rules are in CONTRIBUTING.m
 
 ## Open
 
+- **x87 transcendentals in the native build.** `compat/x87.h` uses real x87 instructions in the hook
+  build (FSIN/FPATAN for the trig lookup tables; x87 NaN propagation in the rotate helpers). The native
+  fallback uses libm. Before the platform flip, generate the tables natively and compare every entry
+  against the emulator's (`zmathInitTables`). If any differ, use correctly rounded values (they're
+  constants; ship them as generated data computed from the original's formula).
+
 
 - How CI gets the original exe for the differential tests. Until then CI skips them and they run locally.

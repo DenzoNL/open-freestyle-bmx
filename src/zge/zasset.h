@@ -14,4 +14,8 @@ ORIG_FN(0x00480850, uint32_t, zassetSize, (int lib));
 /* Reads the selected resource into dst; returns 1 on success. */
 ORIG_FN(0x00480930, int, zassetRead, (int lib, void *dst));
 
+/* Number of resources in the library, and a step to the next one (the selection of the loop in zscene.c). */
+ORIG_FN(0x00480720, int, zassetCount, (int lib));
+ORIG_FN(0x00480730, void, zassetNext, (int lib));
+
 #endif
