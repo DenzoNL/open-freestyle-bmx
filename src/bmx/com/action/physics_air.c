@@ -380,8 +380,8 @@ void bmxphysUpdatePositionAir(PhysRider *r)
                 bmxSoundPlayAt(0xbb9, &r->pos, (int)(((uint32_t)r->player << 28) | 0x109), 0x7f, 0);
                 return;
             }
-        } else if ((hit.flags & 2) != 0 && objectInfo(hit.object) != NULL) {
-            if (physObjectTouch(r->player, objectInfo(hit.object)) == 0) {
+        } else if ((hit.flags & 2) != 0 && objectInfo(hit.objectData) != NULL) {
+            if (physObjectTouch(r->player, objectInfo(hit.objectData)) == 0) {
                 goto airborne;
             }
         }
@@ -396,8 +396,8 @@ void bmxphysUpdatePositionAir(PhysRider *r)
                 material = *(const uint32_t *)hit.material & 0xf;
             }
         } else if ((hit.flags & 2) != 0) {
-            const uint8_t *info = worldObjectInfo(hit.objectId);
-            if (worldObjectState(hit.objectId) != NULL) {
+            const uint8_t *info = worldObjectInfo(hit.object);
+            if (worldObjectState(hit.object) != NULL) {
                 material = info[2];
             }
         }
@@ -514,7 +514,7 @@ void bmxphysUpdatePositionAir(PhysRider *r)
             if (kind == 0 || kind > 3) {
                 continue;
             }
-            contact = physFindQuarterpipeEdge(hit.faceIndex, (int)(faceWord(hit.face) & 0xfff), &r->pos);
+            contact = physFindQuarterpipeEdge(hit.id, (int)(faceWord(hit.face) & 0xfff), &r->pos);
             surface = faceWord(hit.face) >> 12;
             if (contact == NULL) {
                 gZdebugPrint("bmxphysUpdatePositionAir: quarterpipe face with no assigned edge, ID=%d\n",
@@ -525,9 +525,9 @@ void bmxphysUpdatePositionAir(PhysRider *r)
             r->surface = (uint8_t)surface;
             r->contact = contact;
             physSnapshotContact(r);
-        } else if ((hit.flags & 2) != 0 && hit.object != NULL) {
+        } else if ((hit.flags & 2) != 0 && hit.objectData != NULL) {
             r->surface = 0xc;
-            r->contact = hit.object;
+            r->contact = hit.objectData;
             physSnapshotContact(r);
         }
         continue;
@@ -768,7 +768,8 @@ bodyProbe: {
                 goto deadly;
             }
         } else if ((hit.flags & 2) != 0) {
-            if (objectInfo(hit.object) != NULL && physObjectTouch(r->player, objectInfo(hit.object)) == 0) {
+            if (objectInfo(hit.objectData) != NULL &&
+                physObjectTouch(r->player, objectInfo(hit.objectData)) == 0) {
                 continue;
             }
         }
@@ -874,6 +875,6 @@ deadly:
 
 signalObject:
     if ((hit.flags & 2) != 0) {
-        worldObjectSignal(hit.object, 0);
+        worldObjectSignal(hit.objectData, 0);
     }
 }

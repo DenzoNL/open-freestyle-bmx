@@ -48,7 +48,10 @@ value held in an x87 register behaves exactly like a C `double`. A value the ori
    swapped (that's exact), but `(a+b)+c` and `a+(b+c)` differ.
 4. Functions that return a value in `st0` are declared `double` (callers may use it unrounded). If the
    callee pushed a `float` from memory, the value is exact either way.
-5. `_ftol` (`CALL 0x004a4a80`) is a truncating `(int)` cast of the current `st0`. A narrower result such as
+5. `_ftol` (`CALL 0x004a4a80`) truncates `st0` to a **64-bit** integer and returns the low 32 bits (`EDX:EAX`).
+   In range, that's a plain `(int)` cast. Out of range or NaN it differs: NaN and huge values give 0, and
+   values beyond int32 wrap. Use `bmxFtol(double)` from `compat/crt.h` whenever the value isn't provably in
+   range. A narrower result such as `MOV SI,AX` is a cast to `int16_t`.
    `MOV SI,AX` is a cast to `int16_t`.
 6. `FCOMP` and `FNSTSW`, then `TEST AH,0x41 / JZ`, mean "jump if `st0 > operand`". `TEST AH,1` means
    `st0 < operand`. Compare the double in the register, not the rounded float, unless the original

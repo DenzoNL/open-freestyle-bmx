@@ -8,6 +8,7 @@
 
 #include <stdint.h>
 
+#include "bmx/com/action/physics_hit.h"
 #include "bmx/com/action/physics_types.h"
 #include "compat/orig.h"
 #include "zge/zmath.h"

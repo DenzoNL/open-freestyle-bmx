@@ -20,20 +20,10 @@
 0x074 float travelVel
 0x080 int32_t material
 
-@PhysRayHit 0x44
-0x000 uint8_t flags     /* bit 0: terrain face hit, bit 1: object hit */
-0x004 int32_t faceIndex
-0x008 ZVec3 point
-0x01c ZVec3 normal
-0x028 float normalW
-0x030 void_ptr face     /* face record; uint16 at +0x16 is kind << 12 | id */
-0x038 void_ptr material /* low nibble of the first dword is the surface material */
-0x03c int32_t objectId
-0x040 void_ptr object
-
 @PhysRider 0xf70
 0x038 uint32_t flags
 0x03c uint8_t player
+0x03d uint8_t stateLevel[4] /* read through riderGetStateLevel (0x431dd0) */
 0x044 int16_t field44 /* signed input that tilts the bike actor (0x42ba50) */
 0x04a uint8_t anim
 0x04b uint8_t ikPose /* index into the IK limb mask table at 0x55907c */

@@ -269,7 +269,7 @@ addr,size,file,confidence,name,status
 00425760,96,bmx/com/action/physics.c,contiguous,FUN_00425760,orig
 004257e0,238,bmx/com/action/physics.c,contiguous,FUN_004257e0,orig
 00425910,23,bmx/com/action/physics.c,contiguous,FUN_00425910,orig
-00425940,10654,bmx/com/action/physics.c,assert,PhysFuncVeryBig,orig
+00425940,10654,bmx/com/action/physics_roll.c,assert,PhysFuncVeryBig,ported
 00428df0,6892,bmx/com/action/physics_air.c,assert,FUN_00428df0,ported
 0042afd0,158,bmx/com/action/physics.c,affinity,GrindFunc,orig
 0042b0a0,668,bmx/com/action/physics.c,affinity,GrindFunc2,orig

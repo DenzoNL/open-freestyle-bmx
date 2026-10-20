@@ -227,8 +227,8 @@ static int BMX_CDECL stubRaycast(const ZVec3 *from, const ZVec3 *to, PhysRayHit 
         hit->normal.z = 0.0f;
     }
     hit->normalW = dt_float(-100.0f, 100.0f);
-    hit->faceIndex = (int32_t)dt_u32();
-    hit->objectId = (int32_t)(dt_u32() & 0xffff);
+    hit->id = (int32_t)dt_u32();
+    hit->object = (int32_t)(dt_u32() & 0xffff);
     switch (dt_u32() % 8) {
     case 0:
         hit->flags = 2;
@@ -247,19 +247,19 @@ static int BMX_CDECL stubRaycast(const ZVec3 *from, const ZVec3 *to, PhysRayHit 
     if (gWorld.kindBias >= 0 && (dt_u32() & 1)) {
         uint8_t *f = gWorld.face[dt_u32() % kFaces];
         *(uint16_t *)(f + 0x16) = (uint16_t)(gWorld.kindBias << 12 | (dt_u32() & 0xfff));
-        hit->face = f;
+        hit->face = (PhysFace *)f;
     } else {
-        hit->face = (dt_u32() % 16) == 0 ? NULL : gWorld.face[dt_u32() % kFaces];
+        hit->face = (dt_u32() % 16) == 0 ? NULL : (PhysFace *)gWorld.face[dt_u32() % kFaces];
     }
     if (hit->face == NULL) {
         hit->flags &= (uint8_t)~1u;
     }
     hit->material = (dt_u32() % 5) == 0 ? NULL : gWorld.material[dt_u32() % 3];
     if (hit->material != NULL) {
-        *(uint32_t *)hit->material = pct(gWorld.deadlyPct) ? 6 : dt_u32();
+        *(uint32_t *)(uintptr_t)hit->material = pct(gWorld.deadlyPct) ? 6 : dt_u32();
     }
-    hit->object = (dt_u32() % 6) == 0 ? NULL : gWorld.object[dt_u32() % kObjects];
-    if (hit->object == NULL) {
+    hit->objectData = (dt_u32() % 6) == 0 ? NULL : (PhysCollObject *)gWorld.object[dt_u32() % kObjects];
+    if (hit->objectData == NULL) {
         hit->flags &= (uint8_t)~2u; /* both functions dereference the object of an object hit */
     }
     return 1 + (int)(dt_u32() & 0xff);

@@ -9,6 +9,7 @@
 
 #include <stdarg.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #if defined(BMX_HOOK)
 void *memcpy(void *dst, const void *src, size_t n);
@@ -49,5 +50,18 @@ static inline char *_strupr(char *s)
     return s;
 }
 #endif
+
+/*
+ * MSVC6 _ftol: truncate to a 64-bit integer (FISTP qword with the rounding mode set to chop) and
+ * return the low 32 bits. NaN and values outside int64 produce the "integer indefinite"
+ * 0x8000000000000000, whose low half is 0.
+ */
+static inline int32_t bmxFtol(double v)
+{
+    if (!(v > -9223372036854775808.0 && v < 9223372036854775808.0)) {
+        return 0;
+    }
+    return (int32_t)(uint32_t)(uint64_t)(int64_t)v;
+}
 
 #endif

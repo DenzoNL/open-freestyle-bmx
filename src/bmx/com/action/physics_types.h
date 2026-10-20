@@ -58,38 +58,12 @@ _Static_assert(offsetof(PhysWheel, travel) == 0x70, "PhysWheel.travel");
 _Static_assert(offsetof(PhysWheel, travelVel) == 0x74, "PhysWheel.travelVel");
 _Static_assert(offsetof(PhysWheel, material) == 0x80, "PhysWheel.material");
 
-typedef struct PhysRayHit {
-    uint8_t flags; /* bit 0: terrain face hit, bit 1: object hit */
-    uint8_t pad001[0x3];
-    int32_t faceIndex;
-    ZVec3 point;
-    uint8_t pad014[0x8];
-    ZVec3 normal;
-    float normalW;
-    uint8_t pad02c[0x4];
-    void *face; /* face record; uint16 at +0x16 is kind << 12 | id */
-    uint8_t pad034[0x4];
-    void *material; /* low nibble of the first dword is the surface material */
-    int32_t objectId;
-    void *object;
-} PhysRayHit;
-
-_Static_assert(sizeof(PhysRayHit) == 0x44, "PhysRayHit size");
-_Static_assert(offsetof(PhysRayHit, flags) == 0x0, "PhysRayHit.flags");
-_Static_assert(offsetof(PhysRayHit, faceIndex) == 0x4, "PhysRayHit.faceIndex");
-_Static_assert(offsetof(PhysRayHit, point) == 0x8, "PhysRayHit.point");
-_Static_assert(offsetof(PhysRayHit, normal) == 0x1c, "PhysRayHit.normal");
-_Static_assert(offsetof(PhysRayHit, normalW) == 0x28, "PhysRayHit.normalW");
-_Static_assert(offsetof(PhysRayHit, face) == 0x30, "PhysRayHit.face");
-_Static_assert(offsetof(PhysRayHit, material) == 0x38, "PhysRayHit.material");
-_Static_assert(offsetof(PhysRayHit, objectId) == 0x3c, "PhysRayHit.objectId");
-_Static_assert(offsetof(PhysRayHit, object) == 0x40, "PhysRayHit.object");
-
 typedef struct PhysRider {
     uint8_t pad000[0x38];
     uint32_t flags;
     uint8_t player;
-    uint8_t pad03d[0x7];
+    uint8_t stateLevel[4]; /* read through riderGetStateLevel (0x431dd0) */
+    uint8_t pad041[0x3];
     int16_t field44; /* signed input that tilts the bike actor (0x42ba50) */
     uint8_t pad046[0x4];
     uint8_t anim;
@@ -188,6 +162,7 @@ typedef struct PhysRider {
 _Static_assert(sizeof(PhysRider) == 0xf70, "PhysRider size");
 _Static_assert(offsetof(PhysRider, flags) == 0x38, "PhysRider.flags");
 _Static_assert(offsetof(PhysRider, player) == 0x3c, "PhysRider.player");
+_Static_assert(offsetof(PhysRider, stateLevel) == 0x3d, "PhysRider.stateLevel");
 _Static_assert(offsetof(PhysRider, field44) == 0x44, "PhysRider.field44");
 _Static_assert(offsetof(PhysRider, anim) == 0x4a, "PhysRider.anim");
 _Static_assert(offsetof(PhysRider, ikPose) == 0x4b, "PhysRider.ikPose");
