@@ -6,6 +6,16 @@
 
 #include "compat/orig.h"
 
+/* Vertex of the 3D debug primitives: position and an RGB colour. */
+typedef struct NgifVert3 {
+    float x, y, z;
+    uint32_t pad;
+    uint8_t rgb[3];
+    uint8_t pad13;
+} NgifVert3;
+
+ORIG_FN(0x00463130, void, ngifDrawPoly3D, (int flags, int count, const NgifVert3 *verts, int texture));
+ORIG_FN(0x00463710, void, ngifDrawLine3D, (int flags, const NgifVert3 *a, const NgifVert3 *b));
 ORIG_FN(0x004639f0, int, ngifInit, (void));
 ORIG_FN(0x00463a60, void, ngifShutdown, (void));
 ORIG_FN(0x00463ab0, void, ngifBegin, (void));

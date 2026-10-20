@@ -426,7 +426,7 @@ static void rand_hit(PhysRayHit *h, const ZMatrix *b, int wallBias, int faceBias
     if (dt_u32() % 12 == 0) {
         type = 9; /* prop face */
     }
-    h->face->info = (uint16_t)(type << 12 | (dt_u32() & 0xfff));
+    h->face->tag = (uint16_t)(type << 12 | (dt_u32() & 0xfff));
     if (h->kind != 1 || dt_u32() % 5) { /* object hits always carry a material (hazards read it) */
         mat = alloc_contact();
         *mat = dt_u32() & 0x18000f;

@@ -135,9 +135,15 @@ typedef struct PhysRider {
     int16_t fieldB9C;
     uint8_t padb9e[0x6];
     uint32_t fieldBA4;
-    uint8_t padba8[0x14];
+    uint8_t padba8[0x4];
+    uint16_t motionIndex; /* index into gPhysMotions */
+    uint8_t padbae[0x2];
+    void *motionSample; /* ZMotionDelta of the last scripted-motion step */
+    uint16_t motionFlags;
+    uint8_t padbb6[0x6];
     float ikBlend; /* weight of the IK limb targets */
-    uint8_t padbc0[0x3c];
+    float motionScale;
+    uint8_t padbc4[0x38];
     ZVec3 fieldBFC;
     uint8_t padc08[0x8];
     ZVec3 center;
@@ -207,7 +213,11 @@ _Static_assert(offsetof(PhysRider, actor) == 0xb94, "PhysRider.actor");
 _Static_assert(offsetof(PhysRider, actor2) == 0xb98, "PhysRider.actor2");
 _Static_assert(offsetof(PhysRider, fieldB9C) == 0xb9c, "PhysRider.fieldB9C");
 _Static_assert(offsetof(PhysRider, fieldBA4) == 0xba4, "PhysRider.fieldBA4");
+_Static_assert(offsetof(PhysRider, motionIndex) == 0xbac, "PhysRider.motionIndex");
+_Static_assert(offsetof(PhysRider, motionSample) == 0xbb0, "PhysRider.motionSample");
+_Static_assert(offsetof(PhysRider, motionFlags) == 0xbb4, "PhysRider.motionFlags");
 _Static_assert(offsetof(PhysRider, ikBlend) == 0xbbc, "PhysRider.ikBlend");
+_Static_assert(offsetof(PhysRider, motionScale) == 0xbc0, "PhysRider.motionScale");
 _Static_assert(offsetof(PhysRider, fieldBFC) == 0xbfc, "PhysRider.fieldBFC");
 _Static_assert(offsetof(PhysRider, center) == 0xc10, "PhysRider.center");
 _Static_assert(offsetof(PhysRider, basis) == 0xc20, "PhysRider.basis");
@@ -225,5 +235,68 @@ _Static_assert(offsetof(PhysRider, wheel) == 0xc88, "PhysRider.wheel");
 _Static_assert(offsetof(PhysRider, bikeObj) == 0xd90, "PhysRider.bikeObj");
 _Static_assert(offsetof(PhysRider, bikeObj2) == 0xd94, "PhysRider.bikeObj2");
 _Static_assert(offsetof(PhysRider, ik) == 0xd98, "PhysRider.ik");
+
+typedef struct PhysEdge {
+    uint8_t pad000[0x4];
+    int8_t kind;
+    uint8_t pad005[0x3];
+    int16_t a[3];
+    int16_t b[3];
+    int16_t length;
+    uint16_t tag;
+    ZVec3 dir;
+    ZVec3 normal;
+    float d;
+    void *prop;
+} PhysEdge;
+
+_Static_assert(sizeof(PhysEdge) == 0x38, "PhysEdge size");
+_Static_assert(offsetof(PhysEdge, kind) == 0x4, "PhysEdge.kind");
+_Static_assert(offsetof(PhysEdge, a) == 0x8, "PhysEdge.a");
+_Static_assert(offsetof(PhysEdge, b) == 0xe, "PhysEdge.b");
+_Static_assert(offsetof(PhysEdge, length) == 0x14, "PhysEdge.length");
+_Static_assert(offsetof(PhysEdge, tag) == 0x16, "PhysEdge.tag");
+_Static_assert(offsetof(PhysEdge, dir) == 0x18, "PhysEdge.dir");
+_Static_assert(offsetof(PhysEdge, normal) == 0x24, "PhysEdge.normal");
+_Static_assert(offsetof(PhysEdge, d) == 0x30, "PhysEdge.d");
+_Static_assert(offsetof(PhysEdge, prop) == 0x34, "PhysEdge.prop");
+
+typedef struct PhysFace {
+    ZVec3 normal;
+    float d;
+    uint8_t pad010[0x5];
+    uint8_t flags;
+    uint16_t tag;
+    uint8_t pad018[0x4];
+    void *vert[4];
+    uint8_t pad02c[0x5c];
+} PhysFace;
+
+_Static_assert(sizeof(PhysFace) == 0x88, "PhysFace size");
+_Static_assert(offsetof(PhysFace, normal) == 0x0, "PhysFace.normal");
+_Static_assert(offsetof(PhysFace, d) == 0xc, "PhysFace.d");
+_Static_assert(offsetof(PhysFace, flags) == 0x15, "PhysFace.flags");
+_Static_assert(offsetof(PhysFace, tag) == 0x16, "PhysFace.tag");
+_Static_assert(offsetof(PhysFace, vert) == 0x1c, "PhysFace.vert");
+
+typedef struct PhysGroundHit {
+    uint32_t flags;
+    ZVec3 pos;
+    uint8_t pad010[0x4];
+    ZVec3 normal;
+    float d;
+    void *face;
+    void *material;
+    void *edge;
+} PhysGroundHit;
+
+_Static_assert(sizeof(PhysGroundHit) == 0x30, "PhysGroundHit size");
+_Static_assert(offsetof(PhysGroundHit, flags) == 0x0, "PhysGroundHit.flags");
+_Static_assert(offsetof(PhysGroundHit, pos) == 0x4, "PhysGroundHit.pos");
+_Static_assert(offsetof(PhysGroundHit, normal) == 0x14, "PhysGroundHit.normal");
+_Static_assert(offsetof(PhysGroundHit, d) == 0x20, "PhysGroundHit.d");
+_Static_assert(offsetof(PhysGroundHit, face) == 0x24, "PhysGroundHit.face");
+_Static_assert(offsetof(PhysGroundHit, material) == 0x28, "PhysGroundHit.material");
+_Static_assert(offsetof(PhysGroundHit, edge) == 0x2c, "PhysGroundHit.edge");
 
 #endif

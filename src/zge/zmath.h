@@ -41,11 +41,14 @@ _Static_assert(sizeof(ZMatrix) == 64, "RwMatrix layout");
  */
 ORIG_FN(0x00480d20, int, zmathInitTables, (void));
 ORIG_FN(0x00480e40, double, zmathSin, (ZAngle a));
+ORIG_FN(0x00480e60, ZAngle, zmathAsin, (float s));
 ORIG_FN(0x00480eb0, double, zmathCos, (ZAngle a));
 ORIG_FN(0x00480ed0, ZAngle, zmathAcos, (float c));
 ORIG_FN(0x00480ff0, ZAngle, zmathAtan2, (float y, float x));
 ORIG_FN(0x004811c0, double, zvec3NormalizeScaled, (ZVec3 * out, const ZVec3 *v));
 ORIG_FN(0x00481310, double, zvec3Length, (const ZVec3 *v));
+/* Steps the engine's pseudo random generator (seed at 0x6702d0) and returns the new value. */
+ORIG_FN(0x00481f80, uint32_t, zmathRandom, (void));
 ORIG_FN(0x00481fc0, void, zmatrixToEuler, (ZAngle3 * out, const ZMatrix *m, int order));
 
 #endif

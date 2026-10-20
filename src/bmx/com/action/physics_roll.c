@@ -230,7 +230,7 @@ static int rollProbeWalls(PhysRider *r, RollState *s, unsigned w)
             continue;
         }
         s->n = hit->normal;
-        if (!x87Equal(s->n.y, 0.0) || (hit->face->info & 0xf000)) {
+        if (!x87Equal(s->n.y, 0.0) || (hit->face->tag & 0xf000)) {
             /* Ignore ground: a face is a wall only if it is steep relative to the bike. */
             if (zmathAcos((float)__builtin_fabs(zvec3Dot(&r->basis.at, &s->n))) > 0x1555 &&
                 zmathAcos((float)zvec3Dot(&r->basis.up, &s->n)) < gPhysWallAngle) {
@@ -243,7 +243,7 @@ static int rollProbeWalls(PhysRider *r, RollState *s, unsigned w)
             continue;
         }
         lands = 1;
-        if ((hit->face->info & 0xf000) == 0x9000 && pen > 0.0f) {
+        if ((hit->face->tag & 0xf000) == 0x9000 && pen > 0.0f) {
             propHitFace(r->player, hit->face);
             lands = 0;
         }
@@ -300,7 +300,7 @@ static int rollLaunch(PhysRider *r, RollState *s)
     r->vel.y = vy;
     vz = (double)r->vel.z - d * n->z;
     r->vel.z = (float)vz;
-    kick = (double)(int16_t)(face->info & 0xfff);
+    kick = (double)(int16_t)(face->tag & 0xfff);
     r->vel.x = (float)(kick * n->x + vx);
     r->vel.y = (float)(kick * n->y + vy);
     r->vel.z = (float)(kick * n->z + vz);
@@ -324,20 +324,20 @@ static int rollSurface(PhysRider *r, RollState *s)
     if ((hit->kind & 1) && hit->face) {
         PhysFace *face = hit->face;
         void *contact = face;
-        unsigned type = face->info >> 12;
+        unsigned type = face->tag >> 12;
         int res;
 
         switch (type) {
         case 1:
         case 2:
         case 3: {
-            PhysQpEdge *edge = physFindQuarterpipeEdge(hit->id, face->info & 0xfff, &r->pos);
+            PhysQpEdge *edge = physFindQuarterpipeEdge(hit->id, face->tag & 0xfff, &r->pos);
             ZVec3 edgeDir;
 
-            type = face->info >> 12;
+            type = face->tag >> 12;
             if (!edge) {
                 gZdebugPrint("bmxphysUpdatePositionRoll: quarterpipe face with no assigned edge, ID=%d\n",
-                             face->info & 0xfff);
+                             face->tag & 0xfff);
                 type = 0;
                 break;
             }

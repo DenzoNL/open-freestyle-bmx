@@ -59,8 +59,6 @@ ORIG_FN(0x00466610, void, ngifzBspObjectHit, (PhysCollObject * object, int a));
 ORIG_FN(0x00463710, void, ngifDrawLine3D, (int mode, const PhysDebugVertex *a, const PhysDebugVertex *b));
 
 /* TODO(file): zge/zgemods/zobjcamera.h (vector helpers). */
-ORIG_FN(0x004812f0, void, zvec3Negate, (ZVec3 * out, const ZVec3 *in));
-ORIG_FN(0x00481e90, void, zmatrixTranspose, (ZMatrix * out, const ZMatrix *in));
 ORIG_FN(0x00481f80, uint32_t, zmathRand, (void));
 
 /* Tunables (.data). */

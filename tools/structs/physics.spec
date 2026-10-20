@@ -68,7 +68,11 @@
 0xb98 void_ptr actor2
 0xb9c int16_t fieldB9C
 0xba4 uint32_t fieldBA4
+0xbac uint16_t motionIndex /* index into gPhysMotions */
+0xbb0 void_ptr motionSample /* ZMotionDelta of the last scripted-motion step */
+0xbb4 uint16_t motionFlags
 0xbbc float ikBlend /* weight of the IK limb targets */
+0xbc0 float motionScale
 0xbfc ZVec3 fieldBFC
 0xc10 ZVec3 center
 0xc20 ZMatrix basis
@@ -86,3 +90,36 @@
 0xd90 void_ptr bikeObj
 0xd94 void_ptr bikeObj2
 0xd98 uint8_t ik[0x1d8] /* IK limb targets of the rider actor (0x457790 fills, 0x456120 applies) */
+
+# Grind edge / lip record (contact of surfaces 1, 2, 3 and 9), 0x38 bytes. kind 1 and 2 pick different
+# grind sounds; a/b are the end points (world units), dir the unit vector a -> b, normal/d the plane of
+# the edge; tag: top nibble surface kind, low 12 bits id; prop: owner whose +0x1ec goes to the prop module.
+@PhysEdge 0x38
+0x004 int8_t kind
+0x008 int16_t a[3]
+0x00e int16_t b[3]
+0x014 int16_t length
+0x016 uint16_t tag
+0x018 ZVec3 dir
+0x024 ZVec3 normal
+0x030 float d
+0x034 void_ptr prop
+
+# BSP face record (contact of the 0x88 byte surface kinds). flags: 1 quad, 0x10 no respawn; tag: top
+# nibble surface kind; vert: int16 x, y, z each.
+@PhysFace 0x88
+0x000 ZVec3 normal
+0x00c float d
+0x015 uint8_t flags
+0x016 uint16_t tag
+0x01c void_ptr vert[4]
+
+# Result of physProbeGround (flags 1: edge hit).
+@PhysGroundHit 0x30
+0x000 uint32_t flags
+0x004 ZVec3 pos
+0x014 ZVec3 normal
+0x020 float d
+0x024 void_ptr face
+0x028 void_ptr material
+0x02c void_ptr edge

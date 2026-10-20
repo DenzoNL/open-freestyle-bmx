@@ -5,15 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "bmx/com/action/physics_types.h"
 #include "zge/zmath.h"
-
-/* Terrain face record: the high nibble of `info` is the face type, the low 12 bits a type parameter. */
-typedef struct PhysFace {
-    uint8_t pad00[0x16];
-    uint16_t info;
-} PhysFace;
-
-_Static_assert(sizeof(PhysFace) == 0x18, "PhysFace size");
 
 /* Dynamic collision object (props). */
 typedef struct PhysCollObject {
@@ -24,8 +17,11 @@ typedef struct PhysCollObject {
 _Static_assert(sizeof(PhysCollObject) == 0x1f0, "PhysCollObject size");
 
 /*
- * Line test result (0x44 bytes, global at 0x56c128). Bit 0 of the first word: terrain face hit, bit 1:
- * object hit. Some callers test the byte, others compare the whole dword, hence the union.
+ * Line test / ray result (cleared to 0xd8 bytes by zcollideRay; the global copy at 0x56c128 uses the
+ * first 0x44). Bit 0 of the first word: terrain face hit, bit 1: object/edge hit. Some callers test the
+ * byte, others compare the whole dword, hence the union.
+ * TODO: the pointer at 0x40 is read as a collision object by the roll/air updates and as a grind edge by
+ * the contact code; find out whether flag 2 means both.
  */
 typedef struct PhysRayHit {
     union {
@@ -42,12 +38,17 @@ typedef struct PhysRayHit {
     uint8_t pad34[0x4];
     const uint32_t *material; /* bits 0-3 surface material, bits 19-20 hazard kind */
     int32_t object;           /* collision object handle */
-    PhysCollObject *objectData;
+    union {
+        PhysCollObject *objectData;
+        PhysEdge *edge;
+    };
+    uint8_t pad44[0x94];
 } PhysRayHit;
 
-_Static_assert(sizeof(PhysRayHit) == 0x44, "PhysRayHit size");
+_Static_assert(sizeof(PhysRayHit) == 0xd8, "PhysRayHit size");
 _Static_assert(offsetof(PhysRayHit, normal) == 0x1c, "PhysRayHit.normal");
 _Static_assert(offsetof(PhysRayHit, face) == 0x30, "PhysRayHit.face");
+_Static_assert(offsetof(PhysRayHit, material) == 0x38, "PhysRayHit.material");
 _Static_assert(offsetof(PhysRayHit, objectData) == 0x40, "PhysRayHit.objectData");
 
 #endif
