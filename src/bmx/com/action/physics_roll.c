@@ -148,7 +148,7 @@ static int rollWallHit(PhysRider *r, RollState *s, unsigned w, float pen)
         }
         bmxSoundPlayAt(0xbbc, &r->pos, (int)((uint32_t)r->player << 28 | snd | 0x100), vol, 0);
     }
-    if (!((double)gPhysBailImpact * r->field6E0 > pen)) {
+    if (!((double)gPhysBailImpact * r->stat[4] > pen)) {
         physSetState(r, 2);
         r->bailReason = 0;
         riderAddScore(r, 0, pen);

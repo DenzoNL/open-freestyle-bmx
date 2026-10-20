@@ -359,7 +359,7 @@ static void setup_roll(DtCtx *c, Scenario sc)
     r->fieldBA4 = dt_u32() & 8;
     r->state = (uint8_t)dt_range(0, 6);
     r->surface = (uint8_t)(dt_u32() % 3 ? 0 : dt_range(1, 3));
-    r->field6E0 = dt_u32() % 4 ? dt_float(0.2f, 2.0f) : dt_float(0.0f, 0.1f);
+    r->stat[4] = dt_u32() % 4 ? dt_float(0.2f, 2.0f) : dt_float(0.0f, 0.1f);
     r->impactTotal = dt_float(0.0f, 50.0f);
     r->field58 = dt_range(0, 1000);
     rand_basis(&r->basis, dt_u32() % 4 ? 1 : 5);

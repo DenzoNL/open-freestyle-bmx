@@ -15,5 +15,7 @@ ORIG_FN(0x0046bf30, void, ngifzresRegister, (int id, uint32_t a, uint32_t b));
 ORIG_FN(0x0046be10, int, ngifzresInit, (void));
 ORIG_FN(0x0046bef0, int, ngifzresReset, (void));
 ORIG_FN(0x0046bed0, void, ngifzresShutdown, (void));
+/* Reads the 100 byte level info record `index` into a static buffer (0 for an index past the last). */
+ORIG_FN(0x0046b990, const uint8_t *, ngifzresLoadLevelInfo, (uint32_t index));
 
 #endif

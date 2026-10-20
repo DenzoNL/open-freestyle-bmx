@@ -58,25 +58,86 @@ _Static_assert(offsetof(PhysWheel, travel) == 0x70, "PhysWheel.travel");
 _Static_assert(offsetof(PhysWheel, travelVel) == 0x74, "PhysWheel.travelVel");
 _Static_assert(offsetof(PhysWheel, material) == 0x80, "PhysWheel.material");
 
+typedef struct RiderTrick {
+    uint8_t flags; /* bits 0..2: bonus multipliers */
+    uint8_t trick; /* 0xff: none */
+    uint8_t style;
+    uint8_t spin;
+    uint8_t tier;
+    uint8_t pad005[0x1];
+    int16_t count;
+    uint8_t pad008[0x2];
+    uint16_t points;
+    float duration; /* summed per trick family for the HUD */
+} RiderTrick;
+
+_Static_assert(sizeof(RiderTrick) == 0x10, "RiderTrick size");
+_Static_assert(offsetof(RiderTrick, flags) == 0x0, "RiderTrick.flags");
+_Static_assert(offsetof(RiderTrick, trick) == 0x1, "RiderTrick.trick");
+_Static_assert(offsetof(RiderTrick, style) == 0x2, "RiderTrick.style");
+_Static_assert(offsetof(RiderTrick, spin) == 0x3, "RiderTrick.spin");
+_Static_assert(offsetof(RiderTrick, tier) == 0x4, "RiderTrick.tier");
+_Static_assert(offsetof(RiderTrick, count) == 0x6, "RiderTrick.count");
+_Static_assert(offsetof(RiderTrick, points) == 0xa, "RiderTrick.points");
+_Static_assert(offsetof(RiderTrick, duration) == 0xc, "RiderTrick.duration");
+
+typedef struct RiderCombo {
+    uint8_t ready;
+    uint8_t pad001[0x3];
+    int32_t total;
+    int32_t points;
+    int32_t landed;
+    RiderTrick trick[8];
+    uint8_t runState; /* 0 riding, 1 combo open, 2 ended, 3 landing */
+    uint8_t count;
+    uint8_t timer;
+    uint8_t pad093[0x1];
+} RiderCombo;
+
+_Static_assert(sizeof(RiderCombo) == 0x94, "RiderCombo size");
+_Static_assert(offsetof(RiderCombo, ready) == 0x0, "RiderCombo.ready");
+_Static_assert(offsetof(RiderCombo, total) == 0x4, "RiderCombo.total");
+_Static_assert(offsetof(RiderCombo, points) == 0x8, "RiderCombo.points");
+_Static_assert(offsetof(RiderCombo, landed) == 0xc, "RiderCombo.landed");
+_Static_assert(offsetof(RiderCombo, trick) == 0x10, "RiderCombo.trick");
+_Static_assert(offsetof(RiderCombo, runState) == 0x90, "RiderCombo.runState");
+_Static_assert(offsetof(RiderCombo, count) == 0x91, "RiderCombo.count");
+_Static_assert(offsetof(RiderCombo, timer) == 0x92, "RiderCombo.timer");
+
 typedef struct PhysRider {
-    uint8_t pad000[0x38];
+    uint16_t look;
+    uint8_t bikeLook;
+    uint8_t pad003[0x1];
+    uint8_t padIndex; /* controller index */
+    uint8_t dirCount; /* stick directions of the trick being entered, then dirList */
+    uint8_t dirList[4];
+    uint8_t pad00a[0x2];
+    uint32_t inputBits; /* controller snapshot: bit flags, then the two stick axes */
+    uint32_t inputBits2;
+    float stick[4]; /* two sticks, x then y each, as read by the controller layer */
+    float axis[4];  /* the same scaled by 1/127 after rounding to a byte */
+    uint8_t pad034[0x4];
     uint32_t flags;
     uint8_t player;
     uint8_t stateLevel[4]; /* read through riderGetStateLevel (0x431dd0) */
-    uint8_t pad041[0x3];
-    int16_t field44; /* signed input that tilts the bike actor (0x42ba50) */
-    uint8_t pad046[0x4];
+    uint8_t pad041[0x1];
+    int16_t stateTimer[4]; /* frames spent in each state level; [1] doubles as the signed input that tilts the
+                              bike actor (0x42ba50) */
     uint8_t anim;
     uint8_t ikPose; /* index into the IK limb mask table at 0x55907c */
-    uint8_t pad04c[0x3];
+    uint8_t ikFrame;
+    uint8_t soundCooldown;
+    uint8_t hudByte;
     uint8_t bailReason;
-    uint8_t pad050[0x8];
+    int32_t spin;
+    int32_t field54;
     int32_t field58;
-    uint8_t pad05c[0x91];
-    uint8_t fieldED;
-    uint8_t pad0ee[0x2ca];
+    RiderCombo combo;
+    uint8_t pad0f0[0x2c8];
     float impactTotal;
-    uint8_t pad3bc[0x20];
+    uint8_t pad3bc[0x4];
+    uint32_t goalMask; /* goal results unlocked this run (game.c) */
+    uint8_t pad3c4[0x18];
     uint8_t state;
     uint8_t surface;
     int16_t timer;
@@ -114,10 +175,8 @@ typedef struct PhysRider {
     ZVec3 contactAxis1;
     uint8_t pad6ac[0x4];
     ZVec3 contactAxis2;
-    uint8_t pad6bc[0x24];
-    float field6E0;
-    float field6E4;
-    uint8_t pad6e8[0x4];
+    uint8_t pad6bc[0x14];
+    float stat[7]; /* rider and bike tuning: [4] and [5] feed the crash and grind formulas */
     ZMatrix orientA;
     ZAngle3 orientARot;
     uint8_t pad732[0x2];
@@ -133,19 +192,22 @@ typedef struct PhysRider {
     void *actor;
     void *actor2;
     int16_t fieldB9C;
-    uint8_t padb9e[0x6];
+    uint8_t padb9e[0x2];
+    void *fieldBA0; /* non-NULL while a pose is queued */
     uint32_t fieldBA4;
-    uint8_t padba8[0x4];
+    float animSpeed;
     uint16_t motionIndex; /* index into gPhysMotions */
     uint8_t padbae[0x2];
-    void *motionSample; /* ZMotionDelta of the last scripted-motion step */
-    uint16_t motionFlags;
-    uint8_t padbb6[0x6];
+    void *motionSample;   /* ZMotionDelta of the last scripted-motion step */
+    uint16_t motionFlags; /* the original reads and writes all 32 bits (with motionFlagsHi) */
+    uint16_t motionFlagsHi;
+    float motionWeight;
     float ikBlend; /* weight of the IK limb targets */
     float motionScale;
     uint8_t padbc4[0x38];
     ZVec3 fieldBFC;
-    uint8_t padc08[0x8];
+    uint8_t padc08[0x4];
+    int32_t bikeLookId;
     ZVec3 center;
     uint8_t padc1c[0x4];
     ZMatrix basis;
@@ -166,16 +228,31 @@ typedef struct PhysRider {
 } PhysRider;
 
 _Static_assert(sizeof(PhysRider) == 0xf70, "PhysRider size");
+_Static_assert(offsetof(PhysRider, look) == 0x0, "PhysRider.look");
+_Static_assert(offsetof(PhysRider, bikeLook) == 0x2, "PhysRider.bikeLook");
+_Static_assert(offsetof(PhysRider, padIndex) == 0x4, "PhysRider.padIndex");
+_Static_assert(offsetof(PhysRider, dirCount) == 0x5, "PhysRider.dirCount");
+_Static_assert(offsetof(PhysRider, dirList) == 0x6, "PhysRider.dirList");
+_Static_assert(offsetof(PhysRider, inputBits) == 0xc, "PhysRider.inputBits");
+_Static_assert(offsetof(PhysRider, inputBits2) == 0x10, "PhysRider.inputBits2");
+_Static_assert(offsetof(PhysRider, stick) == 0x14, "PhysRider.stick");
+_Static_assert(offsetof(PhysRider, axis) == 0x24, "PhysRider.axis");
 _Static_assert(offsetof(PhysRider, flags) == 0x38, "PhysRider.flags");
 _Static_assert(offsetof(PhysRider, player) == 0x3c, "PhysRider.player");
 _Static_assert(offsetof(PhysRider, stateLevel) == 0x3d, "PhysRider.stateLevel");
-_Static_assert(offsetof(PhysRider, field44) == 0x44, "PhysRider.field44");
+_Static_assert(offsetof(PhysRider, stateTimer) == 0x42, "PhysRider.stateTimer");
 _Static_assert(offsetof(PhysRider, anim) == 0x4a, "PhysRider.anim");
 _Static_assert(offsetof(PhysRider, ikPose) == 0x4b, "PhysRider.ikPose");
+_Static_assert(offsetof(PhysRider, ikFrame) == 0x4c, "PhysRider.ikFrame");
+_Static_assert(offsetof(PhysRider, soundCooldown) == 0x4d, "PhysRider.soundCooldown");
+_Static_assert(offsetof(PhysRider, hudByte) == 0x4e, "PhysRider.hudByte");
 _Static_assert(offsetof(PhysRider, bailReason) == 0x4f, "PhysRider.bailReason");
+_Static_assert(offsetof(PhysRider, spin) == 0x50, "PhysRider.spin");
+_Static_assert(offsetof(PhysRider, field54) == 0x54, "PhysRider.field54");
 _Static_assert(offsetof(PhysRider, field58) == 0x58, "PhysRider.field58");
-_Static_assert(offsetof(PhysRider, fieldED) == 0xed, "PhysRider.fieldED");
+_Static_assert(offsetof(PhysRider, combo) == 0x5c, "PhysRider.combo");
 _Static_assert(offsetof(PhysRider, impactTotal) == 0x3b8, "PhysRider.impactTotal");
+_Static_assert(offsetof(PhysRider, goalMask) == 0x3c0, "PhysRider.goalMask");
 _Static_assert(offsetof(PhysRider, state) == 0x3dc, "PhysRider.state");
 _Static_assert(offsetof(PhysRider, surface) == 0x3dd, "PhysRider.surface");
 _Static_assert(offsetof(PhysRider, timer) == 0x3de, "PhysRider.timer");
@@ -199,8 +276,7 @@ _Static_assert(offsetof(PhysRider, contactPos) == 0x680, "PhysRider.contactPos")
 _Static_assert(offsetof(PhysRider, contactAxis0) == 0x690, "PhysRider.contactAxis0");
 _Static_assert(offsetof(PhysRider, contactAxis1) == 0x6a0, "PhysRider.contactAxis1");
 _Static_assert(offsetof(PhysRider, contactAxis2) == 0x6b0, "PhysRider.contactAxis2");
-_Static_assert(offsetof(PhysRider, field6E0) == 0x6e0, "PhysRider.field6E0");
-_Static_assert(offsetof(PhysRider, field6E4) == 0x6e4, "PhysRider.field6E4");
+_Static_assert(offsetof(PhysRider, stat) == 0x6d0, "PhysRider.stat");
 _Static_assert(offsetof(PhysRider, orientA) == 0x6ec, "PhysRider.orientA");
 _Static_assert(offsetof(PhysRider, orientARot) == 0x72c, "PhysRider.orientARot");
 _Static_assert(offsetof(PhysRider, orientB) == 0x734, "PhysRider.orientB");
@@ -212,13 +288,18 @@ _Static_assert(offsetof(PhysRider, snapBPos) == 0xb84, "PhysRider.snapBPos");
 _Static_assert(offsetof(PhysRider, actor) == 0xb94, "PhysRider.actor");
 _Static_assert(offsetof(PhysRider, actor2) == 0xb98, "PhysRider.actor2");
 _Static_assert(offsetof(PhysRider, fieldB9C) == 0xb9c, "PhysRider.fieldB9C");
+_Static_assert(offsetof(PhysRider, fieldBA0) == 0xba0, "PhysRider.fieldBA0");
 _Static_assert(offsetof(PhysRider, fieldBA4) == 0xba4, "PhysRider.fieldBA4");
+_Static_assert(offsetof(PhysRider, animSpeed) == 0xba8, "PhysRider.animSpeed");
 _Static_assert(offsetof(PhysRider, motionIndex) == 0xbac, "PhysRider.motionIndex");
 _Static_assert(offsetof(PhysRider, motionSample) == 0xbb0, "PhysRider.motionSample");
 _Static_assert(offsetof(PhysRider, motionFlags) == 0xbb4, "PhysRider.motionFlags");
+_Static_assert(offsetof(PhysRider, motionFlagsHi) == 0xbb6, "PhysRider.motionFlagsHi");
+_Static_assert(offsetof(PhysRider, motionWeight) == 0xbb8, "PhysRider.motionWeight");
 _Static_assert(offsetof(PhysRider, ikBlend) == 0xbbc, "PhysRider.ikBlend");
 _Static_assert(offsetof(PhysRider, motionScale) == 0xbc0, "PhysRider.motionScale");
 _Static_assert(offsetof(PhysRider, fieldBFC) == 0xbfc, "PhysRider.fieldBFC");
+_Static_assert(offsetof(PhysRider, bikeLookId) == 0xc0c, "PhysRider.bikeLookId");
 _Static_assert(offsetof(PhysRider, center) == 0xc10, "PhysRider.center");
 _Static_assert(offsetof(PhysRider, basis) == 0xc20, "PhysRider.basis");
 _Static_assert(offsetof(PhysRider, fieldC60) == 0xc60, "PhysRider.fieldC60");

@@ -11,6 +11,7 @@
 #include "bmx/com/action/physics.h"
 #include "bmx/com/action/physics_hit.h"
 #include "bmx/com/action/physics_types.h"
+#include "bmx/com/action/rider.h"
 #include "compat/orig.h"
 #include "zge/zgemods/zobjcamera.h"
 #include "zge/zmath.h"
@@ -24,10 +25,6 @@ typedef struct PhysDebugVertex {
 } PhysDebugVertex;
 
 _Static_assert(sizeof(PhysDebugVertex) == 0x14, "PhysDebugVertex size");
-
-/* TODO(file): rider.c. */
-ORIG_FN(0x00431dd0, int, riderGetStateLevel, (PhysRider * r, unsigned level));
-ORIG_FN(0x00431e10, void, riderAddScore, (PhysRider * r, int kind, float amount));
 
 /* TODO(file): prop.c. */
 ORIG_FN(0x0042eec0, int, propTouch, (int player, int propId));

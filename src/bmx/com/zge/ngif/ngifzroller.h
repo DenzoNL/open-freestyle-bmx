@@ -171,4 +171,9 @@ void zrollerFreeSceneState(void);
 void zrollerSetSceneState(void);
 int zrollerSelectLook(void);
 
+/* Start position and orientation of player `index` (HARDCODED fallback when the level lacks one). */
+ORIG_FN(0x0046cf30, void, zrollerGetStart, (int index, ZVec3 *pos, ZAngle3 *rot));
+/* Creates the bike object for look `*lookId` (asserts <= 0x30). */
+ORIG_FN(0x0046c740, void *, zrollerCreateBike, (const int32_t *lookId));
+
 #endif

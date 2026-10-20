@@ -11,6 +11,7 @@
 #include "bmx/com/action/physics.h"
 #include "bmx/com/action/physics_hit.h"
 #include "bmx/com/action/physics_types.h"
+#include "bmx/com/action/rider.h"
 #include "compat/orig.h"
 #include "zge/zmath.h"
 
@@ -49,9 +50,6 @@ typedef uint32_t PhysIkLimbMasks[256];
 /* Game object touches (0x42eec0 returns 0 when the object is not solid for this player). */
 ORIG_FN(0x0042eec0, int, physObjectTouch, (int player, void *info));
 ORIG_FN(0x0042ef60, void, physFaceTrigger, (int player, void *face));
-/* rider.c. */
-ORIG_FN(0x00431dd0, int, riderGetStateLevel, (const PhysRider *r, unsigned level));
-ORIG_FN(0x00431e10, void, riderAddImpact, (PhysRider * r, int kind, float speed));
 /* Controller rumble (an empty stub in this build). */
 ORIG_FN(0x004086d0, void, padRumble, (int player, int a, int b));
 /* Rider actor inverse kinematics. */

@@ -463,4 +463,19 @@ int16_t zoverTextWidth(const char *text, const void *font);
 /* Parses a font resource into a font record; returns 0 on success. */
 int zoverParseFont(const void *data, void *font);
 
+/* Rider and bike motion objects (the animation layer under the rider actors). */
+ORIG_FN(0x00452e80, void *, zoverCreateRiderMotion, (void *actor, uint32_t flags));
+ORIG_FN(0x004526a0, void *, zoverCreateBikeMotion, (void));
+/* Registers the callback the motion object calls when a body part hits something. */
+typedef void(BMX_CDECL *ZoverHitFn)(uint32_t part, int index, float impact, const uint32_t *hit);
+ORIG_FN(0x00451280, void, zoverSetHitCallback, (void *motion, ZoverHitFn fn));
+ORIG_FN(0x00454400, void, zoverMotionSetupA, (void *motion, void *actor));
+ORIG_FN(0x00454430, void, zoverMotionSetupB, (void *motion, void *actor));
+ORIG_FN(0x00455f10, void, zoverReadLimbs, (void *actor, void *limbs));
+ORIG_FN(0x00454140, void, zoverRiderPoseA, (void *motion, void *actor));
+ORIG_FN(0x00453b70, void, zoverRiderPoseB, (void *motion, void *actor));
+ORIG_FN(0x004546a0, void, zoverRiderPoseC, (void *motion, void *actor));
+ORIG_FN(0x00454790, void, zoverRiderPoseD, (void *motion, void *actor));
+ORIG_FN(0x00453890, void, zoverRiderPoseE, (void *motion, void *actor));
+
 #endif

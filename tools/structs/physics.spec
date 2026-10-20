@@ -20,17 +20,54 @@
 0x074 float travelVel
 0x080 int32_t material
 
+# One scored trick of the current run (rider.c / game.c): stride 0x10 in RiderCombo.
+@RiderTrick 0x10
+0x00 uint8_t flags /* bits 0..2: bonus multipliers */
+0x01 uint8_t trick /* 0xff: none */
+0x02 uint8_t style
+0x03 uint8_t spin
+0x04 uint8_t tier
+0x06 int16_t count
+0x0a uint16_t points
+0x0c float duration /* summed per trick family for the HUD */
+
+# The run record at +0x5c of PhysRider: the tricks of the current combo and the run state.
+@RiderCombo 0x94
+0x00 uint8_t ready
+0x04 int32_t total
+0x08 int32_t points
+0x0c int32_t landed
+0x10 RiderTrick trick[8]
+0x90 uint8_t runState /* 0 riding, 1 combo open, 2 ended, 3 landing */
+0x91 uint8_t count
+0x92 uint8_t timer
+
 @PhysRider 0xf70
+0x000 uint16_t look
+0x002 uint8_t bikeLook
+0x004 uint8_t padIndex /* controller index */
+0x005 uint8_t dirCount /* stick directions of the trick being entered, then dirList */
+0x006 uint8_t dirList[4]
+0x00c uint32_t inputBits /* controller snapshot: bit flags, then the two stick axes */
+0x010 uint32_t inputBits2
+0x014 float stick[4] /* two sticks, x then y each, as read by the controller layer */
+0x024 float axis[4] /* the same scaled by 1/127 after rounding to a byte */
 0x038 uint32_t flags
 0x03c uint8_t player
 0x03d uint8_t stateLevel[4] /* read through riderGetStateLevel (0x431dd0) */
-0x044 int16_t field44 /* signed input that tilts the bike actor (0x42ba50) */
+0x042 int16_t stateTimer[4] /* frames spent in each state level; [1] doubles as the signed input that tilts the bike actor (0x42ba50) */
 0x04a uint8_t anim
 0x04b uint8_t ikPose /* index into the IK limb mask table at 0x55907c */
+0x04c uint8_t ikFrame
+0x04d uint8_t soundCooldown
+0x04e uint8_t hudByte
 0x04f uint8_t bailReason
+0x050 int32_t spin
+0x054 int32_t field54
 0x058 int32_t field58
-0x0ed uint8_t fieldED
+0x05c RiderCombo combo
 0x3b8 float impactTotal
+0x3c0 uint32_t goalMask /* goal results unlocked this run (game.c) */
 0x3dc uint8_t state
 0x3dd uint8_t surface
 0x3de int16_t timer
@@ -54,8 +91,7 @@
 0x690 ZVec3 contactAxis0
 0x6a0 ZVec3 contactAxis1
 0x6b0 ZVec3 contactAxis2
-0x6e0 float field6E0
-0x6e4 float field6E4
+0x6d0 float stat[7] /* rider and bike tuning: [4] and [5] feed the crash and grind formulas */
 0x6ec ZMatrix orientA
 0x72c ZAngle3 orientARot
 0x734 ZMatrix orientB
@@ -67,13 +103,18 @@
 0xb94 void_ptr actor
 0xb98 void_ptr actor2
 0xb9c int16_t fieldB9C
+0xba0 void_ptr fieldBA0 /* non-NULL while a pose is queued */
 0xba4 uint32_t fieldBA4
+0xba8 float animSpeed
 0xbac uint16_t motionIndex /* index into gPhysMotions */
 0xbb0 void_ptr motionSample /* ZMotionDelta of the last scripted-motion step */
-0xbb4 uint16_t motionFlags
+0xbb4 uint16_t motionFlags /* the original reads and writes all 32 bits (with motionFlagsHi) */
+0xbb6 uint16_t motionFlagsHi
+0xbb8 float motionWeight
 0xbbc float ikBlend /* weight of the IK limb targets */
 0xbc0 float motionScale
 0xbfc ZVec3 fieldBFC
+0xc0c int32_t bikeLookId
 0xc10 ZVec3 center
 0xc20 ZMatrix basis
 0xc60 float fieldC60

@@ -185,7 +185,7 @@ void bmxphysUpdatePose(PhysRider *r)
                 case 0x400:
                     if (r->ikBlend > 0.0f) {
                         const double tilt = bit == 0x200 ? IK_TILT : -IK_TILT;
-                        tiltBike(r, physFtol((double)r->field44 * tilt * ANGLE_SCALE));
+                        tiltBike(r, physFtol((double)r->stateTimer[1] * tilt * ANGLE_SCALE));
                     }
                     break;
                 case 0x800:
@@ -429,10 +429,10 @@ void bmxphysUpdatePositionAir(PhysRider *r)
             }
             bmxSoundPlayAt(0xbba, &hit.point, (int)(((uint32_t)r->player << 28) | snd | 0x100), vol, 0);
         }
-        if (!((double)gPhysLandCrashSpeed * r->field6E0 > speed)) {
+        if (!((double)gPhysLandCrashSpeed * r->stat[4] > speed)) {
             physSetState(r, kPhysStateScripted);
             r->bailReason = 2;
-            riderAddImpact(r, 0, speed);
+            riderAddScore(r, 0, speed);
             goto signalObject;
         }
         if (speed > 20.0f) {
@@ -560,7 +560,7 @@ void bmxphysUpdatePositionAir(PhysRider *r)
         }
         if (bail) {
             physSetState(r, kPhysStateScripted);
-            if (r->fieldED <= 1 && (riderGetStateLevel(r, 2) != 2 || (r->flags & 0x100) == 0)) {
+            if (r->combo.count <= 1 && (riderGetStateLevel(r, 2) != 2 || (r->flags & 0x100) == 0)) {
                 r->bailReason = 7;
             } else {
                 r->bailReason = 8;
@@ -773,10 +773,10 @@ bodyProbe: {
                 continue;
             }
         }
-        if (!((double)gPhysAirCrashSpeed * r->field6E0 > speed)) {
+        if (!((double)gPhysAirCrashSpeed * r->stat[4] > speed)) {
             physSetState(r, kPhysStateScripted);
             r->bailReason = (uint8_t)((zmathAcos(-n.y) < 0x2aaa) + 1);
-            riderAddImpact(r, 0, speed);
+            riderAddScore(r, 0, speed);
             goto signalObject;
         }
         if (zmathAcos(-n.y) <= 0x2aaa) {

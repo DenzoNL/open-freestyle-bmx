@@ -6,6 +6,7 @@
 #include <stdarg.h>
 
 #include "bmx/com/action/physics.h"
+#include "bmx/com/action/rider.h"
 #include "bmx/com/zge/ngif/ngifzbsp.h"
 #include "dt.h"
 #include "dt_zactor.h"
@@ -172,9 +173,9 @@ static void install_stubs(void)
     dt_stub(0x00466ed0, NULL, (void *)stubEdgesNear);
     dt_stub(0x00468e30, (void *)zbspFindPropsNear, (void *)stubPropsNear);
     dt_stub(0x00468070, NULL, (void *)stubFaceNear);
-    dt_stub(0x00435ea0, NULL, (void *)stubTrickA);
-    dt_stub(0x00435ef0, NULL, (void *)stubTrickB);
-    dt_stub(0x00435f40, NULL, (void *)stubTrickKind);
+    dt_stub(0x00435ea0, riderGetTrickA, (void *)stubTrickA);
+    dt_stub(0x00435ef0, riderGetTrickB, (void *)stubTrickB);
+    dt_stub(0x00435f40, riderGetTrickKind, (void *)stubTrickKind);
     dt_stub(0x00409250, NULL, (void *)stubSkidMark);
     dt_stub(0x00469b00, NULL, (void *)stubRay);
     dt_stub(0x0044e300, NULL, (void *)stubSound);

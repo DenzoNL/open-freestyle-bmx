@@ -1,40 +1,175 @@
-/* Game state (C:\zaxis\Bmx\src\com\action\game.c). Not ported yet; callees only. */
+/*
+ * Game session logic (C:\zaxis\Bmx\src\com\action\game.c): game modes, the run timer and phases, the
+ * goal bookkeeping of the career levels, high score records and the world markers that show goals.
+ *
+ * A session has a mode (0 free ride/career, 2 and 3 are the competition modes, 6..10 timed modes), a
+ * sub mode, a run type (the phase machine of gameTick advances gGamePhase) and per-level goal rows.
+ */
 #ifndef BMX_COM_ACTION_GAME_H
 #define BMX_COM_ACTION_GAME_H
 
 #include <stdint.h>
 
+#include "bmx/com/action/physics_types.h"
 #include "compat/orig.h"
+#include "zge/zmath.h"
 
-/* (options & mask) != 0, where options is the byte at 0x56b700. */
-ORIG_FN(0x0040a890, int, gameTestOption, (uint32_t mask));
-/* Starts game mode `mode` (resets scores and records) and returns it. */
-ORIG_FN(0x0040a8c0, uint32_t, gameStartMode, (int mode));
-/* Current game mode (byte at 0x56b701): 0 free ride, 2 and 3 are the competition modes, 6..10 timed. */
-ORIG_FN(0x0040a9f0, uint32_t, gameGetMode, (void));
-ORIG_FN(0x0040aa10, uint32_t, gameSetSubMode, (uint32_t subMode));
-/* Game sub-mode (byte at 0x56b702). */
-ORIG_FN(0x0040aa30, uint32_t, gameGetSubMode, (void));
-/* Switches the top-level game state machine (the original calls it game_c_BigGameFunction). */
+/* Session state (.data / .bss). */
+#define gGameOptions     ORIG_VAR(0x0056b700, uint8_t, gGameOptions) /* bit 3: competition run */
+#define gGameMode        ORIG_VAR(0x0056b701, uint8_t, gGameMode)
+#define gGameSubMode     ORIG_VAR(0x0056b702, uint8_t, gGameSubMode)
+#define gGameRunCount    ORIG_VAR(0x0056b703, uint8_t, gGameRunCount)
+#define gGameRunType     ORIG_VAR(0x0056b704, uint8_t, gGameRunType)
+#define gGamePhase       ORIG_VAR(0x0056b705, uint8_t, gGamePhase)
+#define gGamePhaseTicks  ORIG_VAR(0x0056b706, uint8_t, gGamePhaseTicks)
+#define gGameStartPlayer ORIG_VAR(0x0056b707, uint8_t, gGameStartPlayer)
+#define gGameTimer       ORIG_VAR(0x0056b708, uint32_t, gGameTimer) /* frames left in the run */
+#define gGameFrozen      ORIG_VAR(0x0056bc30, uint32_t, gGameFrozen)
+#define gGameFrame       ORIG_VAR(0x0056bc2c, uint32_t, gGameFrame)
+
+/* Replay recorders: one per player, plus one for all of them (and the first player's, repeated). */
+typedef uint8_t GameReplayHandles[4];
+#define gGameReplayAll    ORIG_VAR(0x0056b6f8, uint8_t, gGameReplayAll)
+#define gGameReplayShared ORIG_VAR(0x0056b6f9, uint8_t, gGameReplayShared)
+#define gGameReplays      ORIG_VAR(0x0056b6fc, GameReplayHandles, gGameReplays)
+
+/* Where the player starts in the run type 4 (a free ride started from a record). */
+typedef float GameStartPos[3];
+#define gGameStartPos ORIG_VAR(0x0056b6e8, GameStartPos, gGameStartPos)
+
+/* World extent / 4 of the level (x, z). */
+typedef uint16_t GameExtent[2];
+#define gGameExtent ORIG_VAR(0x0056bc28, GameExtent, gGameExtent)
+
+/* Score records: 8 bytes each, {u32 value; u8 flags at +5}, in tables selected by gameGetRecord. */
+typedef uint8_t GameRecordBytes[0x1000];
+#define gGameRecords ORIG_VAR(0x0056b70c, GameRecordBytes, gGameRecords)
+typedef uint8_t GameRecordSlot[16];
+
+/* Rounds of each mode, the state of each round of the current competition, the word being spelled. */
+typedef uint8_t GameRoundCounts[12];
+typedef uint8_t GameRoundStates[16];
+typedef char GameHorseWord[12];
+#define gGameRoundCounts ORIG_VAR(0x00554c8c, GameRoundCounts, gGameRoundCounts)
+#define gGameRoundStates ORIG_VAR(0x0056ba0c, GameRoundStates, gGameRoundStates)
+#define gGameHorseWord   ORIG_VAR(0x0056ba1c, GameHorseWord, gGameHorseWord)
+#define gGameDefaultWord ORIG_VAR(0x00554d00, uint32_t, gGameDefaultWord)
+
+/* World markers that show the goals: two lists of marker objects ended by NULL. */
+typedef void *GameMarkerList[64];
+#define gGameMarkersA ORIG_VAR(0x0056ba28, GameMarkerList, gGameMarkersA)
+#define gGameMarkersB ORIG_VAR(0x0056bb28, GameMarkerList, gGameMarkersB)
+typedef uint32_t GameMarkerColors[3];
+#define gGameMarkerColors ORIG_VAR(0x00554cb4, GameMarkerColors, gGameMarkerColors)
+
+/* One goal of a goal row (type 0..0x15), its parameters and the props it unlocks. */
+typedef struct GameGoal {
+    uint16_t type;
+    uint16_t min;
+    uint16_t max;
+    uint8_t pad06[10];
+    uint8_t prop[4]; /* 0x10 props (ids into the prop table) that appear when the goal is met */
+} GameGoal;
+
+/* A row: up to four goals. */
+typedef struct GameGoalRow {
+    uint8_t count;
+    uint8_t prop[3];
+    GameGoal goal[4];
+} GameGoalRow;
+
+typedef GameGoalRow GameGoalSet[4];
+typedef GameGoalSet GameGoalTable[18]; /* [level * 3 + set] */
+#define gGameGoals ORIG_VAR(0x00555118, GameGoalTable, gGameGoals)
+
+/* Per player view of one level's goals (0x27 bytes, comdataGetGoalInfo). */
+typedef struct GameGoalInfo {
+    uint8_t pad00;
+    uint8_t set;        /* goal set being played: 0..2 */
+    uint8_t done;       /* rows finished in the current set */
+    uint8_t row[12][3]; /* [set * 4 + row]: flags (0x80 locked, 0x40 reward pending), status of goals 0/1 and
+                           2/3 (nibbles) */
+} GameGoalInfo;
+
+_Static_assert(sizeof(GameGoalRow) == 0x54, "GameGoalRow size");
+_Static_assert(sizeof(GameGoalSet) == 0x150, "GameGoalSet size");
+_Static_assert(sizeof(GameGoalInfo) == 0x27, "GameGoalInfo size");
+
+/* Per rider unlock data (0x104 bytes each, at 0x6955e8; the overlay screens read it too). */
+typedef struct GameRiderData {
+    uint32_t flags; /* 1 .. 0x100 unlock bits (0x40 / 0x80 / 0x100: progress, 2: all levels done) */
+    uint8_t levelsA;
+    uint8_t levelsB;
+    uint8_t levelsC;
+    uint8_t pad07[0xe4];
+    uint8_t levelDone[12]; /* 0xeb: sets completed per level */
+    uint8_t pad0f7[0xd];
+} GameRiderData;
+
+_Static_assert(sizeof(GameRiderData) == 0x104, "GameRiderData size");
+typedef GameRiderData GameRiderDataTable[12];
+#define gGameRiders     ORIG_VAR(0x006955e8, GameRiderDataTable, gGameRiders)
+#define gGameUnlockBits ORIG_VAR(0x006955e0, uint16_t, gGameUnlockBits)
+
+/* Session functions. */
+int gameTestOption(uint32_t mask);
+void gameSetOption(uint32_t mask, int on);
+uint32_t gameStartMode(int mode);
+uint32_t gameGetMode(void);
+uint32_t gameSetSubMode(uint32_t subMode);
+uint32_t gameGetSubMode(void);
+uint32_t gameGetRunType(void);
+uint32_t gameGetRunCount(void);
+uint32_t gameGetStartPlayer(void);
+uint32_t gameGetRoundCount(void);
+uint32_t gameGetRoundState(uint32_t round, uint32_t kind);
+uint8_t *gameGetRecord(uint32_t key);
+char *gameSetHorseWord(const char *word);
+const char *gameGetNameTable(void);
+uint32_t gameGetModeByte(void);
+void gameLeaveRun(void);
+void gameInit(void);
+void gameShutdown(void);
+void gameTick(void);
+void gameNop(void);
+
+/* Goals. */
+void gameResetGoals(int player);
+int gameHasPendingUnlock(int player);
+int gameCheckPropGoal(int player, void *prop);
+int gameCheckGrindGoal(int player, const PhysEdge *edge);
+void gameSubmitScore(int player, uint32_t kind, uint32_t value, uint32_t sound, uint32_t flags);
+int gameRiderBusy(const PhysRider *r);
+void gameEvaluateGoals(int player, int finished);
+void gameScoreCombo(RiderCombo *combo);
+uint32_t gameGoalStatus(int player, int row, uint32_t goal);
+void gameSetGoalStatus(int player, int row, uint32_t goal, int status);
+uint32_t gameGoalFlag(int player, int row, uint32_t goal, uint32_t mask);
+void gameSetGoalFlag(int player, int row, uint32_t goal, uint32_t flag, int on);
+void gameUpdateUnlocks(int player);
+void gameCompleteGoal(int player, const uint8_t *reward);
+void gameResetRider(int player, int full);
+
+/* World markers and effects. */
+int gameDrawGoalMarkers(void);
+void gameDrawPlaneMarker(const void *marker, uint32_t color);
+void gameDrawBoxMarker(const void *marker, uint32_t color);
+void gameDrawPropMarker(const void *marker, uint32_t color);
+void gameDrawEdgeMarker(const void *marker, uint32_t color);
+
+/* TODO(fx.c): the next five probably belong to fx.c (they sit between its functions). */
+void fxWaterSplash(const uint8_t *obj, int unused, const float *offset);
+void fxNop(void);
+void fxCallbackEmit(const uint8_t *obj, uint32_t type);
+int fxCallbackLight(const uint8_t *obj, int event);
+int fxCreateFromList(const uint8_t *list, uint32_t count);
+
+/* Not ported: the phase driver, the run state machine and the goal bookkeeping around it. */
 ORIG_FN(0x0040aa50, uint32_t, gameBigGameFunction, (int state));
-/* Run type (byte at 0x56b704). */
-ORIG_FN(0x0040bd50, uint32_t, gameGetRunType, (void));
-/* Number of runs of the current session (byte at 0x56b703). */
-ORIG_FN(0x0040bdc0, uint32_t, gameGetRunCount, (void));
-/*
- * Score record by key: (mode << 24 | player << 22 | run << 16 | slot) style; returns a pointer to
- * {u32 value; u8 rank; u8 flags; ...} or NULL when the key is invalid.
- */
-ORIG_FN(0x0040be50, uint8_t *, gameGetRecord, (uint32_t key));
-/* Pointer to the player name table at 0x56ba1c. */
-ORIG_FN(0x0040c050, const char *, gameGetNameTable, (void));
-/* Mode dependent byte (0x56b6fc, 0x56b6f8 or 0x56b6f9). */
-ORIG_FN(0x0040c070, uint32_t, gameGetModeByte, (void));
-/* Leaves the current run: back to the menu, or on to the replay screens. */
-ORIG_FN(0x0040c0b0, void, gameLeaveRun, (void));
-/* Resets the goals of the current level for a player. */
-ORIG_FN(0x0040cd40, void, gameResetGoals, (int player));
-/* Non-zero when the player has a pending unlock to show. */
-ORIG_FN(0x0040cf70, int, gameHasPendingUnlock, (int player));
+ORIG_FN(0x0040c300, void, gameRiderTrick, (int player, int a));
+ORIG_FN(0x0040d010, void, gameUpdateRun, (int player));
+ORIG_FN(0x0040dae0, void, gameEndRun, (int player, int a));
+ORIG_FN(0x0040e380, void, gameAwardGoals, (int player));
+ORIG_FN(0x0040ec40, void, gameEvaluateRun, (int player));
 
 #endif

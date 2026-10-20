@@ -211,8 +211,8 @@ static void fill_rider(PhysRider *r, int surface)
     r->contact = rand_contact(surface, &r->pos);
     rand_vec(&r->contactPos, 2000.0f);
     rand_frame(&r->contactAxis0, &r->contactAxis1, &r->contactAxis2);
-    r->field6E0 = rf(0, 1);
-    r->field6E4 = rf(0, 1);
+    r->stat[4] = rf(0, 1);
+    r->stat[5] = rf(0, 1);
     rand_matrix(&r->orientA);
     rand_angles(&r->orientARot, 0x800);
     rand_matrix(&r->orientB);

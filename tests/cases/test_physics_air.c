@@ -397,10 +397,10 @@ static PhysRider *randRider(void)
     for (int i = 0; i < 4; i++) {
         ((uint8_t *)r)[0x3d + i] = (uint8_t)dt_range(0, 3);
     }
-    r->field44 = (int16_t)dt_u32();
+    r->stateTimer[1] = (int16_t)dt_u32();
     r->anim = (uint8_t)dt_u32();
     r->ikPose = (uint8_t)dt_range(0, 15);
-    r->fieldED = (uint8_t)dt_range(0, 3);
+    r->combo.count = (uint8_t)dt_range(0, 3);
     r->state = (uint8_t)dt_range(0, 6);
     r->timer = (dt_u32() & 1) ? 0 : (int16_t)dt_range(1, 20);
     r->yawTrim = (dt_u32() & 1) ? 0 : (int16_t)dt_u32();
@@ -409,7 +409,7 @@ static PhysRider *randRider(void)
     randVec(&r->vel, vmax);
     randVec(&r->dvel, 5.0f);
     r->speed = dt_float(0.0f, 60.0f);
-    r->field6E0 = dt_float(0.0f, 1.2f);
+    r->stat[4] = dt_float(0.0f, 1.2f);
     randVec(&r->fieldBFC, 30.0f);
     r->ikBlend = dt_float_edgy(-0.5f, 1.5f);
     r->center.x = r->pos.x + dt_float(-20.0f, 20.0f);

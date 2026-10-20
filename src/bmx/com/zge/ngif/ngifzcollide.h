@@ -69,4 +69,7 @@ void zcollideInitPropFacesList(void);
 void zcollideGeneratePropBoundingVolume(void);
 void zcollidePropMove(void);
 
+/* Record of world object `id` (a type byte first), or NULL. */
+ORIG_FN(0x00469530, const uint8_t *, ngifzCollideGetObject, (uint32_t id));
+
 #endif

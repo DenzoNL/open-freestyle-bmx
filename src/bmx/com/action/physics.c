@@ -888,7 +888,7 @@ void physVelocityGrind(PhysRider *r)
     r->dvel.y = g.y;
     zvec3Add(&r->vel, &r->vel, &g);
     zvec3Scale(&r->vel, &r->vel,
-               (float)(1.0f - ((1.0f - (double)r->field6E4) * 10.0f + 1.0f) * gPhysGrindDrag));
+               (float)(1.0f - ((1.0f - (double)r->stat[5]) * 10.0f + 1.0f) * gPhysGrindDrag));
     r->speed = (float)zvec3Length(&r->vel);
 }
 
@@ -1206,7 +1206,7 @@ static int isTailTrick(const PhysRider *r)
 /* Balance push of grinds and stalls: ((1 - f6e4) * 10 + 1) * balance. */
 static double balanceGain(const PhysRider *r)
 {
-    return ((1.0f - (double)r->field6E4) * 10.0f + 1.0f) * gPhysGrindBalance;
+    return ((1.0f - (double)r->stat[5]) * 10.0f + 1.0f) * gPhysGrindBalance;
 }
 
 static ZAngle dampYaw(ZAngle a)
@@ -2185,11 +2185,11 @@ void physSyncRoll(PhysRider *r)
         break;
     }
     volume = wheelVolume(r);
-    if (riderGetWheelContact(r, 0) == 0 && riderGetWheelContact(r, 1) == 2) {
+    if (riderGetStateLevel(r, 0) == 0 && riderGetStateLevel(r, 1) == 2) {
         hop = 1;
-    } else if (riderGetWheelContact(r, 0) == 0 && riderGetWheelContact(r, 1) == 1) {
+    } else if (riderGetStateLevel(r, 0) == 0 && riderGetStateLevel(r, 1) == 1) {
         manual = 1;
-    } else if (riderGetWheelContact(r, 0) == 0 && riderGetWheelContact(r, 1) == 4) {
+    } else if (riderGetStateLevel(r, 0) == 0 && riderGetStateLevel(r, 1) == 4) {
         volume = 0x6e;
     }
     bmxSoundPlayAt(4000, &r->center,
