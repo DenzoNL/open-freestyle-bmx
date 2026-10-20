@@ -11,4 +11,9 @@ ORIG_FN(0x0046d690, void, zrollerAddDrawCallback, (ZrollerDrawFn fn));
 /* World bounding box {min x, y, z, pad, max x, y, z} in a static buffer. */
 ORIG_FN(0x0046ceb0, const float *, zrollerGetWorldBounds, (void));
 
+/* Pointer to a 0x10 byte record of the roller table, or NULL. */
+ORIG_FN(0x0046c920, const uint8_t *, zrollerGetRecord, (uint32_t index));
+/* Reserves `count` slots of the roller resource counter and returns the first. */
+ORIG_FN(0x0046ccd0, int, zrollerReserve, (int count));
+
 #endif

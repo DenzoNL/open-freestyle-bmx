@@ -26,7 +26,10 @@ if(BMX_HOOK)
   add_library(bmxtest SHARED ${BMX_TEST_SOURCES} $<TARGET_OBJECTS:bmx_game>)
   target_include_directories(bmxtest PRIVATE src tests/cases)
   target_compile_definitions(bmxtest PRIVATE BMX_HOOK=1)
-  target_compile_options(bmxtest PRIVATE ${BMX_WARNINGS})
+  # Test code is unoptimised on purpose: stub logs written to file-static arrays that nothing reads
+  # would otherwise be removed as dead stores, and the harness would compare nothing. The ported code
+  # under test (bmx_game objects) keeps the normal optimisation level.
+  target_compile_options(bmxtest PRIVATE ${BMX_WARNINGS} -O0)
   target_link_options(bmxtest PRIVATE -Wl,-base:0x10000000 -Wl,-fixed)
 
   # In-game hook DLL (dev only): dinput.dll proxy that redirects ported functions.

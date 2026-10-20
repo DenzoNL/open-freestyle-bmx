@@ -41,6 +41,12 @@ void dt_stub(uint32_t orig, void *ours, void *stub)
 static uint32_t dt_state;
 static uint32_t dt_iter;
 
+uint32_t dt_canon(uint32_t v)
+{
+    /* emulated stack: tests/oracle/oracle.py STACK_BASE / STACK_SIZE */
+    return (v >= 0x00100000u && v < 0x00200000u) ? DT_STACK_PTR : v;
+}
+
 void dt_seed(const DtCtx *ctx)
 {
     dt_iter = ctx->seed;
@@ -75,6 +81,20 @@ float dt_float_edgy(float lo, float hi)
         return edges[dt_iter];
     }
     return dt_float(lo, hi);
+}
+
+/*
+ * Routines the harness may run natively instead of emulating (identical semantics, much faster):
+ * memset, memcpy, memmove of compat/crt.c. Order is fixed; keep in sync with tests/oracle/oracle.py.
+ */
+__declspec(dllexport) void *const dt_accel[] = {(void *)memset, (void *)memcpy, (void *)memmove, 0};
+
+/* Harness hypercall (tests/oracle/oracle.py HYPER_FILL): random bytes keyed to the iteration. */
+#define DT_HYPER_FILL 0x7ff0ffe0u
+
+void dt_fill(void *p, uint32_t n)
+{
+    ((void(__cdecl *)(void *, uint32_t))DT_HYPER_FILL)(p, n);
 }
 
 void *dt_alloc(uint32_t size)

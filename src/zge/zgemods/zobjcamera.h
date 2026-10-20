@@ -35,4 +35,7 @@ ORIG_FN(0x00481cf0, void, zmatrixMul, (ZMatrix * out, const ZMatrix *a, const ZM
 /* Transposes the 3x3 rotation part. */
 ORIG_FN(0x00481e90, void, zmatrixTranspose, (ZMatrix * out, const ZMatrix *in));
 
+/* Sine table lookup; only the low 16 bits of the angle are read (angle >> 3 indexes the table). */
+ORIG_FN(0x00480e40, double, zmathSinTable, (uint32_t angle));
+
 #endif

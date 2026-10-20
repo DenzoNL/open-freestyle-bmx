@@ -33,4 +33,8 @@ ORIG_FN(0x00464220, void, ngifDrawSprite,
 ORIG_FN(0x00464420, void, ngifFillRect, (int color, int a, int x0, int y0, int x1, int y1));
 ORIG_FN(0x004645d0, void, ngifDrawLine, (int color, int unused, int x0, int y0, int x1, int y1));
 
+/* Letterbox fill used by the overlay: colour, x, y, width and a pointer to an ordering table entry. */
+ORIG_FN(0x004623a0, void, ngifFillScreenBar,
+        (uint32_t color, uint32_t x, int y, uint32_t width, const void *ot));
+
 #endif

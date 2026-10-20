@@ -56,9 +56,9 @@ static void logProc(uint32_t who, int msg, GuiElement *el, int arg3, int arg4)
     const uint32_t at = (procCount * 5) % 90;
     procLog[at] = who;
     procLog[at + 1] = (uint32_t)msg;
-    procLog[at + 2] = (uint32_t)(uintptr_t)el;
-    procLog[at + 3] = (uint32_t)arg3;
-    procLog[at + 4] = (uint32_t)arg4;
+    procLog[at + 2] = dt_canon((uint32_t)(uintptr_t)el);
+    procLog[at + 3] = dt_canon((uint32_t)arg3);
+    procLog[at + 4] = dt_canon((uint32_t)arg4);
     procCount++;
 }
 

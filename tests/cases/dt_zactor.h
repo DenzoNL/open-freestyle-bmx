@@ -8,14 +8,6 @@
 #include "dt.h"
 #include "zge/zmem.h"
 
-static inline void dt_fill(void *p, uint32_t n)
-{
-    uint8_t *b = p;
-    for (uint32_t i = 0; i < n; i++) {
-        b[i] = (uint8_t)dt_u32();
-    }
-}
-
 /* A float that keeps blends and sums well behaved (no NaN, no denormals). */
 static inline float dt_rf(void)
 {

@@ -3,6 +3,8 @@
 #ifndef BMX_COM_ACTION_MEMCARD_H
 #define BMX_COM_ACTION_MEMCARD_H
 
+#include <stdint.h>
+
 #include "compat/orig.h"
 
 /*

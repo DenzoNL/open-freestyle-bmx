@@ -4,13 +4,11 @@
 /* Referenced by any object that uses floating point under the MSVC ABI. */
 int _fltused = 0;
 
+/* rep movsb / rep stosb: same results as byte loops, but far cheaper under the emulator. */
 void *memcpy(void *dst, const void *src, size_t n)
 {
-    unsigned char *d = dst;
-    const unsigned char *s = src;
-    while (n--) {
-        *d++ = *s++;
-    }
+    void *d = dst;
+    __asm__ volatile("rep movsb" : "+D"(d), "+S"(src), "+c"(n) : : "memory");
     return dst;
 }
 
@@ -32,10 +30,8 @@ void *memmove(void *dst, const void *src, size_t n)
 
 void *memset(void *dst, int c, size_t n)
 {
-    unsigned char *d = dst;
-    while (n--) {
-        *d++ = (unsigned char)c;
-    }
+    void *d = dst;
+    __asm__ volatile("rep stosb" : "+D"(d), "+c"(n) : "a"(c) : "memory");
     return dst;
 }
 
@@ -116,6 +112,21 @@ char *strchr(const char *s, int c)
         }
     }
 }
+
+/*
+ * MSVC 64-bit arithmetic helpers (emitted by the compiler for 64-bit division, multiplication and
+ * shifts). The exe contains the MSVC6 versions; forward to them so the calling convention (arguments on
+ * the stack, callee pops) matches exactly.
+ */
+#define BMX_FORWARD(name, addr)                                                                              \
+    __attribute__((naked)) void name(void)                                                                   \
+    {                                                                                                        \
+        __asm__ volatile("movl $" #addr ", %eax\n\tjmp *%eax");                                              \
+    }
+BMX_FORWARD(_allmul, 0x004ab3b0)
+BMX_FORWARD(_aulldiv, 0x004ad3f0)
+BMX_FORWARD(_aullrem, 0x004ad460)
+BMX_FORWARD(_allshl, 0x004ae8d0)
 
 /* The game runs in the "C" locale, so ASCII-only case mapping matches MSVC6. */
 int toupper(int c)

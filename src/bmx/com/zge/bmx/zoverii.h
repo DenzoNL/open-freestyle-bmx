@@ -30,4 +30,25 @@ ORIG_FN(0x004527c0, void, zoverStartBikeMotion,
 ORIG_FN(0x004534a0, void, zoverStartRiderMotion,
         (void *motionObj, void *actor, const ZMatrix *m, const ZVec3 *vel, const ZAngle3 *rot));
 
+/* Presents the overlays of the frame. */
+ORIG_FN(0x00457b00, int, zoverFlush, (void));
+ORIG_FN(0x00457f50, int, zoverSetLayerFlag, (uint32_t flag));
+/* Adds a filled rectangle overlay and returns its handle. */
+ORIG_FN(0x004588d0, uint32_t, zoverAddRect, (int layer, int x, int y, int w, int h, uint32_t color));
+/* Moves and resizes an overlay rectangle. */
+ORIG_FN(0x00458b00, int, zoverSetRect, (uint32_t handle, int x, int y, int w, int h));
+/* Draws a filled rectangle for this frame only. */
+ORIG_FN(0x00458ea0, void, zoverDrawRect, (int x, int y, int w, int h, uint32_t color));
+/* Adds a rectangle overlay with a vertical gradient. */
+ORIG_FN(0x00458f20, uint32_t, zoverAddGradient,
+        (int layer, int x, int y, int w, int h, uint32_t top, uint32_t bottom));
+ORIG_FN(0x00459180, uint32_t, zoverAddSprite, (int layer, uint32_t id, int x, int y, uint32_t color));
+/* Changes colour and flags of a text overlay (font by pointer; only the low 16 bits of handle are read). */
+ORIG_FN(0x00459940, int, zoverSetColor, (uint32_t handle, const void *font, uint32_t color, int flags));
+/* Draws a text for this frame only. */
+ORIG_FN(0x00459df0, void, zoverDrawText,
+        (const void *font, const char *text, int x, int y, uint32_t color, int flags));
+/* Parses a font resource into a font record; returns 0 on success. */
+ORIG_FN(0x00459fc0, int, zoverParseFont, (const void *data, void *font));
+
 #endif

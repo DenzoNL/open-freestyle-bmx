@@ -16,6 +16,8 @@ import hashlib
 import math
 import struct
 import sys
+import time
+import zlib
 from dataclasses import dataclass, field
 
 import os
@@ -40,11 +42,15 @@ STACK_BASE, STACK_SIZE = 0x00100000, 0x00100000
 HEAP_BASE, HEAP_SIZE = 0x20000000, 0x04000000
 TRAP_BASE, TRAP_SIZE = 0x7FF00000, 0x00010000
 RET_MAGIC = TRAP_BASE + TRAP_SIZE - 0x10
+HYPER_FILL = TRAP_BASE + TRAP_SIZE - 0x20  # dt_fill(); keep in sync with tests/cases/dt.c
 
 CRT_ENTRY, WINMAIN = 0x004A51F9, 0x0048A460
 
 # MSVC6 CRT heap entry points inside NgBMX.exe
 CRT_MALLOC, CRT_FREE, CRT_CALLOC, CRT_REALLOC = 0x004A50D2, 0x004A4D7F, 0x004AD2E4, 0x0051D67E
+
+# Exe CRT routines run natively by the harness (see Machine.accelerate); identical semantics.
+EXE_ACCEL = {0x004ACCC0: "memset"}
 
 # zdebugFail: the engine's fatal-assert handler. Reaching it ends the run as an "abort" event that is
 # compared between both sides (message, file, line) instead of popping a message box.
@@ -128,6 +134,11 @@ class Machine:
         from win32 import Win32
 
         self.win32 = Win32(self, game_root)
+        self.accel_targets = dict(EXE_ACCEL)
+        self.accel_hooks = []
+        import random
+
+        self.fill_rng = random.Random(0)
 
     def _load(self, path, trap_imports):
         pe = pefile.PE(path)
@@ -200,6 +211,25 @@ class Machine:
                 uc.mem_write(p, bytes(uc.mem_read(old, min(n, self.sizes.get(old, 0)))))
             self._ret(p)
 
+    def accelerate(self, exclude=()):
+        """Run memset/memcpy/memmove natively, except at the addresses under test."""
+        for h in self.accel_hooks:
+            self.uc.hook_del(h)
+        self.accel_hooks = [
+            self.uc.hook_add(UC_HOOK_CODE, self._on_accel, begin=a, end=a)
+            for a in self.accel_targets
+            if a not in exclude
+        ]
+
+    def _on_accel(self, uc, addr, size, _):
+        name = self.accel_targets[addr]
+        dst, b, n = self._arg(0), self._arg(1), self._arg(2)
+        if name == "memset":
+            uc.mem_write(dst, bytes([b & 0xFF]) * n)
+        elif n:
+            uc.mem_write(dst, bytes(uc.mem_read(b, n)))  # memcpy and memmove: read fully, then write
+        self._ret(dst)
+
     def _on_abort(self, uc, addr, size, _):
         why, file, line = self._arg(0), self._arg(1), self._arg(2)
         self.abort = (self.read_cstr(why) if why else None, self.read_cstr(file) if file else None, line)
@@ -208,6 +238,11 @@ class Machine:
     def _on_trap(self, uc, addr, size, _):
         if addr == RET_MAGIC:
             uc.emu_stop()
+            return
+        if addr == HYPER_FILL:
+            p, n = self._arg(0), self._arg(1)
+            uc.mem_write(p, self.fill_rng.randbytes(n))
+            self._ret(0)
             return
         name = self.trap_names.get(addr, hex(addr))
         from win32 import ProcessExit
@@ -298,7 +333,10 @@ class Machine:
         return c
 
     def apply_stubs(self):
-        """Patch `jmp stub` over every entry registered with dt_stub(); returns the bytes to restore."""
+        """Patch `jmp stub` over every entry registered with dt_stub(); returns the bytes to restore.
+
+        (Persistent per-address code hooks were tried instead and made runs about twice as slow.)
+        """
         table, count_addr = self.stub_table
         count = self.read_u32(count_addr)
         if count > 128:
@@ -351,6 +389,15 @@ def load_cases(m, dll_path):
         init.append(fn)
         at += 4
     m.stub_table = (exports["dt_stubs"], exports["dt_stub_count"])
+    if "dt_accel" in exports:
+        names = ["memset", "memcpy", "memmove"]
+        at = exports["dt_accel"]
+        for name in names:
+            fn = m.read_u32(at)
+            if not fn:
+                break
+            m.accel_targets[fn] = name
+            at += 4
     return cases, exports["dt_ctx"], init
 
 
@@ -413,16 +460,18 @@ def default_game_root(exe):
     return d.parent if d.name.lower() == "program_files" else d
 
 
-def run(exe, dll, only=None, iters_override=None, verbose=False, game_root=None):
+def run(exe, dll, only=None, iters_override=None, verbose=False, game_root=None, timing=False):
     digest = hashlib.sha256(open(exe, "rb").read()).hexdigest()
     m = Machine(exe, dll, game_root or os.environ.get("BMX_GAME_DIR") or default_game_root(exe))
     cases, ctx, init = load_cases(m, dll)
+    m.accelerate()
     m.crt_startup()
     for fn in init:
         m.call(fn, [])
     baseline = m.snapshot()
     have_assets = m.win32.game_root is not None and (m.win32.game_root / "Assets").is_dir()
     failed = skipped = 0
+    durations = []
     for case in cases:
         if only and not any(o in case.name for o in only):
             continue
@@ -433,9 +482,15 @@ def run(exe, dll, only=None, iters_override=None, verbose=False, game_root=None)
             continue
         iters = iters_override or case.iters or 1
         errors = []
+        if case.orig in m.accel_targets or case.impl in m.accel_targets:
+            m.accelerate(exclude=(case.orig, case.impl))
+        elif len(m.accel_hooks) != len(m.accel_targets):
+            m.accelerate()
+        started = time.perf_counter()
         for it in range(iters):
             m.restore(baseline)
             m.uc.mem_write(ctx, struct.pack("<I", it))
+            m.fill_rng.seed(it * 2654435761 + zlib.crc32(case.name.encode()))
             try:
                 if case.setup:
                     m.call(case.setup, [ctx])
@@ -458,6 +513,7 @@ def run(exe, dll, only=None, iters_override=None, verbose=False, game_root=None)
                 errors.append(f"iter {it} args={[hex(x) for x in args]}: " + "; ".join(p))
                 if len(errors) >= 3:
                     break
+        durations.append((time.perf_counter() - started, case.name, iters))
         status = "FAIL" if errors else "ok"
         if errors:
             failed += 1
@@ -466,6 +522,9 @@ def run(exe, dll, only=None, iters_override=None, verbose=False, game_root=None)
         for e in errors:
             print(f"     {e}")
     total = len([c for c in cases if not only or any(o in c.name for o in only)])
+    if timing:
+        for secs, name, iters in sorted(durations, reverse=True)[:25]:
+            print(f"{secs:8.2f}s  {iters:5} iters  {1000 * secs / iters:7.2f} ms/iter  {name}")
     total -= skipped
     extra = f", {skipped} skipped without game assets" if skipped else ""
     print(f"{total - failed}/{total} cases passed{extra} (exe sha256 {digest[:12]})")
@@ -479,8 +538,9 @@ def main():
     ap.add_argument("-k", action="append", help="only run cases whose name contains this (repeatable)")
     ap.add_argument("-n", type=int, help="override iteration count")
     ap.add_argument("-v", action="store_true", help="list passing cases too")
+    ap.add_argument("--timing", action="store_true", help="print the slowest cases")
     a = ap.parse_args()
-    sys.exit(0 if run(a.exe, a.dll, a.k, a.n, a.v) else 1)
+    sys.exit(0 if run(a.exe, a.dll, a.k, a.n, a.v, timing=a.timing) else 1)
 
 
 if __name__ == "__main__":

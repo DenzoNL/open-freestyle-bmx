@@ -68,6 +68,16 @@ float dt_float(float lo, float hi);
 /* Random float drawn from edge values (0, -0, +-1, tiny, huge) on early iterations. */
 float dt_float_edgy(float lo, float hi);
 void *dt_alloc(uint32_t size);
+/*
+ * Canonicalises a value for stub logs: a pointer into the emulated stack becomes DT_STACK_PTR, because
+ * the original and our port lay out their frames differently (log the pointed-to data instead if it
+ * matters). Never log uninitialised bytes (struct padding, unset locals) either.
+ */
+#define DT_STACK_PTR 0x57ac0000u
+uint32_t dt_canon(uint32_t v);
+
+/* Fills n bytes with deterministic random data. Served by the harness (fast), not emulated. */
+void dt_fill(void *p, uint32_t n);
 
 /*
  * Replaces a callee for the current iteration, on both sides: the harness patches `jmp stub` over the

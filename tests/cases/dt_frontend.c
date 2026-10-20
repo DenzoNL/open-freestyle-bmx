@@ -12,7 +12,7 @@ DtFrontLog dt_front_log;
 
 void dtFrontLog(uint32_t who, uint32_t a, uint32_t b, uint32_t c, uint32_t d)
 {
-    const uint32_t words[5] = {who, a, b, c, d};
+    const uint32_t words[5] = {who, dt_canon(a), dt_canon(b), dt_canon(c), dt_canon(d)};
     for (int i = 0; i < 5; i++) {
         dt_front_log.hash = (dt_front_log.hash ^ words[i]) * 16777619u + 0x9e3779b9u;
     }

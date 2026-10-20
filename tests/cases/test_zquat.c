@@ -97,11 +97,13 @@ static void setup_to_euler(DtCtx *c)
 }
 
 /* Stubbed zmatrixToEuler: records the matrix it was given and returns fixed angles. */
-static ZMatrix stubMatrix;
+static ZVec3 stubMatrix[3]; /* rotation rows only: the rest of the caller's local matrix is never set */
 static int stubOrder;
 static void BMX_CDECL stub_matrix_to_euler(ZAngle3 *out, const ZMatrix *m, int order)
 {
-    stubMatrix = *m;
+    stubMatrix[0] = m->right;
+    stubMatrix[1] = m->up;
+    stubMatrix[2] = m->at;
     stubOrder = order;
     out->x = 0x1234;
     out->y = -0x0567;
