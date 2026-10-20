@@ -68,11 +68,14 @@ def plan(target):
         print(f"slice {i:3}: {n:4} funcs {b:7} bytes  {' '.join(fs)}")
 
 
-def packet(sel, out):
+def packet(sel, out, addrs=None, exclude=()):
     rows, bundles = load()
-    mine = sorted(a for a, r in rows.items() if r["file"] in sel)
+    if addrs:
+        mine = sorted(a for a in addrs if a in rows)
+    else:
+        mine = sorted(a for a, r in rows.items() if r["file"] in sel and a not in exclude)
     mine_set = set(mine)
-    lines = [f"# Work packet: {', '.join(sel)}", ""]
+    lines = [f"# Work packet: {', '.join(sel) if sel else 'selected functions'}", ""]
     lines += [f"{len(mine)} functions. Port all of them; follow CONTRIBUTING.md exactly.", ""]
     lines += ["| addr | size | file | confidence | ghidra name | status |", "|---|---|---|---|---|---|"]
     for a in mine:
@@ -123,14 +126,18 @@ def main():
     p = sub.add_parser("plan")
     p.add_argument("--target", type=int, default=60)
     k = sub.add_parser("packet")
-    k.add_argument("files", nargs="+")
+    k.add_argument("files", nargs="*")
     k.add_argument("-o", type=Path)
+    k.add_argument("--addrs", help="comma-separated function addresses instead of whole files")
+    k.add_argument("--exclude", default="", help="comma-separated addresses to leave out of whole files")
     a = ap.parse_args()
     if a.cmd == "plan":
         plan(a.target)
     else:
-        name = "+".join(Path(f).stem for f in a.files)
-        packet(a.files, a.o or ROOT / f"work/slices/{name}.md")
+        addrs = [int(x, 16) for x in a.addrs.split(",")] if a.addrs else None
+        exclude = {int(x, 16) for x in a.exclude.split(",") if x}
+        name = "+".join(Path(f).stem for f in a.files) or "custom"
+        packet(a.files, a.o or ROOT / f"work/slices/{name}.md", addrs, exclude)
 
 
 if __name__ == "__main__":
