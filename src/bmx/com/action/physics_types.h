@@ -58,13 +58,43 @@ _Static_assert(offsetof(PhysWheel, travel) == 0x70, "PhysWheel.travel");
 _Static_assert(offsetof(PhysWheel, travelVel) == 0x74, "PhysWheel.travelVel");
 _Static_assert(offsetof(PhysWheel, material) == 0x80, "PhysWheel.material");
 
+typedef struct PhysRayHit {
+    uint8_t flags; /* bit 0: terrain face hit, bit 1: object hit */
+    uint8_t pad001[0x3];
+    int32_t faceIndex;
+    ZVec3 point;
+    uint8_t pad014[0x8];
+    ZVec3 normal;
+    float normalW;
+    uint8_t pad02c[0x4];
+    void *face; /* face record; uint16 at +0x16 is kind << 12 | id */
+    uint8_t pad034[0x4];
+    void *material; /* low nibble of the first dword is the surface material */
+    int32_t objectId;
+    void *object;
+} PhysRayHit;
+
+_Static_assert(sizeof(PhysRayHit) == 0x44, "PhysRayHit size");
+_Static_assert(offsetof(PhysRayHit, flags) == 0x0, "PhysRayHit.flags");
+_Static_assert(offsetof(PhysRayHit, faceIndex) == 0x4, "PhysRayHit.faceIndex");
+_Static_assert(offsetof(PhysRayHit, point) == 0x8, "PhysRayHit.point");
+_Static_assert(offsetof(PhysRayHit, normal) == 0x1c, "PhysRayHit.normal");
+_Static_assert(offsetof(PhysRayHit, normalW) == 0x28, "PhysRayHit.normalW");
+_Static_assert(offsetof(PhysRayHit, face) == 0x30, "PhysRayHit.face");
+_Static_assert(offsetof(PhysRayHit, material) == 0x38, "PhysRayHit.material");
+_Static_assert(offsetof(PhysRayHit, objectId) == 0x3c, "PhysRayHit.objectId");
+_Static_assert(offsetof(PhysRayHit, object) == 0x40, "PhysRayHit.object");
+
 typedef struct PhysRider {
     uint8_t pad000[0x38];
     uint32_t flags;
     uint8_t player;
-    uint8_t pad03d[0xd];
+    uint8_t pad03d[0x7];
+    int16_t field44; /* signed input that tilts the bike actor (0x42ba50) */
+    uint8_t pad046[0x4];
     uint8_t anim;
-    uint8_t pad04b[0x4];
+    uint8_t ikPose; /* index into the IK limb mask table at 0x55907c */
+    uint8_t pad04c[0x3];
     uint8_t bailReason;
     uint8_t pad050[0x8];
     int32_t field58;
@@ -131,7 +161,9 @@ typedef struct PhysRider {
     int16_t fieldB9C;
     uint8_t padb9e[0x6];
     uint32_t fieldBA4;
-    uint8_t padba8[0x54];
+    uint8_t padba8[0x14];
+    float ikBlend; /* weight of the IK limb targets */
+    uint8_t padbc0[0x3c];
     ZVec3 fieldBFC;
     uint8_t padc08[0x8];
     ZVec3 center;
@@ -150,13 +182,15 @@ typedef struct PhysRider {
     PhysWheel wheel[2];
     void *bikeObj;
     void *bikeObj2;
-    uint8_t padd98[0x1d8];
+    uint8_t ik[0x1d8]; /* IK limb targets of the rider actor (0x457790 fills, 0x456120 applies) */
 } PhysRider;
 
 _Static_assert(sizeof(PhysRider) == 0xf70, "PhysRider size");
 _Static_assert(offsetof(PhysRider, flags) == 0x38, "PhysRider.flags");
 _Static_assert(offsetof(PhysRider, player) == 0x3c, "PhysRider.player");
+_Static_assert(offsetof(PhysRider, field44) == 0x44, "PhysRider.field44");
 _Static_assert(offsetof(PhysRider, anim) == 0x4a, "PhysRider.anim");
+_Static_assert(offsetof(PhysRider, ikPose) == 0x4b, "PhysRider.ikPose");
 _Static_assert(offsetof(PhysRider, bailReason) == 0x4f, "PhysRider.bailReason");
 _Static_assert(offsetof(PhysRider, field58) == 0x58, "PhysRider.field58");
 _Static_assert(offsetof(PhysRider, fieldED) == 0xed, "PhysRider.fieldED");
@@ -198,6 +232,7 @@ _Static_assert(offsetof(PhysRider, actor) == 0xb94, "PhysRider.actor");
 _Static_assert(offsetof(PhysRider, actor2) == 0xb98, "PhysRider.actor2");
 _Static_assert(offsetof(PhysRider, fieldB9C) == 0xb9c, "PhysRider.fieldB9C");
 _Static_assert(offsetof(PhysRider, fieldBA4) == 0xba4, "PhysRider.fieldBA4");
+_Static_assert(offsetof(PhysRider, ikBlend) == 0xbbc, "PhysRider.ikBlend");
 _Static_assert(offsetof(PhysRider, fieldBFC) == 0xbfc, "PhysRider.fieldBFC");
 _Static_assert(offsetof(PhysRider, center) == 0xc10, "PhysRider.center");
 _Static_assert(offsetof(PhysRider, basis) == 0xc20, "PhysRider.basis");
@@ -214,5 +249,6 @@ _Static_assert(offsetof(PhysRider, fieldC84) == 0xc84, "PhysRider.fieldC84");
 _Static_assert(offsetof(PhysRider, wheel) == 0xc88, "PhysRider.wheel");
 _Static_assert(offsetof(PhysRider, bikeObj) == 0xd90, "PhysRider.bikeObj");
 _Static_assert(offsetof(PhysRider, bikeObj2) == 0xd94, "PhysRider.bikeObj2");
+_Static_assert(offsetof(PhysRider, ik) == 0xd98, "PhysRider.ik");
 
 #endif

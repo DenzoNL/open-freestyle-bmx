@@ -20,10 +20,23 @@
 0x074 float travelVel
 0x080 int32_t material
 
+@PhysRayHit 0x44
+0x000 uint8_t flags     /* bit 0: terrain face hit, bit 1: object hit */
+0x004 int32_t faceIndex
+0x008 ZVec3 point
+0x01c ZVec3 normal
+0x028 float normalW
+0x030 void_ptr face     /* face record; uint16 at +0x16 is kind << 12 | id */
+0x038 void_ptr material /* low nibble of the first dword is the surface material */
+0x03c int32_t objectId
+0x040 void_ptr object
+
 @PhysRider 0xf70
 0x038 uint32_t flags
 0x03c uint8_t player
+0x044 int16_t field44 /* signed input that tilts the bike actor (0x42ba50) */
 0x04a uint8_t anim
+0x04b uint8_t ikPose /* index into the IK limb mask table at 0x55907c */
 0x04f uint8_t bailReason
 0x058 int32_t field58
 0x0ed uint8_t fieldED
@@ -65,6 +78,7 @@
 0xb98 void_ptr actor2
 0xb9c int16_t fieldB9C
 0xba4 uint32_t fieldBA4
+0xbbc float ikBlend /* weight of the IK limb targets */
 0xbfc ZVec3 fieldBFC
 0xc10 ZVec3 center
 0xc20 ZMatrix basis
@@ -81,3 +95,4 @@
 0xc88 PhysWheel wheel[2]
 0xd90 void_ptr bikeObj
 0xd94 void_ptr bikeObj2
+0xd98 uint8_t ik[0x1d8] /* IK limb targets of the rider actor (0x457790 fills, 0x456120 applies) */

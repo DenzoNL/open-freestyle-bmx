@@ -270,14 +270,14 @@ addr,size,file,confidence,name,status
 004257e0,238,bmx/com/action/physics.c,contiguous,FUN_004257e0,orig
 00425910,23,bmx/com/action/physics.c,contiguous,FUN_00425910,orig
 00425940,10654,bmx/com/action/physics.c,assert,PhysFuncVeryBig,orig
-00428df0,6892,bmx/com/action/physics.c,assert,FUN_00428df0,orig
+00428df0,6892,bmx/com/action/physics_air.c,assert,FUN_00428df0,ported
 0042afd0,158,bmx/com/action/physics.c,affinity,GrindFunc,orig
 0042b0a0,668,bmx/com/action/physics.c,affinity,GrindFunc2,orig
 0042b3f0,293,bmx/com/action/physics.c,affinity,FUN_0042b3f0,orig
 0042b570,77,bmx/com/action/physics.c,affinity,FUN_0042b570,orig
 0042b5e0,457,bmx/com/action/physics.c,affinity,FUN_0042b5e0,orig
 0042b830,379,bmx/com/action/physics.c,affinity,FUN_0042b830,orig
-0042ba50,2684,bmx/com/action/physics.c,affinity,GravityFunction,orig
+0042ba50,2684,bmx/com/action/physics_air.c,affinity,GravityFunction,ported
 0042c7e0,530,bmx/com/action/physics.c,affinity,FUN_0042c7e0,orig
 0042ca90,412,bmx/com/action/physics.c,affinity,FUN_0042ca90,orig
 0042cca0,35,bmx/com/action/physics.c,affinity,FUN_0042cca0,orig
