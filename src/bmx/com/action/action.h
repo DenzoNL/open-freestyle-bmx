@@ -82,26 +82,12 @@ void actionShutdown(void);
 /*
  * Callees that are not ported yet. Names are guessed from what the functions do.
  */
-ORIG_FN(0x004056c0, void, actionCheckPlayers, (void));
 ORIG_FN(0x00405780, void, actionStepPlayers, (void));
-ORIG_FN(0x00407b70, uint32_t, comdataGetView, (uint32_t player));
 ORIG_FN(0x004078c0, void, comdataSetView, (uint32_t player, uint32_t view));
-ORIG_FN(0x00407ba0, void, comdataInit, (void));
-ORIG_FN(0x00408030, void, contrlerCreateDevices, (void));
-ORIG_FN(0x004080c0, void, contrlerFreeDevices, (void));
-ORIG_FN(0x004080f0, uint32_t, contrlerPoll, (void));
-ORIG_FN(0x004083e0, void, contrlerSetMode, (uint32_t mode));
-ORIG_FN(0x004089c0, uint32_t, fxInit, (void));
-ORIG_FN(0x00408a10, void, fxShutdown, (void));
 ORIG_FN(0x0042deb0, void, propInit, (void));
-ORIG_FN(0x0042e270, void, propStopSounds, (void));
 ORIG_FN(0x0042e2f0, void, propUpdate, (void));
-ORIG_FN(0x0042fce0, void, replayInit, (void));
-ORIG_FN(0x0042fd10, void, replayDestroyAll, (void));
 ORIG_FN(0x0042fd50, void, replayUpdate, (void));
 ORIG_FN(0x00430410, void, replaySetMode, (uint32_t handle, uint32_t mode));
-ORIG_FN(0x00430b70, uint32_t, replayGetState, (uint32_t handle));
-ORIG_FN(0x00430c70, uint32_t, replayGetRider, (uint32_t handle));
 ORIG_FN(0x0044e2e0, void, bmxSoundStopAll, (void));
 ORIG_FN(0x0045a1a0, void, zsystemEndFrame, (void));
 

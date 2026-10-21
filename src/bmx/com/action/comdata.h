@@ -1,4 +1,8 @@
-/* Per player data (C:\zaxis\Bmx\src\com\action\comdata.c). Not ported yet; callees only. */
+/*
+ * Common game data (C:\zaxis\Bmx\src\com\action\comdata.c): the view mode of each player's camera, the
+ * level record tables and the reset of the profile / rider data. The view code of the camera state
+ * (camera.h) lives here.
+ */
 #ifndef BMX_COM_ACTION_COMDATA_H
 #define BMX_COM_ACTION_COMDATA_H
 
@@ -6,15 +10,29 @@
 
 #include "compat/orig.h"
 
-/* Sets the view mode of a player's camera state (0x56b448 + 0xb8 * player). */
-ORIG_FN(0x00407620, void, comdataSetViewMode, (int player, uint32_t mode));
-ORIG_FN(0x00407760, void, comdataResetView, (int player, int mode));
+/* A level record (0x14 bytes); 24 of them per level, starting at 0x551fd8. */
+typedef uint32_t ComdataRecord[5];
+typedef ComdataRecord ComdataRecordTable[0x1200];
+#define gComdataRecords ORIG_VAR(0x00551fd8, ComdataRecordTable, gComdataRecords)
+
+/* Sets the view mode of a player's camera (hides / shows the actors for mode 3). */
+void comdataSetViewMode(int player, uint32_t mode);
+/* Switches a camera to another view type and clears its state. */
+void comdataResetView(int player, int mode);
 /* The player whose camera is selected (low byte of the camera state). */
-ORIG_FN(0x00407600, uint32_t, comdataGetViewPlayer, (void));
-/* Level record of key (type << 24 | ...) in the per level table at 0x551fd8 / 0x5520f0. */
-ORIG_FN(0x00407d20, uint32_t *, comdataGetLevelRecord, (uint32_t key));
-/* Goal info of a level for a player: 0x27 bytes per level, 4 goals of 3 bytes per run set (asserts level <
- * 6). */
-ORIG_FN(0x00407fc0, uint8_t *, comdataGetGoalInfo, (int player, uint32_t level));
+uint32_t comdataGetViewPlayer(void);
+uint32_t comdataGetViewMode(int player);
+uint32_t comdataGetViewType(int player);
+/* The chosen view of a player's camera. */
+uint32_t comdataGetView(uint32_t player);
+/* Sets the profiles, riders and options to their defaults. */
+void comdataInit(void);
+/*
+ * Level record of key (type << 24 | player << 22 | slot << 16 | ...) in the per level table at
+ * 0x551fd8 (NULL for unknown types). The index inside a type is not range checked.
+ */
+uint32_t *comdataGetLevelRecord(uint32_t key);
+/* Goal info of a level for a player: 0x27 bytes per level (asserts level < 6). */
+uint8_t *comdataGetGoalInfo(int player, uint32_t level);
 
 #endif

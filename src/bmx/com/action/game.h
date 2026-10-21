@@ -157,13 +157,6 @@ void gameDrawBoxMarker(const void *marker, uint32_t color);
 void gameDrawPropMarker(const void *marker, uint32_t color);
 void gameDrawEdgeMarker(const void *marker, uint32_t color);
 
-/* TODO(fx.c): the next five probably belong to fx.c (they sit between its functions). */
-void fxWaterSplash(const uint8_t *obj, int unused, const float *offset);
-void fxNop(void);
-void fxCallbackEmit(const uint8_t *obj, uint32_t type);
-int fxCallbackLight(const uint8_t *obj, int event);
-int fxCreateFromList(const uint8_t *list, uint32_t count);
-
 /* Not ported: the phase driver, the run state machine and the goal bookkeeping around it. */
 ORIG_FN(0x0040aa50, uint32_t, gameBigGameFunction, (int state));
 ORIG_FN(0x0040c300, void, gameRiderTrick, (int player, int a));

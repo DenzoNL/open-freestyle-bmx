@@ -32,6 +32,8 @@ typedef void(BMX_CDECL *ZobjColorFn)(void *model, const uint8_t *rgba);
 /* Heads of the two static object lists (globals 0x6722b8: tree objects, 0x6722c4: props). */
 ORIG_FN(0x00486ec0, struct ZbspTreeNode **, zobjTreeObjectList, (void));
 ORIG_FN(0x00486ed0, struct PhysPropNode **, zobjPropList, (void));
+/* Position of a scene object (a vector inside its frame). */
+ORIG_FN(0x004874a0, const ZVec3 *, zobjGetPosition, (const void *object));
 /* Moves / rotates an object and notifies its owner. */
 ORIG_FN(0x00487470, void, zobjSetPosition, (void *object, const ZVec3 *pos));
 ORIG_FN(0x004874d0, void, zobjSetRotation, (void *object, const ZQuat *rot));

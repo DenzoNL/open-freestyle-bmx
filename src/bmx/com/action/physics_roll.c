@@ -1,5 +1,8 @@
 /* Rolling position update (C:\zaxis\Bmx\src\com\action\physics.c). */
 #include "bmx/com/action/physics_roll.h"
+#include "bmx/com/action/contrler.h"
+#include "bmx/com/action/fx.h"
+#include "bmx/com/action/prop.h"
 
 #include "bmx/com/zge/bmx/bmxsound.h"
 #include "bmx/com/zge/zactor.h"
@@ -95,7 +98,7 @@ static void rollSparks(const PhysRayHit *hit, const ZVec3 *vel, float velScale, 
     v.x = (float)((double)vel->x * velScale);
     v.y = (float)((double)vel->y * velScale);
     v.z = (float)((double)vel->z * velScale);
-    fxSparks(&pos, &v);
+    fxImpactSparks(&pos, &v);
 }
 
 /* A side probe hit a wall the wheel moves into: impact sound, bail, or a bounce off the wall. */
@@ -248,7 +251,7 @@ static int rollProbeWalls(PhysRider *r, RollState *s, unsigned w)
             lands = 0;
         }
         if ((hit->kind & 2) && hit->objectData->propId != 0 &&
-            !propTouch(r->player, hit->objectData->propId)) {
+            !propTouch(r->player, (void *)(uintptr_t)hit->objectData->propId)) {
             continue;
         }
         if (!lands) {
@@ -513,7 +516,7 @@ static int rollContact(PhysRider *r, RollState *s, unsigned w, double dz)
     } else if (hit->kind & 2) {
         const uint8_t *info;
         if (hit->objectData->propId != 0) {
-            propTouch(r->player, hit->objectData->propId);
+            propTouch(r->player, (void *)(uintptr_t)hit->objectData->propId);
         }
         info = ngifzBspGetInfo(hit->object);
         if (ngifzCollideObjectValid(hit->object)) {

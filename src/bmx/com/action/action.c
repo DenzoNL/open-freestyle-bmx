@@ -4,9 +4,11 @@
 #include "bmx/com/action/camera.h"
 #include "bmx/com/action/comdata.h"
 #include "bmx/com/action/contrler.h"
+#include "bmx/com/action/fx.h"
 #include "bmx/com/action/game.h"
 #include "bmx/com/action/overlay.h"
 #include "bmx/com/action/physics.h"
+#include "bmx/com/action/prop.h"
 #include "bmx/com/action/replay.h"
 #include "bmx/com/zge/bmx/bmxsound.h"
 #include "bmx/com/zge/ngif/missingzge.h"
@@ -186,7 +188,7 @@ uint32_t actionInitialize(void)
     zoverInit();
     ovlInit();
     ovlSetElementVisible(0x10, 1);
-    actionCheckPlayers();
+    cameraInit();
     bank = zmotionLoadBank(0);
     if (bank == NULL) {
         gZdebugPrint("ZARTVIEW: Failed to open motion bank %d\n", 0);

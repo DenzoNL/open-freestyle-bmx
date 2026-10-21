@@ -33,6 +33,9 @@ ORIG_FN(0x00464220, void, ngifDrawSprite,
 ORIG_FN(0x00464420, void, ngifFillRect, (int color, int a, int x0, int y0, int x1, int y1));
 ORIG_FN(0x004645d0, void, ngifDrawLine, (int color, int unused, int x0, int y0, int x1, int y1));
 
+/* Sets the parameter block of the particle system's emitter and creates its helper object on first use. */
+ORIG_FN(0x0045fdc0, void, ngifpsxSetup, (const void *params));
+
 /* Draws one glyph of an overlay text from the scratch record at 0x55b960 (x is passed zero extended). */
 ORIG_FN(0x00462940, void, ngifDrawTextGlyph, (uint32_t x, int y, const void *record));
 

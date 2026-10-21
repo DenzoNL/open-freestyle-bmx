@@ -11,6 +11,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "bmx/com/action/comdata.h"
 #include "bmx/com/menu/gui/gui.h"
 #include "bmx/com/menu/gui/guimain.h"
 #include "bmx/com/zge/bmx/bmxsound.h"
@@ -628,7 +629,10 @@ typedef struct HiscoreEntry {
 
 _Static_assert(sizeof(HiscoreEntry) == 20, "HiscoreEntry layout");
 /* Belongs to the hiscore code: entry `index` (record number in the low half, table in the high half). */
-ORIG_FN(0x00407d20, const HiscoreEntry *, hiscoreEntry, (uint32_t index));
+static inline const HiscoreEntry *hiscoreEntry(uint32_t index)
+{
+    return (const HiscoreEntry *)comdataGetLevelRecord(index);
+}
 
 /* Per level: string id of the title and picture of its high score, and per rider the rider's name. */
 typedef struct LevelId {

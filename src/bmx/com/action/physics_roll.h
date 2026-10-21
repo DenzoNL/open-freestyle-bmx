@@ -26,16 +26,6 @@ typedef struct PhysDebugVertex {
 
 _Static_assert(sizeof(PhysDebugVertex) == 0x14, "PhysDebugVertex size");
 
-/* TODO(file): prop.c. */
-ORIG_FN(0x0042eec0, int, propTouch, (int player, int propId));
-ORIG_FN(0x0042ef60, void, propHitFace, (int player, PhysFace *face));
-
-/* TODO(file): fx.c and contrler.c. */
-ORIG_FN(0x004089a0, void, fxSetRider, (PhysRider * r));
-ORIG_FN(0x00408c90, void, fxSparks, (const ZVec3 *pos, const ZVec3 *vel));
-ORIG_FN(0x00409250, void, fxSkidMark, (const ZVec3 *from, const ZVec3 *to, int flags, const ZVec3 *normal));
-ORIG_FN(0x004086d0, void, contrlerRumble, (int player, int a, int strength));
-
 /* TODO(file): zge/ngif (ngifzcollide.c, ngifzbsp.c, ngifpsx.c). */
 ORIG_FN(0x00469b00, int, ngifzCollideLine, (const ZVec3 *from, const ZVec3 *to, PhysRayHit *hit));
 ORIG_FN(0x004665c0, const uint8_t *, ngifzBspGetInfo, (int object));

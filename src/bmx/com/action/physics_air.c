@@ -1,5 +1,7 @@
 /* Airborne rider update and actor pose sync (C:\zaxis\Bmx\src\com\action\physics.c, part). */
 #include "bmx/com/action/physics_air.h"
+#include "bmx/com/action/contrler.h"
+#include "bmx/com/action/prop.h"
 
 #include "bmx/com/zge/bmx/bmxsound.h"
 #include "bmx/com/zge/zactor.h"
@@ -361,7 +363,7 @@ void bmxphysUpdatePositionAir(PhysRider *r)
         if ((hit.flags & 1) != 0) {
             const unsigned kind = faceWord(hit.face) >> 12;
             if (kind == 9) {
-                physFaceTrigger(r->player, hit.face);
+                propHitFace(r->player, hit.face);
                 goto airborne;
             }
             if (kind == 10) {
@@ -381,7 +383,7 @@ void bmxphysUpdatePositionAir(PhysRider *r)
                 return;
             }
         } else if ((hit.flags & 2) != 0 && objectInfo(hit.objectData) != NULL) {
-            if (physObjectTouch(r->player, objectInfo(hit.objectData)) == 0) {
+            if (propTouch(r->player, objectInfo(hit.objectData)) == 0) {
                 goto airborne;
             }
         }
@@ -761,15 +763,14 @@ bodyProbe: {
         if ((hit.flags & 1) != 0 && hit.face != NULL) {
             if ((faceWord(hit.face) & 0xf000) == 0x9000) {
                 if (speed > 0.0f) {
-                    physFaceTrigger(r->player, hit.face);
+                    propHitFace(r->player, hit.face);
                     continue;
                 }
             } else if (hit.material != NULL && (*(const uint32_t *)hit.material & 0xf) == 6) {
                 goto deadly;
             }
         } else if ((hit.flags & 2) != 0) {
-            if (objectInfo(hit.objectData) != NULL &&
-                physObjectTouch(r->player, objectInfo(hit.objectData)) == 0) {
+            if (objectInfo(hit.objectData) != NULL && propTouch(r->player, objectInfo(hit.objectData)) == 0) {
                 continue;
             }
         }
@@ -870,7 +871,7 @@ deadly:
     physSetState(r, kPhysStateScripted);
     r->bailReason = 10;
     r->surface = 0xd;
-    padRumble(r->player, 1, 0xff);
+    contrlerRumble(r->player, 1, 0xff);
     return;
 
 signalObject:

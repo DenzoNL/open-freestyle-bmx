@@ -47,11 +47,6 @@ typedef uint8_t RiderAnimFlags[256];
 typedef uint32_t PhysIkLimbMasks[256];
 #define gPhysIkLimbMasks ORIG_VAR(0x0055907c, PhysIkLimbMasks, gPhysIkLimbMasks)
 
-/* Game object touches (0x42eec0 returns 0 when the object is not solid for this player). */
-ORIG_FN(0x0042eec0, int, physObjectTouch, (int player, void *info));
-ORIG_FN(0x0042ef60, void, physFaceTrigger, (int player, void *face));
-/* Controller rumble (an empty stub in this build). */
-ORIG_FN(0x004086d0, void, padRumble, (int player, int a, int b));
 /* Rider actor inverse kinematics. */
 ORIG_FN(0x00456120, void, zactorApplyIk, (void *actor, void *ik));
 ORIG_FN(0x00457790, void, zactorSetIkTarget,

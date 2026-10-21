@@ -10,4 +10,11 @@
 /* The effect node `index` attached to an object (NULL if none); +0x30 points at its transform. */
 ORIG_FN(0x0045f480, const uint8_t *, ngiffxGetNode, (const void *obj, int index));
 
+/* Starts effect `kind` (a debug print for kinds other than 0 in this build); returns 0. */
+ORIG_FN(0x0045fcb0, int, ngiffxCreate, (int kind, const void *params, const void *arg));
+/* Destroys the effect list and unregisters the handlers. */
+ORIG_FN(0x0045fc10, void, ngiffxShutdown, (void));
+/* Registers the effect handlers (spark, shard, ripple, splash, ...) by name. */
+ORIG_FN(0x0045f780, void, ngiffxRegisterHandlers, (void));
+
 #endif

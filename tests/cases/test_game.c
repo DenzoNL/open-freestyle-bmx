@@ -481,51 +481,6 @@ static void setupGoalMarkers(DtCtx *c)
     }
 }
 
-/* ---- effects ------------------------------------------------------------------------------------- */
-
-static void setupSplash(DtCtx *c)
-{
-    dtGameBegin(c, DTG_FX);
-    uint8_t *obj = randomBytes(0x40);
-    float *offset = dt_alloc(12);
-    for (int i = 0; i < 0x40; i += 4) {
-        float f = dt_float_edgy(-500.0f, 500.0f);
-        memcpy(obj + i, &f, 4);
-    }
-    for (int i = 0; i < 3; i++) {
-        offset[i] = dt_float_edgy(-50.0f, 50.0f);
-    }
-    DT_ARG_PTR(c, 0, obj);
-    DT_ARG_INT(c, 1, dt_u32());
-    DT_ARG_PTR(c, 2, offset);
-}
-
-static void setupEmit(DtCtx *c)
-{
-    dtGameBegin(c, DTG_FX);
-    DT_ARG_PTR(c, 0, randomBytes(0x40));
-    DT_ARG_INT(c, 1, dt_u32() & 7);
-}
-
-static void setupLight(DtCtx *c)
-{
-    dtGameBegin(c, DTG_FX);
-    DT_ARG_PTR(c, 0, randomBytes(0x40));
-    DT_ARG_INT(c, 1, dt_range(0, 2));
-}
-
-static void setupEffectList(DtCtx *c)
-{
-    dtGameBegin(c, DTG_FX | DTG_DEBUG);
-    uint8_t *list = randomBytes(4 + 16 * 6);
-    const uint32_t count = (uint32_t)dt_range(0, 6);
-    for (uint32_t i = 0; i < count; i++) {
-        list[4 + i * 16 + 6] = (dt_u32() & 3) ? 7 : (uint8_t)dt_u32();
-    }
-    DT_ARG_PTR(c, 0, list);
-    DT_ARG_INT(c, 1, count);
-}
-
 DT_CASES(game_cases) = {
     {"gameTestOption", 0x0040a890, gameTestOption, 1, DT_RET_INT, setupMask, 200, 0},
     {"gameSetOption", 0x0040a850, gameSetOption, 2, DT_RET_VOID, setupSetOption, 200, 0},
@@ -567,9 +522,4 @@ DT_CASES(game_cases) = {
     {"gameDrawPropMarker", 0x004117b0, gameDrawPropMarker, 2, DT_RET_VOID, setupObjectMarker, 300, 0},
     {"gameDrawEdgeMarker", 0x00411c50, gameDrawEdgeMarker, 2, DT_RET_VOID, setupObjectMarker, 300, 0},
     {"gameDrawGoalMarkers", 0x0040a400, gameDrawGoalMarkers, 0, DT_RET_INT, setupGoalMarkers, 400, 0},
-    {"fxWaterSplash", 0x004096d0, fxWaterSplash, 3, DT_RET_VOID, setupSplash, 200, 0},
-    {"fxNop", 0x00409860, fxNop, 0, DT_RET_VOID, setupNone, 1, 0},
-    {"fxCallbackEmit", 0x00409880, fxCallbackEmit, 2, DT_RET_VOID, setupEmit, 100, 0},
-    {"fxCallbackLight", 0x004098b0, fxCallbackLight, 2, DT_RET_INT, setupLight, 50, 0},
-    {"fxCreateFromList", 0x004098f0, fxCreateFromList, 2, DT_RET_INT, setupEffectList, 300, 0},
 };
