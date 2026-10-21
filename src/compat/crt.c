@@ -4,6 +4,12 @@
 /* Referenced by any object that uses floating point under the MSVC ABI. */
 int _fltused = 0;
 
+/*
+ * Stack probe for frames over 4 KB (MSVC convention: eax = bytes, the routine moves esp). Forwards to the
+ * exe's own probe (0x004a4d50) by returning into it.
+ */
+__asm__(".text\n.globl __chkstk\n__chkstk:\n\tpushl $0x004a4d50\n\tretl\n");
+
 /* rep movsb / rep stosb: same results as byte loops, but far cheaper under the emulator. */
 void *memcpy(void *dst, const void *src, size_t n)
 {

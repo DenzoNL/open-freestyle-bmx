@@ -233,7 +233,7 @@ uint32_t actionInitialize(void)
 BMX_ADDR(0x004040c0)
 uint32_t actionStopSounds(void)
 {
-    bmxSoundStopAll();
+    bmxSoundUpdateStreams();
     return 0;
 }
 

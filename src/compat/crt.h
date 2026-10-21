@@ -27,6 +27,7 @@ int tolower(int c);
 
 #include "compat/orig.h"
 ORIG_FN(0x004a50d2, void *, malloc, (size_t n));
+ORIG_FN(0x004a4d7f, void, free, (void *p));
 /* Locale- or format-dependent CRT routines stay in the exe. */
 ORIG_FN(0x004a5338, int, vsprintf, (char *dst, const char *fmt, va_list args));
 ORIG_FN(0x004a56fe, unsigned long, strtoul, (const char *s, char **end, int base));

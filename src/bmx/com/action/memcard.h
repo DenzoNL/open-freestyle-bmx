@@ -7,6 +7,7 @@
 
 #include <stdint.h>
 
+#include "bmx/pc/zge/sound/winchan.h"
 #include "compat/orig.h"
 
 /*
@@ -36,11 +37,11 @@ int saveFileRead(void);
 /* Writes the game state to the save file. */
 int saveFileWrite(void);
 
-/* Card API stubs left over from the console port (filed under winchan.c by the packet; empty or constant). */
-ORIG_FN(0x0046d720, void, memcardSelectSlot, (int slot));
-ORIG_FN(0x0046d8c0, void, memcardBegin, (void));
-ORIG_FN(0x0046d8e0, void, memcardEnd, (void));
+/* Card API stubs left over from the console port: ported as empty functions in winchan.c. */
+#define memcardSelectSlot winchanStart
+#define memcardBegin      winchanBegin
+#define memcardEnd        winchanEnd
 /* Returns 0. */
-ORIG_FN(0x0046d8a0, int, memcardQuery, (void));
+#define memcardQuery winchanQuery
 
 #endif
