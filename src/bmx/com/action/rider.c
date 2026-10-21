@@ -1024,7 +1024,7 @@ int riderGrindSub0(PhysRider *r)
         break;
     case 2:
         startTrickAnimation(r, 0);
-        gameRiderTrick(r->player, 1);
+        gameScoreJump(r->player, 1);
         riderSetStateLevel(r, 2, 3);
         r->stateTimer[2]++;
         return 1;
@@ -1079,7 +1079,7 @@ int riderLipSub0(PhysRider *r)
         break;
     case 2:
         startTrickAnimation(r, 1);
-        gameRiderTrick(r->player, 1);
+        gameScoreJump(r->player, 1);
         riderSetStateLevel(r, 2, 3);
         return 1;
     case 3:

@@ -121,6 +121,10 @@ round floats (so the hook build uses SSE2, not x87). Rules are in CONTRIBUTING.m
 
 ## Open
 
+- **game.c big functions (0x40aa50 etc.): coverage unverified.** The Opus agent was cut off by the
+  usage limit after porting all 7 and passing their cases, before reporting instruction coverage of
+  the original. Measure coverage and strengthen fixtures where needed.
+
 - **x87 transcendentals in the native build.** `compat/x87.h` uses real x87 instructions in the hook
   build (FSIN/FPATAN for the trig lookup tables; x87 NaN propagation in the rotate helpers). The native
   fallback uses libm. Before the platform flip, generate the tables natively and compare every entry

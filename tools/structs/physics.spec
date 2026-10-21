@@ -27,13 +27,15 @@
 0x02 uint8_t style
 0x03 uint8_t spin
 0x04 uint8_t tier
+0x05 uint8_t barspin /* barspin turns of the trick: (|field54| + 0x8000) >> 16, at most 3 */
 0x06 int16_t count
+0x08 uint16_t ticks /* frames since the trick was entered (game.c) */
 0x0a uint16_t points
 0x0c float duration /* summed per trick family for the HUD */
 
 # The run record at +0x5c of PhysRider: the tricks of the current combo and the run state.
 @RiderCombo 0x94
-0x00 uint8_t ready
+0x00 uint32_t score /* run score (game.c) */
 0x04 int32_t total
 0x08 int32_t points
 0x0c int32_t landed
@@ -41,6 +43,22 @@
 0x90 uint8_t runState /* 0 riding, 1 combo open, 2 ended, 3 landing */
 0x91 uint8_t count
 0x92 uint8_t timer
+
+# Run statistics of one sixteenth of the level (game.c): what the judges count.
+@RiderAreaStats 0xe
+0x00 uint16_t tricks
+0x02 uint16_t modifiers
+0x04 uint16_t modified /* tricks with a modifier */
+0x06 uint16_t grinds
+0x08 uint16_t stalls
+0x0a uint16_t manuals
+0x0c uint16_t falls
+
+# One competition run as the judges saw it (game.c).
+@RiderJudgeRun 0xc
+0x00 uint32_t score
+0x04 uint8_t judge[5]
+0x09 uint8_t average
 
 @PhysRider 0xf70
 0x000 uint16_t look
@@ -66,8 +84,13 @@
 0x054 int32_t field54
 0x058 int32_t field58
 0x05c RiderCombo combo
+0x2c6 RiderAreaStats area[16] /* by position on a 4 x 4 grid over the level (gGameExtent) */
+0x3a6 RiderAreaStats statTotal
+0x3b4 float lipHeight /* best height of a lip trick in the current combo */
 0x3b8 float impactTotal
+0x3bc uint32_t hintMask /* tutorial hints still to show (bit per hint, game.c) */
 0x3c0 uint32_t goalMask /* goal results unlocked this run (game.c) */
+0x3c4 RiderJudgeRun judgeRun[2]
 0x3dc uint8_t state
 0x3dd uint8_t surface
 0x3de int16_t timer

@@ -64,9 +64,9 @@ typedef struct RiderTrick {
     uint8_t style;
     uint8_t spin;
     uint8_t tier;
-    uint8_t pad005[0x1];
+    uint8_t barspin; /* barspin turns of the trick: (|field54| + 0x8000) >> 16, at most 3 */
     int16_t count;
-    uint8_t pad008[0x2];
+    uint16_t ticks; /* frames since the trick was entered (game.c) */
     uint16_t points;
     float duration; /* summed per trick family for the HUD */
 } RiderTrick;
@@ -77,13 +77,14 @@ _Static_assert(offsetof(RiderTrick, trick) == 0x1, "RiderTrick.trick");
 _Static_assert(offsetof(RiderTrick, style) == 0x2, "RiderTrick.style");
 _Static_assert(offsetof(RiderTrick, spin) == 0x3, "RiderTrick.spin");
 _Static_assert(offsetof(RiderTrick, tier) == 0x4, "RiderTrick.tier");
+_Static_assert(offsetof(RiderTrick, barspin) == 0x5, "RiderTrick.barspin");
 _Static_assert(offsetof(RiderTrick, count) == 0x6, "RiderTrick.count");
+_Static_assert(offsetof(RiderTrick, ticks) == 0x8, "RiderTrick.ticks");
 _Static_assert(offsetof(RiderTrick, points) == 0xa, "RiderTrick.points");
 _Static_assert(offsetof(RiderTrick, duration) == 0xc, "RiderTrick.duration");
 
 typedef struct RiderCombo {
-    uint8_t ready;
-    uint8_t pad001[0x3];
+    uint32_t score; /* run score (game.c) */
     int32_t total;
     int32_t points;
     int32_t landed;
@@ -95,7 +96,7 @@ typedef struct RiderCombo {
 } RiderCombo;
 
 _Static_assert(sizeof(RiderCombo) == 0x94, "RiderCombo size");
-_Static_assert(offsetof(RiderCombo, ready) == 0x0, "RiderCombo.ready");
+_Static_assert(offsetof(RiderCombo, score) == 0x0, "RiderCombo.score");
 _Static_assert(offsetof(RiderCombo, total) == 0x4, "RiderCombo.total");
 _Static_assert(offsetof(RiderCombo, points) == 0x8, "RiderCombo.points");
 _Static_assert(offsetof(RiderCombo, landed) == 0xc, "RiderCombo.landed");
@@ -103,6 +104,37 @@ _Static_assert(offsetof(RiderCombo, trick) == 0x10, "RiderCombo.trick");
 _Static_assert(offsetof(RiderCombo, runState) == 0x90, "RiderCombo.runState");
 _Static_assert(offsetof(RiderCombo, count) == 0x91, "RiderCombo.count");
 _Static_assert(offsetof(RiderCombo, timer) == 0x92, "RiderCombo.timer");
+
+typedef struct RiderAreaStats {
+    uint16_t tricks;
+    uint16_t modifiers;
+    uint16_t modified; /* tricks with a modifier */
+    uint16_t grinds;
+    uint16_t stalls;
+    uint16_t manuals;
+    uint16_t falls;
+} RiderAreaStats;
+
+_Static_assert(sizeof(RiderAreaStats) == 0xe, "RiderAreaStats size");
+_Static_assert(offsetof(RiderAreaStats, tricks) == 0x0, "RiderAreaStats.tricks");
+_Static_assert(offsetof(RiderAreaStats, modifiers) == 0x2, "RiderAreaStats.modifiers");
+_Static_assert(offsetof(RiderAreaStats, modified) == 0x4, "RiderAreaStats.modified");
+_Static_assert(offsetof(RiderAreaStats, grinds) == 0x6, "RiderAreaStats.grinds");
+_Static_assert(offsetof(RiderAreaStats, stalls) == 0x8, "RiderAreaStats.stalls");
+_Static_assert(offsetof(RiderAreaStats, manuals) == 0xa, "RiderAreaStats.manuals");
+_Static_assert(offsetof(RiderAreaStats, falls) == 0xc, "RiderAreaStats.falls");
+
+typedef struct RiderJudgeRun {
+    uint32_t score;
+    uint8_t judge[5];
+    uint8_t average;
+    uint8_t pad00a[0x2];
+} RiderJudgeRun;
+
+_Static_assert(sizeof(RiderJudgeRun) == 0xc, "RiderJudgeRun size");
+_Static_assert(offsetof(RiderJudgeRun, score) == 0x0, "RiderJudgeRun.score");
+_Static_assert(offsetof(RiderJudgeRun, judge) == 0x4, "RiderJudgeRun.judge");
+_Static_assert(offsetof(RiderJudgeRun, average) == 0x9, "RiderJudgeRun.average");
 
 typedef struct PhysRider {
     uint16_t look;
@@ -133,11 +165,14 @@ typedef struct PhysRider {
     int32_t field54;
     int32_t field58;
     RiderCombo combo;
-    uint8_t pad0f0[0x2c8];
+    uint8_t pad0f0[0x1d6];
+    RiderAreaStats area[16]; /* by position on a 4 x 4 grid over the level (gGameExtent) */
+    RiderAreaStats statTotal;
+    float lipHeight; /* best height of a lip trick in the current combo */
     float impactTotal;
-    uint8_t pad3bc[0x4];
+    uint32_t hintMask; /* tutorial hints still to show (bit per hint, game.c) */
     uint32_t goalMask; /* goal results unlocked this run (game.c) */
-    uint8_t pad3c4[0x18];
+    RiderJudgeRun judgeRun[2];
     uint8_t state;
     uint8_t surface;
     int16_t timer;
@@ -251,8 +286,13 @@ _Static_assert(offsetof(PhysRider, spin) == 0x50, "PhysRider.spin");
 _Static_assert(offsetof(PhysRider, field54) == 0x54, "PhysRider.field54");
 _Static_assert(offsetof(PhysRider, field58) == 0x58, "PhysRider.field58");
 _Static_assert(offsetof(PhysRider, combo) == 0x5c, "PhysRider.combo");
+_Static_assert(offsetof(PhysRider, area) == 0x2c6, "PhysRider.area");
+_Static_assert(offsetof(PhysRider, statTotal) == 0x3a6, "PhysRider.statTotal");
+_Static_assert(offsetof(PhysRider, lipHeight) == 0x3b4, "PhysRider.lipHeight");
 _Static_assert(offsetof(PhysRider, impactTotal) == 0x3b8, "PhysRider.impactTotal");
+_Static_assert(offsetof(PhysRider, hintMask) == 0x3bc, "PhysRider.hintMask");
 _Static_assert(offsetof(PhysRider, goalMask) == 0x3c0, "PhysRider.goalMask");
+_Static_assert(offsetof(PhysRider, judgeRun) == 0x3c4, "PhysRider.judgeRun");
 _Static_assert(offsetof(PhysRider, state) == 0x3dc, "PhysRider.state");
 _Static_assert(offsetof(PhysRider, surface) == 0x3dd, "PhysRider.surface");
 _Static_assert(offsetof(PhysRider, timer) == 0x3de, "PhysRider.timer");

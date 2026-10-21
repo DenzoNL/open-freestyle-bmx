@@ -8,6 +8,7 @@
 #ifndef BMX_COM_ACTION_GAME_H
 #define BMX_COM_ACTION_GAME_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "bmx/com/action/physics_types.h"
@@ -65,9 +66,10 @@ typedef uint32_t GameMarkerColors[3];
 /* One goal of a goal row (type 0..0x15), its parameters and the props it unlocks. */
 typedef struct GameGoal {
     uint16_t type;
-    uint16_t min;
+    uint16_t min; /* first parameter (min/max/arg3: meaning depends on the type) */
     uint16_t max;
-    uint8_t pad06[10];
+    uint16_t arg3;
+    int16_t area[4]; /* x0, z0, x1, z1: the goal is active while the rider is inside */
     uint8_t prop[4]; /* 0x10 props (ids into the prop table) that appear when the goal is met */
 } GameGoal;
 
@@ -91,6 +93,7 @@ typedef struct GameGoalInfo {
                            2/3 (nibbles) */
 } GameGoalInfo;
 
+_Static_assert(sizeof(GameGoal) == 0x14 && offsetof(GameGoal, area) == 8, "GameGoal layout");
 _Static_assert(sizeof(GameGoalRow) == 0x54, "GameGoalRow size");
 _Static_assert(sizeof(GameGoalSet) == 0x150, "GameGoalSet size");
 _Static_assert(sizeof(GameGoalInfo) == 0x27, "GameGoalInfo size");
@@ -110,6 +113,26 @@ _Static_assert(sizeof(GameRiderData) == 0x104, "GameRiderData size");
 typedef GameRiderData GameRiderDataTable[12];
 #define gGameRiders     ORIG_VAR(0x006955e8, GameRiderDataTable, gGameRiders)
 #define gGameUnlockBits ORIG_VAR(0x006955e0, uint16_t, gGameUnlockBits)
+
+/* Competition judges: ten of them, each with a score per run and the average (0x695200), their ranking
+ * (0x69521e), the par score of the competition levels (index: level, 6..11) and each judge's bias. */
+typedef uint8_t GameJudgeScores[10][3];
+typedef uint8_t GameJudgeRank[10];
+typedef uint32_t GameJudgePar[12];
+typedef int8_t GameJudgeBias[10];
+#define gGameJudgeScores ORIG_VAR(0x00695200, GameJudgeScores, gGameJudgeScores)
+#define gGameJudgeRank   ORIG_VAR(0x0069521e, GameJudgeRank, gGameJudgeRank)
+#define gGameJudgePar    ORIG_VAR(0x00554c80, GameJudgePar, gGameJudgePar)
+#define gGameJudgeBias   ORIG_VAR(0x00554cc0, GameJudgeBias, gGameJudgeBias)
+
+/* The horse game: the tricks the next rider must repeat, and the rider in the lead. */
+typedef RiderTrick GameHorseTricks[3];
+#define gGameHorseTricks ORIG_VAR(0x00695260, GameHorseTricks, gGameHorseTricks)
+#define gGameHorseCount  ORIG_VAR(0x00695290, uint8_t, gGameHorseCount)
+#define gGameLeader      ORIG_VAR(0x0056ba1b, uint8_t, gGameLeader)
+
+/* Length of a timed free ride, in seconds. */
+#define gGameRideSeconds ORIG_VAR(0x00554cb0, uint32_t, gGameRideSeconds)
 
 /* Session functions. */
 int gameTestOption(uint32_t mask);
@@ -157,12 +180,13 @@ void gameDrawBoxMarker(const void *marker, uint32_t color);
 void gameDrawPropMarker(const void *marker, uint32_t color);
 void gameDrawEdgeMarker(const void *marker, uint32_t color);
 
-/* Not ported: the phase driver, the run state machine and the goal bookkeeping around it. */
-ORIG_FN(0x0040aa50, uint32_t, gameBigGameFunction, (int state));
-ORIG_FN(0x0040c300, void, gameRiderTrick, (int player, int a));
-ORIG_FN(0x0040d010, void, gameUpdateRun, (int player));
-ORIG_FN(0x0040dae0, void, gameEndRun, (int player, int a));
-ORIG_FN(0x0040e380, void, gameAwardGoals, (int player));
-ORIG_FN(0x0040ec40, void, gameEvaluateRun, (int player));
+/* Run phases, combos, judges and the goals of the current run. */
+uint32_t gameBigGameFunction(int type);
+void gameScoreJump(int player, int landed);
+void gameUpdateCombo(int player);
+void gameEndCombo(int player, int landed);
+void gameUpdateHints(int player);
+void gameUpdateGoals(int player);
+void gameJudgeRun(int player);
 
 #endif

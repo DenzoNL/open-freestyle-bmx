@@ -14,8 +14,8 @@
 #include "bmx/com/action/rider.h"
 #include "bmx/com/menu/frontend.h"
 #include "bmx/com/menu/gui/guiinput.h"
-#include "bmx/com/zge/bmx/zoverii.h"
 #include "bmx/com/zge/bmx/bmxsound.h"
+#include "bmx/com/zge/bmx/zoverii.h"
 #include "compat/orig.h"
 
 /* Mode of the action loop (byte at 0x551a30). */
