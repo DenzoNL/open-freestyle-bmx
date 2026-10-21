@@ -118,6 +118,20 @@ round floats (so the hook build uses SSE2, not x87). Rules are in CONTRIBUTING.m
   but batch them.
 - Target exe: the one we have (sha256 `97aa9077…`), from the DEViANCE repack.
 - No game video or audio is launched without explicit permission. Emulator tests are headless and silent.
+- **Vanilla stays vanilla.** Every enhancement is opt-in and defaults off. With all options off, the build
+  must match the original bit for bit (golden traces are the gate), on every platform: build with
+  `-ffp-contract=off` so ARM FMA can't drift physics. Ported functions stay as decompiled; enhancements
+  attach at seams (main loop, renderer, input, audio), not as option checks inside faithful code.
+  Options are tagged visual-only or gameplay-changing; replays and saves record the gameplay-changing ones.
+
+## Enhancement backlog (P6+, unordered)
+
+- Ultrawide (hor+), high fps via fixed-timestep physics + render interpolation, gamepad, lighting.
+- (Retro)Achievements, ideally with in-game popups.
+- Content from other Dave Mirra titles (Maximum Remix, Dave Mirra 2): check PC availability and formats.
+- Code differences from Maximum Remix, if a binary with the same engine is available to diff against.
+- Uncompressed / higher-quality audio.
+- Remastered menu graphics.
 
 ## Open
 
