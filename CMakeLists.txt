@@ -34,8 +34,10 @@ if(BMX_HOOK)
   target_compile_definitions(bmxtest PRIVATE BMX_HOOK=1)
   # Test code is unoptimised on purpose: stub logs written to file-static arrays that nothing reads
   # would otherwise be removed as dead stores, and the harness would compare nothing. The ported code
-  # under test (bmx_game objects) keeps the normal optimisation level.
-  target_compile_options(bmxtest PRIVATE ${BMX_WARNINGS} -O0)
+  # under test (bmx_game objects) keeps the normal optimisation level. For the same reason, those
+  # write-only statics are intended; newer clang (21+) flags them as unused-but-set globals.
+  target_compile_options(bmxtest PRIVATE ${BMX_WARNINGS} -O0 -Wno-unknown-warning-option
+    -Wno-unused-but-set-global)
   target_link_options(bmxtest PRIVATE -Wl,-base:0x10000000 -Wl,-fixed)
 
   # In-game hook DLL (dev only): dinput.dll proxy that redirects ported functions.
