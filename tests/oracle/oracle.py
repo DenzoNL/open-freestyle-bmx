@@ -503,6 +503,8 @@ def run(exe, dll, only=None, iters_override=None, verbose=False, game_root=None,
             try:
                 if case.setup:
                     m.call(case.setup, [ctx])
+                    if m.abort is not None:
+                        raise RuntimeError(f"setup() hit an assert / exit: {m.abort} (fixture bug)")
                 args = [m.read_u32(ctx + 4 + 4 * i) for i in range(case.argc)]
                 saved = m.apply_stubs()
                 try:

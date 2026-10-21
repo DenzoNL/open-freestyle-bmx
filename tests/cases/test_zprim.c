@@ -1039,7 +1039,8 @@ typedef void(BMX_CDECL *NgifDestroyFn)(int);
 static void setup_init(DtCtx *c)
 {
     dt_seed(c);
-    dt_static_region(c->seed % 5 == 4 ? 0x300 : 0x80000); /* too small for the asset table */
+    /* seed % 5 == 4: room for the DMM pool below, but too small for zprimInit's asset table */
+    dt_static_region(c->seed % 5 == 4 ? 0x40000 + 0x300 : 0x80000);
     dt_zmem_env();
     gNgifObject = 1;
     DT_DMM_INIT(0, c->seed % 5 == 3 ? 0x200 : 0x40000); /* too small for the state stack */

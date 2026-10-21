@@ -478,10 +478,11 @@ static void setup_initialize(DtCtx *c)
 static void setup_setup_callback(DtCtx *c)
 {
     dt_real_env(c, 0);
-    if (c->seed % 8 != 0) {
+    const int initialised = c->seed % 8 != 0;
+    if (initialised) {
         O_INIT();
     }
-    if (c->seed % 3 == 0) {
+    if (initialised && c->seed % 3 == 0) { /* registering needs an initialised reader */
         O_CALLBACK(kMLOD, (int(BMX_CDECL *)(void *))(uintptr_t)chunk_handler, 0);
     }
     DT_ARG_INT(c, 0, (c->seed % 2) ? kMLOD : random_id());
