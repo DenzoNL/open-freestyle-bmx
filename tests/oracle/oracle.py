@@ -467,7 +467,7 @@ def default_game_root(exe):
     return d.parent if d.name.lower() == "program_files" else d
 
 
-def run(exe, dll, only=None, iters_override=None, verbose=False, game_root=None, timing=False):
+def run(exe, dll, only=None, iters_override=None, verbose=False, game_root=None, timing=False, shard=None):
     digest = hashlib.sha256(open(exe, "rb").read()).hexdigest()
     m = Machine(exe, dll, game_root or os.environ.get("BMX_GAME_DIR") or default_game_root(exe))
     cases, ctx, init = load_cases(m, dll)
@@ -479,9 +479,11 @@ def run(exe, dll, only=None, iters_override=None, verbose=False, game_root=None,
     have_assets = m.win32.game_root is not None and (m.win32.game_root / "Assets").is_dir()
     failed = skipped = 0
     durations = []
-    for case in cases:
-        if only and not any(o in case.name for o in only):
-            continue
+    selected = [c for c in cases if not only or any(o in c.name for o in only)]
+    if shard is not None:
+        index, count = shard
+        selected = selected[index::count]
+    for case in selected:
         if case.flags & F_NEEDS_ASSETS and not have_assets:
             skipped += 1
             if verbose:
@@ -528,7 +530,12 @@ def run(exe, dll, only=None, iters_override=None, verbose=False, game_root=None,
             print(f"{status:4} {case.name} ({iters} iters)")
         for e in errors:
             print(f"     {e}")
-    total = len([c for c in cases if not only or any(o in c.name for o in only)])
+    total = len(selected)
+    if shard is not None:
+        for secs, name, iters in durations:
+            print(f"SHARD-TIME {secs} {iters} {name}")
+        print(f"SHARD-RESULT {failed} {skipped} {total} {digest}")
+        return failed == 0
     if timing:
         for secs, name, iters in sorted(durations, reverse=True)[:25]:
             print(f"{secs:8.2f}s  {iters:5} iters  {1000 * secs / iters:7.2f} ms/iter  {name}")
@@ -546,8 +553,64 @@ def main():
     ap.add_argument("-n", type=int, help="override iteration count")
     ap.add_argument("-v", action="store_true", help="list passing cases too")
     ap.add_argument("--timing", action="store_true", help="print the slowest cases")
+    ap.add_argument("-j", type=int, default=0, help="worker processes (default: performance cores; 1 = serial)")
+    ap.add_argument("--shard", help=argparse.SUPPRESS)
     a = ap.parse_args()
-    sys.exit(0 if run(a.exe, a.dll, a.k, a.n, a.v, timing=a.timing) else 1)
+    if a.shard:
+        i, n = (int(x) for x in a.shard.split("/"))
+        sys.exit(0 if run(a.exe, a.dll, a.k, a.n, a.v, shard=(i, n)) else 1)
+    jobs = a.j or default_jobs()
+    if jobs <= 1:
+        sys.exit(0 if run(a.exe, a.dll, a.k, a.n, a.v, timing=a.timing) else 1)
+    sys.exit(0 if run_parallel(a, jobs) else 1)
+
+
+def default_jobs():
+    try:
+        import subprocess
+
+        return int(subprocess.run(["sysctl", "-n", "hw.perflevel0.physicalcpu"], capture_output=True).stdout)
+    except (OSError, ValueError):
+        return os.cpu_count() or 1
+
+
+def run_parallel(a, jobs):
+    """Run the cases in `jobs` worker processes (each its own emulator) and merge their reports."""
+    import subprocess
+
+    base = [sys.executable, "-I", __file__, "--exe", a.exe, "--dll", a.dll]
+    for k in a.k or []:
+        base += ["-k", k]
+    if a.n:
+        base += ["-n", str(a.n)]
+    if a.v:
+        base.append("-v")
+    procs = [subprocess.Popen(base + ["--shard", f"{i}/{jobs}"], stdout=subprocess.PIPE, text=True) for i in range(jobs)]
+    failed = skipped = total = 0
+    digest = ""
+    durations = []
+    ok = True
+    for p in procs:
+        out, _ = p.communicate()
+        for line in out.splitlines():
+            if line.startswith("SHARD-RESULT "):
+                f, s_, t, digest = line.split()[1:]
+                failed += int(f)
+                skipped += int(s_)
+                total += int(t)
+            elif line.startswith("SHARD-TIME "):
+                secs, iters, name = line.split(maxsplit=3)[1:]
+                durations.append((float(secs), name, int(iters)))
+            else:
+                print(line)
+        ok = ok and p.returncode == 0
+    if a.timing:
+        for secs, name, iters in sorted(durations, reverse=True)[:25]:
+            print(f"{secs:8.2f}s  {iters:5} iters  {1000 * secs / iters:7.2f} ms/iter  {name}")
+    total -= skipped
+    extra = f", {skipped} skipped without game assets" if skipped else ""
+    print(f"{total - failed}/{total} cases passed{extra} (exe sha256 {digest[:12]}, {jobs} workers)")
+    return ok and failed == 0
 
 
 if __name__ == "__main__":
