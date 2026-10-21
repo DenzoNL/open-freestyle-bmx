@@ -48,7 +48,7 @@ if(BMX_HOOK)
     -Wl,-def:${CMAKE_SOURCE_DIR}/src/hook/dinput.def)
   target_link_libraries(bmxhook PRIVATE ${CMAKE_BINARY_DIR}/kernel32.lib)
   add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/kernel32.lib
-    COMMAND llvm-dlltool -m i386 -d ${CMAKE_SOURCE_DIR}/src/hook/kernel32.def -l ${CMAKE_BINARY_DIR}/kernel32.lib
+    COMMAND llvm-dlltool -m i386 -k -d ${CMAKE_SOURCE_DIR}/src/hook/kernel32.def -l ${CMAKE_BINARY_DIR}/kernel32.lib
     DEPENDS src/hook/kernel32.def)
   add_custom_target(kernel32_implib DEPENDS ${CMAKE_BINARY_DIR}/kernel32.lib)
   add_dependencies(bmxhook kernel32_implib)
