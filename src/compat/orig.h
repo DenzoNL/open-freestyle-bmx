@@ -12,7 +12,15 @@
 
 #include <stdint.h>
 
+/*
+ * In the hook build a ported function must stay a real call: test stubs and in-game hooks patch its
+ * entry, which an inlined copy would bypass (clang 23 inlined gameBigGameFunction into gameStartMode).
+ */
+#ifdef BMX_HOOK
+#define BMX_ADDR(addr) __attribute__((noinline)) /* original address: addr */
+#else
 #define BMX_ADDR(addr) /* original address: addr */
+#endif
 
 /*
  * Function pointer that ported code stores into exe-owned data. In the hook build it is the original

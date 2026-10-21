@@ -314,7 +314,8 @@ class Machine:
         try:
             self.uc.emu_start(fn, RET_MAGIC, count=budget)
         except UcError as e:
-            raise RuntimeError(f"emulation fault in {fn:#x}: {e}") from None
+            eip = self.uc.reg_read(UC_X86_REG_EIP)
+            raise RuntimeError(f"emulation fault in {fn:#x} (eip={eip:#x}): {e}") from None
         if self.unexpected_import:
             raise RuntimeError(f"{fn:#x} called unemulated import {self.unexpected_import}")
 
