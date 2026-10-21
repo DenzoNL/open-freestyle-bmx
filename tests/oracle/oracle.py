@@ -364,7 +364,7 @@ class Machine:
         out = bytearray()
         while (b := self.uc.mem_read(addr + len(out), 1)[0]) != 0:
             out.append(b)
-        return out.decode()
+        return out.decode(errors="replace")
 
 
 # DtCase layout (tests/cases/dt.h): name, orig, impl, argc, flags, setup, iters, ulps  (8 x u32)

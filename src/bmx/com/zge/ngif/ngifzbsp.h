@@ -173,9 +173,6 @@ void zbspObjectSignal(PhysPropObject *object, int signal);
 const uint32_t *zbspGetMatRef(const void *obj);
 int zbspReturnZero(void);
 
-/* TODO(ngifzactor): this belongs to NgIFzactor.c (it is the tail of that file). */
-void zactorSyncRiderActors(void);
-
 /* One face of a zbspFindFaceNear result; the list ends with a NULL face. */
 typedef struct ZbspFaceHit {
     void *face;  /* PhysFace */

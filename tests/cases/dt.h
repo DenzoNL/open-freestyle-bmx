@@ -29,7 +29,7 @@ enum {
 
 typedef struct DtCtx {
     uint32_t seed;
-    uint32_t args[8];
+    uint32_t args[16]; /* the harness passes the first `argc` of them (at most 16) */
 } DtCtx;
 
 typedef struct DtCase {

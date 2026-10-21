@@ -629,7 +629,15 @@ static void BMX_CDECL dtPrint(const char *fmt, ...)
     for (const char *p = fmt; *p; p++) {
         dtPrintHash = dtPrintHash * 31u + (uint8_t)*p;
         if (*p == '%') {
-            dtPrintHash = dtPrintHash * 31u + (uint32_t)va_arg(ap, int);
+            if (p[1] == 's') {
+                /* hash the text, not its address: ported code prints its own copy of the string */
+                for (const char *t = va_arg(ap, const char *); *t; t++) {
+                    dtPrintHash = dtPrintHash * 31u + (uint8_t)*t;
+                }
+                p++;
+            } else {
+                dtPrintHash = dtPrintHash * 31u + (uint32_t)va_arg(ap, int);
+            }
         }
     }
     va_end(ap);

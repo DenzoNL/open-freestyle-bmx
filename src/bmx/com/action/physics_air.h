@@ -12,6 +12,7 @@
 #include "bmx/com/action/physics_hit.h"
 #include "bmx/com/action/physics_types.h"
 #include "bmx/com/action/rider.h"
+#include "bmx/com/zge/ngif/ngifzactor.h"
 #include "compat/orig.h"
 #include "zge/zmath.h"
 
@@ -52,7 +53,6 @@ ORIG_FN(0x00456120, void, zactorApplyIk, (void *actor, void *ik));
 ORIG_FN(0x00457790, void, zactorSetIkTarget,
         (void *ik, const ZVec3 *target, const ZVec3 *pole, uint32_t limbs));
 ORIG_FN(0x00463710, void, debugDrawLine, (int kind, const PhysDebugVertex *a, const PhysDebugVertex *b));
-ORIG_FN(0x00464b50, void, zactorGetPartPosition, (void *actor, int part, const ZVec3 *offset, ZVec3 *out));
 /* World objects by id. */
 ORIG_FN(0x004665c0, uint8_t *, worldObjectInfo, (int id));
 ORIG_FN(0x00466610, void, worldObjectSignal, (void *object, int signal));

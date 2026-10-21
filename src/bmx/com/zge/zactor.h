@@ -58,7 +58,12 @@ typedef struct ZActor {
     uint8_t lod[0x1d0 - 0x194]; /* uint16 model every 0x10 bytes, up to four levels of detail */
     float radius;               /* 0x1d0 */
     int32_t object;             /* 0x1d4 handle passed to the object module */
-    uint8_t pad1d8[0x278 - 0x1d8];
+    uint8_t pad1d8[4];
+    uint32_t partHash[15]; /* 0x1dc name hash of each part (riders use 15, bikes 10), see ngifzactor.c */
+    uint8_t pad218[0x228 - 0x218];
+    uint32_t partOrder[15]; /* 0x228 part indices in drawing order */
+    uint8_t pad264[0x274 - 0x264];
+    int32_t partCount; /* 0x274 */
 } ZActor;
 
 _Static_assert(sizeof(ZActor) == 0x278, "actor size");
@@ -69,6 +74,9 @@ _Static_assert(__builtin_offsetof(ZActor, player) == 0x48, "actor layout");
 _Static_assert(__builtin_offsetof(ZActor, lod) == 0x194, "actor layout");
 _Static_assert(__builtin_offsetof(ZActor, radius) == 0x1d0, "actor layout");
 _Static_assert(__builtin_offsetof(ZActor, object) == 0x1d4, "actor layout");
+_Static_assert(__builtin_offsetof(ZActor, partHash) == 0x1dc, "actor layout");
+_Static_assert(__builtin_offsetof(ZActor, partOrder) == 0x228, "actor layout");
+_Static_assert(__builtin_offsetof(ZActor, partCount) == 0x274, "actor layout");
 
 /* Header of a motion (keyframe animation), as stored in a motion bank. */
 typedef struct ZMotionBone {

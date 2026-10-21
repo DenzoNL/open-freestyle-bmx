@@ -5,12 +5,10 @@
 #include "bmx/com/menu/gui/guilabel.h"
 #include "bmx/com/menu/gui/guisfile.h"
 #include "bmx/com/menu/gui/guitoggl.h"
+#include "bmx/com/zge/ngif/missingzge.h"
 #include "bmx/com/zge/ngif/ngifzmemdmm.h"
 #include "bmx/com/zge/zprim.h"
 #include "compat/crt.h"
-
-/* Leftover of the console port (0x45a1a0): an empty function called every update. */
-ORIG_FN(0x0045a1a0, void, guiPlatformUpdate, (void));
 
 static void guiDebug(const char *message)
 {

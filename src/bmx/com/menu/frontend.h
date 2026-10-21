@@ -15,6 +15,7 @@
 #include "bmx/com/menu/gui/gui.h"
 #include "bmx/com/menu/gui/guimain.h"
 #include "bmx/com/zge/bmx/bmxsound.h"
+#include "bmx/com/zge/ngif/missingzge.h"
 #include "bmx/com/zge/zprim.h"
 #include "compat/orig.h"
 
@@ -703,7 +704,6 @@ int BMX_CDECL infoHook(int msg, GuiElement *el, int arg3, int arg4);
 #define gExitFlag  ORIG_VAR(0x00574654, int, gExitFlag)
 #define gExitCode  ORIG_VAR(0x00574658, int, gExitCode)
 /* Other start-up calls (engine side, not ported yet). */
-ORIG_FN(0x0045a1c0, void, appLog, (const char *message));
 ORIG_FN(0x0046cbc0, void, appInitCardA, (void));
 ORIG_FN(0x0046cc50, void, appInitCardB, (int arg));
 ORIG_FN(0x0046c310, void, appInitCardC, (void));

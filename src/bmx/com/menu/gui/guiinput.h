@@ -7,6 +7,7 @@
 
 #include "bmx/com/menu/gui/gui.h"
 #include "compat/orig.h"
+#include "zge/pc/pcinput.h"
 
 /* Device returned by the engine's controller layer (0x480370). Only the fields the GUI reads. */
 typedef struct GuiPadDevice {
@@ -40,11 +41,7 @@ _Static_assert(sizeof(GuiPad) == 0x28, "GuiPad layout");
 /* Set when the analog stick should also drive the d-pad bits. */
 #define gGuiAnalogPad ORIG_VAR(0x005ab3a0, uint8_t, gGuiAnalogPad)
 
-/* Controller layer (zge/zasset.c), not ported yet. */
-ORIG_FN(0x00480370, GuiPadDevice *, zpadCreateDevice, (int kind));
-ORIG_FN(0x004803c0, void, zpadDestroyDevice, (GuiPadDevice * device));
-/* The n-th device of the controller list, or NULL (used by the key binding screen). */
-ORIG_FN(0x00480400, GuiPadDevice *, zpadGetDevice, (int index));
+/* Controller layer: zpadCreateDevice, zpadDestroyDevice and zpadGetDevice (zge/pc/pcinput.h). */
 
 GuiPad *guiPadGet(uint32_t index);
 void guiPadInit(void);

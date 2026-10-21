@@ -16,6 +16,7 @@
 #include "bmx/com/menu/gui/guiinput.h"
 #include "bmx/com/zge/bmx/bmxsound.h"
 #include "bmx/com/zge/bmx/zoverii.h"
+#include "bmx/com/zge/ngif/missingzge.h"
 #include "compat/orig.h"
 
 /* Mode of the action loop (byte at 0x551a30). */
@@ -89,6 +90,5 @@ ORIG_FN(0x0042deb0, void, propInit, (void));
 ORIG_FN(0x0042e2f0, void, propUpdate, (void));
 ORIG_FN(0x0042fd50, void, replayUpdate, (void));
 ORIG_FN(0x00430410, void, replaySetMode, (uint32_t handle, uint32_t mode));
-ORIG_FN(0x0045a1a0, void, zsystemEndFrame, (void));
 
 #endif

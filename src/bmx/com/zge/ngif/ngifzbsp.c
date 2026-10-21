@@ -23,9 +23,6 @@ static void trace(int line, const char *what)
     gZdebugPrint("%s %d %s\n", kBspFile, line, what);
 }
 
-/* Index of the rider the player controls (byte at 0x56b408). */
-#define gCurrentPlayer ORIG_VAR(0x0056b408, uint8_t, gCurrentPlayer)
-
 /* Reads pos from the frame like the original (a float truncated to int16 through _ftol). */
 static int16_t toShort(double v)
 {
@@ -46,20 +43,6 @@ static void appendHit(void **list, uint32_t index, void *item)
 {
     list[index] = item;
     list[index + 1] = NULL;
-}
-
-/* Rider records at 0x691f40 are 0xf70 bytes; the index is not range checked. */
-static PhysRider *currentRider(void)
-{
-    return (PhysRider *)((uintptr_t)&gPhysRiders + (size_t)gCurrentPlayer * sizeof(PhysRider));
-}
-
-/* Syncs the pose of the current rider's actor and of its bike. */
-BMX_ADDR(0x004659e0)
-void zactorSyncRiderActors(void)
-{
-    zactorSyncPose(currentRider()->actor);
-    zactorSyncPose(currentRider()->bikeObj);
 }
 
 /* Sets a prop's orientation (Euler angles), tells the renderer and refreshes its collision edges. */
