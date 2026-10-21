@@ -14,7 +14,7 @@ mkdir -p "$root/work"
 ln -sf "$exe" "$root/work/NgBMX.exe"
 if command -v ghidra-analyzeHeadless >/dev/null || command -v analyzeHeadless >/dev/null; then
     "$root/tools/ghidra/export.sh" "$exe" "${2:-}"
-    python3 -I "$root/tools/modmap.py"
+    "${PYTHON:-python3}" -I "$root/tools/modmap.py"
 else
     echo "Ghidra not available: skipped bundle export (only needed for porting, not for tests)"
 fi

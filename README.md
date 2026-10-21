@@ -6,6 +6,8 @@ on Windows, macOS, Linux and Android.
 This repository contains **no game code or assets**. You need your own copy of the game. The port
 reads everything from the original installation.
 
+New session or machine? Start with `docs/HANDOFF.md`.
+
 Status: hook phase. Ported functions are verified bit for bit against the original executable, which
 runs in an emulator. See `PLAN.md` for the strategy and `CONTRIBUTING.md` for the porting rules.
 

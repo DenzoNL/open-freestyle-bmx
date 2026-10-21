@@ -51,7 +51,7 @@
                   pkgs.cppcheck
                   pkgs.sdl3
                 ]
-                ++ pkgs.lib.optional pkgs.stdenv.hostPlatform.isDarwin pkgs.ghidra;
+                ++ pkgs.lib.optional (pkgs.stdenv.hostPlatform.isDarwin || pkgs.stdenv.hostPlatform.isx86_64) pkgs.ghidra;
             }
             // crossEnv
           );

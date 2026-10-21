@@ -8,4 +8,4 @@ if [[ ! -e $exe ]]; then
     echo "NgBMX.exe not found (set BMX_EXE or run tools/setup-work.sh)" >&2
     exit 2
 fi
-exec python3 -I "$root/tests/oracle/oracle.py" --exe "$exe" --dll "$dll" "$@"
+exec "${PYTHON:-python3}" -I "$root/tests/oracle/oracle.py" --exe "$exe" --dll "$dll" "$@"

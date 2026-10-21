@@ -14,8 +14,8 @@ echo "== clang-tidy"
 mapfile -t units < <(git ls-files -co --exclude-standard 'src/*.c' 'tests/cases/*.c')
 clang-tidy --quiet -p build/hook "${units[@]}"
 echo "== functions.csv"
-python3 -I tools/progress.py --check >/dev/null
-python3 -I -m py_compile tools/*.py tests/oracle/*.py
+"${PYTHON:-python3}" -I tools/progress.py --check >/dev/null
+"${PYTHON:-python3}" -I -m py_compile tools/*.py tests/oracle/*.py
 echo "== differential tests"
 if [[ -e ${BMX_EXE:-work/NgBMX.exe} ]]; then
     tests/oracle/run.sh
