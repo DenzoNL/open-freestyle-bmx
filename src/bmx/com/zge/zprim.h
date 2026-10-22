@@ -193,7 +193,7 @@ ZPrimAsset *zprimLoadAsset(uint32_t id);
 ZPrimAsset *zprimLoadScreen(uint32_t id, int keep);
 void zprimFreeScreen(ZPrimAsset *a);
 
-/* Tail-call wrapper (jmp through the ILT); not yet ported. */
-ORIG_FN(0x00477d00, void, zprimEndFrame, (void));
+/* Marks the frame as finished (the original jumps through the ILT to the setter of the flag at 0x5d2504). */
+void zprimEndFrame(void);
 
 #endif

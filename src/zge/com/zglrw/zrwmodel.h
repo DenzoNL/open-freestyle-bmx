@@ -69,7 +69,7 @@ typedef struct ZrwModelDef {
     void *atomic;           /* 0xac first atomic of the first clump */
     void *geometry;         /* 0xb0 its geometry */
     void *atomicInfo;       /* 0xb4 the pointer at +0x4c of the atomic */
-    uint8_t padB8[4];
+    float *vertices;        /* 0xb8 locked vertices of the first morph target (zrwModelLockGeometry) */
 } ZrwModelDef;
 
 typedef struct ZrwModel ZrwModel;

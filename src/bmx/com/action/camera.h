@@ -28,7 +28,9 @@ typedef struct CameraState {
     uint8_t pad08[2];
     uint8_t changed; /* 0x0a set when the view changed */
     uint8_t flags;   /* 0x0b kCameraFlags* */
-    uint8_t pad0c[0xac];
+    uint8_t pad0c[0x14];
+    ZVec3 target; /* 0x20 respawn face centre the view looks at (comdataSetView) */
+    uint8_t pad2c[0x8c];
 } CameraState;
 
 _Static_assert(sizeof(CameraState) == 0xb8, "CameraState size");

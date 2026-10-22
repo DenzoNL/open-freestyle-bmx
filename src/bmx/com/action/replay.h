@@ -12,11 +12,11 @@
 
 /* Header of a recorder (0x40 bytes before the frame buffer). */
 typedef struct Replay {
-    uint32_t *mark; /* 0x00 static region mark taken before the block was allocated */
-    uint8_t state;  /* 0x04 */
-    uint8_t pad05;
-    uint8_t rider; /* 0x06 index of the rider (player) recorded */
-    uint8_t flags; /* 0x07 bit 0 / 1 / 2 set: the part is left out */
+    uint32_t *mark;  /* 0x00 static region mark taken before the block was allocated */
+    uint8_t state;   /* 0x04 1 recording, 2 playing back */
+    uint8_t counter; /* 0x05 frames since the last change record (low 5 bits when read back) */
+    uint8_t rider;   /* 0x06 index of the rider (player) recorded */
+    uint8_t flags;   /* 0x07 bit 0 / 1 / 2 set: the part is left out */
     uint32_t field08;
     uint8_t pad0c[4];
     uint32_t field10;
@@ -28,7 +28,9 @@ typedef struct Replay {
     uint32_t partCEnd;   /* 0x28 */
     uint32_t headerSize; /* 0x2c always 0x40 */
     uint32_t size;       /* 0x30 size of the frame buffer */
-    uint8_t pad34[0xc];
+    uint8_t *cursor;     /* 0x34 next byte to write (recording) or read (playback) */
+    uint32_t buttons;    /* 0x38 the pad's buttons as of the last change record */
+    uint16_t sticks[2];  /* 0x3c the two sticks as bytes (x low, y high) as of the last change record */
 } Replay;
 
 _Static_assert(sizeof(Replay) == 0x40, "Replay size");
@@ -44,6 +46,8 @@ typedef struct ReplayParams {
     int32_t size;
 } ReplayParams;
 
+/* Records the pad of every recording replay or feeds the recorded input to every playing one (per frame). */
+void replayUpdate(void);
 /* Clears the table of recorders. */
 void replayInit(void);
 /* Destroys every recorder that exists. */

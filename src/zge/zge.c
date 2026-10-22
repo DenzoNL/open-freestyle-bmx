@@ -3,6 +3,7 @@
 
 #include "zge/com/zglrw/zrwcol.h"
 #include "zge/com/zglrw/zrwzgl.h"
+#include "zge/pc/pcprofile.h"
 #include "zge/zdebug.h"
 #include "zge/zfile.h"
 #include "zge/zgemods/zobjcamera.h"
@@ -17,8 +18,6 @@ static const char kZgeFile[] = "C:\\NgEngine\\Zge\\zge.c";
 
 /* Subsystems that are not ported yet. */
 ORIG_FN(0x004802f0, int, zinputCreate, (void));
-ORIG_FN(0x0047ec40, int, zdebugCreate, (void));
-ORIG_FN(0x004a4230, int, ztimerInitialize, (int slots));
 
 /* The renderer's start-up function (a pointer in the exe's data). */
 typedef int(BMX_CDECL *ZrwInitFn)(void);

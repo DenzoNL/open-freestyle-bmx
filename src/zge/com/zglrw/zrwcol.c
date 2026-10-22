@@ -5,6 +5,7 @@
 #include "zge/com/zglrw/zrwramdisk.h"
 #include "zge/com/zglrw/zrwtxr.h"
 #include "zge/zdebug.h"
+#include "zge/zgemods/ztaginf.h"
 #include "zge/zmem.h"
 #include "zge/zstring.h"
 

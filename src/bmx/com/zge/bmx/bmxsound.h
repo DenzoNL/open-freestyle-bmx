@@ -62,10 +62,6 @@ ORIG_FN(0x0044e300, int, bmxSoundPlayAt, (int id, const void *position, int a, i
 ORIG_FN(0x0044e300, int, bmxSoundPlayEvent, (int id, int a, int b, int c, int d));
 
 /* Not ported (other owners). */
-/* Sets the timer ticks per second the sequencer and sources count in (0x0055ffc0). Returns the value. */
-ORIG_FN(0x0047eba0, int, zsndSetTickRate, (int ticks));
-/* Returns 0. */
-ORIG_FN(0x0047ebc0, int, zsndNop, (void));
 /* Platform object lookup in the exe (function pointer at 0x00561488): kind 0x15 is the window holder. */
 typedef int(BMX_CDECL *ZsystemGetObjectFn)(int kind, void **object, int flags);
 #define gZsystemGetObject ORIG_VAR(0x00561488, ZsystemGetObjectFn, gZsystemGetObject)

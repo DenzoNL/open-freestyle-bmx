@@ -17,6 +17,11 @@ typedef ComdataRecord ComdataRecordTable[0x1200];
 
 /* Sets the view mode of a player's camera (hides / shows the actors for mode 3). */
 void comdataSetViewMode(int player, uint32_t mode);
+/*
+ * Chooses the view of a player's camera (1..10): places the camera target at a respawn face near the rider
+ * (ahead of the velocity or, standing still, of the facing direction) and sets the view flags.
+ */
+void comdataSetView(uint32_t player, uint32_t view);
 /* Switches a camera to another view type and clears its state. */
 void comdataResetView(int player, int mode);
 /* The player whose camera is selected (low byte of the camera state). */

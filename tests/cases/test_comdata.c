@@ -11,6 +11,7 @@
 #include "bmx/com/menu/frontend.h"
 #include "dt.h"
 #include "dt_gameplay.h"
+#include "zge/zmath.h"
 
 static void randomCamera(CameraState *c)
 {
@@ -108,7 +109,54 @@ static void setupGoalInfo(DtCtx *c)
     DT_ARG_INT(c, 1, (dt_u32() & 7) == 0 ? (int32_t)dt_u32() : dt_range(0, 5));
 }
 
+/* comdataSetView: the respawn face lookup and the face centre are stubbed and log what they get. */
+static void *BMX_CDECL stubRespawnFace(const ZVec3 *pos, uint32_t flags)
+{
+    dtgpLog(0x4e590000u);
+    dtgpLogN(pos, 3);
+    dtgpLog(flags);
+    return (void *)(uintptr_t)(0x00680000u + (uint32_t)dt_range(0, 255) * 0x6c);
+}
+
+static void BMX_CDECL stubFaceCentroid(const void *face, ZVec3 *out)
+{
+    dtgpLog(0xce470000u);
+    dtgpLogP(face);
+    out->x = dt_float_edgy(-1000.0f, 1000.0f);
+    out->y = dt_float_edgy(-1000.0f, 1000.0f);
+    out->z = dt_float_edgy(-1000.0f, 1000.0f);
+}
+
+static void setupSetView(DtCtx *c)
+{
+    const int player = dt_range(0, 1);
+    PhysRider *r = &gPhysRiders[player];
+    const float range = (dt_u32() & 7) == 0 ? 1.0e6f : 3000.0f;
+
+    dtgpBegin(c, DTGP_DEBUG);
+    randomState();
+    dt_fill(r, sizeof *r);
+    r->pos.x = dt_float_edgy(-range, range);
+    r->pos.y = dt_float_edgy(-range, range);
+    r->pos.z = dt_float_edgy(-range, range);
+    r->vel.x = dt_float_edgy(-60.0f, 60.0f);
+    r->vel.z = dt_float_edgy(-60.0f, 60.0f);
+    r->fwd.x = dt_float_edgy(-1.0f, 1.0f);
+    r->fwd.z = dt_float_edgy(-1.0f, 1.0f);
+    r->speed = (dt_u32() & 3) == 0 ? 0.0f : dt_float_edgy(-30.0f, 30.0f);
+    r->state = (uint8_t)dt_range(0, 7);
+    gActionMode = (uint8_t)dt_range(0, 2);
+    gZmathTables.randomSeed = dt_u32();
+    dt_fill(&gCameras[player], sizeof gCameras[player]);
+    gCameras[player].timer = dt_u32();
+    dt_stub(0x004200b0, NULL, (void *)stubRespawnFace);
+    dt_stub(0x00466c50, NULL, (void *)stubFaceCentroid);
+    DT_ARG_INT(c, 0, player);
+    DT_ARG_INT(c, 1, (dt_u32() & 15) == 0 ? dt_u32() : (uint32_t)dt_range(0, 11));
+}
+
 DT_CASES(comdata_cases) = {
+    {"comdataSetView", 0x004078c0, comdataSetView, 2, DT_RET_VOID, setupSetView, 2000, 0},
     {"comdataSetViewMode", 0x00407620, comdataSetViewMode, 2, DT_RET_VOID, setupViewMode, 600, 0},
     {"comdataGetViewMode", 0x00407730, comdataGetViewMode, 1, DT_RET_INT, setupPlayerOnly, 30, 0},
     {"comdataResetView", 0x00407760, comdataResetView, 2, DT_RET_VOID, setupResetView, 600, 0},

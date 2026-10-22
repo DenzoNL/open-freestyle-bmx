@@ -3,7 +3,10 @@
 
 #include "compat/crt.h"
 #include "zge/com/zglrw/zrwmodel.h"
+#include "zge/zdebug.h"
 #include "zge/zmem.h"
+
+static const char kZrwLightFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwLight.c";
 
 ORIG_FN(0x004c2400, void *, RpLightCreate, (uint32_t type));
 ORIG_FN(0x004c2530, void, RpLightSetRadius, (void *light, float radius));
@@ -149,4 +152,16 @@ ZrwLight *zrwLightSetRadius(ZrwLight *light, float radius)
 {
     RpLightSetRadius(light->light, (float)((double)gZrwScale * (double)radius));
     return light;
+}
+
+BMX_ADDR(0x0049f4d0)
+int zrwLightSystemInitialize(void)
+{
+    if (gZrwLightInitialized != 0) {
+        zdebugFail("Already initialized", kZrwLightFile, 0xa9, 0);
+    }
+    gZrwLightInitialized = 1;
+    gZrwLightPool =
+        zmemFreeListCreate(sizeof(ZrwLight), 2, BMX_FNPTR(ZMemDestroyFn, 0x0049f6d0, zrwLightDestroy));
+    return 1;
 }

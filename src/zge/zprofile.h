@@ -70,8 +70,6 @@ void zrwFileRamDiskClear(void);
 
 /* Per-frame profiler update and the entry destructor (0x4a4080, pcprofile.c): not ported. */
 ORIG_FN(0x004a35f0, int, zprofileUpdate, (void *arg));
-ORIG_FN(0x004a4080, void, pcProfileDestroyEntry, (void *entry));
-ORIG_FN(0x004a45e0, int, pcProfileInitialize, (void));
 /* RenderWare's file interface table. */
 ORIG_FN(0x004e8280, void **, RwOSGetFileInterface, (void));
 

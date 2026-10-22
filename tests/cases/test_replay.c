@@ -2,7 +2,9 @@
  * Differential tests of replay.c. The static memory region and the game state it reads are stubbed (the
  * allocation hands out a random filled buffer); the replay table is filled with random records.
  */
+#include "bmx/com/action/contrler.h"
 #include "bmx/com/action/overlay.h"
+#include "bmx/com/action/physics.h"
 #include "bmx/com/action/prop.h"
 #include "bmx/com/action/replay.h"
 #include "dt.h"
@@ -97,7 +99,72 @@ static void setupBuffer(DtCtx *c)
     DT_ARG_PTR(c, 2, dt_alloc(4));
 }
 
+/* replayUpdate: the controllers are random, replaySetMode is stubbed and logs. */
+static void BMX_CDECL stubSetMode(uint32_t handle, uint32_t mode)
+{
+    dtgpLog(0x05e70000u);
+    dtgpLog(handle);
+    dtgpLog(mode);
+}
+
+static void setupUpdate(DtCtx *c)
+{
+    dtgpBegin(c, DTGP_DEBUG);
+    dt_stub(0x00430410, NULL, (void *)stubSetMode);
+    dt_fill(&gPhysRiders, sizeof gPhysRiders);
+    for (int p = 0; p < 2; p++) {
+        ContrlerPad *pad = &gContrlerPads[p];
+
+        dt_fill(pad, sizeof *pad);
+        pad->flags = (dt_u32() & 7) == 0 ? (uint16_t)dt_u32() | 1 : (uint16_t)(dt_u32() & 0xfffe);
+        for (int i = 0; i < 4; i++) {
+            pad->state.axis[i] = dt_float_edgy(-1.3f, 1.3f);
+        }
+        gProfiles[p].controller = (dt_u32() & 15) == 0 ? (uint8_t)dt_u32() : (uint8_t)dt_range(0, 1);
+    }
+    for (int i = 0; i < 5; i++) {
+        const uint32_t size = (uint32_t)dt_range(0x10, 0x60);
+        Replay *r;
+        uint32_t offset;
+
+        if ((dt_u32() & 3) == 0) {
+            gReplays[i] = NULL;
+            continue;
+        }
+        r = dt_alloc(0x40 + size + 0x20);
+        dt_fill(r, 0x40 + size + 0x20);
+        offset = (dt_u32() & 3) == 0 ? 0x40 + size - 3 + (uint32_t)dt_range(-1, 3)
+                                     : (uint32_t)dt_range(0x40, 0x40 + (int)size);
+        r->state = (uint8_t)((dt_u32() & 7) == 0 ? dt_range(0, 3) : dt_range(1, 2));
+        r->counter = (dt_u32() & 3) == 0 ? (uint8_t)dt_u32() : (uint8_t)dt_range(0x1d, 0x20);
+        if (r->state == 2) {
+            r->counter = (uint8_t)dt_range(0, 3);
+        }
+        r->rider = (dt_u32() & 7) == 0 ? (uint8_t)dt_range(2, 3) : (uint8_t)dt_range(0, 1);
+        r->field08 = (uint32_t)dt_range(0, 5);
+        r->field10 = (dt_u32() & 7) == 0 ? 0 : (uint32_t)dt_range(1, 200);
+        if (r->state == 2 && (dt_u32() & 3) == 0) {
+            r->field10 = r->field08 + 1;
+        }
+        r->headerSize = 0x40;
+        r->size = size;
+        r->cursor = (uint8_t *)r + offset;
+        r->buttons = (dt_u32() & 1) != 0 ? gContrlerPads[0].state.buttons : dt_u32();
+        for (int s = 0; s < 2; s++) {
+            if ((dt_u32() & 1) != 0) {
+                const ContrlerState *st = &gContrlerPads[0].state;
+                const uint8_t hi = (uint8_t)(int)(st->axis[2 * s] * 127.0f);
+                const uint8_t lo = (uint8_t)(int)(st->axis[2 * s + 1] * 127.0f);
+
+                r->sticks[s] = (uint16_t)(hi << 8 | lo);
+            }
+        }
+        gReplays[i] = r;
+    }
+}
+
 DT_CASES(replay_cases) = {
+    {"replayUpdate", 0x0042fd50, replayUpdate, 0, DT_RET_VOID, setupUpdate, 3000, 0},
     {"replayInit", 0x0042fce0, replayInit, 0, DT_RET_VOID, setupInit, 10, 0},
     {"replayDestroyAll", 0x0042fd10, replayDestroyAll, 0, DT_RET_VOID, setupDestroyAll, 100, 0},
     {"replayCreate", 0x00430180, replayCreate, 1, DT_RET_INT8, setupCreate, 1500, 0},

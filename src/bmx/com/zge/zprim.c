@@ -1980,3 +1980,12 @@ void zprimFreeScreen(ZPrimAsset *a)
 {
     zprimAssetFree(a);
 }
+
+/* Set by zprimEndFrame (read by the display list code of the frame). */
+#define gZprimFrameEnded ORIG_VAR(0x005d2504, uint32_t, gZprimFrameEnded)
+
+BMX_ADDR(0x00477d00)
+void zprimEndFrame(void)
+{
+    gZprimFrameEnded = 1;
+}

@@ -23,6 +23,8 @@ _Static_assert(sizeof(ZrwLight) == 12, "light record");
 #define gZrwLightPool        ORIG_VAR(0x00675374, ZMemFreeList *, gZrwLightPool)
 #define gZrwLightInitialized ORIG_VAR(0x00675370, int, gZrwLightInitialized)
 
+/* Creates the pool of light records (asserts when already done). Returns 1. */
+int zrwLightSystemInitialize(void);
 /* Frees the pool of light records. Returns 1. */
 int zrwLightShutdown(void);
 /* Creates a light of renderer kind 0..3 with the given RGBA colour and adds it to the world; NULL on failure.

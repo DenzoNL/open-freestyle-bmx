@@ -2,6 +2,7 @@
 #include "zge/zprofile.h"
 
 #include "zge/com/zglrw/zrwzgl.h"
+#include "zge/pc/pcprofile.h"
 #include "zge/zdebug.h"
 #include "zge/zmem.h"
 #include "zge/zstring.h"
@@ -134,7 +135,7 @@ int zprofileInitialize(void)
     s->scale1c = 32.0f;
     s->scale20 = 2.0f;
     s->initialized = 1;
-    s->entries = zmemFreeListCreate(0x24, 0, pcProfileDestroyEntry);
+    s->entries = zmemFreeListCreate(0x24, 0, BMX_FNPTR(ZMemDestroyFn, 0x004a4080, pcProfileDestroyEntry));
     if (s->updateNode == NULL) {
         s->updateNode = zrwRegisterUpdateFunction(4, zprofileUpdate, NULL, 0);
     }

@@ -8,8 +8,11 @@
 #include "bmx/com/action/physics.h"
 #include "bmx/com/menu/frontend.h"
 #include "bmx/com/zge/ngif/missingzge.h"
+#include "bmx/com/zge/ngif/ngifzbsp.h"
 #include "bmx/com/zge/zactor.h"
+#include "compat/crt.h"
 #include "zge/zdebug.h"
+#include "zge/zmath.h"
 
 static const char comdataFile[] = "C:\\zaxis\\Bmx\\Src\\com\\action\\comdata.c";
 
@@ -50,6 +53,86 @@ void comdataSetViewMode(int player, uint32_t mode)
     if (cam->type == 0) {
         cam->timer = 0;
     }
+}
+
+/*
+ * Chooses view `view` (1..10) of a player's camera. Views 1, 3, 5, 7, 8, 9 and 10 look at the respawn face
+ * near a spot 25 units behind the rider's velocity (250 behind the facing direction when standing still),
+ * snapped to the middle of a 400 unit grid cell; the target is lowered by a view dependent amount. Unless a
+ * playback runs, some views also pick one of the two random camera cuts (flag bits 4 / 5).
+ */
+BMX_ADDR(0x004078c0)
+void comdataSetView(uint32_t player, uint32_t view)
+{
+    CameraState *const cam = &gCameras[player];
+    PhysRider *const rider = &gPhysRiders[player];
+
+    cam->timer = 0;
+    cam->pad01 = 0;
+    cam->changed = 1;
+    gCameraReset = 0;
+    switch (view) {
+    case 1:
+    case 3:
+    case 5:
+    case 7:
+    case 8:
+    case 9:
+    case 10: {
+        int32_t dx;
+        int32_t dz;
+        ZVec3 spot;
+        float drop;
+
+        if (rider->speed < 0.0f || rider->speed > 0.0f) {
+            const int32_t ax = bmxFtol((double)rider->vel.x * (double)-25.0f);
+            const int32_t px = bmxFtol((double)rider->pos.x);
+            const int32_t az = bmxFtol((double)rider->vel.z * (double)-25.0f);
+            const int32_t pz = bmxFtol((double)rider->pos.z);
+            dx = px - ax;
+            dz = pz - az;
+        } else {
+            const int32_t ax = bmxFtol((double)rider->fwd.x * (double)-250.0f);
+            const int32_t px = bmxFtol((double)rider->pos.x);
+            const int32_t az = bmxFtol((double)rider->fwd.z * (double)-250.0f);
+            const int32_t pz = bmxFtol((double)rider->pos.z);
+            dx = px - ax;
+            dz = pz - az;
+        }
+        spot.x = (float)(int32_t)(int16_t)((dx / 400) * 400 + 200);
+        spot.y = rider->pos.y;
+        spot.z = (float)(int32_t)(int16_t)((dz / 400) * 400 + 200);
+        zbspFaceCentroid(physFindRespawnFace(&spot, 2), &cam->target);
+        if (view == 1) {
+            drop = 300.0f;
+        } else if (view == 7) {
+            drop = 120.0f;
+        } else if (view == 10) {
+            drop = 800.0f;
+        } else {
+            drop = 500.0f;
+        }
+        cam->target.y = (float)((double)cam->target.y - (double)drop);
+        if (cameraPlaybackActive() == 1) {
+            cam->flags &= 0xef;
+        } else if (view < 9 || view > 10) {
+            const uint32_t state = physGetState(rider);
+
+            if (state == 1 || (state >= 3 && state <= 5)) {
+                const uint32_t cut = zmathRandom() & 3;
+
+                if (cut < 2) {
+                    cam->flags |= (uint8_t)(0x10u << cut);
+                }
+            }
+        }
+        break;
+    }
+    default:
+        break;
+    }
+    cam->view = (uint8_t)view;
+    cam->flags &= 0xf3;
 }
 
 BMX_ADDR(0x00407730)

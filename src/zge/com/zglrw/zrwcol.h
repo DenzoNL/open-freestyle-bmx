@@ -118,7 +118,6 @@ int zrwcolSphereTest(const float *center, float radius, uint32_t flags, const in
 
 /* Not ported: the line query (0x493e20, held by the pointer at 0x562068) and the tag table setup. */
 ORIG_FN(0x00493e20, int, zrwcolQueryLine, (const float *a, const float *b, int mode, int flags, float *out));
-ORIG_FN(0x0048d6f0, int, ztaginfInitialize, (void));
 
 /* RenderWare: matrices and points of frames, materials, and the intersection enumerators. */
 ORIG_FN(0x004d2b10, void *, rwFrameGetLTM, (void *frame));

@@ -17,4 +17,11 @@ typedef void(BMX_CDECL *ZDebugPrintFn)(const char *fmt, ...);
 typedef void(BMX_CDECL *ZDebugIndentFn)(int delta);
 #define gZdebugIndent ORIG_VAR(0x00560078, ZDebugIndentFn, gZdebugIndent)
 
+/* Sets the sound timer's ticks per second (0x55ffc0); returns the value. */
+int zsndSetTickRate(int ticks);
+/* Returns 0. */
+int zsndNop(void);
+/* Starts the debug back end; asserts when called twice. Returns 0 when the back end fails to start. */
+int zdebugCreate(void);
+
 #endif
