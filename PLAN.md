@@ -152,6 +152,12 @@ round floats (so the hook build uses SSE2, not x87). Rules are in CONTRIBUTING.m
 - **Left out of slices:** ngiffx.c x87 functions 0x45cc50 and 0x45eaa0 (Opus); WinMain 0x48a460
   (app entry, misfiled in zrwzgl.c, can't return in the harness); world/particle callbacks
   0x497200–0x497780 and 0x4975b0 sit in zrwtxr.c with `TODO(file)`, belong in zrwworld.c.
+- More misfiled functions (left with `TODO(file)`): roller shadow 0x49b3d0/0x49b4e0/0x49b520 (in
+  zrwmodelcreate.c, belongs in ngifzroller.c); asset decompressors 0x49bd10/0x49c080 (zasset);
+  0x49c570 zobjDispatchEvents (zobj). zrwzgl.h and zrwmodel.h name 0x697720/0x697724 the other way
+  round (gZrwScale/gZrwInvScale) and can't be included together: settle which is which.
+- Reserved for Opus so far: 0x42e2f0, 0x42f0d0, 0x44e300 (5.7 KB), 0x45a4d0, 0x45c150, 0x45cc50,
+  0x45eaa0, 0x466ed0, 0x468070, 0x48ccf0, 0x48d170, 0x48ee70, 0x493e20, 0x4947e0, 0x4a35f0.
 - `zquatNormalize` doesn't assert on a NaN length like the original (x87 FCOM unordered).
 
 - How CI gets the original exe for the differential tests. Until then CI skips them and they run locally.

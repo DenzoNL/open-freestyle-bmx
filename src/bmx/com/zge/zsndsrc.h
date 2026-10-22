@@ -65,7 +65,7 @@ typedef ZsndSource ZsndSourceTable[kZsndSrcMax];
 #define gZsndStreamBytes     ORIG_VAR(0x0064fcbc, uint32_t, gZsndStreamBytes)
 
 /* Transforms a world position into the listener's space (camera of the current frame). */
-ORIG_FN(0x0045a340, void, zsystemToListener, (const ZVec3 *world, ZVec3 *local));
+void zsystemToListener(const ZVec3 *world, ZVec3 *local);
 
 /*
  * Clears the sources and sets the audible `range` (world units) and the source `lifetimeMs`.

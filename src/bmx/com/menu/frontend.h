@@ -579,7 +579,7 @@ typedef struct ExtrasTitle {
 
 _Static_assert(sizeof(ExtrasTitle) == 0x7c, "ExtrasTitle layout");
 /* Plays the movie(s) of the descriptor; the exe's own name for it is not known. */
-ORIG_FN(0x0045a3c0, void, moviePlay, (MovieDesc *const *list));
+void moviePlay(MovieDesc *const *list);
 
 /* Titles of the movie list (the first is always there, the others when unlocked). */
 #define gTitleIntro ORIG_VAR(0x0055af40, ExtrasTitle, gTitleIntro)

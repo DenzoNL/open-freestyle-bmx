@@ -633,16 +633,17 @@ int zobjCameraRotated(ZObjCamera *camera)
 }
 
 BMX_ADDR(0x00482130)
-void zobjCameraInitialize(void)
+int zobjCameraInitialize(void)
 {
     if (gZobjCameraInitialized != 0) {
         zdebugFail("Already initialized", zobjCameraFile, 169, 0);
     }
     if (gZrwCamInit() == 0) {
-        return;
+        return 0;
     }
     gZobjCameraCaches = zmemFreeListCreate(sizeof(ZCameraCache), 4, 0);
     gZobjCameraInitialized = 1;
+    return 1;
 }
 
 BMX_ADDR(0x004821c0)

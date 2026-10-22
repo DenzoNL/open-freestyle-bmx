@@ -211,7 +211,8 @@ ZActor *zrollerCreatePlayerActor(const uint16_t *def)
     if (gZrollerUpdateHandle != 0) {
         gZrollerUnregister(gZrollerUpdateHandle);
     }
-    gZrollerUpdateHandle = gZrollerRegister(5, (void *)zrollerUpdateShadow, &gZrollerShadow, 1);
+    gZrollerUpdateHandle =
+        gZrollerRegister(5, BMX_FNPTR(void *, 0x0049b520, zrollerUpdateShadow), &gZrollerShadow, 1);
     actor = zactorCreate(1);
     if (actor == NULL) {
         return NULL;

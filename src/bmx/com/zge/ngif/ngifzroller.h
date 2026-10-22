@@ -57,8 +57,8 @@ typedef void(BMX_CDECL *ZrollerUnregisterFn)(int handle);
 #define gZrollerRegister   ORIG_VAR(0x00561470, ZrollerRegisterFn, gZrollerRegister)
 #define gZrollerUnregister ORIG_VAR(0x00561474, ZrollerUnregisterFn, gZrollerUnregister)
 typedef void(BMX_CDECL *ZrollerFreeNodeFn)(void *payload, void *list);
-/* Update callback of the shadow state (0x49b520, not ported). */
-ORIG_FN(0x0049b520, void, zrollerUpdateShadow, (void *state));
+/* Update callback of the shadow state (zrwmodelcreate.c by address). */
+void zrollerUpdateShadow(void *state);
 
 /* World bounds record (0x5fb718) returned by zrollerGetWorldBounds. */
 typedef float ZrollerBounds[7];

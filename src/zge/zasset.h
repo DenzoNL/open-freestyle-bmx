@@ -57,7 +57,6 @@ int zassetCount(int lib);
 int zassetNext(int lib);
 
 /* Decompressor of the renderer (kind 1 or 2): source, size, destination, bytes written. */
-ORIG_FN(0x0049c080, void, zassetDecompress,
-        (int kind, const void *src, uint32_t size, void *dst, uint32_t *outSize));
+int zassetDecompress(int kind, const void *packed, uint32_t size, void *dest, uint32_t *outSize);
 
 #endif

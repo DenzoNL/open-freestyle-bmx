@@ -45,9 +45,9 @@ ORIG_FN(0x00488890, int, zrwMdlRegisterPlugin, (void));
 ORIG_FN(0x004d0020, int, rwEngineOpen, (void *params));
 ORIG_FN(0x004cfd50, int, rwEngineStart, (void));
 ORIG_FN(0x004dba80, const uint32_t *, rwOsGetMemoryInterface, (void));
-ORIG_FN(0x0049f900, int, zgeInitializeSubsystems, (const char *argument));
-ORIG_FN(0x0045b270, int, ngifInitialize, (void));
-ORIG_FN(0x0045b8a0, int, ngifRunFrame, (float dt));
+int zgeInitializeSubsystems(const char *argument);
+int ngifInitialize(void);
+int ngifRunFrame(float dt);
 
 ORIG_FN(0x00492eb0, void *, zrwcamFirst, (void));
 ORIG_FN(0x00492ed0, void *, zrwcamNext, (void *camera));

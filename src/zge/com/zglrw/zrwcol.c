@@ -238,11 +238,13 @@ int zrwcolQuerySphere(const float *center, float radius, uint32_t flags, const i
 }
 
 BMX_ADDR(0x00494c20)
-void zrwcolEnableIfTagInfo(void)
+int zrwcolEnableIfTagInfo(void)
 {
     if (ztaginfInitialize() != 0) {
         gZrwColEnabled = 1;
+        return 1;
     }
+    return 0;
 }
 
 BMX_ADDR(0x00494c70)

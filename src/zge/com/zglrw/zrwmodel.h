@@ -66,6 +66,10 @@ typedef struct ZrwModelDef {
     uint16_t entryCount; /* 0xa4 */
     uint8_t padA6[2];
     ZrwModelEntry *entries; /* 0xa8 */
+    void *atomic;           /* 0xac first atomic of the first clump */
+    void *geometry;         /* 0xb0 its geometry */
+    void *atomicInfo;       /* 0xb4 the pointer at +0x4c of the atomic */
+    uint8_t padB8[4];
 } ZrwModelDef;
 
 typedef struct ZrwModel ZrwModel;
@@ -97,7 +101,7 @@ _Static_assert(sizeof(ZrwModelEntry) == 0x14, "zrw entry");
 _Static_assert(sizeof(ZrwPartDef) == 0x44, "zrw part definition");
 _Static_assert(sizeof(ZrwModelPart) == 0x28, "zrw part");
 _Static_assert(sizeof(ZrwPartSet) == 12, "zrw part set");
-_Static_assert(sizeof(ZrwModelDef) == 0xac, "zrw model definition");
+_Static_assert(sizeof(ZrwModelDef) == 0xbc, "zrw model definition");
 
 /* State of the model system (memset at initialisation): the two scratch matrices of zrwModelUpdate. */
 typedef struct ZrwModelState {

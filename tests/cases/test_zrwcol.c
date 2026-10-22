@@ -417,7 +417,7 @@ DT_CASES(zrwcol_cases) = {
     {"zrwcolFilterRecord", 0x00494750, zrwcolFilterRecord, 5, DT_RET_INT, setup_filter, 500, 0},
     {"zrwcolRecordObjectHit", 0x004947c0, zrwcolRecordObjectHit, 4, DT_RET_INT, setup_record_object_short,
      500, 0},
-    {"zrwcolEnableIfTagInfo", 0x00494c20, zrwcolEnableIfTagInfo, 0, DT_RET_VOID, setup_enable, 50, 0},
+    {"zrwcolEnableIfTagInfo", 0x00494c20, zrwcolEnableIfTagInfo, 0, DT_RET_INT, setup_enable, 50, 0},
     {"zrwcolLineTest", 0x00494c70, zrwcolLineTest, 5, DT_RET_INT, setup_line_test, 100, 0},
     {"zrwcolSphereTest", 0x00494ca0, zrwcolSphereTest, 5, DT_RET_INT, setup_sphere_test, 100, 0},
 };

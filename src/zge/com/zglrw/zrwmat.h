@@ -24,6 +24,23 @@ ORIG_FN(0x00489150, void, zrwmatNodeToWorld,
 ORIG_FN(0x00489180, void, zrwmatNodeVector, (void *object, uint32_t node, float *out, int flag));
 /* Stores the skeleton at +0x30 of the object and hands it to the renderer. */
 ORIG_FN(0x00489210, void, zrwmatSetSkeleton, (void *object, void *skeleton));
+/* Matrix of a node of the object (the parent frame of an attached scene object). */
+ORIG_FN(0x004891b0, void, zrwmatNodeMatrix, (void *object, uint32_t node, void *out, int flag));
+/* Material and texture interface of the renderer (called through the pointers at 0x561024..0x561048). */
+/* Releases a texture handle. */
+ORIG_FN(0x00489530, void, zrwmatReleaseTexture, (void *texture));
+/* Sets the material callback of the renderer (receives each material read by a model); returns the old one.
+ */
+ORIG_FN(0x004896c0, void *, zrwmatSetMaterialHook, (void *hook));
+/* Creates a texture from `size` bytes of image data under the given name. */
+ORIG_FN(0x004896d0, void *, zrwmatLoadSpriteTexture,
+        (void *data, uint32_t size, const char *name, int a, int b));
+/* Texture `index` of a material. */
+ORIG_FN(0x00489a40, void *, zrwmatGetTexture, (void *material, int index));
+/* Registers (takes a reference to) a material. */
+ORIG_FN(0x00489af0, void, zrwmatRetainMaterial, (void *material));
+/* Replaces the texture of a material. */
+ORIG_FN(0x00489b80, void, zrwmatSetTexture, (void *material, void *texture));
 /* Refreshes the world matrices of an object. */
 ORIG_FN(0x004892a0, void, zrwmatUpdate, (void *object));
 

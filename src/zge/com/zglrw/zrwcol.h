@@ -110,8 +110,8 @@ ZrwColTriangle *zrwcolRecordObjectHit(void *arg, ZrwColTriangle *triangle, float
                                       const ZrwColObject *object);
 /* Sphere query: 1 and the hit buffer and count in out[0], out[1] when something was hit. */
 int zrwcolQuerySphere(const float *center, float radius, uint32_t flags, const int *excluded, uint32_t *out);
-/* Sets gZrwColEnabled when the tag tables initialise. */
-void zrwcolEnableIfTagInfo(void);
+/* Sets gZrwColEnabled when the tag tables initialise; returns whether they did. */
+int zrwcolEnableIfTagInfo(void);
 /* Line and sphere tests through the function pointers at 0x562068 / 0x56206c. */
 int zrwcolLineTest(const float *a, const float *b, int mode, int flags, float *out);
 int zrwcolSphereTest(const float *center, float radius, uint32_t flags, const int *excluded, uint32_t *out);

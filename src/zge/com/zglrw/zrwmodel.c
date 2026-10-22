@@ -39,9 +39,9 @@ ORIG_FN(0x004b47a0, void *, RpGeometryGetMaterial, (void *geometry, int index));
 ORIG_FN(0x004b9310, void *, RpMaterialSetColor, (void *material, const void *color));
 
 /* Other renderer modules (zrwmodelcreate.c, zrwmodelrender.c, zrwzgl.c, zobjlight.c, ...). */
-ORIG_FN(0x0049d9d0, int, zrwModelCreateInitialize, (void));
-ORIG_FN(0x0049da60, int, zrwModelCreateShutdown, (void));
-ORIG_FN(0x0049cc70, void *, zrwModelCreateFirstAtomic, (void *clump));
+int zrwModelCreateInitialize(void);
+int zrwModelCreateShutdown(void);
+void *zrwModelCreateFirstAtomic(void *clump);
 ORIG_FN(0x0048be30, void, zrwMatrixToGame, (void *out, const ZMatrix *matrix));
 ORIG_FN(0x00504490, void, zrwModelPostUpdate, (void *clump));
 

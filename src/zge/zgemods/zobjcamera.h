@@ -130,7 +130,8 @@ int zobjCameraDraw(ZObjCamera *camera);
 /* The moved / rotated hooks drop all cached matrices. */
 int zobjCameraMoved(ZObjCamera *camera);
 int zobjCameraRotated(ZObjCamera *camera);
-void zobjCameraInitialize(void);
+/* Returns 0 when the renderer's camera system fails to start, else 1. */
+int zobjCameraInitialize(void);
 ZObjCamera *zobjCameraCreate(void);
 /* Sets the field of view (a ZAngle in the low 16 bits; 0 is ignored by the renderer). */
 void zobjCameraSetFov(ZObjCamera *camera, int fov);
