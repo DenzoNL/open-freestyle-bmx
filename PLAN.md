@@ -146,4 +146,12 @@ round floats (so the hook build uses SSE2, not x87). Rules are in CONTRIBUTING.m
   constants; ship them as generated data computed from the original's formula).
 
 
+- **Fixture bugs (not port bugs).** `saveFileRead` runs the emulated heap out of RAM in setup (iter 86);
+  `zassetRead_made` asserts in setup without game assets; with `BMX_GAME_DIR` set and full iterations,
+  18 `ziff*` cases fault inside the original at iter 153.
+- **Left out of slices:** ngiffx.c x87 functions 0x45cc50 and 0x45eaa0 (Opus); WinMain 0x48a460
+  (app entry, misfiled in zrwzgl.c, can't return in the harness); world/particle callbacks
+  0x497200–0x497780 and 0x4975b0 sit in zrwtxr.c with `TODO(file)`, belong in zrwworld.c.
+- `zquatNormalize` doesn't assert on a NaN length like the original (x87 FCOM unordered).
+
 - How CI gets the original exe for the differential tests. Until then CI skips them and they run locally.
