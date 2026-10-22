@@ -6,6 +6,7 @@
 #include "zge/com/zglrw/zrwzgl.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zobjcamera.h"
+#include "zge/zgemods/zobjpemit.h"
 #include "zge/zlist.h"
 #include "zge/zmem.h"
 #include "zge/zobj.h"
@@ -95,7 +96,6 @@ typedef void(BMX_CDECL *ZfxSetRasterFn)(uint32_t material, void *raster, int ind
 /* Code the effects call in the exe: effect creation by name, modifier attach, axis matrix, scene calls. */
 ORIG_FN(0x00495d50, void, ngiffxSpawn,
         (uint32_t handle, const char *name, int flags, int unused, const void *params));
-ORIG_FN(0x00495900, void, ngiffxAxisMatrix, (ZMatrix * out, const ZVec3 *from, const ZVec3 *to));
 
 /* Copies a 32 bit word between float / integer views without touching its bits. */
 #define COPY32(dst, src) __builtin_memcpy(&(dst), &(src), 4)
@@ -326,7 +326,7 @@ int ngiffxShardRender(const void *effect, ZfxEmitter *emitter)
         uint32_t rgba;
 
         __builtin_memcpy(&rgba, p->rgba, 4);
-        ngiffxAxisMatrix(&matrix, &kUp, &p->axis);
+        zobjAxisMatrix(&matrix, &kUp, &p->axis);
         matrix.pos.x = 0.0f;
         matrix.pos.y = 0.0f;
         matrix.pos.z = 0.0f;

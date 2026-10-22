@@ -10,6 +10,7 @@
 #include "zge/ziff.h"
 #include "zge/zlist.h"
 #include "zge/zmem.h"
+#include "zge/zprofile.h"
 #include "zge/zstring.h"
 
 static const char kZrwTxrFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwTxr.c";
@@ -49,6 +50,9 @@ ORIG_FN(0x004df810, int, RwTexDictionaryDestroy, (void *dictionary));
 ORIG_FN(0x004dfc80, void *, RwTexDictionarySetCurrent, (void *dictionary));
 ORIG_FN(0x004e4a30, int, RwImageRegisterImageFormat, (const char *extension, void *read, void *write));
 ORIG_FN(0x004df580, int, RwTextureSetMipmapping, (int enable));
+ORIG_FN(0x004df980, void *, RwTextureAddRef, (void *texture));
+ORIG_FN(0x004dffd0, int, RwTextureRegisterPlugin,
+        (int size, uint32_t id, void(BMX_CDECL *ctor)(void *), void *(BMX_CDECL *dtor)(void *), void *copy));
 ORIG_FN(0x004df550, void *, RwTextureSetFindCallBack, (void *callback));
 ORIG_FN(0x004df540, void *, RwTextureGetReadCallBack, (void));
 ORIG_FN(0x004df520, int, RwTextureSetReadCallBack, (void *callback));
@@ -77,9 +81,6 @@ ORIG_FN(0x00492eb0, uint8_t *, zrwGetCurrentCamera, (void));
 ORIG_FN(0x00493060, void *, zrwCameraGetRwCamera, (const uint8_t *camera));
 ORIG_FN(0x00496620, void, zrwWorldPvsCallback, (void));
 ORIG_FN(0x004cd510, void, rwWorldPvsDefaultCallback, (void));
-ORIG_FN(0x004a3500, void, RegisterCallBacksForFileSystem, (void));
-ORIG_FN(0x004a3580, void, ImageBufferSizeType, (const void *data, uint32_t size, const char *extension));
-ORIG_FN(0x004a35c0, void, zrwFileRamDiskClear, (void));
 ORIG_FN(0x00489ba0, void, zrwmatTextureLoadBegin, (void));
 ORIG_FN(0x00489be0, void, zrwmatTextureLoaded, (ZrwTexture * texture));
 
@@ -869,4 +870,74 @@ int zrwTextureWritePalette(const ZrwTexture *texture)
     }
     RwRasterUnlockPalette(raster);
     return 1;
+}
+
+/*
+ * Accessors and plugin glue at 0x498ac0..0x498cb0, filed under zanim.c by the packet but part of this
+ * file's address range.
+ */
+BMX_ADDR(0x00498ac0)
+void *zrwTextureGetRwTexture(const ZrwTexture *texture)
+{
+    return texture->texture;
+}
+
+BMX_ADDR(0x00498ad0)
+void *zrwTextureGetRaster(const ZrwTexture *texture)
+{
+    return RwTextureGetRaster(texture->texture);
+}
+
+BMX_ADDR(0x00498af0)
+void *zrwTextureAddRef(ZrwTexture *texture)
+{
+    texture->refCount++;
+    return RwTextureAddRef(texture->texture);
+}
+
+BMX_ADDR(0x00498b10)
+int zrwMatRegisterPlugin(void)
+{
+    gZrwMatPluginOffset =
+        RwTextureRegisterPlugin(4, 0xff01, BMX_FNPTR(void(BMX_CDECL *)(void *), 0x00497a90, rwMatConstructor),
+                                BMX_FNPTR(void *(BMX_CDECL *)(void *), 0x00497ab0, rwMatDestructor), NULL);
+    return gZrwMatPluginOffset != -1;
+}
+
+BMX_ADDR(0x00498b40)
+void zrwTextureSetLoadName(const char *name)
+{
+    gZrwTxr.loadName = name;
+}
+
+BMX_ADDR(0x00498b50)
+void zrwTextureSetUserData(const ZrwTexture *texture, uint32_t value)
+{
+    if (gZrwMatPluginOffset > 0) {
+        *(uint32_t *)((uint8_t *)texture->texture + gZrwMatPluginOffset) = value;
+    }
+}
+
+BMX_ADDR(0x00498b70)
+void zrwSetMaterialParam(const void *value)
+{
+    gZrwTxr.mipmapped = (int)(uintptr_t)value;
+    RwTextureSetMipmapping((int)(uintptr_t)value);
+    RwTextureSetFindCallBack((void *)(uintptr_t)value);
+}
+
+BMX_ADDR(0x00498b90)
+void zrwSetMaterialValue(int value)
+{
+    (void)value;
+}
+
+BMX_ADDR(0x00498cb0)
+void zrwTextureLogAll(void)
+{
+    gZdebugPrint("ZGLTEXTURE: Objects in use:%d\n", zmemFreeListUsedCount(gZrwTxr.textures));
+    gZdebugIndent(1);
+    zmemFreeListForEach(gZrwTxr.textures,
+                        BMX_FNPTR(void(BMX_CDECL *)(void *, void *), 0x00498580, zrwTextureLog), NULL);
+    gZdebugIndent(-1);
 }

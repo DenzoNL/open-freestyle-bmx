@@ -8,6 +8,7 @@
 #include "dt.h"
 #include "dt_ngif.h"
 #include "zge/com/zglrw/zrwmat.h"
+#include "zge/zstring.h"
 
 #define gViewPlayer ORIG_VAR(0x0056b408, uint32_t, gViewPlayer)
 
@@ -177,7 +178,95 @@ static void setup_setup_actor(DtCtx *c)
     DT_ARG_PTR(c, 0, make_actor());
 }
 
+/* ---- zactorSyncPose -------------------------------------------------------------------------------- */
+
+static void *BMX_CDECL stubFindSkeletonNode(void *skeleton, uint32_t hash)
+{
+    ngLogPtr(skeleton);
+    ngLog(hash);
+    return (dt_u32() % 6 == 0) ? NULL : (void *)(uintptr_t)(dt_u32() | 1);
+}
+
+static void BMX_CDECL stubSetNodeRotation(void *node, const float *quat)
+{
+    ngLog(0x49a570);
+    ngLogPtr(node);
+    for (int i = 0; i < 4; i++) {
+        ngLogFloat(quat[i]);
+    }
+}
+
+static void BMX_CDECL stubSetPosition(void *object, const ZVec3 *pos)
+{
+    ngLog(0x487470);
+    ngLogPtr(object);
+    ngLogVec(pos);
+}
+
+static void BMX_CDECL stubSetAngles(void *object, const ZAngle3 *angles)
+{
+    ngLog(0x487520);
+    ngLogPtr(object);
+    ngLog((uint16_t)angles->x);
+    ngLog((uint16_t)angles->y);
+    ngLog((uint16_t)angles->z);
+}
+
+static int32_t make_model_object(void)
+{
+    uint8_t *object = dt_alloc(0x40);
+
+    dt_fill(object, 0x40);
+    return (int32_t)(uintptr_t)object;
+}
+
+static void setup_sync_pose(DtCtx *c)
+{
+    static const char *const kArms[6] = {"LeftUpArm",  "LeftLowArm",  "LeftHand",
+                                         "RightUpArm", "RightLowArm", "RightHand"};
+    ZActor *a;
+    uint8_t *player = dt_alloc(0x200);
+
+    ngBegin(c, 0);
+    a = make_actor();
+    dt_fill(player, 0x200);
+    *(float *)(player + 0x100) = dt_float_edgy(-5.0f, 5.0f);
+    a->player = (struct ZMotionPlayer *)player;
+    a->object = make_model_object();
+    a->object2 = make_model_object();
+    a->partCount = dt_range(0, 15);
+    for (int i = 0; i < 15; i++) {
+        a->partHash[i] = (dt_u32() % 3 == 0) ? dt_u32() : (uint32_t)zstrHash(kArms[dt_range(0, 5)]);
+    }
+    switch (dt_u32() % 4) {
+    case 0:
+        break; /* looked up by the call */
+    case 1:
+        for (int i = 0; i < 6; i++) {
+            gZactorArmHashes[i] = (uint32_t)zstrHash(kArms[i]);
+        }
+        break;
+    default:
+        for (int i = 0; i < 6; i++) {
+            gZactorArmHashes[i] = (i == 0 && dt_u32() & 1) ? 0 : (uint32_t)zstrHash(kArms[i]);
+        }
+        break;
+    }
+    if (dt_u32() % 4 == 0) {
+        gZactorArmHashes[0] = 0;
+    }
+    for (int i = 0; i < 3; i++) {
+        (&a->pos.x)[i] = dt_float_edgy(-100.0f, 100.0f);
+    }
+    dt_stub(0x0049a540, NULL, (void *)stubFindSkeletonNode);
+    dt_stub(0x0049a570, NULL, (void *)stubSetNodeRotation);
+    dt_stub(0x00487470, NULL, (void *)stubSetPosition);
+    dt_stub(0x00487520, NULL, (void *)stubSetAngles);
+    DT_ARG_PTR(c, 0, a);
+}
+
 DT_CASES(ngifzactor_cases) = {
+    {"zactorSyncPose", 0x004654b0, zactorSyncPose, 1, DT_RET_VOID, setup_sync_pose, 1000, 0},
     {"zactorViewPlayer", 0x00464720, zactorViewPlayer, 0, DT_RET_INT, setup_view_player, 20, 0},
     {"zactorInitRiderParts", 0x00464740, zactorInitRiderParts, 2, DT_RET_VOID, setup_init_parts, 200, 0},
     {"zactorInitBikeParts", 0x004649a0, zactorInitBikeParts, 2, DT_RET_VOID, setup_init_parts, 200, 0},

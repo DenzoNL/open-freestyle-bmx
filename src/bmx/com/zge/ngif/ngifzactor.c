@@ -7,6 +7,9 @@
 #include "zge/com/zglrw/zrwmat.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zobjcamera.h"
+#include "zge/ziff.h"
+#include "zge/zobj.h"
+#include "zge/zquat.h"
 #include "zge/zstring.h"
 
 static const char kActorFile[] = "C:\\zaxis\\Bmx\\src\\com\\zge\\NgIF\\NgIFzactor.c";
@@ -234,6 +237,86 @@ void zactorSetupBike(void *actor)
         a->partOrder[i] = kBikePartOrder[i];
     }
     a->partCount = kZactorBikeParts;
+}
+
+/* Joint angles of the extra twists the arm parts get (euler z of a quarter turn, one way or the other). */
+static const ZAngle3 kTwistPlus = {0, 0, 0x4000};
+static const ZAngle3 kTwistMinus = {0, 0, (ZAngle)0xc000};
+
+/* The skeleton of a model object (the object stores it at +0x30). */
+static void *objectSkeleton(int32_t object)
+{
+    return *(void **)((uint8_t *)(uintptr_t)object + 0x30);
+}
+
+/*
+ * Applies the actor's joint angles to the skeletons of its two objects: each part gets the quaternion of its
+ * angles, the arm parts twisted by a quarter turn around their own axis (upper parts one way, lower parts
+ * and hands the other way). Then both objects are moved to the actor (raised by the player's height offset)
+ * and turned like it.
+ */
+BMX_ADDR(0x004654b0)
+void zactorSyncPose(void *actor)
+{
+    ZActor *a = actor;
+    const ZAngle3 *joints = (const ZAngle3 *)((uint8_t *)a->player + 0x104);
+    ZAngle3 angles;
+    ZVec3 pos;
+
+    if (gZactorArmHashes[0] == 0) {
+        for (int i = 0; i < 6; i++) {
+            gZactorArmHashes[i] = (uint32_t)zstrHash(kRiderPartNames[3 + i]);
+        }
+    }
+    for (uint32_t i = 0; i < (uint32_t)a->partCount; i++) {
+        void *node1 = zrwmatFindSkeletonNode(objectSkeleton(a->object), a->partHash[i]);
+        void *node2 = zrwmatFindSkeletonNode(objectSkeleton(a->object2), a->partHash[i]);
+        ZQuat joint;
+        ZQuat outer;
+        ZQuat inner;
+
+        if (node1 == NULL) {
+            printUnknownPart(0x1fe, "Missing hash function");
+        } else {
+            const uint32_t hash = a->partHash[i];
+
+            zquatFromEuler(&joint, &joints[i], 0);
+            if (hash == gZactorArmHashes[0]) {
+                zquatFromEuler(&outer, &kTwistPlus, 0);
+                zquatIdentity(&inner);
+                zquatMul(&joint, &inner, &joint);
+                zquatMul(&joint, &joint, &outer);
+            } else if (hash == gZactorArmHashes[1] || hash == gZactorArmHashes[2]) {
+                zquatFromEuler(&outer, &kTwistPlus, 0);
+                zquatFromEuler(&inner, &kTwistMinus, 0);
+                zquatMul(&joint, &inner, &joint);
+                zquatMul(&joint, &joint, &outer);
+            } else if (hash == gZactorArmHashes[3]) {
+                zquatFromEuler(&outer, &kTwistMinus, 0);
+                zquatIdentity(&inner);
+                zquatMul(&joint, &inner, &joint);
+                zquatMul(&joint, &joint, &outer);
+            } else if (hash == gZactorArmHashes[4] || hash == gZactorArmHashes[5]) {
+                zquatFromEuler(&outer, &kTwistMinus, 0);
+                zquatFromEuler(&inner, &kTwistPlus, 0);
+                zquatMul(&joint, &inner, &joint);
+                zquatMul(&joint, &joint, &outer);
+            }
+            zrwmatSetNodeRotation(node1, &joint.x);
+            zrwmatSetNodeRotation(node2, &joint.x);
+        }
+    }
+    pos.x = zactorGetPos(a)->x;
+    pos.y = zactorGetPos(a)->y;
+    pos.z = zactorGetPos(a)->z;
+    pos.y = (float)((double)pos.y + *(const float *)((const uint8_t *)a->player + 0x100));
+    zobjSetPosition((void *)(uintptr_t)a->object, &pos);
+    zobjSetPosition((void *)(uintptr_t)a->object2, &pos);
+    angles.x = a->rot[0];
+    angles.y = (ZAngle)-a->rot[1];
+    angles.z = (ZAngle)-a->rot[2];
+    zobjSetAngles((void *)(uintptr_t)a->object, &angles);
+    zobjSetAngles((void *)(uintptr_t)a->object2, &angles);
 }
 
 /* Index of the rider the player controls (byte at 0x56b408); read directly, not through comdata. */

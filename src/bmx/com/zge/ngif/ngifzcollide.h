@@ -6,6 +6,7 @@
 
 #include "bmx/com/action/physics_hit.h"
 #include "compat/orig.h"
+#include "zge/com/zglrw/zrwcol.h"
 #include "zge/zmath.h"
 
 /* Casts a ray from -> to and fills a 0xd8 byte hit record; returns nonzero on a hit. */
@@ -40,9 +41,6 @@ typedef struct ZcollideProbe {
 _Static_assert(sizeof(ZcollideProbe) == 0x58, "ZcollideProbe size");
 _Static_assert(offsetof(ZcollideProbe, point) == 0x30, "ZcollideProbe.point");
 _Static_assert(offsetof(ZcollideProbe, point2) == 0x40, "ZcollideProbe.point2");
-
-/* Renderer collision test used by zcollideProbeHeight (0x494c70, zrwcol.c). */
-ORIG_FN(0x00494c70, int, zrwcolLineTest, (const float *a, const float *b, int mode, int flags, float *out));
 
 /* Casts a vertical line through p onto the terrain; returns the hit height or 10000 on a miss. */
 double zcollideProbeHeight(const ZVec3 *p, ZcollideProbe *out);

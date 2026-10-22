@@ -7,6 +7,7 @@
 #include "bmx/com/action/physics.h"
 #include "bmx/com/zge/bmx/bmxsound.h"
 #include "bmx/com/zge/ngif/ngifzbsp.h"
+#include "bmx/com/zge/ngif/ngifzroller.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zobjcamera.h"
 #include "zge/zmem.h"
@@ -52,6 +53,118 @@ PhysPropNode *propFindNode(uint32_t id)
         node = node->next;
     }
     return node;
+}
+
+static const char kPropFile[] = "C:\\zaxis\\Bmx\\Src\\com\\action\\prop.c";
+
+/*
+ * Sets up the props of the current level: each definition is matched to a collision object of the level
+ * (props, types 0..3 and above 5) or to a face node (types 4 and 5), the record gets its position and
+ * orientation, and the looping sounds start. The tagged nodes get their visibility state, the collectables
+ * of level 0 that start out collected are switched, and the result is saved as the defaults.
+ */
+BMX_ADDR(0x0042deb0)
+void propInit(void)
+{
+    uint32_t *slot;
+    uint32_t nodeCount = 0;
+
+    for (uint32_t i = 0; i < kPropMax; i++) {
+        PropRecord *const rec = &gPropRecords[i];
+        const PropDef *const def = &gPropDefs[0][0] + (uint32_t)gCurrentLevel * 16 + i;
+
+        rec->state = 0;
+        rec->object = NULL;
+        if (def->id == 0) {
+            continue;
+        }
+        if (def->type < kPropTypeFixed || def->type > kPropTypeToggle) {
+            PhysPropObject **const hits = (PhysPropObject **)zbspFindPropsNear(def->id, def->id);
+
+            if (hits == NULL) {
+                gZdebugPrint("bmxpropInit: error finding prop with tag %d\n", def->id);
+                continue;
+            }
+            {
+                PhysPropObject *const object = hits[0];
+
+                rec->index = (uint8_t)i;
+                rec->object = object;
+                rec->pos.x = (float)(int)object->pos[0];
+                rec->pos.y = (float)(int)object->pos[1];
+                rec->pos.z = (float)(int)object->pos[2];
+                zvec3Zero(&rec->vel);
+                zmatrixIdentity(&rec->orient);
+                zmatrixRotateEuler(&rec->orient, &rec->orient, &object->rot);
+                rec->angles.x = 0;
+                rec->angles.y = 0;
+                rec->angles.z = 0;
+                rec->flags = 0;
+                rec->timer = 0;
+                rec->state = kPropStateRecord;
+                rec->mode = 0;
+                rec->paramA = def->paramA;
+                rec->paramB = def->paramB;
+                object->flags |= 0x400;
+                object->prop = (const PhysPropInfo *)(const void *)rec;
+                rec->sound = 0xffffffffu;
+                if (def->soundStop != 0xff) {
+                    rec->sound = (uint32_t)bmxSoundPlayAt(kSoundProp, &rec->pos, 0, def->soundStop, 0x7f);
+                }
+                for (PhysPropObject **extra = hits + 1; *extra != NULL; extra++) {
+                    gZdebugPrint("bmxpropInit: error: extra prop with tag %d (X: %d, Z: %d)\n", def->id,
+                                 (int)(*extra)->pos[0], (int)(*extra)->pos[2]);
+                }
+            }
+        } else {
+            const PhysPropNode *const node = propFindNode(def->id);
+
+            if (node == NULL) {
+                gZdebugPrint("bmxpropInit: error finding face with tag %d\n", def->id);
+                continue;
+            }
+            rec->index = (uint8_t)i;
+            rec->object = node->object;
+            rec->pos.x = node->frame->pos.x;
+            rec->pos.y = node->frame->pos.y;
+            rec->pos.z = node->frame->pos.z;
+            rec->state = kPropStateRecord;
+            rec->sound = 0xffffffffu;
+            if (def->soundStop != 0xff) {
+                rec->sound = (uint32_t)bmxSoundPlayAt(kSoundProp, &rec->pos, 0, def->soundStop, 0x7f);
+            }
+        }
+    }
+    zmemFill(&gPropState.pad840, 0, 0x300);
+    /* The slot is the node field of a state record; the original also clears the word 8 bytes before it. */
+    slot = (uint32_t *)(uintptr_t)&gPropNodeStates[0].node;
+    for (PhysPropNode *node = *zobjPropList(); node != NULL; node = node->next) {
+        if (node->tag != NULL && node->tag->range != 0) {
+            if (nodeCount >= 64) {
+                zdebugFail("state info overflow", kPropFile, 0x1eb, 0);
+            }
+            slot[-2] = 0;
+            slot[0] = (uint32_t)(uintptr_t)node;
+            slot += 3;
+            nodeCount++;
+        }
+    }
+    if (gCurrentLevel == 0) {
+        for (uint32_t i = 0; i < kPropMax; i++) {
+            PropRecord *const rec = &gPropRecords[i];
+
+            if (rec->state != 0) {
+                const uint32_t id = (&gPropDefs[0][0] + (uint32_t)gCurrentLevel * 16 + i)->id;
+
+                if (id >= 0x14 && id <= 0x19) {
+                    propSwitch(rec, 0, 0);
+                    rec->state = kPropStateCollected;
+                }
+            }
+        }
+    }
+    zmemCopy(&gPropDefaults, &gPropState, kPropStateSize);
+    zrollerAddDrawCallback(BMX_FNPTR(ZrollerDrawFn, 0x00402527, propReturnZero));
 }
 
 BMX_ADDR(0x0042e270)

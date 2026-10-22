@@ -25,7 +25,7 @@ void *zlistGet(const ZList *list, int index);
 int zlistCount(const ZList *list);
 void zlistInsert(ZList *list, void *item);
 
-/* Belongs to zList.c too (the packet filed it under zrwprim.c); removes and returns the current item. */
-ORIG_FN(0x0048c570, void *, zlistRemoveCurrent, (ZList * list));
+/* Removes and returns the current item (the last one without a cursor); the last item fills its slot. */
+void *zlistRemoveCurrent(ZList *list);
 
 #endif

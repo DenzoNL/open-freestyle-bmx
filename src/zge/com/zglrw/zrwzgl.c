@@ -25,8 +25,10 @@ ORIG_FN(0x004930b0, void, zrwSetViewWindow, (const void *a, const void *b));
 ORIG_FN(0x004930c0, void, zrwSetCameraPlane, (const void *a, const void *b));
 ORIG_FN(0x004930e0, void, zrwSetCameraOffset, (const void *a, const void *b));
 ORIG_FN(0x00493100, void, zrwSetCameraFlags, (const void *a, int flags));
-ORIG_FN(0x00498b70, void, zrwSetMaterialParam, (const void *a));
-ORIG_FN(0x00498b90, void, zrwSetMaterialValue, (int value));
+/* Ported in zrwtxr.c (its header cannot be included here: it clashes with the macros of zrwzgl.h). */
+void zrwSetMaterialParam(const void *value);
+void zrwSetMaterialValue(int value);
+int zrwMatRegisterPlugin(void);
 
 ORIG_FN(0x0049ea10, int, zrwFileInitialize, (void));
 ORIG_FN(0x0049ea60, void, zrwFileShutdown, (void));
@@ -39,7 +41,6 @@ ORIG_FN(0x00500250, int, rpAnimPluginAttach, (void));
 ORIG_FN(0x00505870, int, rpBonePluginAttach, (void));
 ORIG_FN(0x005062b0, int, rpLodAtomicPluginAttach, (void));
 ORIG_FN(0x004ccac0, int, rpPvsPluginAttach, (void));
-ORIG_FN(0x00498b10, int, zrwMatRegisterPlugin, (void));
 ORIG_FN(0x00488890, int, zrwMdlRegisterPlugin, (void));
 ORIG_FN(0x004d0020, int, rwEngineOpen, (void *params));
 ORIG_FN(0x004cfd50, int, rwEngineStart, (void));
@@ -161,8 +162,6 @@ typedef struct DdVtbl {
 } DdVtbl;
 #define gDirectDraw ORIG_VAR(0x0069730c, void *, gDirectDraw)
 #define gGdiSurface ORIG_VAR(0x006977cc, void *, gGdiSurface)
-ORIG_FN(0x00493830, void, zrwOnActivate, (void));
-ORIG_FN(0x00493890, void, zrwOnDeactivate, (void));
 
 #define gZglMaterials     ORIG_VAR(0x006723b0, ZMemFreeList *, gZglMaterials)
 #define gMovie            ORIG_VAR(0x006973a0, ZMovie, gMovie)

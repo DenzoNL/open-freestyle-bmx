@@ -37,5 +37,7 @@ ORIG_FN(0x004874a0, const ZVec3 *, zobjGetPosition, (const void *object));
 /* Moves / rotates an object and notifies its owner. */
 ORIG_FN(0x00487470, void, zobjSetPosition, (void *object, const ZVec3 *pos));
 ORIG_FN(0x004874d0, void, zobjSetRotation, (void *object, const ZQuat *rot));
+/* Sets the rotation of an object from Euler angles. */
+ORIG_FN(0x00487520, void, zobjSetAngles, (void *object, const ZAngle3 *angles));
 
 #endif

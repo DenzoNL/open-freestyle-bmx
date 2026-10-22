@@ -13,4 +13,8 @@ ORIG_FN(0x0047ed10, void, zdebugFail, (const char *why, const char *file, int li
 typedef void(BMX_CDECL *ZDebugPrintFn)(const char *fmt, ...);
 #define gZdebugPrint ORIG_VAR(0x00560074, ZDebugPrintFn, gZdebugPrint)
 
+/* Indents (positive) or unindents (negative) the following debug output: a function pointer at 0x560078. */
+typedef void(BMX_CDECL *ZDebugIndentFn)(int delta);
+#define gZdebugIndent ORIG_VAR(0x00560078, ZDebugIndentFn, gZdebugIndent)
+
 #endif

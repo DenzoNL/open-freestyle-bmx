@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 #include "compat/crt.h"
+#include "zge/com/zglrw/zrwmodelrender.h"
 #include "zge/zdebug.h"
 #include "zge/ziff.h"
 #include "zge/zlist.h"
@@ -40,12 +41,8 @@ ORIG_FN(0x004b9310, void *, RpMaterialSetColor, (void *material, const void *col
 /* Other renderer modules (zrwmodelcreate.c, zrwmodelrender.c, zrwzgl.c, zobjlight.c, ...). */
 ORIG_FN(0x0049d9d0, int, zrwModelCreateInitialize, (void));
 ORIG_FN(0x0049da60, int, zrwModelCreateShutdown, (void));
-ORIG_FN(0x0048fc50, int, zrwModelRenderInitialize, (void));
-ORIG_FN(0x0048fd00, int, zrwModelRenderShutdown, (void));
 ORIG_FN(0x0049cc70, void *, zrwModelCreateFirstAtomic, (void *clump));
 ORIG_FN(0x0048be30, void, zrwMatrixToGame, (void *out, const ZMatrix *matrix));
-ORIG_FN(0x0048f530, void, zrwModelRenderCallback, (void *model)); /* handed on as a callback */
-ORIG_FN(0x0048fec0, void, zrwModelSetRenderCallback, (void *model, void(BMX_CDECL *callback)(void *)));
 ORIG_FN(0x00504490, void, zrwModelPostUpdate, (void *clump));
 
 /* Part sets are 12 bytes apart from +0x54; the index is a 16 bit field of the model, not range checked. */
@@ -657,7 +654,7 @@ BMX_ADDR(0x00488ca0)
 void zrwModelSetUpdateHook(ZrwModel *model, const uint32_t *arg)
 {
     model->onUpdateArg = *arg;
-    zrwModelSetRenderCallback(model, zrwModelRenderCallback);
+    zrwModelSetRenderCallback(model, BMX_FNPTR(ZrwObjectCallback, 0x0048f530, zrwModelRenderCallback));
 }
 
 BMX_ADDR(0x00488cc0)

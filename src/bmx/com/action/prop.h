@@ -15,10 +15,11 @@
 
 /* Definition of a prop of a level (10 bytes, 16 per level at 0x557d28). */
 typedef struct PropDef {
-    uint16_t id;  /* 0x00 id the goals and the level's prop tags use */
-    uint8_t type; /* 0x02 0 collectable, 3 / 4 / 5 other behaviours (see propCollect) */
-    uint8_t kind; /* 0x03 8, 9: float up, 11, 12: collect on touch, 0x10: slides in */
-    uint8_t pad04[4];
+    uint16_t id;       /* 0x00 id the goals and the level's prop tags use */
+    uint8_t type;      /* 0x02 0 collectable, 3 / 4 / 5 other behaviours (see propCollect) */
+    uint8_t kind;      /* 0x03 8, 9: float up, 11, 12: collect on touch, 0x10: slides in */
+    uint16_t paramA;   /* 0x04 copied to PropRecord.paramA */
+    uint16_t paramB;   /* 0x06 */
     uint8_t sound;     /* 0x08 sound played when it is collected (0xff: none) */
     uint8_t soundStop; /* 0x09 sound that keeps playing for it (0xff: none) */
 } PropDef;
@@ -42,9 +43,10 @@ typedef struct PropRecord {
     ZMatrix orient; /* 0x2c */
     ZAngle3 angles; /* 0x6c turn applied to the orientation by propOrient */
     uint8_t pad72[2];
-    uint32_t sound; /* 0x74 handle of the looping sound */
-    uint32_t mode;  /* 0x78 sub state of the movement / whether it is shown (kind 5) */
-    uint8_t pad7c[8];
+    uint32_t sound;  /* 0x74 handle of the looping sound */
+    uint32_t mode;   /* 0x78 sub state of the movement / whether it is shown (kind 5) */
+    uint32_t paramA; /* 0x7c from PropDef.paramA */
+    uint32_t paramB; /* 0x80 */
 } PropRecord;
 
 _Static_assert(sizeof(PropRecord) == 0x84, "PropRecord size");
@@ -102,5 +104,8 @@ void propNop(void);
 void propUpdateMove(PropRecord *prop);
 /* Shows or hides the nodes that belong to a prop (and its +1 twin) and stores its mode. */
 void propSetShown(PropRecord *prop, int shown);
+/* Sets up the 16 props of the current level from the level's collision data and saves them as the defaults.
+ */
+void propInit(void);
 
 #endif

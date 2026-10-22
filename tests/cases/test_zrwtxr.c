@@ -1089,6 +1089,91 @@ static void setup_pal_read(DtCtx *c)
     DT_ARG_PTR(c, 0, tex);
 }
 
+/* ---- accessors and plugin glue (0x498ac0..0x498cb0) ---------------------------------------------- */
+
+static void *BMX_CDECL stubTextureAddRef(void *texture)
+{
+    ngLog(0x4df980);
+    ngLogPtr(texture);
+    return texture;
+}
+
+static int BMX_CDECL stubRegisterPlugin(int size, uint32_t id, void *ctor, void *dtor, void *copy)
+{
+    static const int answers[] = {-1, 8, 16, 0x20};
+
+    ngLog(0x4dffd0);
+    ngLog((uint32_t)size);
+    ngLog(id);
+    ngLogPtr(ctor);
+    ngLogPtr(dtor);
+    ngLogPtr(copy);
+    return answers[dt_u32() % 4];
+}
+
+static int BMX_CDECL stubTextureLogEach(const ZrwTexture *texture)
+{
+    ngLog(0x498580);
+    ngLogPtr(texture);
+    return 1;
+}
+
+static void BMX_CDECL stubIndent(int delta)
+{
+    ngLog(0x560078);
+    ngLog((uint32_t)delta);
+}
+
+static void setup_tex_addref(DtCtx *c)
+{
+    setup_texture(c);
+    dt_stub(0x4df980, NULL, (void *)stubTextureAddRef);
+}
+
+static void setup_register_plugin(DtCtx *c)
+{
+    begin(c);
+    gZrwMatPluginOffset = dt_range(-1, 40);
+    dt_stub(0x4dffd0, NULL, (void *)stubRegisterPlugin);
+}
+
+static void setup_load_name(DtCtx *c)
+{
+    begin(c);
+    DT_ARG_PTR(c, 0, dt_u32() % 4 == 0 ? NULL : "other-name");
+}
+
+/* The RwTexture of the record is big enough for the plugin slot to be anywhere up to 0x3c. */
+static void setup_texture_user(DtCtx *c)
+{
+    begin(c);
+    DT_ARG_PTR(c, 0, make_texture());
+    DT_ARG_INT(c, 1, dt_u32());
+    gZrwMatPluginOffset = dt_u32() % 5 == 0 ? dt_range(-1, 0) : dt_range(1, 15) * 4;
+}
+
+static void setup_material_param(DtCtx *c)
+{
+    begin(c);
+    DT_ARG_INT(c, 0, dt_u32() % 3 == 0 ? dt_u32() : dt_range(0, 1));
+}
+
+static void setup_texture_log_all(DtCtx *c)
+{
+    typedef void *(BMX_CDECL * AllocFn)(ZMemFreeList *);
+    const int count = dt_range(0, 5);
+
+    begin(c);
+    make_texture_list();
+    for (int i = 0; i < count; i++) {
+        uint8_t *payload = DT_ORIG(0x00486050, AllocFn)(gZrwTxr.textures);
+
+        dt_fill(payload, 0x28);
+    }
+    gZdebugIndent = stubIndent;
+    dt_stub(0x498580, NULL, (void *)stubTextureLogEach);
+}
+
 DT_CASES(zrwtxr_cases) = {
     {"zrwWorldReset", 0x00497200, zrwWorldReset, 0, DT_RET_INT, setup_world_reset, 1000, 0},
     {"zrwWorldFindMaterial", 0x00497400, zrwWorldFindMaterial, 1, DT_RET_INT, setup_world_find, 400, 0},
@@ -1132,4 +1217,13 @@ DT_CASES(zrwtxr_cases) = {
     {"zrwTextureGetNameHash", 0x004988b0, zrwTextureGetNameHash, 1, DT_RET_INT, setup_texture, 50, 0},
     {"zrwTextureReadPalette", 0x004988c0, zrwTextureReadPalette, 1, DT_RET_INT, setup_pal_read, 1500, 0},
     {"zrwTextureWritePalette", 0x00498a20, zrwTextureWritePalette, 1, DT_RET_INT, setup_pal_read, 1500, 0},
+    {"zrwTextureGetRwTexture", 0x00498ac0, zrwTextureGetRwTexture, 1, DT_RET_INT, setup_texture, 50, 0},
+    {"zrwTextureGetRaster", 0x00498ad0, zrwTextureGetRaster, 1, DT_RET_INT, setup_texture, 100, 0},
+    {"zrwTextureAddRef", 0x00498af0, zrwTextureAddRef, 1, DT_RET_INT, setup_tex_addref, 100, 0},
+    {"zrwMatRegisterPlugin", 0x00498b10, zrwMatRegisterPlugin, 0, DT_RET_INT, setup_register_plugin, 100, 0},
+    {"zrwTextureSetLoadName", 0x00498b40, zrwTextureSetLoadName, 1, DT_RET_VOID, setup_load_name, 20, 0},
+    {"zrwTextureSetUserData", 0x00498b50, zrwTextureSetUserData, 2, DT_RET_VOID, setup_texture_user, 300, 0},
+    {"zrwSetMaterialParam", 0x00498b70, zrwSetMaterialParam, 1, DT_RET_VOID, setup_material_param, 100, 0},
+    {"zrwSetMaterialValue", 0x00498b90, zrwSetMaterialValue, 1, DT_RET_VOID, setup_material_param, 20, 0},
+    {"zrwTextureLogAll", 0x00498cb0, zrwTextureLogAll, 0, DT_RET_VOID, setup_texture_log_all, 100, 0},
 };

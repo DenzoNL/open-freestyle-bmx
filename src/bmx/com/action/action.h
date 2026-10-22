@@ -86,7 +86,6 @@ void actionShutdown(void);
  */
 ORIG_FN(0x00405780, void, actionStepPlayers, (void));
 ORIG_FN(0x004078c0, void, comdataSetView, (uint32_t player, uint32_t view));
-ORIG_FN(0x0042deb0, void, propInit, (void));
 ORIG_FN(0x0042e2f0, void, propUpdate, (void));
 ORIG_FN(0x0042fd50, void, replayUpdate, (void));
 ORIG_FN(0x00430410, void, replaySetMode, (uint32_t handle, uint32_t mode));

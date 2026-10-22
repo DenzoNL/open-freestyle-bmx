@@ -6,6 +6,7 @@
 #include "bmx/com/action/overlay.h"
 #include "bmx/com/action/physics.h"
 #include "bmx/com/action/prop.h"
+#include "bmx/com/zge/ngif/ngifzroller.h"
 #include "dt.h"
 #include "dt_gameplay.h"
 #include "zge/zgemods/zobjcamera.h"
@@ -275,7 +276,96 @@ static void setupSetShown(DtCtx *c)
     DT_ARG_INT(c, 1, (dt_u32() & 7) == 0 ? (int32_t)dt_u32() : dt_range(0, 2));
 }
 
+static void **gPropHits[16];
+
+/* zbspFindPropsNear: the hit lists of the fixture, indexed by the (16 bit) id. */
+static void **BMX_CDECL stubFindProps(int lo, int hi)
+{
+    dtgpLog(0x468e3000u);
+    dtgpLog((uint32_t)lo & 0xffff);
+    dtgpLog((uint32_t)hi & 0xffff);
+    return gPropHits[(uint32_t)lo & 0xf];
+}
+
+static PhysPropObject *randomObject(void)
+{
+    PhysPropObject *o = dt_alloc(0x200);
+
+    dt_fill(o, 0x200);
+    o->flags = (uint16_t)dt_u32();
+    return o;
+}
+
+/* A node list of up to 70 nodes (more than the 64 the state table holds). */
+static void manyNodes(void)
+{
+    const int count = dt_u32() % 10 == 0 ? dt_range(60, 70) : dt_range(0, 12);
+    PhysPropNode *head = NULL;
+
+    for (int i = 0; i < count; i++) {
+        PhysPropNode *n = dt_alloc(sizeof *n);
+        PhysPropTag *tag = dt_alloc(sizeof *tag);
+        uint8_t *frame = dt_alloc(0x40);
+
+        dt_fill(frame, 0x40);
+        tag->range = (dt_u32() & 7) == 0 ? 0 : (uint16_t)(pickId() + (dt_u32() & 1));
+        n->next = head;
+        n->frame = (PhysPropFrame *)frame;
+        n->object = (struct PhysPropObject *)(uintptr_t)(0x00360000u + dt_range(0, 0xff) * 0x200u);
+        n->tag = (dt_u32() & 7) == 0 ? NULL : tag;
+        head = n;
+    }
+    *zobjPropList() = head;
+}
+
+static void setupInit(DtCtx *c)
+{
+    dtgpBegin(c, DTGP_DEBUG | DTGP_PROP | DTGP_SOUND);
+    dt_stub(0x00468e30, NULL, (void *)stubFindProps);
+    randomDefs();
+    if ((dt_u32() & 1) != 0) {
+        gCurrentLevel = 0;
+    }
+    for (int i = 0; i < 16; i++) {
+        PropDef *d = &gPropDefs[gCurrentLevel][i];
+
+        if (gCurrentLevel == 0 && (dt_u32() & 3) == 0) {
+            d->id = (uint16_t)dt_range(0x13, 0x1a); /* the collectables that start out collected */
+        }
+        if ((dt_u32() & 15) == 0) {
+            d->id = 0;
+        }
+    }
+    for (int i = 0; i < 16; i++) {
+        const uint32_t kind = dt_u32() % 4;
+
+        gPropHits[i] = NULL;
+        if (kind != 0) {
+            void **hits = (void **)dt_alloc(5 * sizeof(void *));
+            const int extra = kind == 3 ? dt_range(1, 3) : 0;
+
+            hits[0] = randomObject();
+            for (int k = 0; k < extra; k++) {
+                hits[1 + k] = randomObject();
+            }
+            gPropHits[i] = hits;
+        }
+    }
+    randomRecords();
+    dt_fill(&gPropState, sizeof gPropState);
+    dt_fill(&gPropDefaults, sizeof gPropDefaults);
+    manyNodes();
+    {
+        const int filled = (dt_u32() & 15) == 0 ? 8 : dt_range(0, 3);
+
+        for (int i = 0; i < 8; i++) {
+            gZrollerDrawCallbacks[i] = i < filled ? (ZrollerDrawFn)(uintptr_t)0x1234 : NULL;
+        }
+    }
+}
+
 DT_CASES(prop_cases) = {
+    {"propInit", 0x0042deb0, propInit, 0, DT_RET_VOID, setupInit, 800, 0},
     {"propFindNode", 0x0042de70, propFindNode, 1, DT_RET_INT, setupFindNode, 300, 0},
     {"propStopSounds", 0x0042e270, propStopSounds, 0, DT_RET_VOID, setupStopSounds, 300, 0},
     {"propReturnZero", 0x0042eb50, propReturnZero, 0, DT_RET_INT, setupNone, 1, 0},

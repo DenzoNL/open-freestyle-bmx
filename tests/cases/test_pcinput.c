@@ -20,16 +20,17 @@ static int BMX_CDECL stubSetup(int kind, void *device)
     return gSetupAnswer ? (int)(0x7100 + (dt_u32() & 0xff0)) : 0;
 }
 
-static void BMX_CDECL stubRelease(void *device)
+static int BMX_CDECL stubRelease(void *device)
 {
     ngLog(0x4937f0);
     ngLogPtr(device);
+    return 1;
 }
 
 static int BMX_CDECL stubPoll(void)
 {
     ngLog(0x493910);
-    return (int)dt_u32();
+    return 1; /* the real one always returns 1: the callers are optimised on that */
 }
 
 static void begin(DtCtx *c)
@@ -92,7 +93,184 @@ static void setup_poll(DtCtx *c)
     begin(c);
 }
 
+/* ---- DirectInput side ------------------------------------------------------------------------------ */
+
+/* Stand-in DirectInput device: every method logs, answers from the generator and fills state buffers. */
+static int32_t answer(void)
+{
+    switch (dt_u32() % 6) {
+    case 0:
+        return (int32_t)0x80004005;
+    case 1:
+        return (int32_t)0x8007001e;
+    default:
+        return 0;
+    }
+}
+
+static int32_t BMX_STDCALL diAcquire(ZpadDiDevice *self)
+{
+    ngLog(0xd10001);
+    ngLogPtr(self);
+    return answer();
+}
+
+static int32_t BMX_STDCALL diUnacquire(ZpadDiDevice *self)
+{
+    ngLog(0xd10002);
+    ngLogPtr(self);
+    return 0;
+}
+
+static uint32_t BMX_STDCALL diRelease(ZpadDiDevice *self)
+{
+    ngLog(0xd10003);
+    ngLogPtr(self);
+    return 0;
+}
+
+static int32_t BMX_STDCALL diPoll(ZpadDiDevice *self)
+{
+    ngLog(0xd10004);
+    ngLogPtr(self);
+    return (dt_u32() % 6 == 0) ? (int32_t)0x80004005 : 0;
+}
+
+/* dt_fill is not usable from code that runs under test: its generator is not part of the snapshot. */
+static void fill_words(void *p, uint32_t n)
+{
+    uint32_t *w = p;
+
+    for (uint32_t i = 0; i < n / 4; i++) {
+        w[i] = dt_u32();
+    }
+}
+
+static int32_t BMX_STDCALL diGetState(ZpadDiDevice *self, uint32_t size, void *state)
+{
+    int32_t *words = state;
+
+    ngLog(0xd10005);
+    ngLogPtr(self);
+    ngLog(size);
+    if (size == 0x50) {
+        for (int i = 0; i < 12; i++) {
+            words[i] = (dt_u32() % 3 == 0) ? 0 : dt_range(-130, 130);
+        }
+        fill_words(&words[12], 0x20);
+    } else {
+        fill_words(state, size);
+    }
+    return answer();
+}
+
+static const ZpadDiVtbl kDiVtbl = {
+    .release = diRelease,
+    .acquire = diAcquire,
+    .unacquire = diUnacquire,
+    .getDeviceState = diGetState,
+    .poll = diPoll,
+};
+
+static ZpadDiDevice *make_di(void)
+{
+    ZpadDiDevice *di = dt_alloc(sizeof *di);
+
+    di->vtbl = &kDiVtbl;
+    return di;
+}
+
+/* Byte pairs {index, slot} ended by `end`; `header` bytes of noise come first. */
+static const uint8_t *make_map(int header, uint8_t end)
+{
+    uint8_t *map = dt_alloc(64);
+    int n = dt_range(0, 8);
+    int at = header;
+
+    dt_fill(map, (uint32_t)header);
+    for (int i = 0; i < n; i++) {
+        map[at++] = (uint8_t)((end == 0xff && dt_u32() % 8 == 0) ? 0xfe : dt_range(0, 31));
+        map[at++] = (uint8_t)dt_range(0, 21);
+    }
+    map[at] = end;
+    return map;
+}
+
+static ZMemFreeList *make_records(int count)
+{
+    ZMemFreeList *list = DT_ORIG(0x00485e80, ListCreateFn)(sizeof(ZpadDiRecord), 3, NULL);
+
+    for (int i = 0; i < count; i++) {
+        ZpadDiRecord *r = DT_ORIG(0x00486050, ListAllocFn)(list);
+        ZpadDevice *d = dt_alloc(sizeof *d);
+
+        dt_fill(d, sizeof *d);
+        d->record = r;
+        r->device = d;
+        r->di = (dt_u32() % 5 == 0) ? NULL : make_di();
+        r->flags = dt_u32();
+        r->keyMap = (dt_u32() % 3 == 0) ? NULL : make_map(0, 0xff);
+        r->buttonMap = make_map(8, 0xff);
+    }
+    return list;
+}
+
+static void begin_di(DtCtx *c, int count)
+{
+    ngBegin(c, 0);
+    dt_zmem_env();
+    gZpadDiRecords = make_records(count);
+    gZpadDiActive = (dt_u32() % 5 != 0);
+    gZpadKeyboard = (dt_u32() % 4 == 0) ? NULL : make_di();
+    gZpadKeyboardFlags = dt_u32();
+    gZpadKeyboardOk = (uint16_t)dt_u32();
+    dt_fill(&gZpadKeyState, sizeof gZpadKeyState);
+}
+
+static void setup_di_poll(DtCtx *c)
+{
+    begin_di(c, dt_range(0, 4));
+    if (gZpadKeyboard == NULL) {
+        gZpadKeyboard = make_di();
+    }
+}
+
+static void setup_di_activate(DtCtx *c)
+{
+    begin_di(c, dt_range(0, 4));
+}
+
+static void setup_di_release(DtCtx *c)
+{
+    ZpadDiRecord *record;
+    ZMemFreeNode *node;
+
+    begin_di(c, dt_range(1, 4));
+    node = zmemFreeListFirst(gZpadDiRecords);
+    for (int i = dt_range(0, 2); i > 0 && zmemFreeNodeNext(node) != NULL; i--) {
+        node = zmemFreeNodeNext(node);
+    }
+    record = zmemFreeNodePayload(node);
+    DT_ARG_PTR(c, 0, record->device);
+}
+
+static void setup_di_keymap(DtCtx *c)
+{
+    ZpadDevice *d = dt_alloc(sizeof *d);
+
+    begin_di(c, 1);
+    dt_fill(d, sizeof *d);
+    d->record = (dt_u32() % 4 == 0) ? NULL : zmemFreeNodePayload(zmemFreeListFirst(gZpadDiRecords));
+    DT_ARG_PTR(c, 0, d);
+    DT_ARG_PTR(c, 1, make_map(0, 0xff));
+}
+
 DT_CASES(pcinput_cases) = {
+    {"zpadReleaseDirectInput", 0x004937f0, zpadReleaseDirectInput, 1, DT_RET_INT, setup_di_release, 100, 0},
+    {"zrwOnActivate", 0x00493830, zrwOnActivate, 0, DT_RET_INT, setup_di_activate, 200, 0},
+    {"zrwOnDeactivate", 0x00493890, zrwOnDeactivate, 0, DT_RET_INT, setup_di_activate, 200, 0},
+    {"zpadPollDevices", 0x00493910, zpadPollDevices, 0, DT_RET_INT, setup_di_poll, 1000, 0},
+    {"zpadSetKeyMap", 0x00493cc0, zpadSetKeyMap, 2, DT_RET_INT, setup_di_keymap, 50, 0},
     {"zpadCreateDevice", 0x00480370, zpadCreateDevice, 1, DT_RET_INT, setup_create, 200, 0},
     {"zpadDestroyDevice", 0x004803c0, zpadDestroyDevice, 1, DT_RET_INT, setup_destroy, 100, 0},
     {"zpadPoll", 0x004803f0, zpadPoll, 0, DT_RET_INT, setup_poll, 20, 0},

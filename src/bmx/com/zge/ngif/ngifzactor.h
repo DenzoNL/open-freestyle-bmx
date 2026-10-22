@@ -50,7 +50,12 @@ void zactorSetupBike(void *actor);
 /* Syncs the pose of the current rider's actor and of its bike. */
 void zactorSyncRiderActors(void);
 
-/* Applies the pose of a rider / bike actor (limb joints) to its model. */
-ORIG_FN(0x004654b0, void, zactorSyncPose, (void *actor));
+/* Applies the pose of a rider / bike actor (limb joints) to its model and places it at the actor. */
+void zactorSyncPose(void *actor);
+
+/* Name hashes of the six rider arm parts (left up, low, hand, right up, low, hand), looked up on first use.
+ */
+typedef uint32_t ZactorArmHashes[6];
+#define gZactorArmHashes ORIG_VAR(0x005da2c8, ZactorArmHashes, gZactorArmHashes)
 
 #endif

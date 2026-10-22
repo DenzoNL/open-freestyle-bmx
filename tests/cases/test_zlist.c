@@ -94,7 +94,22 @@ static void setup_insert(DtCtx *c)
                c->seed == 4 ? NULL : (void *)(uintptr_t)(0x9000 + dt_u32() % 0x1000)); /* seed 4: assert */
 }
 
+static void setup_remove(DtCtx *c)
+{
+    ZList *list;
+    dt_seed(c);
+    dt_zmem_env();
+    list = make_list(dt_range(1, 40), 1, -1);
+    list->count = dt_range(1, list->capacity);
+    for (int i = 0; i < list->count; i++) {
+        list->items[i] = (void *)(uintptr_t)(0x1000 + i * 0x10 + (int)(dt_u32() & 7));
+    }
+    list->cursor = dt_range(-1, list->count - 1);
+    DT_ARG_PTR(c, 0, list);
+}
+
 DT_CASES(zlist_cases) = {
+    {"zlistRemoveCurrent", 0x0048c570, zlistRemoveCurrent, 1, DT_RET_INT, setup_remove, 300, 0},
     {"zlistCreate", 0x0048c260, zlistCreate, 1, DT_RET_INT, setup_create, 50, 0},
     {"zlistDestroy", 0x0048c2b0, zlistDestroy, 1, DT_RET_VOID, setup_destroy, 50, 0},
     {"zlistClear", 0x0048c2d0, zlistClear, 3, DT_RET_VOID, setup_clear, 200, 0},

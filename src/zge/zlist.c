@@ -121,3 +121,23 @@ void zlistInsert(ZList *list, void *item)
     list->count++;
     list->items[list->cursor] = item;
 }
+
+/* Removes and returns the current item (the last one without a cursor); the last item fills its slot. */
+BMX_ADDR(0x0048c570)
+void *zlistRemoveCurrent(ZList *list)
+{
+    const int cursor = list->cursor;
+    void *item;
+
+    if (cursor == -1) {
+        list->count--;
+        item = list->items[list->count];
+        list->items[list->count] = NULL;
+        return item;
+    }
+    item = list->items[cursor];
+    list->count--;
+    list->items[cursor] = list->items[list->count];
+    list->items[list->count] = NULL;
+    return item;
+}

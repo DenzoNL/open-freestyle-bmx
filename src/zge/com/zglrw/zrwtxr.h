@@ -68,6 +68,19 @@ int zrwTextureGetNameHash(const ZrwTexture *texture);
 uint8_t *zrwTextureReadPalette(const ZrwTexture *texture);
 int zrwTextureWritePalette(const ZrwTexture *texture);
 int zrwTextureLog(const ZrwTexture *texture);
+/* The RenderWare texture of a record; its raster; takes a reference. */
+void *zrwTextureGetRwTexture(const ZrwTexture *texture);
+void *zrwTextureGetRaster(const ZrwTexture *texture);
+void *zrwTextureAddRef(ZrwTexture *texture);
+/* Sets the name the texture reader is going to look for. */
+void zrwTextureSetLoadName(const char *name);
+/* Stores a user value in the texture's material plugin slot (when the plugin is registered). */
+void zrwTextureSetUserData(const ZrwTexture *texture, uint32_t value);
+/* The `mipmapped` flag of the texture system, also handed to RenderWare's mipmapping / find callback. */
+void zrwSetMaterialParam(const void *value);
+void zrwSetMaterialValue(int value);
+/* Logs every texture record. */
+void zrwTextureLogAll(void);
 void zrwRasterLog(void *raster);
 
 /* The IFF chunk readers (TBMP, TPNG, TDDS), the image readers registered with RenderWare, ... */
@@ -87,6 +100,8 @@ void zrwPaletteEncodeEntry(void *out, uint32_t format, int index, const uint8_t 
 void rwMatConstructor(void *material);
 void *rwMatDestructor(void *material);
 uint32_t zrwMatGetUserData(const void *material);
+/* Registers the material plugin on RenderWare textures; 0 on failure. */
+int zrwMatRegisterPlugin(void);
 
 /* ---- world and particle callbacks, TODO(file): probably belong to zrwworld.c --------------------------- */
 
