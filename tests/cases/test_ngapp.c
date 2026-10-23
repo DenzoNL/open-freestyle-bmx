@@ -119,14 +119,13 @@ S5_STUB1(stubSetAssetFile, 0x437850)
 S5_STUB2(stubModelRenderCb, 0x48fec0)
 S5_STUB2(stubBuildName, 0x485460)
 
-static uint32_t BMX_CDECL stubLoadSprite(void *data, uint32_t size, const char *name, int a, int b)
+static uint32_t BMX_CDECL stubLoadSprite(void *data, uint32_t size, const char *name, int type)
 {
     s5Log(0x4896d0);
     s5LogPtr(data);
     s5Log(size);
     s5Log(s5Hash(name));
-    s5Log((uint32_t)a);
-    s5Log((uint32_t)b);
+    s5Log((uint32_t)type);
     return s5Ret(0x4896d0);
 }
 

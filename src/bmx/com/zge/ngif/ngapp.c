@@ -481,7 +481,7 @@ void ngappShowLoading(void)
         zassetRead(library, data);
         zassetCloseLibrary(library);
         if (data != NULL) {
-            sprite = zrwmatLoadSpriteTexture(data, size, "LOADING", 0, 0);
+            sprite = zrwmatLoadSpriteTexture(data, size, "LOADING", 0);
         }
         zmemStaticRelease(mark);
         if (sprite != NULL) {
@@ -565,7 +565,7 @@ int ngifRunFrame(float dt)
         size = zassetSize(library);
         data = zmemStaticAlloc(size);
         zassetRead(library, data);
-        gNgLegal1 = zrwmatLoadSpriteTexture(data, size, "LEGAL", 0, 0);
+        gNgLegal1 = zrwmatLoadSpriteTexture(data, size, "LEGAL", 0);
         gNgLegalTime = zrwTimeGetTime();
         ngZrwcamBegin(ngZrwcamFirst());
         ngappDrawSprite(gNgLegal1);
@@ -581,7 +581,7 @@ int ngifRunFrame(float dt)
         /* Original quirk: the buffer is sized for the first picture, not the second. */
         data = zmemStaticAlloc(size);
         zassetRead(library, data);
-        gNgLegal2 = zrwmatLoadSpriteTexture(data, size2, "LEGAL2", 0, 0);
+        gNgLegal2 = zrwmatLoadSpriteTexture(data, size2, "LEGAL2", 0);
         zassetCloseLibrary(library);
         ngZrwcamBegin(ngZrwcamFirst());
         ngappDrawSprite(gNgLegal2);
@@ -681,7 +681,7 @@ dispatch:
                 zassetRead(library, data);
                 zassetCloseLibrary(library);
                 if (data != NULL) {
-                    gNgLoadTexture = zrwmatLoadSpriteTexture(data, size, "LOADING", 0, 0);
+                    gNgLoadTexture = zrwmatLoadSpriteTexture(data, size, "LOADING", 0);
                 }
                 zmemStaticRelease(mark);
             }

@@ -72,6 +72,8 @@ typedef uint32_t ZrwShadowMissList[36];
 
 /* Draws the quads built by the last zrollerUpdateShadow (once); returns 1. */
 int zrollerShadowDraw(void);
+/* Loads the shadow texture ("assets\shadowMap.Bmp") and registers the draw callback. Returns 1. */
+int zrollerShadowStart(void);
 /* Unregisters the shadow's update callback. Returns 1. */
 int zrollerShadowStop(void);
 /* Update callback of the roller's shadow: probes the ground on a 6x6 grid and builds the quad mesh. */
