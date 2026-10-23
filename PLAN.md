@@ -156,8 +156,10 @@ round floats (so the hook build uses SSE2, not x87). Rules are in CONTRIBUTING.m
   zrwmodelcreate.c, belongs in ngifzroller.c); asset decompressors 0x49bd10/0x49c080 (zasset);
   0x49c570 zobjDispatchEvents (zobj). zrwzgl.h and zrwmodel.h name 0x697720/0x697724 the other way
   round (gZrwScale/gZrwInvScale) and can't be included together: settle which is which.
-- Reserved for Opus so far: 0x42e2f0, 0x42f0d0, 0x44e300 (5.7 KB), 0x45a4d0, 0x45c150, 0x45cc50,
-  0x45eaa0, 0x466ed0, 0x468070, 0x48ccf0, 0x48d170, 0x48ee70, 0x493e20, 0x4947e0, 0x4a35f0.
+- **What's left (86.4%, 2026-10-24):** every function still `orig` in data/functions.csv except
+  WinMain (0x48a460) and the zdebugFail abort trap (0x47ed10): ~40 functions of 1 KB or more,
+  mostly x87-heavy (camera, rider, overlay/zoverii, ngifpsx, ngifzcollide, prop, sound, zrwprim/col).
+  All Opus work, a few at a time.
 - `zquatNormalize` doesn't assert on a NaN length like the original (x87 FCOM unordered).
 
 - How CI gets the original exe for the differential tests. Until then CI skips them and they run locally.
