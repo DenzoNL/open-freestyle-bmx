@@ -8,6 +8,7 @@
 #include "zge/zfile.h"
 #include "zge/zgemods/zobjcamera.h"
 #include "zge/ziff.h"
+#include "zge/zinput.h"
 #include "zge/zmem.h"
 #include "zge/zobj.h"
 #include "zge/zprofile.h"
@@ -15,9 +16,6 @@
 #include "zge/zstring.h"
 
 static const char kZgeFile[] = "C:\\NgEngine\\Zge\\zge.c";
-
-/* Subsystems that are not ported yet. */
-ORIG_FN(0x004802f0, int, zinputCreate, (void));
 
 /* The renderer's start-up function (a pointer in the exe's data). */
 typedef int(BMX_CDECL *ZrwInitFn)(void);

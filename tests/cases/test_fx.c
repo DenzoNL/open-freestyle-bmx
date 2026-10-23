@@ -131,6 +131,35 @@ static void setupScatter(DtCtx *c)
     DT_ARG_PTR(c, 4, randomVec(200.0f));
 }
 
+static void setupShards(DtCtx *c)
+{
+    dtgpBegin(c, DTGP_FX);
+    randomNode(0);
+    gZmathTables.randomSeed = dt_u32();
+    DT_ARG_PTR(c, 0, randomVec(1000.0f));
+    DT_ARG_PTR(c, 1, randomVec(50.0f));
+}
+
+static void setupSkidMark(DtCtx *c)
+{
+    ZVec3 *from = randomVec(500.0f);
+    ZVec3 *to = randomVec(500.0f);
+
+    dtgpBegin(c, DTGP_FX);
+    randomNode(0);
+    randomRider();
+    if ((dt_u32() & 3) == 0) {
+        /* close to each other, around the length limit of 4 */
+        to->x = from->x + dt_float(-2.5f, 2.5f);
+        to->y = from->y + dt_float(-2.5f, 2.5f);
+        to->z = from->z + dt_float(-2.5f, 2.5f);
+    }
+    DT_ARG_PTR(c, 0, from);
+    DT_ARG_PTR(c, 1, to);
+    DT_ARG_INT(c, 2, dt_u32());
+    DT_ARG_PTR(c, 3, randomVec(1.0f));
+}
+
 static void setupEmit(DtCtx *c)
 {
     dtgpBegin(c, DTGP_FX | DTGP_DEBUG);
@@ -220,6 +249,8 @@ DT_CASES(fx_cases) = {
     {"fxPuff", 0x00408c50, fxPuff, 1, DT_RET_VOID, setupPuff, 200, 0},
     {"fxImpactSparks", 0x00408c90, fxImpactSparks, 2, DT_RET_VOID, setupImpact, 600, 0},
     {"fxScatter", 0x00408db0, fxScatter, 5, DT_RET_VOID, setupScatter, 400, 0},
+    {"fxShards", 0x00408fd0, fxShards, 2, DT_RET_VOID, setupShards, 300, 0},
+    {"fxSkidMark", 0x00409250, fxSkidMark, 4, DT_RET_VOID, setupSkidMark, 600, 0},
     {"fxEmit", 0x004095a0, fxEmit, 5, DT_RET_VOID, setupEmit, 300, 0},
     {"fxCreate", 0x00409640, fxCreate, 3, DT_RET_VOID, setupCreate, 300, 0},
     {"fxWaterSplash", 0x004096d0, fxWaterSplash, 3, DT_RET_VOID, setupSplash, 400, 0},

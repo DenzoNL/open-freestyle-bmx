@@ -225,6 +225,19 @@ static void BMX_CDECL stubNameCall(const char *name, uint32_t a, uint32_t b)
         words = 9;
     } else if (name[0] == 's' && name[1] == 'p' && name[2] == 'l') {
         words = 13;
+    } else if (name[0] == 's' && name[1] == 'h') {
+        words = 16; /* shard block: words 3, 7 and 11 are never written by the original */
+    } else if (name[0] == 's' && name[1] == 'k') {
+        words = 19; /* skid block: the pad words 3, 7, 11 and 15 are never written */
+    }
+    if (name[0] == 's' && (name[1] == 'h' || name[1] == 'k')) {
+        const uint32_t *w = (const uint32_t *)(uintptr_t)b;
+        for (uint32_t i = 0; i < words; i++) {
+            if (i % 4 != 3 || (name[1] == 'h' && i == 15)) {
+                dtgpLog(w[i]);
+            }
+        }
+        return;
     }
     if (name[0] == 'r') {
         /* The ripple block's word 3 is never written by the original (stack garbage). */

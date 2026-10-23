@@ -20,8 +20,32 @@
 #define gNgifScreenW ORIG_VAR(0x0055c690, float, gNgifScreenW)
 #define gNgifScreenH ORIG_VAR(0x0055c694, float, gNgifScreenH)
 
-/* Writes a draw-area primitive (rect = x, y, w, h as int16) at prim; not ported yet. */
-ORIG_FN(0x0045fe00, void, ngifPrimSetDrawArea, (uint32_t *prim, const int16_t *rect));
+/*
+ * The ordering table of the 3D debug primitives and the flush callbacks (0x400 entries chained downward:
+ * entry 0x3ff is the start, entry 0 ends the chain). The 3D primitives (0x80 bytes each) are written at
+ * gNgifPrim3D.
+ */
+typedef uint32_t NgifWords[1];
+#define gNgifOtBase       ORIG_VAR(0x0055c698, uint32_t *, gNgifOtBase)
+#define gNgifPrim3D       ORIG_VAR(0x0068ebe0, uint32_t *, gNgifPrim3D)
+#define gNgifPrim3DBuffer ORIG_VAR(0x00678560, NgifWords, gNgifPrim3DBuffer)
+#define gNgifPrimBuffer   ORIG_VAR(0x005ab4fc, NgifWords, gNgifPrimBuffer)
+#define gNgifPrimStart    ORIG_VAR(0x005d250c, uint32_t *, gNgifPrimStart)
+/* Frame flags: set when the ordering table holds something to draw (two tables of callbacks). */
+#define gNgifFlushPending  ORIG_VAR(0x005d24fc, int, gNgifFlushPending)
+#define gNgifFlushPending2 ORIG_VAR(0x005d2504, int, gNgifFlushPending2)
+/* Update node handles of the two flush callbacks. */
+#define gNgifFlushNode  ORIG_VAR(0x005d2500, int, gNgifFlushNode)
+#define gNgifFlushNode2 ORIG_VAR(0x005d2508, int, gNgifFlushNode2)
+/* Particle effect script (pairs of bytes, 0x80 ends it) and the update node that plays it. */
+#define gNgifScript     ORIG_VAR(0x005ab4f0, const int8_t *, gNgifScript)
+#define gNgifScriptNode ORIG_VAR(0x0068fcfc, int, gNgifScriptNode)
+
+/* Free list of the glyph texture tables (0x20 handles per font). */
+#define gNgifGlyphPages ORIG_VAR(0x0068ff94, struct ZMemFreeList *, gNgifGlyphPages)
+
+/* Writes a draw-area primitive (rect = x, y, w, h as int16) at prim. */
+void ngifPrimSetDrawArea(uint32_t *prim, const int16_t *rect);
 
 /* Vertex of the 3D debug primitives: position and an RGB colour. */
 typedef struct NgifVert3 {
@@ -32,16 +56,20 @@ typedef struct NgifVert3 {
 } NgifVert3;
 
 ORIG_FN(0x00463130, void, ngifDrawPoly3D, (int flags, int count, const NgifVert3 *verts, int texture));
-ORIG_FN(0x00463710, void, ngifDrawLine3D, (int flags, const NgifVert3 *a, const NgifVert3 *b));
-ORIG_FN(0x004639f0, int, ngifInit, (void));
-ORIG_FN(0x00463a60, void, ngifShutdown, (void));
-ORIG_FN(0x00463ab0, void, ngifBegin, (void));
-/* Starts a frame that shows picture data (texture handle at +0x20) at size w x h. */
-ORIG_FN(0x00463b20, void, ngifSetPictureScreen, (const void *picture, int w, int h));
-ORIG_FN(0x00463c40, void, ngifSetBlend, (int a, int b));
-/* Draws one glyph of a font. */
-ORIG_FN(0x00463c70, void, ngifDrawGlyph,
-        (const void *font, const void *glyph, int mode, int a, int b, int x, int y, int c, int d));
+/* Writes a 3D line (colour words at +0x10 of each end) into the 3D list; only the low 2 bits of flags are
+ * read. */
+void ngifDrawLine3D(int flags, const NgifVert3 *a, const NgifVert3 *b);
+int ngifInit(void);
+void ngifShutdown(void);
+void ngifBegin(void);
+/* Starts a frame that shows picture data (texture handle at +0x20); the size arguments are not read. */
+void ngifSetPictureScreen(const void *picture, int w, int h);
+void ngifSetBlend(int a, int b);
+/*
+ * Draws one glyph of a font (palette `d` selects the texture, created on first use). a, b and c are not
+ * read.
+ */
+void ngifDrawGlyph(const void *font, const void *glyph, int mode, int a, int b, int x, int y, int c, int d);
 void ngifSetClip(int x0, int y0, int x1, int y1);
 /*
  * Draws a sprite frame as a textured quad. `set` is a sprite set whose frame table (16 byte entries
@@ -62,8 +90,46 @@ void ngifNop(void);
 int ngifReturnOneA(void);
 int ngifReturnOneB(void);
 
-/* Sets the parameter block of the particle system's emitter and creates its helper object on first use. */
-ORIG_FN(0x0045fdc0, void, ngifpsxSetup, (const void *params));
+/* Sets the script of the particle system's camera animation and starts its update node on first use. */
+void ngifpsxSetup(const void *params);
+/* Update callback of that node: plays one step of the script; returns 1. */
+int ngifpsxUpdate(void);
+
+/* ---- ordering table ---------------------------------------------------------------------------- */
+
+/* Links entries 0x3ff .. 1 of the table `ot` (n entries) to their predecessors and ends entry 0. */
+void ngifInitOrderTable(uint32_t *ot, int n);
+/* Draws every primitive of an ordering table, starting at its end entry. */
+void ngifDrawList(uint32_t *entry);
+/* Draws one primitive (dispatch on its command byte); unsupported kinds print "Prim not coded". */
+void ngifDrawPrimitive(const uint8_t *prim);
+void ngifNop2(void);
+void ngifResetOrderTable(void);
+/* Flush callbacks (update nodes of type 2): query the screen size, draw the pending list; return 1. */
+int ngifFlushFrame(void);
+int ngifFlushFrame2(void);
+void ngifQueryScreen(void);
+void ngifRegisterFlush(void);
+void ngifUnregisterFlush(void);
+void ngifRequestFlush2(void);
+/* The ordering table entry the next primitive is linked into, and setter. */
+uint32_t *ngifGetOrderTable(void);
+void ngifSetOrderTable(uint32_t *table);
+
+/* ---- primitives -------------------------------------------------------------------------------- */
+
+/* Primitive kinds drawn through the renderer's draw hooks (flag word of the primitive, blend on / off). */
+void ngifDrawPolyF3(const uint8_t *prim, int blend);
+void ngifDrawPolyG4(const uint8_t *prim, int blend);
+void ngifDrawLineF2(const uint8_t *prim, int blend);
+void ngifDrawLineG2(const uint8_t *prim, int blend);
+/* Draw-area primitive (code 0xf8): moves the current camera's viewport. */
+void ngifDrawAreaPrim(const uint8_t *prim);
+
+/* Kinds not in this file. */
+ORIG_FN(0x004611d0, void, ngifDrawPolyF4, (const uint8_t *prim, int blend));
+ORIG_FN(0x00460b40, void, ngifDrawPolyFT4, (const uint8_t *prim, int blend));
+ORIG_FN(0x0045ffd0, void, ngifDrawPolyGT4, (const uint8_t *prim, int blend));
 
 /* Draws one glyph of an overlay text from the scratch record at 0x55b960 (x is passed zero extended). */
 ORIG_FN(0x00462940, void, ngifDrawTextGlyph, (uint32_t x, int y, const void *record));

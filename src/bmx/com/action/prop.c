@@ -360,7 +360,7 @@ void propHitFace(int player, PhysFace *face)
         const ZVec3 *const at = zobjGetPosition(node->frame);
         const ZVec3 pos = {at->x, at->y, at->z};
 
-        fxShards(&pos, (const uint8_t *)&gPhysRiders[player] + 0x448);
+        fxShards(&pos, (const ZVec3 *)((const uint8_t *)&gPhysRiders[player] + 0x448));
         bmxSoundPlayAt(kSoundBreak, &pos, 3, 3, 0x7f);
     }
     gameCheckGrindGoal(player, (const PhysEdge *)(const void *)face);

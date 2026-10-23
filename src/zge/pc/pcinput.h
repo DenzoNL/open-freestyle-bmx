@@ -48,13 +48,17 @@ _Static_assert(sizeof(ZpadDevice) == kZpadDeviceBytes, "pad device");
 typedef struct ZpadDiDevice ZpadDiDevice;
 typedef struct ZpadDiVtbl {
     uint32_t pad00[2];
-    uint32_t(BMX_STDCALL *release)(ZpadDiDevice *self);                                   /* 0x08 */
-    uint32_t pad0c[4];                                                                    /* 0x0c */
-    int32_t(BMX_STDCALL *acquire)(ZpadDiDevice *self);                                    /* 0x1c */
-    int32_t(BMX_STDCALL *unacquire)(ZpadDiDevice *self);                                  /* 0x20 */
-    int32_t(BMX_STDCALL *getDeviceState)(ZpadDiDevice *self, uint32_t size, void *state); /* 0x24 */
-    uint32_t pad28[15];                                                                   /* 0x28 */
-    int32_t(BMX_STDCALL *poll)(ZpadDiDevice *self);                                       /* 0x64 */
+    uint32_t(BMX_STDCALL *release)(ZpadDiDevice *self);                                          /* 0x08 */
+    uint32_t pad0c[4];                                                                           /* 0x0c */
+    int32_t(BMX_STDCALL *acquire)(ZpadDiDevice *self);                                           /* 0x1c */
+    int32_t(BMX_STDCALL *unacquire)(ZpadDiDevice *self);                                         /* 0x20 */
+    int32_t(BMX_STDCALL *getDeviceState)(ZpadDiDevice *self, uint32_t size, void *state);        /* 0x24 */
+    uint32_t pad28;                                                                              /* 0x28 */
+    int32_t(BMX_STDCALL *setDataFormat)(ZpadDiDevice *self, const void *format);                 /* 0x2c */
+    uint32_t pad30;                                                                              /* 0x30 */
+    int32_t(BMX_STDCALL *setCooperativeLevel)(ZpadDiDevice *self, void *window, uint32_t flags); /* 0x34 */
+    uint32_t pad38[11];                                                                          /* 0x38 */
+    int32_t(BMX_STDCALL *poll)(ZpadDiDevice *self);                                              /* 0x64 */
 } ZpadDiVtbl;
 
 _Static_assert(__builtin_offsetof(ZpadDiVtbl, poll) == 0x64, "DirectInput vtable");
@@ -93,5 +97,51 @@ int zpadSetKeyMap(void *device, const uint8_t *map);
 
 /* Platform side, not ported yet. */
 ORIG_FN(0x00493310, int, zpadSetupDirectInput, (int kind, void *device));
+
+/* GUID by value (16 bytes). */
+typedef struct ZpadGuid {
+    uint32_t data1;
+    uint16_t data2, data3;
+    uint8_t data4[8];
+} ZpadGuid;
+
+/* The part of IDirectInput the code uses. */
+typedef struct ZpadDirectInput ZpadDirectInput;
+typedef struct ZpadDirectInputVtbl {
+    uint32_t pad00[4];
+    int32_t(BMX_STDCALL *enumDevices)(ZpadDirectInput *self, uint32_t type,
+                                      uint32_t(BMX_STDCALL *callback)(const void *instance, void *ref),
+                                      void *ref, uint32_t flags); /* 0x10 */
+    uint32_t pad14[4];                                            /* 0x14 */
+    int32_t(BMX_STDCALL *createDeviceEx)(ZpadDirectInput *self, const ZpadGuid *guid, const ZpadGuid *iid,
+                                         ZpadDiDevice **out, void *outer); /* 0x24 */
+} ZpadDirectInputVtbl;
+
+_Static_assert(__builtin_offsetof(ZpadDirectInputVtbl, createDeviceEx) == 0x24, "IDirectInput vtable");
+
+struct ZpadDirectInput {
+    const ZpadDirectInputVtbl *vtbl;
+};
+
+/* Window of the game, the DirectInput object and the first joystick's GUID. */
+#define gZpadWindow       ORIG_VAR(0x00674034, void *, gZpadWindow)
+#define gZpadDirectInput  ORIG_VAR(0x00674038, ZpadDirectInput *, gZpadDirectInput)
+#define gZpadJoystickGuid ORIG_VAR(0x0067403c, ZpadGuid, gZpadJoystickGuid)
+
+/* Starts DirectInput once (the records list, the object, the joystick GUID); asserts when creation fails. */
+int zpadDirectInputInitialize(void);
+/* Enumeration callback: remembers the instance GUID (instance + 4) and stops (0). */
+/* A stdcall callback; the label keeps the symbol undecorated for the generated hook table. */
+#if defined(BMX_HOOK)
+uint32_t BMX_STDCALL zpadEnumJoysticksCallback(const void *instance,
+                                               void *guid) __asm__("_zpadEnumJoysticksCallback");
+#else
+uint32_t BMX_STDCALL zpadEnumJoysticksCallback(const void *instance, void *guid);
+#endif
+/*
+ * Creates a device for `guid` and sets its data format and cooperative level; NULL when creation fails, or
+ * when a later step fails (those assert).
+ */
+ZpadDiDevice *zpadCreateDiDevice(void *window, ZpadGuid guid, const void *format, uint32_t flags);
 
 #endif

@@ -276,3 +276,163 @@ DT_CASES(pcinput_cases) = {
     {"zpadPoll", 0x004803f0, zpadPoll, 0, DT_RET_INT, setup_poll, 20, 0},
     {"zpadGetDevice", 0x00480400, zpadGetDevice, 1, DT_RET_INT, setup_get, 200, 0},
 };
+
+/* ---- DirectInput start-up and device creation -----------------------------------------------------------
+ */
+
+static int gDiHr; /* answers of the stand-in DirectInput calls */
+static int gFmtHr, gCoopHr;
+static void *gFakeDevice;
+static void *gFakeDirectInput;
+
+static int BMX_CDECL stubQuery(int kind, void **out, int flags)
+{
+    ngLog(0x48ad20);
+    ngLog((uint32_t)kind);
+    ngLog((uint32_t)flags);
+    *out = dt_alloc(8);
+    *(uint32_t *)*out = 0x00400000u + (dt_u32() & 0xfff0);
+    return 1;
+}
+
+static intptr_t BMX_STDCALL stubGetWindowLong(void *window, int index)
+{
+    ngLog(0x699794);
+    ngLog((uint32_t)(uintptr_t)window);
+    ngLog((uint32_t)index);
+    return (intptr_t)(0x00400000 + (dt_u32() & 0xff0));
+}
+
+static int32_t BMX_STDCALL stubEnumDevices(ZpadDirectInput *self, uint32_t type,
+                                           uint32_t(BMX_STDCALL *cb)(const void *, void *), void *ref,
+                                           uint32_t flags)
+{
+    ngLog(0xd1e001);
+    ngLogPtr(self);
+    ngLog(type);
+    ngLog((uint32_t)(uintptr_t)cb);
+    ngLog((uint32_t)(uintptr_t)ref);
+    ngLog(flags);
+    return 0;
+}
+
+static int32_t BMX_STDCALL stubCreateDeviceEx(ZpadDirectInput *self, const ZpadGuid *guid,
+                                              const ZpadGuid *iid, ZpadDiDevice **out, void *outer)
+{
+    ngLog(0xd1e002);
+    ngLogPtr(self);
+    ngLog(guid->data1);
+    ngLog(guid->data2);
+    ngLog(guid->data3);
+    ngLog(iid->data1);
+    ngLog((uint32_t)(uintptr_t)iid);
+    ngLogPtr((const void *)out);
+    ngLog((uint32_t)(uintptr_t)outer);
+    if (gDiHr >= 0) {
+        *out = gFakeDevice;
+    }
+    return gDiHr;
+}
+
+static int32_t BMX_STDCALL stubDirectInputCreate(void *instance, uint32_t version, const ZpadGuid *iid,
+                                                 ZpadDirectInput **out, void *outer)
+{
+    ngLog(0x4afc58);
+    ngLog((uint32_t)(uintptr_t)instance);
+    ngLog(version);
+    ngLog(iid->data1);
+    ngLog((uint32_t)(uintptr_t)out);
+    ngLog((uint32_t)(uintptr_t)outer);
+    if (gDiHr >= 0) {
+        *out = gFakeDirectInput;
+    }
+    return gDiHr;
+}
+
+static int32_t BMX_STDCALL stubSetDataFormat(ZpadDiDevice *self, const void *format)
+{
+    ngLog(0xd1e003);
+    ngLogPtr(self);
+    ngLogPtr(format);
+    return gFmtHr;
+}
+
+static int32_t BMX_STDCALL stubSetCoop(ZpadDiDevice *self, void *window, uint32_t flags)
+{
+    ngLog(0xd1e004);
+    ngLogPtr(self);
+    ngLog((uint32_t)(uintptr_t)window);
+    ngLog(flags);
+    return gCoopHr;
+}
+
+static int32_t hrAnswer(void)
+{
+    return (dt_u32() & 3) == 0 ? (int32_t)0x80004005 : 0;
+}
+
+static void di_begin(DtCtx *c)
+{
+    ZpadDirectInputVtbl *dvt = dt_alloc(sizeof *dvt);
+    ZpadDiVtbl *devt = dt_alloc(sizeof *devt);
+    ZpadDirectInput *di = dt_alloc(sizeof *di);
+    ZpadDiDevice *dev = dt_alloc(sizeof *dev);
+
+    ngBegin(c, 1);
+    memset(dvt, 0, sizeof *dvt);
+    memset(devt, 0, sizeof *devt);
+    dvt->enumDevices = stubEnumDevices;
+    dvt->createDeviceEx = stubCreateDeviceEx;
+    devt->setDataFormat = stubSetDataFormat;
+    devt->setCooperativeLevel = stubSetCoop;
+    di->vtbl = dvt;
+    dev->vtbl = devt;
+    gFakeDevice = dev;
+    gFakeDirectInput = di;
+    gDiHr = hrAnswer();
+    gFmtHr = hrAnswer();
+    gCoopHr = hrAnswer();
+    gZpadDirectInput = di;
+    *(void **)(uintptr_t)0x00699794 = (void *)stubGetWindowLong;
+    dt_stub(0x0048ad20, NULL, (void *)stubQuery);
+    dt_stub(0x004afc58, NULL, (void *)stubDirectInputCreate);
+}
+
+static void setup_di_init(DtCtx *c)
+{
+    di_begin(c);
+    gZpadDiActive = (dt_u32() & 3) == 0;
+    gZpadDiRecords = NULL;
+    gZpadDirectInput = NULL;
+}
+
+static void setup_di_enum(DtCtx *c)
+{
+    uint8_t *inst = dt_alloc(0x20);
+    uint32_t *guid = dt_alloc(16);
+
+    ngBegin(c, 0);
+    dt_fill(inst, 0x20);
+    dt_fill(guid, 16);
+    DT_ARG_PTR(c, 0, inst);
+    DT_ARG_PTR(c, 1, guid);
+}
+
+static void setup_di_device(DtCtx *c)
+{
+    di_begin(c);
+    DT_ARG_PTR(c, 0, dt_alloc(8));
+    for (int i = 1; i <= 4; i++) {
+        DT_ARG_INT(c, i, dt_u32());
+    }
+    DT_ARG_PTR(c, 5, dt_alloc(16));
+    DT_ARG_INT(c, 6, dt_u32());
+}
+
+DT_CASES(pcinput_cases2) = {
+    {"zpadDirectInputInitialize", 0x00493160, zpadDirectInputInitialize, 0, DT_RET_INT, setup_di_init, 200,
+     0},
+    {"zpadEnumJoysticksCallback", 0x00493220, (void *)zpadEnumJoysticksCallback, 2, DT_RET_INT, setup_di_enum,
+     20, 0},
+    {"zpadCreateDiDevice", 0x00493760, (void *)zpadCreateDiDevice, 7, DT_RET_INT, setup_di_device, 300, 0},
+};

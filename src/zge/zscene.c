@@ -911,7 +911,7 @@ BMX_ADDR(0x00491ee0)
 void zscnptsShutdown(void)
 {
     gScnpts.count = 0;
-    zmemFreeListForEach(gScnpts.points, zscnptsFreePoint, 0);
+    zmemFreeListForEach(gScnpts.points, (void(BMX_CDECL *)(void *, void *))(uintptr_t)zscnptsFreePoint, 0);
     zscnptsReset();
 }
 

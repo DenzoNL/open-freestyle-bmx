@@ -23,5 +23,9 @@ int zsndSetTickRate(int ticks);
 int zsndNop(void);
 /* Starts the debug back end; asserts when called twice. Returns 0 when the back end fails to start. */
 int zdebugCreate(void);
+/* Sets the debug indent level, clamped to 0..32; zdebugIndent changes it by a delta (the function behind
+ * gZdebugIndent). */
+void zdebugSetIndent(int level);
+void zdebugIndent(int delta);
 
 #endif

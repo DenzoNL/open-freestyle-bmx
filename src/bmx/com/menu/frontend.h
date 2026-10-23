@@ -16,6 +16,7 @@
 #include "bmx/com/menu/gui/guimain.h"
 #include "bmx/com/zge/bmx/bmxsound.h"
 #include "bmx/com/zge/ngif/missingzge.h"
+#include "bmx/com/zge/ngif/ngifpsx.h"
 #include "bmx/com/zge/zprim.h"
 #include "compat/orig.h"
 
@@ -25,9 +26,6 @@ typedef void(BMX_CDECL *FrontendStepFn)(void);
 
 /* Display list: the primitive buffer cursor (0x5d2510) and the ordering table pointer (0x68c3d0). */
 #define gPrimCursor ORIG_VAR(0x005d2510, uint8_t *, gPrimCursor)
-/* Belong to NgIFpsx.c: get/set the ordering table pointer (the tail of the frame's display list). */
-ORIG_FN(0x00463960, uint32_t *, ngifGetOrderTable, (void));
-ORIG_FN(0x00463980, void, ngifSetOrderTable, (uint32_t *table));
 
 /*
  * Primitive of the 3x3 frame box (a 4 point textured polygon of the display list, 0xa4 bytes apart in the

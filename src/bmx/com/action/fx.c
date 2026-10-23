@@ -251,6 +251,138 @@ void fxScatter(const uint32_t *sprites, int kind, const ZVec3 *offset, int angle
     }
 }
 
+/* Parameter block of the "shard" handler (words 3, 7 and 11 are never set: stack garbage in the original). */
+typedef struct FxShard {
+    ZVec3 pos;
+    uint32_t pad0c;
+    ZVec3 vel;
+    uint32_t pad1c;
+    ZVec3 spin;
+    uint32_t pad2c;
+    float size;
+    int32_t life;
+    uint8_t color[4];
+    uint32_t zero3c;
+} FxShard;
+
+_Static_assert(sizeof(FxShard) == 0x40, "FxShard size");
+
+/*
+ * Bursts 32 shards at `pos` (relative to the first effect node): each gets a position jittered by +-300,
+ * the velocity `vel` slowed by a random 0..31 steps of 0.005, a random spin and size and a life of 1..3 s.
+ */
+BMX_ADDR(0x00408fd0)
+void fxShards(const ZVec3 *pos, const ZVec3 *vel)
+{
+    FxShard shard = {{0.0f, 0.0f, 0.0f},       0, {0.0f, 0.0f, 0.0f}, 0, {0.0f, 0.0f, 0.0f}, 0, 0.0f, 0,
+                     {0x80, 0x80, 0xd0, 0x70}, 0};
+    const uint8_t *const node = ngiffxGetNode(NULL, 0);
+
+    if (node == NULL) {
+        return;
+    }
+    const float *const target = *(const float *const *)(node + 0x30);
+
+    for (int i = 0x20; i != 0; i--) {
+        shard.pos.x = (float)(((double)pos->x - target[2]) + (double)(int16_t)(zmathRandom() % 600 - 300));
+        shard.pos.y = (float)(((double)pos->y - target[3]) + (double)(int16_t)(zmathRandom() % 600 - 300));
+        shard.pos.z = (float)(((double)pos->z - target[4]) + (double)(int16_t)(zmathRandom() % 600 - 300));
+        shard.vel.x = (float)((double)vel->x - (double)(int16_t)(zmathRandom() & 0x1f) * 0.005f);
+        shard.vel.y = (float)((double)vel->y - (double)(int16_t)(zmathRandom() & 0x1f) * 0.005f);
+        shard.vel.z = (float)((double)vel->z - (double)(int16_t)(zmathRandom() & 0x1f) * 0.005f);
+        shard.spin.x = (float)(int16_t)(zmathRandom() % 1000);
+        shard.spin.y = (float)(int16_t)(zmathRandom() % 1000);
+        shard.spin.z = (float)(int16_t)(zmathRandom() % 1000);
+        shard.size = (float)(int16_t)(zmathRandom() % 0x50 + 5);
+        shard.life = (int32_t)(zmathRandom() % 2000 + 1000);
+        zstrNameTable2Call("shard", (uint32_t)(uintptr_t)node, (uint32_t)(uintptr_t)&shard);
+    }
+}
+
+/* Four corners of the skid mark quad (0x554964; the words between are used by the particle code). */
+typedef struct FxSkidCorner {
+    ZVec3 pos;
+    uint32_t other;
+} FxSkidCorner;
+
+typedef FxSkidCorner FxSkidCorners[4];
+#define gFxSkidCorners ORIG_VAR(0x00554964, FxSkidCorners, gFxSkidCorners)
+/* A zero vector in .bss, the middle point of the cross product below. */
+#define gFxZero ORIG_VAR(0x0056b6d0, ZVec3, gFxZero)
+
+/* Parameter block of the "skid" handler: four corners (pad words 3, 7, 11, 15 never set), life, colour. */
+typedef struct FxSkid {
+    FxSkidCorner corner[4];
+    int32_t life;
+    uint8_t color[4];
+    uint32_t zero48;
+} FxSkid;
+
+_Static_assert(sizeof(FxSkid) == 0x4c, "FxSkid size");
+
+/*
+ * Leaves a skid mark from `from` to `to` on a surface with `normal`: a quad 1 unit either side of the
+ * segment (the normal's cross product with the direction), lifted 0.5 along the normal, handed to the
+ * "skid" handler relative to the first effect node. Segments shorter than 4 (L1) are ignored; flags unused.
+ */
+BMX_ADDR(0x00409250)
+void fxSkidMark(const ZVec3 *from, const ZVec3 *to, int flags, const ZVec3 *normal)
+{
+    const double dz = (double)from->z - to->z;
+    const double dy = (double)from->y - to->y;
+    const double dx = (double)from->x - to->x;
+    ZVec3 dir, side, up;
+    FxSkid skid = {{{{0.0f, 0.0f, 0.0f}, 0}}, 5000, {0x7f, 0x7f, 0x7f, 0x7f}, 0};
+
+    (void)flags;
+    if (!((__builtin_fabs(dy) + __builtin_fabs(dz)) + __builtin_fabs(dx) >= 4.0)) {
+        return;
+    }
+    dir.x = (float)dx;
+    dir.y = (float)dy;
+    dir.z = (float)dz;
+    zvec3NormalizeScaled(&dir, &dir);
+    up = *normal;
+    zvec3Cross3(&side, &gFxZero, &dir, &up);
+    gFxSkidCorners[0].pos.x = (float)((double)side.x + from->x);
+    gFxSkidCorners[0].pos.y = (float)((double)side.y + from->y);
+    gFxSkidCorners[0].pos.z = (float)((double)side.z + from->z);
+    gFxSkidCorners[1].pos.x = (float)((double)from->x - side.x);
+    gFxSkidCorners[1].pos.y = (float)((double)from->y - side.y);
+    gFxSkidCorners[1].pos.z = (float)((double)from->z - side.z);
+    gFxSkidCorners[2].pos.x = (float)((double)to->x - side.x);
+    gFxSkidCorners[2].pos.y = (float)((double)to->y - side.y);
+    gFxSkidCorners[2].pos.z = (float)((double)to->z - side.z);
+    gFxSkidCorners[3].pos.x = (float)((double)side.x + to->x);
+    gFxSkidCorners[3].pos.y = (float)((double)side.y + to->y);
+    gFxSkidCorners[3].pos.z = (float)((double)side.z + to->z);
+    const uint8_t *const node = ngiffxGetNode(gFxRider->actor, 0);
+
+    if (node == NULL) {
+        return;
+    }
+    const float *const target = *(const float *const *)(node + 0x30);
+    const double hx = (double)up.x * 0.5f;
+    const double hy = (double)up.y * 0.5f;
+    const double hz = (double)up.z * 0.5f;
+    const double hyf = (float)hy;
+    const double hzf = (float)hz;
+
+    skid.corner[0].pos.x = (float)((hx + gFxSkidCorners[0].pos.x) - target[2]);
+    skid.corner[0].pos.y = (float)((hy + gFxSkidCorners[0].pos.y) - target[3]);
+    skid.corner[0].pos.z = (float)((hz + gFxSkidCorners[0].pos.z) - target[4]);
+    skid.corner[1].pos.x = (float)((hx + gFxSkidCorners[1].pos.x) - target[2]);
+    skid.corner[1].pos.y = (float)((hyf + gFxSkidCorners[1].pos.y) - target[3]);
+    skid.corner[1].pos.z = (float)((hzf + gFxSkidCorners[1].pos.z) - target[4]);
+    skid.corner[2].pos.x = (float)((hx + gFxSkidCorners[2].pos.x) - target[2]);
+    skid.corner[2].pos.y = (float)((hyf + gFxSkidCorners[2].pos.y) - target[3]);
+    skid.corner[2].pos.z = (float)((hzf + gFxSkidCorners[2].pos.z) - target[4]);
+    skid.corner[3].pos.x = (float)((hx + gFxSkidCorners[3].pos.x) - target[2]);
+    skid.corner[3].pos.y = (float)((hyf + gFxSkidCorners[3].pos.y) - target[3]);
+    skid.corner[3].pos.z = (float)((hzf + gFxSkidCorners[3].pos.z) - target[4]);
+    zstrNameTable2Call("skid", (uint32_t)(uintptr_t)node, (uint32_t)(uintptr_t)&skid);
+}
+
 BMX_ADDR(0x004095a0)
 void fxEmit(uint32_t a, uint32_t b, const ZVec3 *pos, uint32_t unused, uint32_t type)
 {

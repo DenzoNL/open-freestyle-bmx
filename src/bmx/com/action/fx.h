@@ -57,8 +57,9 @@ void fxCallbackEmit(const uint8_t *obj, uint32_t type);
 int fxCallbackLight(const uint8_t *obj, int event);
 int fxCreateFromList(const uint8_t *list, uint32_t count);
 
-/* Not ported (big x87 functions): a burst of shards at a position, and skid marks. */
-ORIG_FN(0x00408fd0, void, fxShards, (const ZVec3 *pos, const void *rider));
-ORIG_FN(0x00409250, void, fxSkidMark, (const ZVec3 *from, const ZVec3 *to, int flags, const ZVec3 *normal));
+/* A burst of shards at a position, flying along `vel` (relative to the first effect node). */
+void fxShards(const ZVec3 *pos, const ZVec3 *vel);
+/* Skid mark quad from `from` to `to` on a surface with `normal`; `flags` is not read. */
+void fxSkidMark(const ZVec3 *from, const ZVec3 *to, int flags, const ZVec3 *normal);
 
 #endif

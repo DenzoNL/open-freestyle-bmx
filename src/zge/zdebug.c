@@ -39,3 +39,32 @@ int zdebugCreate(void)
     gZdebugCreated = 1;
     return 1;
 }
+
+/* Indent level of the debug output (0..0x20). */
+#define gZdebugIndentLevel ORIG_VAR(0x0065e29c, int, gZdebugIndentLevel)
+
+BMX_ADDR(0x00480290)
+void zdebugSetIndent(int level)
+{
+    gZdebugIndentLevel = level;
+    if (level < 0) {
+        gZdebugIndentLevel = 0;
+        return;
+    }
+    if (level > 0x20) {
+        gZdebugIndentLevel = 0x20;
+    }
+}
+
+BMX_ADDR(0x004802c0)
+void zdebugIndent(int delta)
+{
+    gZdebugIndentLevel += delta;
+    if (gZdebugIndentLevel < 0) {
+        gZdebugIndentLevel = 0;
+        return;
+    }
+    if (gZdebugIndentLevel > 0x20) {
+        gZdebugIndentLevel = 0x20;
+    }
+}

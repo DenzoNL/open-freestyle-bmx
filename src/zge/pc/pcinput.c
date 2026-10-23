@@ -1,6 +1,7 @@
 /* Controller devices of the PC platform layer (C:\NgEngine\Zge\PC\pcinput.c). */
 #include "zge/pc/pcinput.h"
 
+#include "zge/zdebug.h"
 #include "zge/zmem.h"
 #include "zge/zstring.h"
 
@@ -223,4 +224,69 @@ int zpadSetKeyMap(void *device, const uint8_t *map)
     }
     d->record->keyMap = map;
     return 1;
+}
+
+/* ---- DirectInput start-up ------------------------------------------------------------------------ */
+
+static const char kPcInputFile[] = "C:\\NgEngine\\Zge\\Pc\\pcinput.c";
+
+typedef int(BMX_CDECL *ZpadQueryFn)(int kind, void **object, int flags);
+typedef intptr_t(BMX_STDCALL *ZpadGetWindowLongFn)(void *window, int index);
+#define gZpadQuery          ORIG_VAR(0x00561488, ZpadQueryFn, gZpadQuery)
+#define gZpadGetWindowLong  ORIG_VAR(0x00699794, ZpadGetWindowLongFn, gZpadGetWindowLong)
+#define gZpadIidDirectInput ORIG_VAR(0x0054f448, ZpadGuid, gZpadIidDirectInput)
+#define gZpadIidDevice      ORIG_VAR(0x0054f408, ZpadGuid, gZpadIidDevice)
+ORIG_FN_STDCALL(0x004afc58, int32_t, DirectInputCreateEx,
+                (void *instance, uint32_t version, const ZpadGuid *iid, ZpadDirectInput **out, void *outer));
+
+BMX_ADDR(0x00493160)
+int zpadDirectInputInitialize(void)
+{
+    if (gZpadDiActive == 0) {
+        void **holder;
+        void *instance;
+
+        gZpadDiActive = 1;
+        gZpadDiRecords = zmemFreeListCreate(0x14, 2, BMX_FNPTR(ZMemDestroyFn, 0x004803c0, zpadDestroyDevice));
+        gZpadQuery(0x15, (void **)&holder, 0);
+        gZpadWindow = *holder;
+        instance = (void *)gZpadGetWindowLong(gZpadWindow, -6);
+        if (DirectInputCreateEx(instance, 0x700, &gZpadIidDirectInput, &gZpadDirectInput, NULL) < 0) {
+            zdebugFail("DirectInputCreate() failed.", kPcInputFile, 0x145, 0);
+            return 0;
+        }
+        zmemFill(&gZpadJoystickGuid, 0, 0x10);
+        gZpadDirectInput->vtbl->enumDevices(
+            gZpadDirectInput, 4,
+            BMX_FNPTR(uint32_t(BMX_STDCALL *)(const void *, void *), 0x00493220, zpadEnumJoysticksCallback),
+            &gZpadJoystickGuid, 1);
+    }
+    return 1;
+}
+
+BMX_ADDR(0x00493220)
+uint32_t BMX_STDCALL zpadEnumJoysticksCallback(const void *instance, void *guid)
+{
+    zmemCopy(guid, (const uint8_t *)instance + 4, 0x10);
+    return 0;
+}
+
+BMX_ADDR(0x00493760)
+ZpadDiDevice *zpadCreateDiDevice(void *window, ZpadGuid guid, const void *format, uint32_t flags)
+{
+    ZpadDirectInput *const di = gZpadDirectInput;
+    ZpadDiDevice *device;
+
+    if (di->vtbl->createDeviceEx(di, &guid, &gZpadIidDevice, &device, NULL) < 0) {
+        return NULL;
+    }
+    if (device->vtbl->setDataFormat(device, format) < 0) {
+        zdebugFail("SetDataFormat() failed", kPcInputFile, 0x175, 0);
+        return NULL;
+    }
+    if (device->vtbl->setCooperativeLevel(device, window, flags) < 0) {
+        zdebugFail("SetCooperativeLevel() failed", kPcInputFile, 0x17d, 0);
+        return NULL;
+    }
+    return device;
 }
