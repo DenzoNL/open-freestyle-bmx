@@ -142,6 +142,11 @@ round floats (so the hook build uses SSE2, not x87). Rules are in CONTRIBUTING.m
   anchoring for widescreen/ultrawide, UI scaling.
 - RTX Remix: hooks only D3D9 fixed-function. Try now on the original exe via a DX7→D3D9 wrapper
   (dgVoodoo2/dxwrapper). For our build: optional D3D9 fixed-function backend on Windows (decide in P4).
+- Vendor-neutral ray/path tracing (preferred long-term over Remix-only): separate Vulkan RT backend
+  (NVIDIA/AMD RDNA2+/Intel), optionally Metal RT; SDL3 GPU has no RT. Precedent: Quake II RTX. The
+  real work is PBR materials (override folder shared with Remix), lights (original is mostly baked
+  vertex colour) and a vendor-neutral denoiser (SVGF or FidelityFX). P4 must put the renderer behind a
+  backend interface so this and the Remix D3D9 path are add-ons.
 - DLSS / FSR upscaling: needs depth + motion vectors (also needed for render interpolation). SDL3 GPU
   may not expose enough for the vendor SDKs; decide in P4 whether a D3D12/Vulkan backend is needed.
 - Modding: asset override folder (menus, riders, bikes), custom music, later a Blender level exporter.
