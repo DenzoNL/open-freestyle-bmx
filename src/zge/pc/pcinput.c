@@ -1,6 +1,7 @@
 /* Controller devices of the PC platform layer (C:\NgEngine\Zge\PC\pcinput.c). */
 #include "zge/pc/pcinput.h"
 
+#include "compat/crt.h"
 #include "zge/zdebug.h"
 #include "zge/zmem.h"
 #include "zge/zstring.h"
@@ -11,7 +12,7 @@ struct GuiPadDevice *zpadCreateDevice(int kind)
     uint32_t *device = zmemFreeListAlloc(gZpadDevices);
 
     zmemFill(device, 0, kZpadDeviceBytes);
-    device[kZpadDirectInputSlot / 4] = (uint32_t)zpadSetupDirectInput(kind, device);
+    device[kZpadDirectInputSlot / 4] = (uint32_t)(uintptr_t)zpadSetupDirectInput(kind, (ZpadDevice *)device);
     if (device[kZpadDirectInputSlot / 4] == 0) {
         zmemFreeListFree(gZpadDevices, device);
         return NULL;
@@ -289,4 +290,123 @@ ZpadDiDevice *zpadCreateDiDevice(void *window, ZpadGuid guid, const void *format
         return NULL;
     }
     return device;
+}
+
+/* ---- device setup -------------------------------------------------------------------------------- */
+
+#define gZpadGuidKeyboard     ORIG_VAR(0x0054f2f8, ZpadGuid, gZpadGuidKeyboard)
+#define gZpadFormatKeyboard   ORIG_VAR(0x0054e7e0, uint8_t, gZpadFormatKeyboard)
+#define gZpadFormatJoystick   ORIG_VAR(0x0054e7c8, uint8_t, gZpadFormatJoystick)
+#define gZpadKeyMapFirst      ORIG_VAR(0x00561e68, uint8_t, gZpadKeyMapFirst)
+#define gZpadKeyMapOther      ORIG_VAR(0x00561e88, uint8_t, gZpadKeyMapOther)
+#define gZpadDefaultButtonMap ORIG_VAR(0x00561ea8, uint8_t, gZpadDefaultButtonMap)
+
+/* DIPROPRANGE and DIPROPDWORD. */
+typedef struct ZpadPropRange {
+    uint32_t size, headerSize, obj, how;
+    int32_t min, max;
+} ZpadPropRange;
+
+typedef struct ZpadPropDword {
+    uint32_t size, headerSize, obj, how;
+    uint32_t data;
+} ZpadPropDword;
+
+/* The fields of DIDEVICEINSTANCE the profile lookup reads. */
+typedef struct ZpadDeviceInfo {
+    uint32_t size;
+    uint8_t guidInstance[0x10];
+    ZpadGuid guidProduct;
+    uint8_t pad24[4];
+    char instanceName[260];
+    char productName[260];
+    uint8_t tail[0x14];
+} ZpadDeviceInfo;
+
+_Static_assert(sizeof(ZpadDeviceInfo) == 0x244, "DIDEVICEINSTANCE size");
+
+/* The keyboard is shared by all devices: created once, with its acquired flag cleared. */
+static int createKeyboard(void)
+{
+    gZpadKeyboard = zpadCreateDiDevice(gZpadWindow, gZpadGuidKeyboard, &gZpadFormatKeyboard, 6);
+    return gZpadKeyboard != NULL;
+}
+
+BMX_ADDR(0x00493310)
+ZpadDiRecord *zpadSetupDirectInput(int kind, ZpadDevice *device)
+{
+    ZpadDiRecord *record = zmemFreeListAlloc(gZpadDiRecords);
+
+    zmemFill(record, 0, sizeof *record);
+    if (kind == 1 || kind == 2) {
+        if (gZpadKeyboard == NULL) {
+            if (!createKeyboard()) {
+                zdebugFail("Could not create an input device", kPcInputFile, 0x37c, 0);
+                zmemFreeListFree(gZpadDiRecords, record);
+                return NULL;
+            }
+            gZpadKeyboardFlags &= ~1u;
+        }
+        record->keyMap = zmemFreeListUsedCount(gZpadDiRecords) == 1 ? &gZpadKeyMapFirst : &gZpadKeyMapOther;
+    }
+    if (kind == 0 || kind == 2) {
+        ZpadDiDevice *di = zpadCreateDiDevice(gZpadWindow, gZpadJoystickGuid, &gZpadFormatJoystick, 5);
+
+        record->di = di;
+        if (di == NULL) {
+            /* No pad: the keyboard stands in for it. */
+            gZdebugPrint("PCINPUT: Could not create controller\n");
+            if (gZpadKeyboard == NULL) {
+                if (!createKeyboard()) {
+                    zdebugFail("Could not create an input device", kPcInputFile, 0x389, 0);
+                    zmemFreeListFree(gZpadDiRecords, record);
+                    return NULL;
+                }
+                gZpadKeyboardFlags &= ~1u;
+            }
+            record->keyMap =
+                zmemFreeListUsedCount(gZpadDiRecords) == 1 ? &gZpadKeyMapFirst : &gZpadKeyMapOther;
+        } else {
+            ZpadPropRange range = {0x18, 0x10, 0, 1, -127, 127};
+            ZpadPropDword deadZone = {0x14, 0x10, 0, 0, 1000};
+            ZpadDeviceInfo info;
+
+            /*
+             * Original quirk: the range property is set on both axes, then the dead zone only on the
+             * second, and that call names the range property (4) as well.
+             */
+            di->vtbl->setProperty(di, 4, &range);
+            range.obj = 4;
+            record->di->vtbl->setProperty(record->di, 4, &range);
+            record->di->vtbl->setProperty(record->di, 5, &deadZone);
+            deadZone.obj = 4;
+            record->di->vtbl->setProperty(record->di, 4, &deadZone);
+            record->flags &= ~1u;
+            info.size = sizeof info;
+            record->di->vtbl->getDeviceInfo(record->di, &info);
+            record->buttonMap = &gZpadDefaultButtonMap;
+            for (const ZpadProfile *const *entry = &gZpadProfiles; *entry != NULL; entry++) {
+                const ZpadProfile *profile = *entry;
+                const char *const *name = profile->names;
+                const ZpadGuid *const *guid = profile->guids;
+
+                while (*name != NULL && zstrcmp(*name, info.productName) != 0) {
+                    name++;
+                }
+                if (*name != NULL) {
+                    record->buttonMap = (const uint8_t *)profile;
+                    continue;
+                }
+                for (; guid != NULL && *guid != NULL; guid++) {
+                    if (memcmp(*guid, &info.guidProduct, sizeof(ZpadGuid)) == 0) {
+                        record->buttonMap = (const uint8_t *)profile;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    record->device = device;
+    device->pad04 |= 1;
+    return record;
 }

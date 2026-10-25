@@ -55,7 +55,22 @@ typedef struct NgifVert3 {
     uint8_t pad13;
 } NgifVert3;
 
-ORIG_FN(0x00463130, void, ngifDrawPoly3D, (int flags, int count, const NgifVert3 *verts, int texture));
+/* A texture of the 3D list: window in the page (u0, v0, u1, v1), size, and the material that holds it. */
+typedef struct NgifTexture {
+    uint16_t pageWord;      /* 0x00 */
+    uint16_t clutWord;      /* 0x02 */
+    uint8_t u0, v0, u1, v1; /* 0x04 */
+    uint8_t pad08[4];
+    uint8_t width, height; /* 0x0c */
+    uint8_t pad0e[2];
+    uint32_t material; /* 0x10 ZrwMaterial pointer; 0 = unused */
+} NgifTexture;
+
+_Static_assert(sizeof(NgifTexture) == 0x14, "NgifTexture size");
+#define gNgifTextures ORIG_VAR(0x0068c3e0, NgifTexture, gNgifTextures)
+
+/* Draws a polygon (3 or 4 vertices, optionally textured) into the 3D list. */
+void ngifDrawPoly3D(int flags, int count, const NgifVert3 *verts, int texture);
 /* Writes a 3D line (colour words at +0x10 of each end) into the 3D list; only the low 2 bits of flags are
  * read. */
 void ngifDrawLine3D(int flags, const NgifVert3 *a, const NgifVert3 *b);
@@ -132,10 +147,12 @@ ORIG_FN(0x00460b40, void, ngifDrawPolyFT4, (const uint8_t *prim, int blend));
 ORIG_FN(0x0045ffd0, void, ngifDrawPolyGT4, (const uint8_t *prim, int blend));
 
 /* Draws one glyph of an overlay text from the scratch record at 0x55b960 (x is passed zero extended). */
-ORIG_FN(0x00462940, void, ngifDrawTextGlyph, (uint32_t x, int y, const void *record));
+void ngifDrawTextGlyph(uint32_t x, int y, const void *record);
 
-/* Letterbox fill used by the overlay: colour, x, y, width and a pointer to an ordering table entry. */
-ORIG_FN(0x004623a0, void, ngifFillScreenBar,
-        (uint32_t color, uint32_t x, int y, uint32_t width, const void *ot));
+/*
+ * Screen space rectangle in the 3D list (letterbox bars, fades, overlay rectangles): colour (or texture
+ * number), x, y, flag word and the size / window information the flags ask for.
+ */
+void ngifFillScreenBar(uint32_t color, uint32_t x, int y, uint32_t flags, const void *info);
 
 #endif

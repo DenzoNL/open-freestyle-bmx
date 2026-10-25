@@ -12,12 +12,12 @@ typedef void *(BMX_CDECL *ListAllocFn)(struct ZMemFreeList *);
 
 static int gSetupAnswer;
 
-static int BMX_CDECL stubSetup(int kind, void *device)
+static ZpadDiRecord *BMX_CDECL stubSetup(int kind, void *device)
 {
     ngLog(0x493310);
     ngLog((uint32_t)kind);
     ngLogPtr(device);
-    return gSetupAnswer ? (int)(0x7100 + (dt_u32() & 0xff0)) : 0;
+    return gSetupAnswer ? (ZpadDiRecord *)(uintptr_t)(0x7100 + (dt_u32() & 0xff0)) : NULL;
 }
 
 static int BMX_CDECL stubRelease(void *device)
@@ -429,10 +429,124 @@ static void setup_di_device(DtCtx *c)
     DT_ARG_INT(c, 6, dt_u32());
 }
 
+/* ---- device setup (profile lookup) ------------------------------------------------------------------- */
+
+static int32_t BMX_STDCALL stubSetProperty(ZpadDiDevice *self, uintptr_t property, const void *header)
+{
+    const uint32_t *w = header;
+
+    ngLog(0xd1e005);
+    ngLogPtr(self);
+    ngLog((uint32_t)property);
+    for (uint32_t i = 0; i < w[0] / 4; i++) {
+        ngLog(w[i]);
+    }
+    return hrAnswer();
+}
+
+static uint32_t nameCount(const ZpadProfile *p)
+{
+    uint32_t n = 0;
+
+    while (p->names[n] != NULL) {
+        n++;
+    }
+    return n;
+}
+
+static uint32_t guidCount(const ZpadProfile *p)
+{
+    uint32_t n = 0;
+
+    while (p->guids != NULL && p->guids[n] != NULL) {
+        n++;
+    }
+    return n;
+}
+
+/* A product the profile table knows by name, by GUID, by both of different profiles, or not at all. */
+static int32_t BMX_STDCALL stubGetDeviceInfo(ZpadDiDevice *self, void *infop)
+{
+    uint8_t *info = infop;
+    uint32_t profiles = 0;
+    const uint32_t mode = dt_u32() % 5;
+
+    ngLog(0xd1e006);
+    ngLogPtr(self);
+    ngLog(*(uint32_t *)info);
+    while ((&gZpadProfiles)[profiles] != NULL) {
+        profiles++;
+    }
+    fill_words(info + 0x14, 0x10);
+    for (int i = 0; i < 12; i++) {
+        info[0x12c + i] = (char)dt_range('a', 'z');
+    }
+    info[0x12c + 12] = 0;
+    if (mode >= 1 && mode <= 3) {
+        const ZpadProfile *p = (&gZpadProfiles)[dt_u32() % profiles];
+        const uint32_t n = nameCount(p);
+
+        if (n != 0) {
+            const char *name = p->names[dt_u32() % n];
+            uint32_t len = 0;
+
+            while (name[len] != 0) {
+                info[0x12c + len] = (uint8_t)name[len];
+                len++;
+            }
+            info[0x12c + len] = 0;
+        }
+    }
+    if (mode >= 3) {
+        const ZpadProfile *p = (&gZpadProfiles)[dt_u32() % profiles];
+        const uint32_t n = guidCount(p);
+
+        if (n != 0) {
+            memcpy(info + 0x14, p->guids[dt_u32() % n], sizeof(ZpadGuid));
+        }
+    }
+    return 0;
+}
+
+static void setup_setup_di(DtCtx *c)
+{
+    ZpadDirectInputVtbl *dvt = dt_alloc(sizeof *dvt);
+    ZpadDiVtbl *devt = dt_alloc(sizeof *devt);
+    ZpadDirectInput *di = dt_alloc(sizeof *di);
+    ZpadDiDevice *dev = dt_alloc(sizeof *dev);
+    ZpadDevice *device = dt_alloc(sizeof *device);
+
+    ngBegin(c, 0);
+    dt_zmem_env();
+    memset(dvt, 0, sizeof *dvt);
+    memset(devt, 0, sizeof *devt);
+    dvt->createDeviceEx = stubCreateDeviceEx;
+    devt->setDataFormat = stubSetDataFormat;
+    devt->setCooperativeLevel = stubSetCoop;
+    devt->setProperty = stubSetProperty;
+    devt->getDeviceInfo = stubGetDeviceInfo;
+    di->vtbl = dvt;
+    dev->vtbl = devt;
+    gFakeDevice = dev;
+    gDiHr = (dt_u32() & 3) == 0 ? (int32_t)0x80004005 : 0;
+    gFmtHr = (dt_u32() & 15) == 0 ? (int32_t)0x80004005 : 0;
+    gCoopHr = (dt_u32() & 15) == 0 ? (int32_t)0x80004005 : 0;
+    gZpadDirectInput = di;
+    gZpadWindow = (void *)(uintptr_t)(dt_u32() | 1);
+    fill_words(&gZpadJoystickGuid, sizeof gZpadJoystickGuid);
+    gZpadDiRecords = make_records(dt_range(0, 2));
+    gZpadKeyboard = (dt_u32() & 1) ? NULL : make_di();
+    gZpadKeyboardFlags = dt_u32();
+    dt_fill(device, sizeof *device);
+    DT_ARG_INT(c, 0, (dt_u32() & 15) == 0 ? dt_range(-1, 4) : dt_range(0, 2));
+    DT_ARG_PTR(c, 1, device);
+}
+
 DT_CASES(pcinput_cases2) = {
     {"zpadDirectInputInitialize", 0x00493160, zpadDirectInputInitialize, 0, DT_RET_INT, setup_di_init, 200,
      0},
     {"zpadEnumJoysticksCallback", 0x00493220, (void *)zpadEnumJoysticksCallback, 2, DT_RET_INT, setup_di_enum,
      20, 0},
     {"zpadCreateDiDevice", 0x00493760, (void *)zpadCreateDiDevice, 7, DT_RET_INT, setup_di_device, 300, 0},
+    {"zpadSetupDirectInput", 0x00493310, zpadSetupDirectInput, 2, DT_RET_INT, setup_setup_di, 1500, 0},
 };

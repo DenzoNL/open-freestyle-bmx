@@ -32,5 +32,7 @@ void overlympDrawBody(int y);
 int overlympResultsUpdate(void);
 /* Score screen after a run (one layout per game mode). */
 void overlympDrawResults(void);
+/* Run statistics screen of the HORSE, competition and timed modes. */
+void overlympDrawRunStats(void);
 
 #endif

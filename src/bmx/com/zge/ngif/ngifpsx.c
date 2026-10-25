@@ -4,6 +4,7 @@
 #include "bmx/com/zge/zprim.h"
 #include "compat/crt.h"
 #include "zge/com/zglrw/zrwdbg.h"
+#include "zge/com/zglrw/zrwmat.h"
 #include "zge/zdebug.h"
 #include "zge/zmem.h"
 
@@ -565,6 +566,519 @@ void ngifDrawList(uint32_t *entry)
         }
         word = *entry;
     }
+}
+
+/* ---- 3D list primitives -------------------------------------------------------------------------- */
+
+/* zrwtxr.h clashes with zrwdbg.h; only the size queries are needed. */
+struct ZrwTexture;
+int zrwTextureGetWidth(const struct ZrwTexture *texture);
+int zrwTextureGetHeight(const struct ZrwTexture *texture);
+
+/* Links the primitive at p (header word `tag`) into entry `index` of the ordering table. */
+static void linkPrim3D(uint8_t *p, uint32_t tag, uint32_t index)
+{
+    uint32_t *const ot = gNgifOtBase;
+
+    put32(p, 0, withLink(tag, ot[index]));
+    ot[index] = withLink(ot[index], (uint32_t)(uintptr_t)p);
+}
+
+/*
+ * The semi-transparency follow-up of a 3D primitive: an 8 byte mode packet at p (blend `mode` 1..4,
+ * anything else clamps) linked into table entry `index`.
+ */
+static void putBlendPacket(uint8_t *p, uint32_t blend, uint32_t index)
+{
+    const uint32_t tag = (get32(p, 0) & 0x0fffffffu) | 0x10000000u;
+    int32_t mode = (int32_t)blend - 1;
+
+    put32(p, 0, tag);
+    mode = mode < 0 ? 0 : (mode >= 3 ? 3 : mode);
+    put32(p, 4, (((uint32_t)mode & 3) | 0xff080030u) << 5);
+    linkPrim3D(p, tag, index);
+}
+
+/*
+ * Draws a screen space rectangle into the 3D list: a flat colour quad, or (flags & 4) a textured one
+ * (`color` is then the texture number). The size comes from `info` (flags & 0x200: its first two words,
+ * & 0x80: a corner at info[4], info[5]), else from the texture; & 0x100 scales it by info[2], info[3];
+ * & 8 and & 0x10 centre it on x and y, & 0x20 and & 0x40 anchor it at the right and the bottom. & 1 and
+ * & 2 flip the texture, & 0x400 and & 0x4000 take its window from info, & 0x800 and & 0x1000 take a clut
+ * offset and an ordering table entry from info[10] and info[11]. The alpha byte of a flat colour (or
+ * & 0x2000) makes it semi-transparent. Original quirk: a flag set without size information asserts.
+ */
+BMX_ADDR(0x004623a0)
+void ngifFillScreenBar(uint32_t color, uint32_t x, int y, uint32_t flags, const void *infop)
+{
+    uint8_t *p = (uint8_t *)gNgifPrim3D;
+    const uint32_t *info = infop;
+    const NgifTexture *tex = NULL;
+    const int textured = (flags & 4) != 0;
+    uint32_t w = 0;
+    uint32_t h;
+    int32_t xx;
+    int32_t yy;
+    int32_t xl;
+    int32_t x2;
+    int32_t y2;
+    uint16_t clutShift = 0;
+    uint32_t otIndex = 0;
+
+    if (textured) {
+        tex = &(&gNgifTextures)[color];
+        if (tex->material == 0) {
+            return;
+        }
+    }
+    if ((flags & 0x800) != 0) {
+        clutShift = (uint16_t)info[10];
+    }
+    if ((flags & 0x1000) != 0) {
+        otIndex = info[11];
+    }
+    if ((flags & 0x200) != 0) {
+        w = info[0];
+        h = info[1];
+    } else if ((flags & 0x80) != 0) {
+        w = info[4] - x;
+        h = info[5] - (uint32_t)y;
+    } else if (!textured) {
+        h = 0;
+        zdebugFail("Cannot get size of object", kNgifFile, 0x63f, 0);
+    } else if ((flags & 0x400) != 0) {
+        w = info[8];
+        h = info[9];
+    } else {
+        w = tex->width;
+        h = tex->height;
+    }
+    if ((flags & 0x100) != 0) {
+        w *= info[2];
+        h *= info[3];
+    }
+    xx = (int32_t)x;
+    if ((flags & 8) != 0) {
+        xx -= (int32_t)w >> 1;
+    }
+    yy = y;
+    if ((flags & 0x10) != 0) {
+        yy -= (int32_t)h >> 1;
+    }
+    xl = xx;
+    if ((flags & 0x80) != 0) {
+        x2 = (int32_t)info[4];
+        y2 = (int32_t)info[5];
+    } else {
+        x2 = (int32_t)((uint32_t)xx + w);
+        y2 = (int32_t)((uint32_t)yy + h);
+    }
+    if ((flags & 0x20) != 0) {
+        xl = (int32_t)((uint32_t)xx - w);
+        x2 = (int32_t)((uint32_t)x2 - w);
+    }
+    if ((flags & 0x40) != 0) {
+        yy = (int32_t)((uint32_t)yy - h);
+        y2 = (int32_t)((uint32_t)y2 - h);
+    }
+    if (p == NULL) {
+        return;
+    }
+
+    if (textured) {
+        const uint32_t tag = (get32(p, 0) & 0x0fffffffu) | 0x90000000u;
+
+        if ((flags & 1) != 0) {
+            const int32_t t = xl;
+            xl = x2;
+            x2 = t;
+        }
+        if ((flags & 2) != 0) {
+            const int32_t t = yy;
+            yy = y2;
+            y2 = t;
+        }
+        put32(p, 0x34, (get32(p, 0x34) & 0xffffff80u) | 0x7f80u);
+        put32(p, 0, tag);
+        put8(p, 7, 0x2c);
+        put16(p, 0x10, (uint32_t)(uint16_t)(tex->clutWord + clutShift));
+        put16(p, 0x1a, tex->pageWord);
+        put32(p, 0x30, tex->material);
+        put32(p, 4, 0x2c808080u);
+        put32(p, 0x1c, get32(p, 0x1c) & 0xffffffcfu);
+        if ((flags & 0x2000) != 0) {
+            put8(p, 0x20, 1);
+            put8(p, 7, p[7] | 2);
+        }
+        put16(p, 0xa, (uint32_t)yy);
+        put16(p, 8, (uint32_t)xl);
+        put16(p, 0x1c, (uint32_t)xl);
+        put16(p, 0x12, (uint32_t)x2);
+        put16(p, 0x14, (uint32_t)yy);
+        put16(p, 0x1e, (uint32_t)y2);
+        put16(p, 0x26, (uint32_t)x2);
+        put16(p, 0x28, (uint32_t)y2);
+        if ((flags & 0x400) != 0) {
+            put16(p, 0xc, (uint32_t)(tex->u0 + (uint16_t)info[6]));
+            put16(p, 0xe, (uint32_t)(tex->v0 + (uint16_t)info[7]));
+            put16(p, 0x2a, (uint32_t)((uint16_t)info[8] + rd16(p, 0xc)));
+            put16(p, 0x2c, (uint32_t)((uint16_t)info[9] + rd16(p, 0xe)));
+        } else if ((flags & 0x4000) != 0) {
+            const uint8_t *b = (const uint8_t *)info;
+
+            put16(p, 0xc, (uint32_t)(b[0x30] + tex->u0));
+            put16(p, 0xe, (uint32_t)(b[0x31] + tex->v0));
+            put16(p, 0x2a, (uint32_t)(b[0x32] + tex->u0));
+            put16(p, 0x2c, (uint32_t)(b[0x33] + tex->v0));
+        } else {
+            put16(p, 0xc, tex->u0);
+            put16(p, 0xe, tex->v0);
+            put16(p, 0x2a, tex->u1);
+            put16(p, 0x2c, tex->v1);
+        }
+        put16(p, 0x16, rd16(p, 0x2a));
+        put16(p, 0x18, rd16(p, 0xe));
+        put16(p, 0x20, rd16(p, 0xc));
+        put16(p, 0x22, rd16(p, 0x2c));
+        linkPrim3D(p, tag, otIndex);
+        gNgifPrim3D = (uint32_t *)(p + 0x9c);
+        return;
+    }
+
+    {
+        const uint32_t tag = (get32(p, 0) & 0x0fffffffu) | 0x50000000u;
+        const uint32_t alpha = color >> 24;
+
+        put32(p, 4, (color & 0xffffffu) + 0x28000000u);
+        put32(p, 0, tag);
+        put32(p, 0x1c, (get32(p, 0x1c) & 0xffffff80u) | 0x7f80u);
+        if (alpha != 0 || (flags & 0x2000) != 0) {
+            put8(p, 7, p[7] | 2);
+            put8(p, 0x20, alpha - 1);
+        }
+        put16(p, 8, (uint32_t)xl);
+        put16(p, 0xa, (uint32_t)yy);
+        put16(p, 0xc, (uint32_t)x2);
+        put16(p, 0xe, (uint32_t)yy);
+        put16(p, 0x10, (uint32_t)xl);
+        put16(p, 0x12, (uint32_t)y2);
+        put16(p, 0x14, (uint32_t)x2);
+        put16(p, 0x16, (uint32_t)y2);
+        put32(p, 0x18, 0);
+        linkPrim3D(p, tag, otIndex);
+        p += 0x84;
+        if (alpha != 0 || (flags & 0x2000) != 0) {
+            putBlendPacket(p, alpha, otIndex);
+            p += 8;
+        }
+        gNgifPrim3D = (uint32_t *)p;
+    }
+}
+
+/*
+ * Draws the glyph records of an overlay text into the 3D list (x is passed zero extended): a record list
+ * that ends with kind 0xff. Kinds 0 and 0x11 are flat triangles and quads (colour code in word 1, corners
+ * from +4), 0x30..0x32 textured quads of a texture (+6) from the texture table: 0x30 takes the window
+ * from the texture, 0x32 also scales it by the floats at +8 and +10 (they stay in force for the records
+ * after it), 0x31 takes the corner positions and window from the record. Other kinds assert.
+ */
+BMX_ADDR(0x00462940)
+void ngifDrawTextGlyph(uint32_t x, int y, const void *record)
+{
+    uint8_t *p = (uint8_t *)gNgifPrim3D;
+    const uint8_t *rec = record;
+    float scaleX = 1.0f;
+    float scaleY = 1.0f;
+    const uint16_t x16 = (uint16_t)x;
+    const uint16_t y16 = (uint16_t)y;
+
+    if (p == (uint8_t *)(uintptr_t)0xffffffffu || rec == NULL) {
+        return;
+    }
+    while (rec != NULL) {
+        const uint32_t kind = rec[0];
+        const uint16_t cx = (uint16_t)rd16(rec, 2);
+
+        if (kind > 0x32) {
+            if (kind == 0xff) {
+                return;
+            }
+            zdebugFail("Can not get size of object", kNgifFile, 0x7bd, 0);
+            continue;
+        }
+        if (kind == 0 || kind == 0x11) {
+            const int quad = kind == 0x11;
+            uint32_t tag;
+
+            if (quad) {
+                tag = (get32(p, 0) & 0x0fffffffu) | 0x50000000u;
+                put32(p, 0x1c, (get32(p, 0x1c) & 0xffffff80u) | 0x7f80u);
+            } else {
+                tag = (get32(p, 0) & 0x0fffffffu) | 0x30000000u;
+            }
+            put8(p, 4, (uint32_t)(cx >> 7) & 0xe0);
+            put32(p, 0, tag);
+            put8(p, 7, quad ? 0x28 : 0x40);
+            put8(p, 5, (uint32_t)(cx >> 2) & 0xe0);
+            put8(p, 6, (uint32_t)(cx & 0xfc) << 3);
+            if ((rec[1] & 1) != 0) {
+                put8(p, 7, quad ? 0x2a : 0x42);
+            }
+            put16(p, 8, rd16(rec, 4) + x16);
+            put16(p, 0xa, rd16(rec, 6) + y16);
+            put16(p, 0xc, rd16(rec, 8) + x16);
+            put16(p, 0xe, rd16(rec, 0xa) + y16);
+            if (quad) {
+                put16(p, 0x10, rd16(rec, 0x10) + x16);
+                put16(p, 0x12, rd16(rec, 0x12) + y16);
+                put16(p, 0x14, rd16(rec, 0xc) + x16);
+                put16(p, 0x16, rd16(rec, 0xe) + y16);
+            }
+            linkPrim3D(p, tag, 0);
+            p += quad ? 0x84 : 0x7c;
+            rec += quad ? 0x14 : 0xc;
+            gNgifPrim3D = (uint32_t *)p;
+            continue;
+        }
+        if (kind < 0x30) {
+            zdebugFail("Can not get size of object", kNgifFile, 0x7bd, 0);
+            continue;
+        }
+
+        {
+            const NgifTexture *tex = &(&gNgifTextures)[rd16(rec, 6)];
+            const int16_t dx = (int16_t)cx;
+            const int16_t dy = (int16_t)rd16(rec, 4);
+            const uint16_t x0 = (uint16_t)(x + cx);
+            const uint16_t y0 = (uint16_t)(y + (int16_t)rd16(rec, 4));
+            uint16_t x1;
+            uint16_t y1;
+            uint16_t u0;
+            uint16_t v0;
+            uint16_t u1;
+            uint16_t v1;
+            uint16_t wordF;
+            uint16_t wordG;
+            uint32_t flagBits;
+            const uint32_t tag = 0x90000000u;
+
+            if (tex->material == 0) {
+                return;
+            }
+            if (kind == 0x32) {
+                scaleX = (float)(int32_t)rd16(rec, 8);
+                scaleY = (float)(int32_t)rd16(rec, 0xa);
+            }
+            memset(p, 0, 0x9c);
+            put32(p, 0, tag);
+            put8(p, 7, 0x2c);
+            put32(p, 0x34, 0x7f80u);
+            put16(p, 0x10, 0);
+            if (kind == 0x31) {
+                x1 = (uint16_t)bmxFtol((double)rd16(rec, 0xc) * (double)scaleX +
+                                       (double)(int32_t)((uint32_t)(int32_t)dx + x));
+                y1 = (uint16_t)bmxFtol((double)rd16(rec, 0xe) * (double)scaleY +
+                                       (double)(int32_t)((uint32_t)(int32_t)dy + (uint32_t)y));
+                u0 = (uint16_t)(tex->u0 + rd16(rec, 8));
+                v0 = (uint16_t)(tex->v0 + rd16(rec, 0xa));
+                u1 = (uint16_t)(rd16(rec, 0xc) + u0);
+                v1 = (uint16_t)(rd16(rec, 0xe) + v0);
+                wordF = (uint16_t)rd16(rec, 0x10);
+                wordG = (uint16_t)rd16(rec, 0x12);
+            } else {
+                x1 = (uint16_t)bmxFtol((double)tex->width * (double)scaleX +
+                                       (double)(int32_t)((uint32_t)(int32_t)dx + x));
+                y1 = (uint16_t)bmxFtol((double)tex->height * (double)scaleY +
+                                       (double)(int32_t)((uint32_t)(int32_t)dy + (uint32_t)y));
+                u0 = tex->u0;
+                v0 = tex->v0;
+                u1 = tex->u1;
+                v1 = tex->v1;
+                wordF = (uint16_t)rd16(rec, kind == 0x32 ? 0xc : 8);
+                wordG = (uint16_t)rd16(rec, kind == 0x32 ? 0xe : 0xa);
+            }
+            put16(p, 0x10, wordG);
+            put8(p, 4, (uint32_t)(wordF >> 4) & 0xf0);
+            put8(p, 5, (uint32_t)wordF & 0xf0);
+            put8(p, 6, (uint32_t)wordF << 4);
+            flagBits = (wordF >> 12) & 7u;
+            if (flagBits == 0) {
+                put8(p, 7, 0x2c);
+                put16(p, 0x1a, tex->pageWord);
+            } else {
+                const uint32_t mode = flagBits - 1 > 3 ? 3 : flagBits - 1;
+
+                put8(p, 7, 0x2e);
+                put16(p, 0x1a, ((mode & 3) << 5) | (tex->pageWord & 0xff9fu));
+                put8(p, 0x38, flagBits - 1);
+            }
+            put16(p, 0xc, u0);
+            put32(p, 0x30, tex->material);
+            put16(p, 8, x0);
+            put16(p, 0xa, y0);
+            put16(p, 0x12, x1);
+            put16(p, 0x14, y0);
+            put16(p, 0x1c, x0);
+            put16(p, 0x1e, y1);
+            put16(p, 0x20, u0);
+            put16(p, 0x26, x1);
+            put16(p, 0xe, v0);
+            put16(p, 0x16, u1);
+            put16(p, 0x18, v0);
+            put16(p, 0x22, v1);
+            put16(p, 0x28, y1);
+            put16(p, 0x2a, u1);
+            put16(p, 0x2c, v1);
+            linkPrim3D(p, tag, 0);
+            p += 0x9c;
+            rec += kind == 0x30 ? 0xc : (kind == 0x32 ? 0x10 : 0x14);
+            gNgifPrim3D = (uint32_t *)p;
+        }
+    }
+}
+
+/*
+ * Draws a polygon into the 3D list from vertices of 0x14 bytes (position, then rgb at +0x10): `count` 4
+ * is a quad, 0..3 a triangle (corners in the order the GPU packet wants them); the low two bits of flags
+ * select the blend mode (0 = opaque), and bit 3 must be set (screen space polygons are not coded). A
+ * texture number selects a textured quad, whose window is taken from the texture table and the size of the
+ * texture of its material. Counts above 4 and an empty list draw nothing.
+ */
+BMX_ADDR(0x00463130)
+void ngifDrawPoly3D(int flags, int count, const NgifVert3 *verts, int texture)
+{
+    uint8_t *p = (uint8_t *)gNgifPrim3D;
+    const uint8_t *v = (const uint8_t *)verts;
+    const uint32_t blend = (uint32_t)flags & 3;
+    uint32_t tag;
+    uint32_t color;
+
+    if ((uint8_t)count > 4 || p == NULL) {
+        return;
+    }
+    if (((uint32_t)flags & 8) == 0) {
+        zdebugFail("Uncoded for polygons in screen space", kNgifFile, 0x838, 0);
+    }
+    color = ((((uint32_t)v[0x12]) << 8) + v[0x11]) << 8;
+    color += v[0x10];
+    if ((uint16_t)texture != 0) {
+        const NgifTexture *tex;
+        const struct ZrwTexture *image;
+
+        if ((uint8_t)count != 4) {
+            zdebugFail("Not coded for textured tris", kNgifFile, 0x853, 0);
+        }
+        tex = &(&gNgifTextures)[(uint16_t)texture];
+        if (tex->material == 0) {
+            return;
+        }
+        tag = (get32(p, 0) & 0x0fffffffu) | 0x90000000u;
+        put32(p, 0, tag);
+        put8(p, 7, 0x2c);
+        put32(p, 0x34, (get32(p, 0x34) & 0xffffff80u) | 0x7f80u);
+        put16(p, 0x10, tex->clutWord);
+        put32(p, 4, color + 0x2c000000u);
+        if (blend != 0) {
+            const uint32_t mode = blend - 1 >= 3 ? 3 : blend - 1;
+
+            put16(p, 0x1a, ((mode & 3) << 5) | (tex->pageWord & 0xff9fu));
+            put8(p, 7, p[7] | 2);
+            put8(p, 0x38, blend - 1);
+        } else {
+            put16(p, 0x1a, tex->pageWord);
+        }
+        put32(p, 0x30, tex->material);
+        put8(p, 0x38, blend - 1);
+        put32(p, 0x34, get32(p, 0x34) | 0x30);
+        put32(p, 0x5c, get32(v, 0));
+        put32(p, 0x60, get32(v, 4));
+        put32(p, 0x64, get32(v, 8));
+        put32(p, 0x6c, get32(v, 0x14));
+        put32(p, 0x70, get32(v, 0x18));
+        put32(p, 0x74, get32(v, 0x1c));
+        put32(p, 0x8c, get32(v, 0x28));
+        put32(p, 0x90, get32(v, 0x2c));
+        put32(p, 0x94, get32(v, 0x30));
+        put32(p, 0x7c, get32(v, 0x3c));
+        put32(p, 0x80, get32(v, 0x40));
+        put32(p, 0x84, get32(v, 0x44));
+        put16(p, 0xc, tex->u0);
+        put16(p, 0xe, tex->v0);
+        image = zrwmatGetTexture((ZrwMaterial *)(uintptr_t)tex->material, 0);
+        put16(p, 0x2a,
+              (uint32_t)bmxFtol((double)(int16_t)zrwTextureGetWidth(image) + (double)rd16(p, 0xc) -
+                                (double)1.0f));
+        image = zrwmatGetTexture((ZrwMaterial *)(uintptr_t)tex->material, 0);
+        put16(p, 0x2c,
+              (uint32_t)bmxFtol((double)(int16_t)zrwTextureGetHeight(image) + (double)rd16(p, 0xe) -
+                                (double)1.0f));
+        put16(p, 0x16, rd16(p, 0x2a));
+        put16(p, 0x18, rd16(p, 0xe));
+        put16(p, 0x20, rd16(p, 0xc));
+        put16(p, 0x22, rd16(p, 0x2c));
+        linkPrim3D(p, tag, 0);
+        gNgifPrim3D = (uint32_t *)(p + 0x9c);
+        return;
+    }
+    if ((uint8_t)count == 4) {
+        const uint32_t flagWord = (get32(p, 0x1c) & 0xffffff80u) | 0x7f80u;
+
+        tag = (get32(p, 0) & 0x0fffffffu) | 0x50000000u;
+        put32(p, 0, tag);
+        put8(p, 7, 0x28);
+        put32(p, 0x1c, flagWord);
+        put32(p, 4, color + 0x28000000u);
+        if (blend != 0) {
+            put8(p, 7, p[7] | 2);
+            put8(p, 0x20, blend - 1);
+        }
+        put8(p, 0x20, blend - 1);
+        put32(p, 0x1c, flagWord | 0x30);
+        put32(p, 0x44, get32(v, 0));
+        put32(p, 0x48, get32(v, 4));
+        put32(p, 0x4c, get32(v, 8));
+        put32(p, 0x54, get32(v, 0x14));
+        put32(p, 0x58, get32(v, 0x18));
+        put32(p, 0x5c, get32(v, 0x1c));
+        put32(p, 0x74, get32(v, 0x28));
+        put32(p, 0x78, get32(v, 0x2c));
+        put32(p, 0x7c, get32(v, 0x30));
+        put32(p, 0x64, get32(v, 0x3c));
+        put32(p, 0x68, get32(v, 0x40));
+        put32(p, 0x6c, get32(v, 0x44));
+        linkPrim3D(p, tag, 0);
+        p += 0x84;
+    } else {
+        const uint32_t flagWord = (get32(p, 0x18) & 0xffffff80u) | 0x7f80u;
+
+        tag = (get32(p, 0) & 0x0fffffffu) | 0x40000000u;
+        put32(p, 0, tag);
+        put32(p, 0x18, flagWord);
+        put8(p, 7, 0x20);
+        put32(p, 4, color + 0x20000000u);
+        if (blend != 0) {
+            put8(p, 7, p[7] | 2);
+            put8(p, 0x1c, blend - 1);
+        }
+        put8(p, 0x1c, blend - 1);
+        put32(p, 0x18, get32(p, 0x18) | 0x30);
+        put32(p, 0x40, get32(v, 0));
+        put32(p, 0x44, get32(v, 4));
+        put32(p, 0x48, get32(v, 8));
+        put32(p, 0x50, get32(v, 0x14));
+        put32(p, 0x54, get32(v, 0x18));
+        put32(p, 0x58, get32(v, 0x1c));
+        put32(p, 0x60, get32(v, 0x28));
+        put32(p, 0x64, get32(v, 0x2c));
+        put32(p, 0x68, get32(v, 0x30));
+        linkPrim3D(p, tag, 0);
+        p += 0x80;
+    }
+    if (blend != 0) {
+        putBlendPacket(p, blend, 0);
+        p += 8;
+    }
+    gNgifPrim3D = (uint32_t *)p;
 }
 
 /* ---- 3D line and frame control -------------------------------------------------------------------- */

@@ -48,17 +48,20 @@ _Static_assert(sizeof(ZpadDevice) == kZpadDeviceBytes, "pad device");
 typedef struct ZpadDiDevice ZpadDiDevice;
 typedef struct ZpadDiVtbl {
     uint32_t pad00[2];
-    uint32_t(BMX_STDCALL *release)(ZpadDiDevice *self);                                          /* 0x08 */
-    uint32_t pad0c[4];                                                                           /* 0x0c */
-    int32_t(BMX_STDCALL *acquire)(ZpadDiDevice *self);                                           /* 0x1c */
-    int32_t(BMX_STDCALL *unacquire)(ZpadDiDevice *self);                                         /* 0x20 */
-    int32_t(BMX_STDCALL *getDeviceState)(ZpadDiDevice *self, uint32_t size, void *state);        /* 0x24 */
-    uint32_t pad28;                                                                              /* 0x28 */
-    int32_t(BMX_STDCALL *setDataFormat)(ZpadDiDevice *self, const void *format);                 /* 0x2c */
-    uint32_t pad30;                                                                              /* 0x30 */
-    int32_t(BMX_STDCALL *setCooperativeLevel)(ZpadDiDevice *self, void *window, uint32_t flags); /* 0x34 */
-    uint32_t pad38[11];                                                                          /* 0x38 */
-    int32_t(BMX_STDCALL *poll)(ZpadDiDevice *self);                                              /* 0x64 */
+    uint32_t(BMX_STDCALL *release)(ZpadDiDevice *self);                                            /* 0x08 */
+    uint32_t pad0c[3];                                                                             /* 0x0c */
+    int32_t(BMX_STDCALL *setProperty)(ZpadDiDevice *self, uintptr_t property, const void *header); /* 0x18 */
+    int32_t(BMX_STDCALL *acquire)(ZpadDiDevice *self);                                             /* 0x1c */
+    int32_t(BMX_STDCALL *unacquire)(ZpadDiDevice *self);                                           /* 0x20 */
+    int32_t(BMX_STDCALL *getDeviceState)(ZpadDiDevice *self, uint32_t size, void *state);          /* 0x24 */
+    uint32_t pad28;                                                                                /* 0x28 */
+    int32_t(BMX_STDCALL *setDataFormat)(ZpadDiDevice *self, const void *format);                   /* 0x2c */
+    uint32_t pad30;                                                                                /* 0x30 */
+    int32_t(BMX_STDCALL *setCooperativeLevel)(ZpadDiDevice *self, void *window, uint32_t flags);   /* 0x34 */
+    uint32_t pad38;                                                                                /* 0x38 */
+    int32_t(BMX_STDCALL *getDeviceInfo)(ZpadDiDevice *self, void *info);                           /* 0x3c */
+    uint32_t pad40[9];                                                                             /* 0x40 */
+    int32_t(BMX_STDCALL *poll)(ZpadDiDevice *self);                                                /* 0x64 */
 } ZpadDiVtbl;
 
 _Static_assert(__builtin_offsetof(ZpadDiVtbl, poll) == 0x64, "DirectInput vtable");
@@ -95,15 +98,32 @@ int zrwOnDeactivate(void);
 /* Binds the key map of a device; 0 when the device has no DirectInput record. */
 int zpadSetKeyMap(void *device, const uint8_t *map);
 
-/* Platform side, not ported yet. */
-ORIG_FN(0x00493310, int, zpadSetupDirectInput, (int kind, void *device));
-
 /* GUID by value (16 bytes). */
 typedef struct ZpadGuid {
     uint32_t data1;
     uint16_t data2, data3;
     uint8_t data4[8];
 } ZpadGuid;
+
+/*
+ * A controller profile of the game pads the game knows (table at 0x561f2c, ended by a NULL entry): the
+ * product names and product GUIDs (both NULL ended lists) that select it, then the button map. The record
+ * keeps a pointer to the whole profile as its button map.
+ */
+typedef struct ZpadProfile {
+    const char *const *names;
+    const ZpadGuid *const *guids;
+    uint8_t map[1]; /* pairs {button, input slot}, ended by 0xff */
+} ZpadProfile;
+#define gZpadProfiles ORIG_VAR(0x00561f2c, const ZpadProfile *, gZpadProfiles)
+
+/*
+ * Creates the DirectInput record of a device: kind 1 (keyboard) and 2 (both) bind the keyboard (created on
+ * first use), kind 0 (pad) and 2 the pad, whose product name or GUID selects its button map from the
+ * profiles. Without a pad the keyboard stands in for it. Returns the record, NULL if the keyboard cannot
+ * be created.
+ */
+ZpadDiRecord *zpadSetupDirectInput(int kind, ZpadDevice *device);
 
 /* The part of IDirectInput the code uses. */
 typedef struct ZpadDirectInput ZpadDirectInput;

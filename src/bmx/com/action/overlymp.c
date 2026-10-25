@@ -466,3 +466,165 @@ void overlympDrawResults(void)
     }
     ovlDrawMenuItems(1, 0);
 }
+
+/* Like drawCentred, around the column cx. */
+static void drawCentredAt(const void *font, const char *text, int cx, int y, uint32_t color)
+{
+    const int16_t w = zoverTextWidth(text, font);
+    zoverDrawText(font, text, cx - (int)((uint16_t)w >> 1), y, color, 0);
+}
+
+/* A caption at the left of a stats line. */
+static void drawCaption(int y, uint16_t label)
+{
+    char buf[256];
+
+    zstrFormat(buf, "%s:", zstringGet(label));
+    zoverDrawText(&gOvlFontSmall, buf, kLabelX, y, kColorText, 0);
+}
+
+/* A value right aligned in the small font; the timed modes (6..10) show a length in feet and inches. */
+static void drawStatsValue(int y, uint32_t value, int isLength)
+{
+    char buf[256];
+
+    if (isLength) {
+        ovlFormatFeetInches(buf, (float)value);
+    } else {
+        zstrFormat(buf, "%ld", (long)value);
+    }
+    zoverDrawText(&gOvlFontSmall, buf, kValueRight - zoverTextWidth(buf, &gOvlFontSmall), y, kColorValue, 0);
+}
+
+/* The tricks the next rider of the HORSE game must repeat: name in the tiny font on the left, the turn and
+ * barspin captions in the button font on the right, "to" between the lines. */
+static void drawHorseTricks(int y)
+{
+    char buf[256];
+
+    for (uint32_t i = 0; i < gGameHorseCount; i++) {
+        const RiderTrick *t = &gGameHorseTricks[i];
+
+        ovlFormatTrickName(buf, &t->flags, 0);
+        drawCentredAt(&gOvlFontTiny, buf, 0xba, gOvlFontButton.height / 2 + y - 8, 0x2808080);
+        buf[0] = '\0';
+        if (t->trick != 0xff) {
+            zstrFormat(buf + strlen(buf), "%s", zstringGet((uint16_t)(0x10bb + t->trick)));
+        }
+        if (t->style != 0xff) {
+            if (t->trick != 0xff) {
+                zstrFormat(buf + strlen(buf), " ");
+            }
+            zstrFormat(buf + strlen(buf), "%s", zstringGet((uint16_t)(0x10e9 + t->style)));
+        }
+        drawCentredAt(&gOvlFontButton, buf, 0x1c4, y, 0x808080);
+        if (i < (uint32_t)gGameHorseCount - 1) {
+            zstrFormat(buf, "to");
+            drawCentredAt(&gOvlFontTiny, buf, 0xba, gOvlFontButton.height + y - 8, 0x2a07010);
+        }
+        y += gOvlFontButton.height;
+    }
+}
+
+/*
+ * Run statistics screen of the HORSE / competition / timed modes: the player's title, the score of the
+ * run, the best of the mode and (HORSE) the tricks to repeat.
+ */
+BMX_ADDR(0x00412bf0)
+void overlympDrawRunStats(void)
+{
+    const uint32_t cur = gCurrentPlayer;
+    char buf[256];
+    int y = 0x8f;
+    uint32_t mode;
+
+    switch (gameGetMode()) {
+    case 2:
+    case 4: {
+        const long run = (long)gameGetRunCount() + 1;
+        zstrFormat(buf, "%s %ld", zstringGet(0x1004), run);
+        overlympDrawHeader(buf);
+    } break;
+    case 5:
+    case 6:
+    case 7:
+    case 8:
+    case 9:
+    case 10: {
+        const uint32_t rounds = gameGetRoundCount();
+        uint16_t id = 0x1014;
+        const char *a;
+
+        if (gameGetRunCount() < ((rounds - 1) & 0xffff)) {
+            id = (uint16_t)(gameGetRunCount() + 0x1010);
+        }
+        a = zstringGet(0x1005);
+        zstrFormat(buf, "%s %s", zstringGet(id), a);
+        overlympDrawHeader(buf);
+        break;
+    }
+    default:
+        overlympDrawHeader(zstringGet(0x304e));
+        break;
+    }
+    drawPlayerTitle(kFirstLine);
+
+    mode = gameGetMode();
+    if (mode == 3) {
+        if (gameTestOption(4) == 0) {
+            char text[256];
+
+            zstrFormat(text, "%s:", zstringGet(0x304f));
+            drawCentred(&gOvlFontSmall, text, y, kColorText);
+            drawHorseTricks(0xac);
+        }
+    } else {
+        if (mode == 4) {
+            drawCaption(y, 0x1001);
+            drawStatsValue(y, playerWord(cur, kPlayerScoreB), 0);
+            y = 0xac;
+        }
+        if (gameTestOption(4) == 0 || (gameGetMode() != 2 && gameGetRunCount() != 0)) {
+            uint32_t key;
+            const uint32_t *rec;
+
+            if (gameGetMode() == 2) {
+                const uint32_t m = gameGetMode();
+                key = ((m << 2 | gameGetSubMode()) << 0x16) | 0x12000;
+            } else {
+                const uint32_t m = gameGetMode();
+                const uint32_t sub = gameGetSubMode();
+                key = (((m << 2 | sub) << 6 | gScoreRecordSlot[gameGetMode()]) << 0x10) | 0x1000;
+            }
+            rec = (const uint32_t *)gameGetRecord(key);
+            if (rec == NULL) {
+                zdebugFail((const char *)gOvlEmpty, overlympFile, 0x195, 0);
+            }
+            drawCaption(y, 0x100a);
+            mode = gameGetMode();
+            drawStatsValue(y, *rec, mode >= 6 && mode <= 10);
+            y += kLineStep;
+        }
+        {
+            const uint32_t m = gameGetMode();
+            const uint32_t sub = gameGetSubMode();
+            const uint32_t key = ((m << 2 | sub) << 6 | gScoreRecordSlot[gameGetMode()]) << 0x10;
+            const uint32_t *rec = (const uint32_t *)gameGetRecord(key);
+
+            if (rec == NULL) {
+                zdebugFail((const char *)gOvlEmpty, overlympFile, 0x1b8, 0);
+            }
+            drawCaption(y, 0x100b);
+            mode = gameGetMode();
+            drawStatsValue(y, *rec, mode >= 6 && mode <= 10);
+        }
+        if (gameGetMode() == 2) {
+            overlympDrawBody(y + kSectionStep);
+        }
+    }
+    if (gameGetMode() == 3 && gameTestOption(4) == 0) {
+        ovlDrawMenuItems(1, 0);
+    } else {
+        ovlDrawMenuItems(0, 0);
+    }
+}

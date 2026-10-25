@@ -3049,6 +3049,128 @@ void ovlNameDraw(void)
     zoverDrawText(&gOvlFontButton, name, 0x35, 0x3c, kOvlColorLabel, 0);
 }
 
+/* Fields of the player record that the combo list reads. */
+enum {
+    kOvlPlayerComboScore = 0x64,
+    kOvlPlayerCombo = 0x6c,      /* RiderTrick[], 16 bytes each; the u16 at +8 of an entry is its age */
+    kOvlPlayerComboCount = 0xed, /* entries in use */
+};
+
+/* Position a combo line has scrolled to after `ticks` frames: the cosine eases it up from the bottom. */
+static uint32_t ovlComboAge(uint16_t ticks)
+{
+    const uint32_t v = ticks * 0x16cu;
+    return v > 0x4000 ? 0x4000 : v;
+}
+
+/*
+ * Element 4 (combo list): the tricks of the player's combo scroll up the screen, one line each with a "TO"
+ * between them; names fade in at the bottom and out at the top. Lines that are too wide are split at the
+ * first blank after the middle. The score is shown below when the mode has one.
+ */
+BMX_ADDR(0x0041c590)
+void ovlComboDraw(void)
+{
+    const uint8_t *rec = (const uint8_t *)&gPlayerRecs + gCurrentPlayer * kOvlPlayerStride;
+    const RiderTrick *tricks = (const RiderTrick *)(rec + kOvlPlayerCombo);
+    char buf[256];
+    int32_t y = 0;
+
+    for (int i = 0; i < rec[kOvlPlayerComboCount]; i++) {
+        const uint32_t age = ovlComboAge(tricks[i].ticks);
+        char *second;
+        uint32_t color;
+        uint32_t flags;
+        uint32_t level;
+        int16_t pos;
+        int16_t w;
+
+        if (i > 0) {
+            const int32_t rise = bmxFtol((double)0x1.9p+7f - zmathCos((ZAngle)age) * (double)0x1.9p+7f);
+            const int32_t step = 0x168 - rise - (int16_t)y;
+
+            y += bmxFtol((double)step * (double)0x1.570a3ep-1f);
+            pos = (int16_t)y;
+            if (pos >= 0xf0) {
+                if (pos < 0x110) {
+                    const int32_t d = pos - 0xf0;
+                    level = (d & ~1) >= 0x18 ? 0xc : (uint32_t)(d >> 1);
+                    color = ((level * 0x50 | 0x20000000) >> 4) | level * 0xb00 | level * 0xd0000;
+                } else {
+                    color = 0xd0b050;
+                }
+                zstrFormat(buf, "TO");
+                w = zoverTextWidth(buf, &gOvlFontSmall);
+                zoverDrawText(&gOvlFontSmall, buf, ovlCentreX(0x140, w), y, color, 5);
+            }
+        }
+
+        const int32_t rise = bmxFtol(zmathCos((ZAngle)age) * (double)-0x1.9p+7f + (double)0x1.9p+7f);
+        y = 0x168 - rise;
+        pos = (int16_t)y;
+        if (pos < 0xd2) {
+            continue;
+        }
+        ovlFormatTrickName(buf, &tricks[i].flags, 1);
+        if (pos < 0xf2) {
+            const int32_t d = pos - 0xd2;
+            color = 0x2000000;
+            level = (d & ~3) >= 0x28 ? 10 : (uint32_t)(d >> 2);
+        } else {
+            color = 0;
+            level = 0xc;
+        }
+        if (tricks[i].trick == 0xff || tricks[i].style == 0xff) {
+            flags = 0;
+            color |= ((level << 8 | level) << 8 | level) << 4;
+        } else {
+            const int32_t scaled = bmxFtol((double)level * (double)0x1.8p+0f);
+            const uint32_t bright = scaled < 0xf ? (uint8_t)scaled : 0xf;
+
+            zstrupr(buf);
+            flags = 3;
+            color |= (level << 6 >> 4) | bright << 10 | bright * 0xd0000;
+        }
+        second = NULL;
+        w = (int16_t)(zoverTextWidth(buf, &gOvlFontSmall) & 0xffff);
+        if ((uint16_t)w < 0x1e0) {
+            y -= 0xe;
+        } else {
+            char *p = buf + (strlen(buf) >> 1);
+
+            while (*p != '\0') {
+                if (*p == ' ') {
+                    *p++ = '\0';
+                    break;
+                }
+                p++;
+            }
+            second = p;
+            w = (int16_t)(zoverTextWidth(buf, &gOvlFontSmall) & 0xffff);
+        }
+        zoverDrawText(&gOvlFontSmall, buf, 0x140 - (int)((uint16_t)w >> 1), y, color, (int)flags);
+        if (second != NULL) {
+            y += 0x1d;
+            w = zoverTextWidth(second, &gOvlFontSmall);
+            zoverDrawText(&gOvlFontSmall, second, ovlCentreX(0x140, w), y, color, (int)flags);
+        }
+    }
+    if (rec[kOvlPlayerComboCount] != 0) {
+        const uint32_t mode = gameGetMode();
+
+        if (mode == 0) {
+            if (gameGetSubMode() == 2) {
+                return;
+            }
+        } else if (mode == 3 || (mode >= 5 && mode <= 10)) {
+            return;
+        }
+        zstrFormat(buf, "%ld", (long)*(const uint32_t *)(rec + kOvlPlayerComboScore));
+        const int16_t w = zoverTextWidth(buf, &gOvlFontSmall);
+        zoverDrawText(&gOvlFontSmall, buf, ovlCentreX(0x140, w), 400, kOvlColorLabel, 0);
+    }
+}
+
 /* Element 5 (height meter): the frame (four bars) and the marker. */
 BMX_ADDR(0x0041cae0)
 void ovlHeightInit(int create)

@@ -70,7 +70,28 @@ static void randomScreenState(void)
     for (uint32_t i = 0; i < sizeof gGameRoundStates; i++) {
         gGameRoundStates[i] = (uint8_t)dt_range(0, 3);
     }
-    gGameMode = (uint8_t)((dt_u32() & 7) == 0 ? dt_range(0, 6) : dt_range(1, 4));
+    gGameMode = (uint8_t)((dt_u32() & 7) == 0 ? dt_range(0, 10) : dt_range(1, 4));
+    gGameHorseCount = (uint8_t)dt_range(0, 3);
+    for (uint32_t i = 0; i < 3; i++) {
+        RiderTrick *t = &gGameHorseTricks[i];
+
+        t->flags = (uint8_t)dt_range(0, 7);
+        t->trick = (uint8_t)((dt_u32() & 3) == 0 ? 0xff : dt_range(0, 0x2d));
+        t->style = (uint8_t)((dt_u32() & 3) == 0 ? 0xff : dt_range(0, 0x25));
+        t->spin = (uint8_t)dt_range(0, 7);
+        t->tier = (uint8_t)dt_range(0, 8);
+        /*
+         * Tricks with their own names ("flair", "limo", ...) and turn 0 leave the end of the name buffer in
+         * ECX and the original builds the next line's y from that stale register (the pointer's high word is
+         * a stack address). That cannot be reproduced; keep the fixtures on the generic names.
+         */
+        if (t->trick == 0 || t->trick == 1 || t->trick == 3 || t->trick == 4 || t->trick == 10) {
+            t->trick = 2;
+        }
+        if (t->trick == 0xff && t->style == 0) {
+            t->tier = (uint8_t)dt_range(0, 1);
+        }
+    }
     gGameSubMode = (uint8_t)dt_range(0, 3);
     gGameOptions = (uint8_t)dt_u32();
     gGameRunCount = (uint8_t)dt_range(0, 5);
@@ -116,4 +137,5 @@ DT_CASES(overlymp_cases) = {
     {"overlympDrawBody", 0x004134a0, overlympDrawBody, 1, DT_RET_VOID, setupBody, 600, 0},
     {"overlympResultsUpdate", 0x004136f0, overlympResultsUpdate, 0, DT_RET_INT, setupScreen, 1000, 0},
     {"overlympDrawResults", 0x004137d0, overlympDrawResults, 0, DT_RET_VOID, setupScreen, 2000, 0},
+    {"overlympDrawRunStats", 0x00412bf0, overlympDrawRunStats, 0, DT_RET_VOID, setupScreen, 1500, 0},
 };

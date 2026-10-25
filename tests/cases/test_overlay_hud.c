@@ -71,6 +71,52 @@ static void setup_timer_set(DtCtx *c)
 
 DTO_SETUP(setup_name_draw, DTS_DRAWTEXT)
 
+/*
+ * Combo list: random combos of the current player on a small font with real glyph widths (so that long
+ * names take the line splitting path); drawing is stubbed and logged. Names stay below the 64 bytes of the
+ * original's line buffer.
+ */
+static void setup_combo_draw(DtCtx *c)
+{
+    dtOvlBegin(c, DTS_DRAWTEXT | DTS_GETMODE | DTS_GETSUB);
+    int8_t *glyphs = dt_alloc(8 * 0x60);
+
+    for (int i = 0; i < 0x60; i++) {
+        *(int16_t *)(void *)(glyphs + i * 8 + 4) = (int16_t)dt_range(2, 12);
+    }
+    gOvlFontSmall.firstChar = 0x20;
+    gOvlFontSmall.charCount = 0x60;
+    gOvlFontSmall.glyphs = glyphs;
+    gCurrentPlayer = (uint8_t)dt_range(0, 1);
+    uint8_t *rec = gPlayerRecs[gCurrentPlayer];
+    rec[0xed] = (uint8_t)dt_range(0, 8);
+    *(uint32_t *)(rec + 0x64) = dt_u32() % 4 == 0 ? dt_u32() : (uint32_t)dt_range(0, 99999);
+    for (int i = 0; i < 8; i++) {
+        uint8_t *t = rec + 0x6c + i * 16;
+        char name[256];
+
+        for (int attempt = 0;; attempt++) {
+            t[0] = (uint8_t)dt_range(0, 7);
+            t[1] = (uint8_t)(dt_u32() % 5 == 0 ? 0xff : dt_range(0, 0x2d));
+            t[2] = (uint8_t)(dt_u32() % 5 == 0 ? 0xff : dt_range(0, 0x25));
+            t[3] = (uint8_t)dt_range(0, 7);
+            t[4] = (uint8_t)dt_range(0, 8);
+            ovlFormatTrickName(name, t, 1);
+            if (strlen(name) < 60) {
+                break;
+            }
+            if (attempt > 8) {
+                t[0] = 0;
+                t[1] = 2;
+                t[2] = 0xff;
+                t[4] = 0;
+                break;
+            }
+        }
+        *(uint16_t *)(t + 8) = (uint16_t)(dt_u32() % 8 == 0 ? dt_u32() : (uint32_t)dt_range(0, 70));
+    }
+}
+
 /* ---- height and balance meters ------------------------------------------------------------------ */
 
 DTO_SETUP_CREATE(setup_height_init, DTS_ADDRECT | DTS_SHOW | DTS_REMOVE)
@@ -209,6 +255,7 @@ DT_CASES(overlay_hud_cases) = {
     {"ovlTimerShow", 0x0041c4a0, ovlTimerShow, 1, DT_RET_VOID, setup_timer_show, 300, 0},
     {"ovlTimerSet", 0x0041c4e0, ovlTimerSet, 1, DT_RET_VOID, setup_timer_set, 100, 0},
     {"ovlNameDraw", 0x0041c500, ovlNameDraw, 0, DT_RET_VOID, setup_name_draw, 300, 0},
+    {"ovlComboDraw", 0x0041c590, ovlComboDraw, 0, DT_RET_VOID, setup_combo_draw, 1500, 0},
     {"ovlHeightInit", 0x0041cae0, ovlHeightInit, 1, DT_RET_VOID, setup_height_init, 200, 0},
     {"ovlHeightDraw", 0x0041cc60, ovlHeightDraw, 0, DT_RET_VOID, setup_height_draw, 1500, 0},
     {"ovlHeightShow", 0x0041cfa0, ovlHeightShow, 1, DT_RET_VOID, setup_height_show, 300, 0},

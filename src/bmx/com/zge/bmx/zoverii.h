@@ -168,6 +168,7 @@ typedef int32_t ZoverIndices8[8];
 typedef int32_t ZoverIndices3[3];
 #define gZoverRigs         ORIG_VAR(0x00574bc4, ZoverRigTable, gZoverRigs)
 #define gZoverRigIndex     ORIG_VAR(0x00574ca8, int32_t, gZoverRigIndex)
+#define gZoverRigNext      ORIG_VAR(0x00574ca4, int32_t, gZoverRigNext) /* slot the next rider rig goes in */
 #define gZoverHandsGrabbed ORIG_VAR(0x0057491c, ZoverRigFlags, gZoverHandsGrabbed)
 #define gZoverHandsHolding ORIG_VAR(0x00574924, ZoverRigFlags, gZoverHandsHolding)
 #define gZoverHandsEased   ORIG_VAR(0x005748d4, ZoverRigFlags, gZoverHandsEased)
@@ -204,11 +205,11 @@ uint32_t BMX_STDCALL zoverPollTimer(uint32_t a, uint32_t b, uint32_t c, uint32_t
 #endif
 ZRig *zoverRigCreate(void);
 int zoverRigAddPoint(ZRig *rig, const ZRigPointDef *def);
-void zoverRigAddStick(ZRig *rig, int a, int b, float stiffness);
+int zoverRigAddStick(ZRig *rig, int a, int b, float stiffness);
 void zoverRigAddStickLinked(ZRig *rig, int a, int b, int c, int d, float stiffness, float alignGain);
 void zoverRigAddCorner(ZRig *rig, int a, int b, int i0, int i1, int i2, float stiffness);
-void zoverRigAddHingeSwing(ZRig *rig, const ZRigHingeDef *def);
-void zoverRigAddHingeTwist(ZRig *rig, const ZRigHingeDef *def);
+int zoverRigAddHingeSwing(ZRig *rig, const ZRigHingeDef *def);
+int zoverRigAddHingeTwist(ZRig *rig, const ZRigHingeDef *def);
 void zoverRigAddBone(ZRig *rig, const ZRigHingeDef *def);
 void zoverRigSolveHingeSwing(ZRigHinge *h);
 void zoverRigSolveHingeTwist(ZRigHinge *h);
@@ -231,6 +232,7 @@ void zoverStepBikeMotion(void *rig, void *bike);
 void zoverStartRiderMotion(void *rig, void *rider, const ZMatrix *m, const ZVec3 *vel, const ZAngle3 *rot);
 void zoverZeroAngles(ZAngle3 *angles);
 void zoverRigLoadPose(ZRig *rig, ZActor *rider);
+ZRig *zoverRigCreateRider(ZActor *rider, uint32_t flags);
 void zoverRigSelect(ZRig *rig);
 void zoverRigEase(ZRig *rig, ZActor *rider);
 void zoverRigGrabEdges(ZRig *rig);
@@ -310,7 +312,6 @@ void zoverResetLimbs(void *limbs);
 void zoverLimbsBegin(void *actor, void *limbs);
 ORIG_FN(0x00456120, void, zoverSolveLimbs, (void *actor, void *limbs));
 ORIG_FN(0x004547c0, void, zoverStepRiderMotion, (void *rig, void *actor));
-ORIG_FN(0x00452e80, ZRig *, zoverRigCreateRider, (uint32_t a, uint8_t b));
 
 /* ---- overlays --------------------------------------------------------------------------------- */
 

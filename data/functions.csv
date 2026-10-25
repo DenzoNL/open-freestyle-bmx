@@ -113,7 +113,7 @@ addr,size,file,confidence,name,status
 00412670,372,bmx/com/action/overlymp.c,affinity,FUN_00412670,ported
 00412850,224,bmx/com/action/overlymp.c,affinity,FUN_00412850,ported
 00412970,509,bmx/com/action/overlymp.c,affinity,FUN_00412970,ported
-00412bf0,1745,bmx/com/action/overlymp.c,assert,FUN_00412bf0,orig
+00412bf0,1745,bmx/com/action/overlymp.c,assert,FUN_00412bf0,ported
 004134a0,463,bmx/com/action/overlymp.c,contiguous,FUN_004134a0,ported
 004136f0,174,bmx/com/action/overlymp.c,contiguous,FUN_004136f0,ported
 004137d0,2781,bmx/com/action/overlymp.c,assert,FUN_004137d0,ported
@@ -191,7 +191,7 @@ addr,size,file,confidence,name,status
 0041c4a0,41,bmx/com/action/overlay.c,contiguous,FUN_0041c4a0,ported
 0041c4e0,13,bmx/com/action/overlay.c,contiguous,FUN_0041c4e0,ported
 0041c500,101,bmx/com/action/overlay.c,contiguous,FUN_0041c500,ported
-0041c590,1060,bmx/com/action/overlay.c,contiguous,FUN_0041c590,orig
+0041c590,1060,bmx/com/action/overlay.c,contiguous,FUN_0041c590,ported
 0041cae0,289,bmx/com/action/overlay.c,contiguous,FUN_0041cae0,ported
 0041cc60,654,bmx/com/action/overlay.c,assert,FUN_0041cc60,ported
 0041cfa0,70,bmx/com/action/overlay.c,contiguous,FUN_0041cfa0,ported
@@ -664,7 +664,7 @@ addr,size,file,confidence,name,status
 004527c0,503,bmx/com/zge/bmx/zoverii.c,affinity,FUN_004527c0,ported
 00452a40,251,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00452a40,ported
 00452b80,549,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00452b80,ported
-00452e80,1200,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00452e80,orig
+00452e80,1200,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00452e80,ported
 00453460,34,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00453460,ported
 004534a0,232,bmx/com/zge/bmx/zoverii.c,affinity,FUN_004534a0,ported
 004535d0,148,bmx/com/zge/bmx/zoverii.c,affinity,FUN_004535d0,ported
@@ -811,9 +811,9 @@ addr,size,file,confidence,name,status
 00461da0,515,bmx/com/zge/ngif/ngifpsx.c,affinity,FUN_00461da0,ported
 00462050,309,bmx/com/zge/ngif/ngifpsx.c,assert,DrawPrimitive,ported
 00462350,62,bmx/com/zge/ngif/ngifpsx.c,contiguous,FUN_00462350,ported
-004623a0,1144,bmx/com/zge/ngif/ngifpsx.c,assert,FUN_004623a0,orig
-00462940,1609,bmx/com/zge/ngif/ngifpsx.c,assert,FUN_00462940,orig
-00463130,1186,bmx/com/zge/ngif/ngifpsx.c,assert,FUN_00463130,orig
+004623a0,1144,bmx/com/zge/ngif/ngifpsx.c,assert,FUN_004623a0,ported
+00462940,1609,bmx/com/zge/ngif/ngifpsx.c,assert,FUN_00462940,ported
+00463130,1186,bmx/com/zge/ngif/ngifpsx.c,assert,FUN_00463130,ported
 00463710,177,bmx/com/zge/ngif/ngifpsx.c,contiguous,FUN_00463710,ported
 00463800,1,bmx/com/zge/ngif/ngifpsx.c,contiguous,FUN_00463800,ported
 00463820,40,bmx/com/zge/ngif/ngifpsx.c,contiguous,FUN_00463820,ported
@@ -1843,7 +1843,7 @@ addr,size,file,confidence,name,status
 00493130,41,zge/com/zglrw/zrwcam.c,affinity,FUN_00493130,ported
 00493160,186,zge/pc/pcinput.c,assert,DirectInputInitialize,ported
 00493220,28,zge/pc/pcinput.c,contiguous,EnumJoysticksCallback,ported
-00493310,1103,zge/pc/pcinput.c,assert,DirectInputSetup,orig
+00493310,1103,zge/pc/pcinput.c,assert,DirectInputSetup,ported
 00493760,144,zge/pc/pcinput.c,assert,SetDataFormat_and_SetCooperativeLevel,ported
 004937f0,59,zge/pc/pcinput.c,affinity,FUN_004937f0,ported
 00493830,96,zge/pc/pcinput.c,affinity,OnActivate,ported

@@ -545,6 +545,14 @@ static void setup_load_pose(DtCtx *c)
     DT_ARG_PTR(c, 1, rand_actor());
 }
 
+static void setup_create_rider(DtCtx *c)
+{
+    setup_rig_create(c);
+    gZoverRigNext = dt_range(0, 1);
+    DT_ARG_PTR(c, 0, rand_actor());
+    DT_ARG_INT(c, 1, dt_u32());
+}
+
 /* ---- rider state -------------------------------------------------------------------------------- */
 
 static ZRig *stateRigs[2];
@@ -1395,12 +1403,12 @@ DT_CASES(zoverii_cases) = {
     {"zoverPollTimer", 0x00450020, zoverPollTimer, 5, DT_RET_INT, setup_poll_timer, 100, 0},
     {"zoverRigCreate", 0x00450060, zoverRigCreate, 0, DT_RET_INT, setup_rig_create, 40, 0},
     {"zoverRigAddPoint", 0x004500a0, zoverRigAddPoint, 2, DT_RET_INT, setup_add_point, 300, 0},
-    {"zoverRigAddStick", 0x00450140, zoverRigAddStick, 4, DT_RET_VOID, setup_add_stick, 300, 0},
+    {"zoverRigAddStick", 0x00450140, zoverRigAddStick, 4, DT_RET_INT, setup_add_stick, 300, 0},
     {"zoverRigAddStickLinked", 0x00450210, zoverRigAddStickLinked, 7, DT_RET_VOID, setup_add_stick_linked,
      300, 0},
     {"zoverRigAddCorner", 0x00450300, zoverRigAddCorner, 7, DT_RET_VOID, setup_add_corner, 300, 0},
-    {"zoverRigAddHingeSwing", 0x00450430, zoverRigAddHingeSwing, 2, DT_RET_VOID, setup_add_hinge, 100, 0},
-    {"zoverRigAddHingeTwist", 0x004504c0, zoverRigAddHingeTwist, 2, DT_RET_VOID, setup_add_hinge, 100, 0},
+    {"zoverRigAddHingeSwing", 0x00450430, zoverRigAddHingeSwing, 2, DT_RET_INT, setup_add_hinge, 100, 0},
+    {"zoverRigAddHingeTwist", 0x004504c0, zoverRigAddHingeTwist, 2, DT_RET_INT, setup_add_hinge, 100, 0},
     {"zoverRigAddBone", 0x00450550, zoverRigAddBone, 2, DT_RET_VOID, setup_add_hinge, 300, 0},
     {"zoverRigSolveHingeSwing", 0x004505f0, zoverRigSolveHingeSwing, 1, DT_RET_VOID, setup_hinge_swing, 800,
      0},
@@ -1421,6 +1429,7 @@ DT_CASES(zoverii_cases) = {
     {"zoverStartBikeMotion", 0x004527c0, zoverStartBikeMotion, 5, DT_RET_VOID, setup_start_bike, 300, 0},
     {"zoverStepBikeMotion", 0x00452a40, zoverStepBikeMotion, 2, DT_RET_VOID, setup_step_bike, 300, 0},
     {"zoverRigLoadPose", 0x00452b80, zoverRigLoadPose, 2, DT_RET_VOID, setup_load_pose, 200, 0},
+    {"zoverRigCreateRider", 0x00452e80, zoverRigCreateRider, 2, DT_RET_INT, setup_create_rider, 300, 0},
     {"zoverRigSelect", 0x00453460, zoverRigSelect, 1, DT_RET_VOID, setup_select, 100, 0},
     {"zoverStartRiderMotion", 0x004534a0, zoverStartRiderMotion, 5, DT_RET_VOID, setup_start_rider, 200, 0},
     {"zoverRigEase", 0x004535d0, zoverRigEase, 2, DT_RET_VOID, setup_ease, 300, 0},

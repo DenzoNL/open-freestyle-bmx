@@ -81,7 +81,7 @@ int zoverRigAddPoint(ZRig *rig, const ZRigPointDef *def)
 
 /* Adds a distance stick between two points, with the current distance as its rest length. */
 BMX_ADDR(0x00450140)
-void zoverRigAddStick(ZRig *rig, int a, int b, float stiffness)
+int zoverRigAddStick(ZRig *rig, int a, int b, float stiffness)
 {
     ZRigConstraint *c = &rig->constraints[rig->constraintCount];
     ZVec3 d;
@@ -94,7 +94,7 @@ void zoverRigAddStick(ZRig *rig, int a, int b, float stiffness)
     d.y = c->a->pos.y - c->b->pos.y;
     d.z = c->a->pos.z - c->b->pos.z;
     c->u.stick.length = (float)zvec3Length(&d);
-    rig->constraintCount++;
+    return (int)rig->constraintCount++;
 }
 
 /* A stick that also reads the alignment of points c and d (see zoverRigSolveStickLinked). */
@@ -146,7 +146,7 @@ void zoverRigAddCorner(ZRig *rig, int a, int b, int i0, int i1, int i2, float st
     rig->constraintCount++;
 }
 
-static void addHinge(ZRig *rig, const ZRigHingeDef *def, int type)
+static int addHinge(ZRig *rig, const ZRigHingeDef *def, int type)
 {
     ZRigHinge *h = &rig->hinges[rig->hingeCount];
     h->type = type;
@@ -159,19 +159,20 @@ static void addHinge(ZRig *rig, const ZRigHingeDef *def, int type)
     h->sign = def->sign;
     h->axisA = def->axisA;
     h->axisB = def->axisB;
-    rig->hingeCount++;
+    return (int)rig->hingeCount++;
 }
 
+/* The hinge adders return the number of the new hinge. */
 BMX_ADDR(0x00450430)
-void zoverRigAddHingeSwing(ZRig *rig, const ZRigHingeDef *def)
+int zoverRigAddHingeSwing(ZRig *rig, const ZRigHingeDef *def)
 {
-    addHinge(rig, def, kZoverHingeSwing);
+    return addHinge(rig, def, kZoverHingeSwing);
 }
 
 BMX_ADDR(0x004504c0)
-void zoverRigAddHingeTwist(ZRig *rig, const ZRigHingeDef *def)
+int zoverRigAddHingeTwist(ZRig *rig, const ZRigHingeDef *def)
 {
-    addHinge(rig, def, kZoverHingeTwist);
+    return addHinge(rig, def, kZoverHingeTwist);
 }
 
 /* Adds a bone: only a and b are read from the definition; the strength field is the current distance. */
@@ -704,6 +705,102 @@ void zoverRigLoadPose(ZRig *rig, ZActor *rider)
         }
         zactorGetBonePos(rider, bones[i], &v, &rig->points[i].pos, 1);
     }
+}
+
+static void defineHinge(ZRigHingeDef *d, int32_t axisA, int32_t axisB, ZRigPoint *a, ZRigPoint *b,
+                        ZRigPoint *c, int32_t sign, float strength)
+{
+    d->axisA = axisA;
+    d->axisB = axisB;
+    d->a = a;
+    d->b = b;
+    d->c = c;
+    d->refA = a;
+    d->refB = b;
+    d->sign = sign;
+    d->strength = strength;
+}
+
+/*
+ * Builds the rider's rig from the rider actor's pose: 14 points (the first one heavier), the sticks that
+ * hold the body together, six hinges for the joints and the back, then lifts the whole rig so that its
+ * lowest point is at height 0. The numbers of the sticks and hinges the state functions adjust are kept
+ * in gZoverStickIdx, gZoverBackIdx and gZoverHingeIdx. `flags` bit 0 makes the points grip (friction 1.75
+ * instead of 0.6). The rig goes into the next slot of the rig table, even when the allocation failed.
+ */
+BMX_ADDR(0x00452e80)
+ZRig *zoverRigCreateRider(ZActor *rider, uint32_t flags)
+{
+    float lowest = 500.0f;
+    ZRig *rig = zoverRigCreate();
+
+    if (rig != NULL) {
+        ZRigPointDef def;
+        ZRigHingeDef hinge;
+        ZRigPoint *const p = rig->points;
+
+        memset(&def, 0, sizeof def);
+        def.mode = 1;
+        def.mass = 0.4f;
+        def.friction = (flags & 1) != 0 ? 1.75f : 0.6f;
+        def.restitution = 1.0f;
+        zoverRigAddPoint(rig, &def);
+        def.mass = 0.1f;
+        for (int i = 1; i < 14; i++) {
+            zoverRigAddPoint(rig, &def);
+        }
+        zoverRigLoadPose(rig, rider);
+
+        zoverRigAddStick(rig, 0, 1, 24.0f);
+        zoverRigAddStick(rig, 0, 2, 24.0f);
+        zoverRigAddStick(rig, 1, 2, 24.0f);
+        zoverRigAddStick(rig, 7, 0, 48.0f);
+        zoverRigAddStick(rig, 8, 0, 48.0f);
+        zoverRigAddStick(rig, 7, 8, 24.0f);
+        zoverRigAddStick(rig, 7, 1, 48.0f);
+        zoverRigAddStick(rig, 7, 2, 48.0f);
+        zoverRigAddStick(rig, 8, 1, 48.0f);
+        zoverRigAddStick(rig, 8, 2, 48.0f);
+        gZoverStickIdx[5] = zoverRigAddStick(rig, 2, 4, 24.0f);
+        gZoverStickIdx[7] = zoverRigAddStick(rig, 4, 6, 24.0f);
+        gZoverStickIdx[4] = zoverRigAddStick(rig, 1, 3, 24.0f);
+        gZoverStickIdx[6] = zoverRigAddStick(rig, 3, 5, 24.0f);
+        gZoverStickIdx[1] = zoverRigAddStick(rig, 8, 10, 24.0f);
+        gZoverStickIdx[3] = zoverRigAddStick(rig, 10, 12, 24.0f);
+        gZoverStickIdx[0] = zoverRigAddStick(rig, 7, 9, 24.0f);
+        gZoverStickIdx[2] = zoverRigAddStick(rig, 9, 11, 24.0f);
+        gZoverBackIdx[0] = zoverRigAddStick(rig, 13, 0, 4.8f);
+        gZoverBackIdx[0] = zoverRigAddStick(rig, 13, 7, 24.0f);
+        gZoverBackIdx[0] = zoverRigAddStick(rig, 13, 8, 24.0f);
+
+        defineHinge(&hinge, 4, 2, &p[8], &p[9], &p[7], 2, 1.2f);
+        gZoverHingeIdx[4] = zoverRigAddHingeSwing(rig, &hinge);
+        defineHinge(&hinge, 1, 2, &p[7], &p[10], &p[8], 2, 1.2f);
+        gZoverHingeIdx[5] = zoverRigAddHingeSwing(rig, &hinge);
+        defineHinge(&hinge, 4, 2, &p[2], &p[3], &p[1], 2, 0.5f);
+        gZoverHingeIdx[1] = zoverRigAddHingeSwing(rig, &hinge);
+        defineHinge(&hinge, 1, 2, &p[1], &p[4], &p[2], 2, 0.5f);
+        gZoverHingeIdx[3] = zoverRigAddHingeSwing(rig, &hinge);
+        defineHinge(&hinge, 2, 5, &p[2], &p[3], &p[1], 1, 1.0f);
+        gZoverHingeIdx[0] = zoverRigAddHingeTwist(rig, &hinge);
+        defineHinge(&hinge, 2, 2, &p[1], &p[4], &p[2], 1, 1.0f);
+        gZoverHingeIdx[2] = zoverRigAddHingeTwist(rig, &hinge);
+
+        for (uint32_t i = 0; i < rig->pointCount; i++) {
+            if (!(p[i].pos.y >= lowest)) {
+                lowest = p[i].pos.y;
+            }
+        }
+        for (uint32_t i = 0; i < rig->pointCount; i++) {
+            p[i].pos.y = (float)((double)p[i].pos.y - (double)lowest);
+        }
+    }
+    gZoverRigs[gZoverRigNext] = rig;
+    gZoverRigNext++;
+    if (gZoverRigNext > 1) {
+        gZoverRigNext = 0;
+    }
+    return rig;
 }
 
 /* ---- rider state ------------------------------------------------------------------------------ */

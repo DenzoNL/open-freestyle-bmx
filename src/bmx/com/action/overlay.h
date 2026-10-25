@@ -376,6 +376,7 @@ void ovlTimerDraw(void);
 void ovlTimerShow(int show);
 void ovlTimerSet(const uint32_t *ticks);
 void ovlNameDraw(void);
+void ovlComboDraw(void);
 void ovlHeightInit(int create);
 void ovlHeightDraw(void);
 void ovlHeightShow(int show);

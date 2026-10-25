@@ -492,6 +492,177 @@ static void setupGlyph(DtCtx *c)
     DT_ARG_INT(c, 8, (dt_u32() & 0xffff0000u) | idx);
 }
 
+/* ---- 3D list: screen rectangles, glyph records, polygons --------------------------------------------- */
+
+/*
+ * The 3D list buffer, its ordering table (entry words random: the links must be rebuilt from them), and
+ * the texture table: 16 entries, some unused (material 0). Asserts are not stubbed: reaching one ends the
+ * run and the abort is compared.
+ */
+static uint8_t *setupList3D(DtCtx *c, uint32_t size, uint32_t none)
+{
+    uint8_t *prim = dt_alloc(size);
+    uint32_t *ot = dt_alloc(0x40 * 4);
+
+    ngBegin(c, 0);
+    dt_fill(prim, size);
+    dt_fill(ot, 0x40 * 4);
+    gNgifPrim3D = (dt_u32() & 31) == 0 ? (uint32_t *)(uintptr_t)none : (uint32_t *)prim;
+    gNgifOtBase = ot;
+    for (uint32_t i = 0; i < 16; i++) {
+        NgifTexture *t = &(&gNgifTextures)[i];
+
+        dt_fill(t, sizeof *t);
+        t->width = (uint8_t)dt_range(0, 200);
+        t->height = (uint8_t)dt_range(0, 200);
+        if ((dt_u32() & 7) == 0) {
+            t->material = 0;
+        } else {
+            t->material = dt_u32() | 1;
+        }
+    }
+    return prim;
+}
+
+static void setupFillBar(DtCtx *c)
+{
+    static const uint32_t bits[] = {1,     2,     8,      0x10,   0x20,   0x40, 0x100,
+                                    0x400, 0x800, 0x1000, 0x2000, 0x4000, 0x80};
+    uint32_t *info = dt_alloc(0x40);
+    uint32_t flags = 0;
+    uint32_t color;
+
+    setupList3D(c, 0x200, 0);
+    color = dt_u32();
+    dt_fill(info, 0x40);
+    for (uint32_t i = 0; i < sizeof bits / sizeof bits[0]; i++) {
+        if ((dt_u32() & 3) == 0) {
+            flags |= bits[i];
+        }
+    }
+    flags |= (dt_u32() & 1) ? 4 : 0;
+    if ((flags & 4) == 0 && (flags & 0x80) == 0 && (dt_u32() & 15) != 0) {
+        flags |= 0x200;
+    }
+    if ((dt_u32() & 3) == 0) {
+        flags |= 0x200;
+    }
+    if ((flags & 4) != 0) {
+        color = (uint32_t)dt_range(0, 15);
+    } else if ((dt_u32() & 3) != 0) {
+        color &= 0x00ffffffu | ((dt_u32() & 3) == 0 ? 0xff000000u : 0);
+    }
+    for (uint32_t i = 0; i < 0x10; i++) {
+        info[i] = (uint32_t)dt_range(-300, 600);
+    }
+    info[2] = (uint32_t)dt_range(0, 4);
+    info[3] = (uint32_t)dt_range(0, 4);
+    info[10] = (uint32_t)dt_range(0, 40);
+    info[11] = (uint32_t)dt_range(0, 15);
+    if ((flags & 0x4000) != 0) {
+        for (uint32_t i = 0x30; i < 0x34; i++) {
+            ((uint8_t *)info)[i] = (uint8_t)dt_u32();
+        }
+    }
+    DT_ARG_INT(c, 0, color);
+    DT_ARG_INT(c, 1, (dt_u32() & 3) == 0 ? dt_u32() : (uint32_t)dt_range(-100, 700));
+    DT_ARG_INT(c, 2, (dt_u32() & 3) == 0 ? (int32_t)dt_u32() : dt_range(-100, 600));
+    DT_ARG_INT(c, 3, flags);
+    DT_ARG_PTR(c, 4, info);
+}
+
+/* A record list: up to four records of the drawable kinds, then the terminator (or a bad kind). */
+static void setupTextGlyph(DtCtx *c)
+{
+    static const uint8_t kinds[] = {0, 0x11, 0x30, 0x31, 0x32};
+    static const uint8_t sizes[] = {0xc, 0x14, 0xc, 0x14, 0x10};
+    uint8_t *rec = dt_alloc(0x80);
+    uint32_t off = 0;
+    uint32_t n;
+
+    setupList3D(c, 0x800, 0xffffffffu);
+    n = (uint32_t)dt_range(0, 4);
+    dt_fill(rec, 0x80);
+    for (uint32_t i = 0; i < n; i++) {
+        const uint32_t k = dt_u32() % 5;
+        uint16_t *w = (uint16_t *)(void *)(rec + off);
+
+        rec[off] = kinds[k];
+        for (uint32_t j = 2; j < sizes[k]; j += 2) {
+            w[j / 2] = (uint16_t)dt_range(-60, 400);
+        }
+        w[3] = (uint16_t)dt_range(0, 15);
+        if (k >= 2) {
+            w[1] = (uint16_t)(dt_u32() & 0xffff);
+            w[2] = (uint16_t)dt_range(-20, 20);
+        } else {
+            w[1] = (uint16_t)(dt_u32() & 0xffff);
+        }
+        if (k == 4) {
+            w[4] = (uint16_t)dt_range(1, 3);
+            w[5] = (uint16_t)dt_range(1, 3);
+        }
+        off += sizes[k];
+    }
+    rec[off] = (dt_u32() & 31) == 0 ? (uint8_t)dt_range(1, 0x2f) : 0xff;
+    DT_ARG_INT(c, 0, (dt_u32() & 3) == 0 ? dt_u32() : (dt_u32() & 0xffffu));
+    DT_ARG_INT(c, 1, (dt_u32() & 3) == 0 ? (int32_t)dt_u32() : dt_range(-100, 600));
+    DT_ARG_PTR(c, 2, (dt_u32() & 63) == 0 ? NULL : rec);
+}
+
+static int BMX_CDECL stubMaterialTexture(void *material, uint32_t index)
+{
+    ngLog(0x489a40);
+    ngLog((uint32_t)(uintptr_t)material);
+    ngLog(index);
+    return 0x1234;
+}
+
+static int BMX_CDECL stubTextureWidth(const void *texture)
+{
+    ngLog(0x498870);
+    ngLog((uint32_t)(uintptr_t)texture);
+    return (int)dt_u32();
+}
+
+static int BMX_CDECL stubTextureHeight(const void *texture)
+{
+    ngLog(0x498880);
+    ngLog((uint32_t)(uintptr_t)texture);
+    return (int)dt_u32();
+}
+
+void *zrwmatGetTexture(void *material, uint32_t index);
+int zrwTextureGetWidth(const void *texture);
+int zrwTextureGetHeight(const void *texture);
+
+static void setupPoly3D(DtCtx *c)
+{
+    NgifVert3 *v = dt_alloc(5 * sizeof *v);
+    uint32_t flags;
+    uint32_t count;
+    uint32_t texture;
+
+    setupList3D(c, 0x200, 0);
+    dt_stub(0x00489a40, (void *)zrwmatGetTexture, (void *)stubMaterialTexture);
+    dt_stub(0x00498870, (void *)zrwTextureGetWidth, (void *)stubTextureWidth);
+    dt_stub(0x00498880, (void *)zrwTextureGetHeight, (void *)stubTextureHeight);
+    dt_fill(v, 5 * sizeof *v);
+    flags = (uint32_t)dt_range(0, 3) | ((dt_u32() & 15) == 0 ? 0 : 8) | (dt_u32() & 0xf0);
+    count = dt_u32() % 6;
+    texture = (dt_u32() & 3) == 0 ? 0 : (uint32_t)dt_range(1, 15);
+    if (texture != 0 && (dt_u32() & 7) != 0) {
+        count = 4;
+    }
+    if ((dt_u32() & 3) == 0) {
+        texture |= dt_u32() & 0xffff0000u;
+    }
+    DT_ARG_INT(c, 0, flags | (dt_u32() & 0xffffff00u));
+    DT_ARG_INT(c, 1, (dt_u32() & 7) == 0 ? (dt_u32() & 0xffffff00u) | count : count);
+    DT_ARG_PTR(c, 2, v);
+    DT_ARG_INT(c, 3, texture);
+}
+
 DT_CASES(ngifpsx_cases2) = {
     {"ngifpsxUpdate", 0x0045fcf0, ngifpsxUpdate, 0, DT_RET_INT, setupScriptStep, 300, 0},
     {"ngifpsxSetup", 0x0045fdc0, ngifpsxSetup, 1, DT_RET_VOID, setupScriptSet, 60, 0},
@@ -504,6 +675,9 @@ DT_CASES(ngifpsx_cases2) = {
     {"ngifDrawLineG2", 0x00461da0, (void *)ngifDrawLineG2, 2, DT_RET_VOID, setupPolyF3, 1000, 0},
     {"ngifDrawPrimitive", 0x00462050, (void *)ngifDrawPrimitive, 1, DT_RET_VOID, setupDrawPrim, 600, 0},
     {"ngifDrawList", 0x00462350, ngifDrawList, 1, DT_RET_VOID, setupDrawList, 300, 0},
+    {"ngifFillScreenBar", 0x004623a0, ngifFillScreenBar, 5, DT_RET_VOID, setupFillBar, 2000, 0},
+    {"ngifDrawTextGlyph", 0x00462940, ngifDrawTextGlyph, 3, DT_RET_VOID, setupTextGlyph, 2000, 0},
+    {"ngifDrawPoly3D", 0x00463130, ngifDrawPoly3D, 4, DT_RET_VOID, setupPoly3D, 2000, 0},
     {"ngifDrawLine3D", 0x00463710, ngifDrawLine3D, 3, DT_RET_VOID, setupLine3D, 300, 0},
     {"ngifNop2", 0x00463800, ngifNop2, 0, DT_RET_VOID, setupBlend, 2, 0},
     {"ngifResetOrderTable", 0x00463820, ngifResetOrderTable, 0, DT_RET_VOID, setupFrame, 30, 0},
