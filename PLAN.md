@@ -132,6 +132,22 @@ round floats (so the hook build uses SSE2, not x87). Rules are in CONTRIBUTING.m
 - Code differences from Maximum Remix, if a binary with the same engine is available to diff against.
 - Uncompressed / higher-quality audio.
 - Remastered menu graphics.
+- Compatibility (default on, behaviour-neutral): no DX7/DirectShow/CD dependencies (Cinepak decoder,
+  SDL audio); saves and settings in the user profile, not the install dir or registry; any resolution,
+  borderless/windowed, alt-tab, DPI awareness, vsync; SDL gamepad DB with correct prompts, hot-plug,
+  rumble, key rebinding; crash fixes for original bugs found while porting (uninitialised stack in the
+  device dialog, skid fps 0 divide, zrwEpicFail buffer overflow, NULL reads before checks) — anything
+  that changes normal-play behaviour becomes an option instead.
+- Graphics options: texture filtering, MSAA/anisotropic, shadow resolution, draw/fog distance, HUD
+  anchoring for widescreen/ultrawide, UI scaling.
+- RTX Remix: hooks only D3D9 fixed-function. Try now on the original exe via a DX7→D3D9 wrapper
+  (dgVoodoo2/dxwrapper). For our build: optional D3D9 fixed-function backend on Windows (decide in P4).
+- DLSS / FSR upscaling: needs depth + motion vectors (also needed for render interpolation). SDL3 GPU
+  may not expose enough for the vendor SDKs; decide in P4 whether a D3D12/Vulkan backend is needed.
+- Modding: asset override folder (menus, riders, bikes), custom music, later a Blender level exporter.
+- Dev: 64-bit build, ASan/UBSan builds.
+- Not planned by us, PRs welcome if the repo goes public: online multiplayer (rollback is feasible:
+  deterministic sim, input-based replays), speedrun timer/practice mode.
 
 ## Open
 
