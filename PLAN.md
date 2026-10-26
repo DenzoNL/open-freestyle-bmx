@@ -170,14 +170,18 @@ round floats (so the hook build uses SSE2, not x87). Rules are in CONTRIBUTING.m
 - **Fixture bugs (not port bugs).** `saveFileRead` runs the emulated heap out of RAM in setup (iter 86);
   `zassetRead_made` asserts in setup without game assets; with `BMX_GAME_DIR` set and full iterations,
   18 `ziff*` cases fault inside the original at iter 153.
-- **Left out of slices:** ngiffx.c x87 functions 0x45cc50 and 0x45eaa0 (Opus); WinMain 0x48a460
+- **Signalling NaNs through x87 load/store.** The original copies some float words with FLD/FSTP
+  (FT4/GT4 u/v in ngifpsx.c), which quietens an sNaN on real hardware. Unicorn keeps the bits, so the
+  port copies bits to match the emulator. Decide which to follow (real hardware is the truth; the
+  game probably never feeds sNaNs) before the platform flip.
+- **Left out of slices:** WinMain 0x48a460
   (app entry, misfiled in zrwzgl.c, can't return in the harness); world/particle callbacks
   0x497200–0x497780 and 0x4975b0 sit in zrwtxr.c with `TODO(file)`, belong in zrwworld.c.
 - More misfiled functions (left with `TODO(file)`): roller shadow 0x49b3d0/0x49b4e0/0x49b520 (in
   zrwmodelcreate.c, belongs in ngifzroller.c); asset decompressors 0x49bd10/0x49c080 (zasset);
   0x49c570 zobjDispatchEvents (zobj). zrwzgl.h and zrwmodel.h name 0x697720/0x697724 the other way
   round (gZrwScale/gZrwInvScale) and can't be included together: settle which is which.
-- **What's left (86.4%, 2026-10-24):** every function still `orig` in data/functions.csv except
+- **What's left (97.1%, 2026-10-26):** zrwprim/zrwmodelrender/zrwcol/zrwtxr/zprofile big functions, plus the ngifzbsp/ngifzcollide slice in progress. Earlier note (86.4%, 2026-10-24): every function still `orig` in data/functions.csv except
   WinMain (0x48a460) and the zdebugFail abort trap (0x47ed10): ~40 functions of 1 KB or more,
   mostly x87-heavy (camera, rider, overlay/zoverii, ngifpsx, ngifzcollide, prop, sound, zrwprim/col).
   All Opus work, a few at a time.

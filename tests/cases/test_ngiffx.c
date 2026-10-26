@@ -3,8 +3,7 @@
  * registration code. The renderer's draw calls, camera, texture lookups and the exe's effect-by-name call
  * are stubbed: every call is logged by value (vertex data included), so the effects are compared through
  * what they would draw. Particle memory and the emitter lists are real (built with the original allocators)
- * and compared as memory. The spark and lightning renderers (0x45cc50, 0x45eaa0) are not part of this
- * module's port.
+ * and compared as memory.
  */
 #include "bmx/com/zge/ngif/ngiffx.h"
 #include "compat/crt.h"
@@ -53,7 +52,7 @@ static uint32_t remaining(void)
     return kRem[dt_u32() % (sizeof kRem / sizeof kRem[0])];
 }
 
-static void newParticle(ZfxEmitter *e, int moving)
+static ZfxParticle *newParticle(ZfxEmitter *e, int moving)
 {
     ZfxParticle *p = DT_ORIG(0x00486050, PoolAllocFn)(e->pool);
     const uint32_t birth = (uint32_t)dt_range(800, 1001);
@@ -74,6 +73,7 @@ static void newParticle(ZfxEmitter *e, int moving)
         p->corner[i][2] = rf();
     }
     DT_ORIG(0x0048c460, ListInsertFn)(e->particles, p);
+    return p;
 }
 
 static ZfxEmitter *newEmitter(int particles, int moving)
@@ -374,6 +374,69 @@ static void setup_render_camera_dust(DtCtx *c)
 {
     setupRender(c, dt_range(0, 4));
     dt_fill((void *)0x0068fc20, 64);
+}
+
+/* Line primitives (0x48ccf0): the texture and both end vertices. */
+static void BMX_CDECL stubDrawLine(uint32_t flags, const uint32_t *desc, int count, int a, int b)
+{
+    ngLog(0x48ccf0);
+    ngLog(flags);
+    ngLog((uint32_t)count);
+    ngLog((uint32_t)a);
+    ngLog((uint32_t)b);
+    ngLog(desc[0]);
+    for (int k = 0; k < 2; k++) {
+        const ZfxVertex *v = (const ZfxVertex *)(uintptr_t)desc[1 + k];
+
+        ngLogFloat(v->x);
+        ngLogFloat(v->y);
+        ngLogFloat(v->z);
+        ngLogFloat(v->u);
+        ngLogFloat(v->v);
+        ngLog(v->color);
+    }
+}
+
+/*
+ * Spark / lightning particles: some untextured (drawn as lines), some standing still or moving along a
+ * single axis (zero offsets: a degenerate sweep direction, the lightning's winding test at exactly 0).
+ */
+static void setup_render_streak(DtCtx *c)
+{
+    ZfxEmitter *e;
+
+    ngBegin(c, 0);
+    stubRenderer();
+    dt_stub(0x0048ccf0, NULL, (void *)stubDrawLine);
+    if (dt_u32() % 4 == 0) {
+        gMatrix.right = (ZVec3){1.0f, 0.0f, 0.0f};
+        gMatrix.up = (ZVec3){0.0f, 1.0f, 0.0f};
+        gMatrix.at = (ZVec3){0.0f, 0.0f, 1.0f};
+    }
+    e = newEmitter(0, 1);
+    for (int i = dt_range(0, 5); i > 0; i--) {
+        ZfxParticle *p = newParticle(e, 1);
+
+        switch (dt_u32() % 6) {
+        case 0:
+            p->texture = 0;
+            break;
+        case 1:
+            p->prev = p->pos;
+            break;
+        case 2:
+            p->prev.x = p->pos.x;
+            break;
+        case 3:
+            p->prev.y = p->pos.y;
+            p->prev.z = p->pos.z;
+            break;
+        default:
+            break;
+        }
+    }
+    DT_ARG_PTR(c, 0, newObject());
+    DT_ARG_PTR(c, 1, e);
 }
 
 /* ---- emitter ---------------------------------------------------------------------------------------- */
@@ -679,6 +742,7 @@ DT_CASES(ngiffxCases) = {
     {"ngiffxAdaptQuality", 0x0045c710, ngiffxAdaptQuality, 0, DT_RET_VOID, setup_adapt_quality, 1000, 0},
     {"ngiffxSetQuality", 0x0045c920, ngiffxSetQuality, 1, DT_RET_VOID, setup_set_quality, 100, 0},
     {"ngiffxSparkSpawn", 0x0045c950, ngiffxSparkSpawn, 6, DT_RET_VOID, setup_spark_spawn, 600, 0},
+    {"ngiffxSparkRender", 0x0045cc50, ngiffxSparkRender, 2, DT_RET_INT, setup_render_streak, 1000, 0},
     {"ngiffxShardSpawn", 0x0045d260, ngiffxShardSpawn, 6, DT_RET_VOID, setup_shard_spawn, 600, 0},
     {"ngiffxShardRender", 0x0045d420, ngiffxShardRender, 2, DT_RET_INT, setup_render, 600, 0},
     {"ngiffxSplashRender", 0x0045d730, ngiffxSplashRender, 2, DT_RET_INT, setup_render, 600, 0},
@@ -691,6 +755,7 @@ DT_CASES(ngiffxCases) = {
     {"ngiffxRippleRender", 0x0045e2d0, ngiffxRippleRender, 2, DT_RET_INT, setup_render, 600, 0},
     {"ngiffxUpdateEmitter", 0x0045e4e0, ngiffxUpdateEmitter, 2, DT_RET_INT, setup_update, 1000, 0},
     {"ngiffxLightningSpawn", 0x0045e750, ngiffxLightningSpawn, 6, DT_RET_VOID, setup_lightning_spawn, 600, 0},
+    {"ngiffxLightningRender", 0x0045eaa0, ngiffxLightningRender, 2, DT_RET_INT, setup_render_streak, 1000, 0},
     {"ngiffxCreateSpark", 0x0045f030, ngiffxCreateSpark, 2, DT_RET_VOID, setup_create_spark, 100, 0},
     {"ngiffxCreateShard", 0x0045f0a0, ngiffxCreateShard, 2, DT_RET_VOID, setup_create_spark, 100, 0},
     {"ngiffxCreateSplash", 0x0045f0d0, ngiffxCreateSplash, 2, DT_RET_VOID, setup_create_spark, 100, 0},

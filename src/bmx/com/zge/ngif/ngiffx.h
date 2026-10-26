@@ -1,8 +1,7 @@
 /*
  * Particle effects of the level renderer (C:\zaxis\Bmx\src\com\zge\NgIF\NgIFfx.c). An effect ("spark",
  * "shard", "splash", "dust", "poster", "ripple", "lightning") is a table of handlers in the exe's data
- * (ZfxEffect); each emitter owns a ZList of particles drawn from a free list. The spark and lightning
- * renderers (0x45cc50, 0x45eaa0) are not ported yet.
+ * (ZfxEffect); each emitter owns a ZList of particles drawn from a free list.
  */
 #ifndef BMX_COM_ZGE_NGIF_NGIFFX_H
 #define BMX_COM_ZGE_NGIF_NGIFFX_H
@@ -99,6 +98,10 @@ typedef struct ZfxQuad {
     uint32_t texture;
     ZfxVertex *vertex[4];
 } ZfxQuad;
+typedef struct ZfxLine {
+    uint32_t texture;
+    ZfxVertex *vertex[2];
+} ZfxLine;
 
 typedef struct ZfxSkid ZfxSkid;
 /* A level object with a texture animation: texture handles rotate through the frames. */
@@ -143,7 +146,9 @@ void ngiffxRippleSpawn(int enabled, const void *object, ZfxEmitter *emitter, uin
 void ngiffxLightningSpawn(int enabled, const void *object, ZfxEmitter *emitter, uint32_t count, int unused,
                           const float *params);
 /* Renderers and the generic updater: return the number of live particles. */
+int ngiffxSparkRender(const void *effect, ZfxEmitter *emitter);
 int ngiffxShardRender(const void *effect, ZfxEmitter *emitter);
+int ngiffxLightningRender(const void *effect, ZfxEmitter *emitter);
 int ngiffxSplashRender(const void *effect, ZfxEmitter *emitter);
 int ngiffxDustRender(const void *effect, ZfxEmitter *emitter);
 int ngiffxPosterRender(const void *effect, ZfxEmitter *emitter);

@@ -769,7 +769,7 @@ addr,size,file,confidence,name,status
 0045c710,402,bmx/com/zge/ngif/ngiffx.c,affinity,FUN_0045c710,ported
 0045c920,29,bmx/com/zge/ngif/ngiffx.c,affinity,FUN_0045c920,ported
 0045c950,594,bmx/com/zge/ngif/ngiffx.c,affinity,FUN_0045c950,ported
-0045cc50,1221,bmx/com/zge/ngif/ngiffx.c,affinity,FUN_0045cc50,orig
+0045cc50,1221,bmx/com/zge/ngif/ngiffx.c,affinity,FUN_0045cc50,ported
 0045d260,343,bmx/com/zge/ngif/ngiffx.c,affinity,FUN_0045d260,ported
 0045d420,619,bmx/com/zge/ngif/ngiffx.c,affinity,FUN_0045d420,ported
 0045d730,619,bmx/com/zge/ngif/ngiffx.c,affinity,FUN_0045d730,ported
@@ -782,7 +782,7 @@ addr,size,file,confidence,name,status
 0045e2d0,415,bmx/com/zge/ngif/ngiffx.c,affinity,FUN_0045e2d0,ported
 0045e4e0,486,bmx/com/zge/ngif/ngiffx.c,affinity,FUN_0045e4e0,ported
 0045e750,668,bmx/com/zge/ngif/ngiffx.c,affinity,FUN_0045e750,ported
-0045eaa0,1125,bmx/com/zge/ngif/ngiffx.c,affinity,FUN_0045eaa0,orig
+0045eaa0,1125,bmx/com/zge/ngif/ngiffx.c,affinity,FUN_0045eaa0,ported
 0045f030,68,bmx/com/zge/ngif/ngiffx.c,affinity,FUN_0045f030,ported
 0045f0a0,28,bmx/com/zge/ngif/ngiffx.c,affinity,FUN_0045f0a0,ported
 0045f0d0,68,bmx/com/zge/ngif/ngiffx.c,affinity,FUN_0045f0d0,ported
@@ -802,10 +802,10 @@ addr,size,file,confidence,name,status
 0045fe00,56,bmx/com/zge/ngif/ngifpsx.c,affinity,FUN_0045fe00,ported
 0045fe50,197,bmx/com/zge/ngif/ngifpsx.c,affinity,FUN_0045fe50,ported
 0045ff60,76,bmx/com/zge/ngif/ngifpsx.c,affinity,FUN_0045ff60,ported
-0045ffd0,1287,bmx/com/zge/ngif/ngifpsx.c,affinity,FUN_0045ffd0,orig
+0045ffd0,1287,bmx/com/zge/ngif/ngifpsx.c,affinity,FUN_0045ffd0,ported
 00460640,1005,bmx/com/zge/ngif/ngifpsx.c,affinity,FUN_00460640,ported
-00460b40,1316,bmx/com/zge/ngif/ngifpsx.c,affinity,FUN_00460b40,orig
-004611d0,1033,bmx/com/zge/ngif/ngifpsx.c,affinity,FUN_004611d0,orig
+00460b40,1316,bmx/com/zge/ngif/ngifpsx.c,affinity,FUN_00460b40,ported
+004611d0,1033,bmx/com/zge/ngif/ngifpsx.c,affinity,FUN_004611d0,ported
 00461700,784,bmx/com/zge/ngif/ngifpsx.c,affinity,FUN_00461700,ported
 00461af0,525,bmx/com/zge/ngif/ngifpsx.c,affinity,FUN_00461af0,ported
 00461da0,515,bmx/com/zge/ngif/ngifpsx.c,affinity,FUN_00461da0,ported

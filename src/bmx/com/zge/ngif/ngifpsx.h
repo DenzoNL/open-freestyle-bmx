@@ -141,10 +141,10 @@ void ngifDrawLineG2(const uint8_t *prim, int blend);
 /* Draw-area primitive (code 0xf8): moves the current camera's viewport. */
 void ngifDrawAreaPrim(const uint8_t *prim);
 
-/* Kinds not in this file. */
-ORIG_FN(0x004611d0, void, ngifDrawPolyF4, (const uint8_t *prim, int blend));
-ORIG_FN(0x00460b40, void, ngifDrawPolyFT4, (const uint8_t *prim, int blend));
-ORIG_FN(0x0045ffd0, void, ngifDrawPolyGT4, (const uint8_t *prim, int blend));
+/* Quads: flat (0x28), textured flat (0x2c, nothing without a material) and textured Gouraud (0x3c). */
+void ngifDrawPolyF4(const uint8_t *prim, int blend);
+void ngifDrawPolyFT4(const uint8_t *prim, int blend);
+void ngifDrawPolyGT4(const uint8_t *prim, int blend);
 
 /* Draws one glyph of an overlay text from the scratch record at 0x55b960 (x is passed zero extended). */
 void ngifDrawTextGlyph(uint32_t x, int y, const void *record);

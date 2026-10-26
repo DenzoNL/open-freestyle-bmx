@@ -85,6 +85,7 @@ typedef void(BMX_CDECL *ZfxSetRasterFn)(uint32_t material, void *raster, int ind
 #define gFxSetParam      ORIG_VAR(0x00561484, ZfxSetParamFn, gFxSetParam)
 #define gFxDrawTriangles ORIG_VAR(0x0056172c, ZfxDrawFn, gFxDrawTriangles)
 #define gFxDrawQuads     ORIG_VAR(0x00561738, ZfxDrawFn, gFxDrawQuads)
+#define gFxDrawLines     ORIG_VAR(0x00561728, ZfxDrawFn, gFxDrawLines)
 #define gFxGetCamera     ORIG_VAR(0x00561db0, ZfxCameraFn, gFxGetCamera)
 #define gFxCameraObject  ORIG_VAR(0x00561db4, ZfxCameraObjectFn, gFxCameraObject)
 #define gFxTextureByHash ORIG_VAR(0x0056104c, ZfxTextureByHashFn, gFxTextureByHash)
@@ -241,6 +242,97 @@ void ngiffxSparkSpawn(int enabled, const void *object, ZfxEmitter *emitter, uint
         COPY32(p->texture, params[12]);
         zlistInsert(emitter->particles, p);
     }
+}
+
+/* Fills one vertex of an immediate mode primitive (the padding word is left alone). */
+static void setVertex(ZfxVertex *v, float x, float y, float z, float u, float tv, uint32_t color)
+{
+    v->x = x;
+    v->y = y;
+    v->z = z;
+    v->u = u;
+    v->v = tv;
+    v->color = color;
+}
+
+/*
+ * The camera rotation (position from the camera matrix) and its transpose with a zero position, which
+ * takes world points into the camera's frame.
+ */
+static void cameraMatrices(ZMatrix *camera, ZMatrix *toCamera)
+{
+    zmatrixCopyRotation(camera, zobjCameraGetMatrix(gFxCameraObject(gFxGetCamera()), 1));
+    zmatrixCopyRotation(toCamera, camera);
+    zmatrixTranspose(toCamera, toCamera);
+    toCamera->pos = (ZVec3){0.0f, 0.0f, 0.0f};
+}
+
+/*
+ * Draws the spark particles: untextured ones as a line from the previous to the current position,
+ * textured ones as a quad of width 2 * size swept along the motion as seen by the camera. The alpha
+ * ramps down over the last 0x200 ms.
+ */
+BMX_ADDR(0x0045cc50)
+int ngiffxSparkRender(const void *effect, ZfxEmitter *emitter)
+{
+    const uint32_t now = gTimeGetTime();
+    int drawn = 0;
+    ZfxParticle *p;
+    ZfxVertex v[4];
+    ZfxQuad quad;
+    ZfxLine line = {.vertex = {&v[0], &v[1]}};
+    ZMatrix camera, toCamera;
+
+    cameraMatrices(&camera, &toCamera);
+    p = zlistFirst(emitter->particles);
+    if (p == NULL) {
+        return 0;
+    }
+    do {
+        const uint32_t rem = (p->birth + p->life) - now;
+        uint32_t color;
+
+        __builtin_memcpy(&color, p->rgba, 4);
+        color = (color & 0x00ffffffu) | ((rem < 0x200 ? (rem >> 1) & 0xff : 0xffu) << 24);
+        if (p->texture == 0) {
+            setVertex(&v[0], p->prev.x, p->prev.y, p->prev.z, 0.0f, 0.0f, color);
+            setVertex(&v[1], p->pos.x, p->pos.y, p->pos.z, 0.0f, 0.0f, color);
+            line.texture = p->texture;
+            gFxDrawLines(0x2202, &line, 1, 0, 0);
+        } else {
+            ZVec3 a = p->pos, b = p->prev, side;
+            float dx, dy, dz;
+            float s;
+
+            camera.pos = p->prev;
+            zmatrixTransformPoint(&a, &toCamera, &a);
+            zmatrixTransformPoint(&b, &toCamera, &b);
+            dx = (float)((double)a.x - b.x);
+            dy = (float)((double)a.y - b.y);
+            dz = (float)((double)a.z - b.z);
+            side = (ZVec3){dy, -dx, 0.0f};
+            zvec3NormalizeScaled(&side, &side);
+            s = p->size;
+            setVertex(&v[0], (float)((double)s * side.x), (float)((double)s * side.y),
+                      (float)((double)s * side.z), 0.0f, 0.0f, color);
+            zmatrixTransformPoint((ZVec3 *)&v[0], &camera, (ZVec3 *)&v[0]);
+            setVertex(&v[1], (float)-((double)s * side.x), (float)-((double)s * side.y),
+                      (float)-((double)s * side.z), 0.0f, 1.0f, color);
+            zmatrixTransformPoint((ZVec3 *)&v[1], &camera, (ZVec3 *)&v[1]);
+            setVertex(&v[2], (float)((double)dx - (double)s * side.x),
+                      (float)((double)dy - (double)s * side.y), (float)((double)dz - (double)s * side.z),
+                      1.0f, 1.0f, color);
+            zmatrixTransformPoint((ZVec3 *)&v[2], &camera, (ZVec3 *)&v[2]);
+            setVertex(&v[3], (float)((double)s * side.x + dx), (float)((double)s * side.y + dy),
+                      (float)((double)s * side.z + dz), 1.0f, 0.0f, color);
+            zmatrixTransformPoint((ZVec3 *)&v[3], &camera, (ZVec3 *)&v[3]);
+            quad = (ZfxQuad){p->texture, {&v[0], &v[1], &v[2], &v[3]}};
+            gFxDrawQuads(0x2202, &quad, 1, 0, 0);
+        }
+        p = zlistNext(emitter->particles);
+        drawn++;
+    } while (p != NULL);
+    return drawn;
 }
 
 /* Shard spawner: a particle with a velocity, and an axis perpendicular-ish to it that spins. */
@@ -772,6 +864,76 @@ void ngiffxLightningSpawn(int enabled, const void *object, ZfxEmitter *emitter, 
             i++;
         } while (i < total);
     }
+}
+
+/*
+ * Draws the lightning segments: untextured ones as a line, textured ones as a camera facing quad of
+ * height 2 * size spanning the segment's camera space offset. The quad's winding flips when the segment
+ * runs leftwards (camera x not positive). The alpha is the remaining life below 0x100 ms, else 0.
+ */
+BMX_ADDR(0x0045eaa0)
+int ngiffxLightningRender(const void *effect, ZfxEmitter *emitter)
+{
+    const uint32_t now = gTimeGetTime();
+    int drawn = 0;
+    ZfxParticle *p;
+    ZfxVertex v[4];
+    ZfxQuad quad = {.vertex = {&v[0], &v[1], &v[2], &v[3]}};
+    ZfxLine line = {.vertex = {&v[0], &v[1]}};
+    ZMatrix camera, toCamera;
+
+    cameraMatrices(&camera, &toCamera);
+    p = zlistFirst(emitter->particles);
+    if (p == NULL) {
+        return 0;
+    }
+    do {
+        const uint32_t rem = (p->birth + p->life) - now;
+        uint32_t color;
+
+        __builtin_memcpy(&color, p->rgba, 4);
+        color = (color & 0x00ffffffu) | ((rem < 0x100 ? rem & 0xff : 0u) << 24);
+        if (p->texture == 0) {
+            setVertex(&v[0], p->prev.x, p->prev.y, p->prev.z, 0.0f, 0.0f, color);
+            setVertex(&v[1], p->pos.x, p->pos.y, p->pos.z, 0.0f, 0.0f, color);
+            line.texture = p->texture;
+            gFxDrawLines(0x2202, &line, 1, 0, 0);
+        } else {
+            ZVec3 a = p->pos, b = p->prev;
+            float dx, dy, dz;
+
+            camera.pos = p->prev;
+            zmatrixTransformPoint(&a, &toCamera, &a);
+            zmatrixTransformPoint(&b, &toCamera, &b);
+            dx = (float)((double)a.x - b.x);
+            dy = (float)((double)a.y - b.y);
+            dz = (float)((double)a.z - b.z);
+            if (dx > 0.0f) {
+                quad.vertex[0] = &v[0];
+                quad.vertex[1] = &v[1];
+                quad.vertex[2] = &v[2];
+                quad.vertex[3] = &v[3];
+            } else {
+                quad.vertex[0] = &v[3];
+                quad.vertex[1] = &v[2];
+                quad.vertex[2] = &v[1];
+                quad.vertex[3] = &v[0];
+            }
+            setVertex(&v[0], 0.0f, -p->size, 0.0f, 0.0f, 0.0f, color);
+            zmatrixTransformPoint((ZVec3 *)&v[0], &camera, (ZVec3 *)&v[0]);
+            setVertex(&v[1], 0.0f, p->size, 0.0f, 0.0f, 1.0f, color);
+            zmatrixTransformPoint((ZVec3 *)&v[1], &camera, (ZVec3 *)&v[1]);
+            setVertex(&v[2], dx, (float)((double)p->size + dy), dz, 1.0f, 1.0f, color);
+            zmatrixTransformPoint((ZVec3 *)&v[2], &camera, (ZVec3 *)&v[2]);
+            setVertex(&v[3], dx, (float)((double)dy - p->size), dz, 1.0f, 0.0f, color);
+            zmatrixTransformPoint((ZVec3 *)&v[3], &camera, (ZVec3 *)&v[3]);
+            quad.texture = p->texture;
+            gFxDrawQuads(0x2202, &quad, 1, 0, 0);
+        }
+        p = zlistNext(emitter->particles);
+        drawn++;
+    } while (p != NULL);
+    return drawn;
 }
 
 BMX_ADDR(0x0045f030)

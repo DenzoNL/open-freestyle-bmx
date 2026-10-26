@@ -663,12 +663,126 @@ static void setupPoly3D(DtCtx *c)
     DT_ARG_INT(c, 3, texture);
 }
 
+/* ---- quads (F4, FT4, GT4) ------------------------------------------------------------------------- */
+
+/* Texture size the stubs report (low 16 bits used by the original; junk above). */
+static uint32_t gQuadTexW, gQuadTexH;
+
+static void *BMX_CDECL stubQuadTexture(uint32_t material, int index)
+{
+    ngLog(0x489a40);
+    ngLog(material);
+    ngLog((uint32_t)index);
+    return (void *)(uintptr_t)0x5678u;
+}
+
+static int BMX_CDECL stubQuadWidth(const void *texture)
+{
+    ngLog(0x498870);
+    ngLog((uint32_t)(uintptr_t)texture);
+    return (int)gQuadTexW;
+}
+
+static int BMX_CDECL stubQuadHeight(const void *texture)
+{
+    ngLog(0x498880);
+    ngLog((uint32_t)(uintptr_t)texture);
+    return (int)gQuadTexH;
+}
+
+static uint32_t quadTexSize(void)
+{
+    static const uint16_t kSize[] = {0, 1, 2, 16, 64, 128, 256, 255, 0x7fff, 0x8000, 0xffff, 0xfff0};
+    const uint32_t junk = (dt_u32() & 1) ? dt_u32() & 0xffff0000u : 0;
+
+    return junk | kSize[dt_u32() % (sizeof kSize / sizeof kSize[0])];
+}
+
+/*
+ * A quad primitive of 0xa0 bytes: random bytes, the flag word (at `flagOff`) mixing every tested bit, float
+ * words (some raw: signalling / quiet NaNs, infinities) from 0x3c on, a material word that is sometimes 0,
+ * and blend mode bytes with values above 3.
+ */
+static uint8_t *quadPrim(unsigned flagOff, unsigned materialOff, unsigned modeOff)
+{
+    static const uint32_t kRaw[] = {0x7f800001u, 0x7fa00000u, 0xffbfffffu, 0x7fc00000u, 0xffc00001u,
+                                    0x7f800000u, 0xff800000u, 0x00000001u, 0x80000000u};
+    uint8_t *p = dt_alloc(0xa0);
+    uint32_t pf = dt_u32();
+
+    dt_fill(p, 0xa0);
+    for (unsigned i = 0x3c; i < 0xa0; i += 4) {
+        const float f = dt_float_edgy(-500.0f, 500.0f);
+
+        if (i == flagOff || i == materialOff) {
+            continue;
+        }
+        if (dt_u32() % 10 == 0) {
+            memcpy(p + i, &kRaw[dt_u32() % (sizeof kRaw / sizeof kRaw[0])], 4);
+        } else if (dt_u32() % 4 != 0) {
+            memcpy(p + i, &f, 4);
+        }
+    }
+    if ((dt_u32() & 1) != 0) {
+        pf &= 0xffffff00u | (dt_u32() & 0x6f);
+    }
+    memcpy(p + flagOff, &pf, 4);
+    if (materialOff != 0 && dt_u32() % 5 == 0) {
+        memset(p + materialOff, 0, 4);
+    }
+    p[modeOff] = (dt_u32() & 1) ? (uint8_t)dt_range(0, 3) : (uint8_t)dt_u32();
+    if ((dt_u32() & 3) == 0) {
+        /* texel / screen coordinates near the edges */
+        static const uint16_t kEdge[] = {0, 1, 0xffff, 0x7fff, 0x8000, 0x8001};
+        for (unsigned i = 8; i < 0x38; i += 2) {
+            if ((dt_u32() & 3) == 0) {
+                memcpy(p + i, &kEdge[dt_u32() % (sizeof kEdge / sizeof kEdge[0])], 2);
+            }
+        }
+    }
+    return p;
+}
+
+static void setupQuad(DtCtx *c, unsigned flagOff, unsigned materialOff, unsigned modeOff)
+{
+    /* not psxBegin(): that stubs the quad functions themselves for the dispatch tests */
+    ngBegin(c, 1);
+    dt_stub(0x0048d660, NULL, (void *)stubDraw4);
+    gNgifScreenW = (dt_u32() & 3) ? 640.0f : dt_float_edgy(0.0f, 2000.0f);
+    gNgifScreenH = (dt_u32() & 3) ? 480.0f : dt_float_edgy(0.0f, 2000.0f);
+    dt_stub(0x00489a40, NULL, (void *)stubQuadTexture);
+    dt_stub(0x00498870, NULL, (void *)stubQuadWidth);
+    dt_stub(0x00498880, NULL, (void *)stubQuadHeight);
+    gQuadTexW = quadTexSize();
+    gQuadTexH = quadTexSize();
+    DT_ARG_PTR(c, 0, quadPrim(flagOff, materialOff, modeOff));
+    DT_ARG_INT(c, 1, (dt_u32() & 1) ? 2 : (dt_u32() & 3) ? 0 : dt_u32());
+}
+
+static void setupPolyGT4(DtCtx *c)
+{
+    setupQuad(c, 0x3c, 0, 0xa);
+}
+
+static void setupPolyFT4(DtCtx *c)
+{
+    setupQuad(c, 0x34, 0x30, 0x38);
+}
+
+static void setupPolyF4(DtCtx *c)
+{
+    setupQuad(c, 0x1c, 0, 0x20);
+}
+
 DT_CASES(ngifpsx_cases2) = {
     {"ngifpsxUpdate", 0x0045fcf0, ngifpsxUpdate, 0, DT_RET_INT, setupScriptStep, 300, 0},
     {"ngifpsxSetup", 0x0045fdc0, ngifpsxSetup, 1, DT_RET_VOID, setupScriptSet, 60, 0},
     {"ngifPrimSetDrawArea", 0x0045fe00, ngifPrimSetDrawArea, 2, DT_RET_VOID, setupDrawArea, 100, 0},
     {"ngifDrawAreaPrim", 0x0045fe50, ngifDrawAreaPrim, 1, DT_RET_VOID, setupAreaPrim, 300, 0},
     {"ngifInitOrderTable", 0x0045ff60, ngifInitOrderTable, 2, DT_RET_VOID, setupInitOt, 300, 0},
+    {"ngifDrawPolyGT4", 0x0045ffd0, (void *)ngifDrawPolyGT4, 2, DT_RET_VOID, setupPolyGT4, 2000, 0},
+    {"ngifDrawPolyFT4", 0x00460b40, (void *)ngifDrawPolyFT4, 2, DT_RET_VOID, setupPolyFT4, 2000, 0},
+    {"ngifDrawPolyF4", 0x004611d0, (void *)ngifDrawPolyF4, 2, DT_RET_VOID, setupPolyF4, 2000, 0},
     {"ngifDrawPolyG4", 0x00460640, (void *)ngifDrawPolyG4, 2, DT_RET_VOID, setupPolyF3, 1000, 0},
     {"ngifDrawPolyF3", 0x00461700, (void *)ngifDrawPolyF3, 2, DT_RET_VOID, setupPolyF3, 1000, 0},
     {"ngifDrawLineF2", 0x00461af0, (void *)ngifDrawLineF2, 2, DT_RET_VOID, setupPolyF3, 1000, 0},

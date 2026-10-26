@@ -227,6 +227,11 @@ typedef void(BMX_CDECL *NgifSetOffsetFn)(void *camera, float x, float y);
 #define gNgifSetViewport   ORIG_VAR(0x00561db8, NgifSetViewportFn, gNgifSetViewport)
 #define gNgifSetViewOffset ORIG_VAR(0x00561dc0, NgifSetOffsetFn, gNgifSetViewOffset)
 #define gNgifDrawQuads     ORIG_VAR(0x00561738, ZrwDrawFn, gNgifDrawQuads)
+typedef void *(BMX_CDECL *NgifGetTextureFn)(uint32_t material, int index);
+typedef int(BMX_CDECL *NgifTextureSizeFn)(void *texture);
+#define gNgifGetTexture    ORIG_VAR(0x00561034, NgifGetTextureFn, gNgifGetTexture)
+#define gNgifTextureWidth  ORIG_VAR(0x00562404, NgifTextureSizeFn, gNgifTextureWidth)
+#define gNgifTextureHeight ORIG_VAR(0x00562408, NgifTextureSizeFn, gNgifTextureHeight)
 
 static const char kNgifFile[] = "C:\\zaxis\\Bmx\\src\\com\\zge\\NgIF\\NgIFpsx.c";
 
@@ -439,6 +444,150 @@ void ngifDrawPolyG4(const uint8_t *prim, int blend)
     fillVertex(&v1, prim, pf, 8, 0x50, prim + 4, alpha);
     fillVertex(&v2, prim, pf, 0x18, 0x70, prim + 0x14, alpha);
     fillVertex(&v3, prim, pf, 0x20, 0x80, prim + 0x1c, alpha);
+    gNgifDrawQuads(flags, &poly, 1, NULL, 0);
+}
+
+/*
+ * Texture coordinates of a corner: with flag 1 two float words at `floatOff`, else the 16 bit texel
+ * position at `texelOff` biased by 0.01 (u) and by `vBias` (v), over the texture size. The float words go
+ * through an x87 FLD / FSTP pair, which keeps their bits in the emulated original (a signalling NaN is not
+ * quietened there), so they are copied.
+ */
+static void setTexel(ZrwDbgVertex *v, const uint8_t *prim, uint32_t flags, unsigned texelOff,
+                     unsigned floatOff, float width, double height, double vBias)
+{
+    if ((flags & 1) != 0) {
+        v->u = rd32(prim, floatOff);
+        v->v = rd32(prim, floatOff + 4);
+    } else {
+        const float u = (float)(((double)(int16_t)rd16(prim, texelOff) + 0.01) / width);
+        const float tv = (float)(((double)(int16_t)rd16(prim, texelOff + 2) + vBias) / height);
+
+        memcpy(&v->u, &u, 4);
+        memcpy(&v->v, &tv, 4);
+    }
+}
+
+/* Size of texture 0 of a material, as the 16 bit values the original keeps. */
+static void textureSize(uint32_t material, float *width, double *height)
+{
+    *width = (float)(int16_t)gNgifTextureWidth(gNgifGetTexture(material, 0));
+    *height = (double)(int16_t)gNgifTextureHeight(gNgifGetTexture(material, 0));
+}
+
+/* Base renderer flags of the quads: 0x2000000 unless the float flag 0x20 is set, 4 unless flag 8 is set. */
+static uint32_t quadFlags(uint32_t pf, uint32_t base)
+{
+    return (pf & 8) == 0 ? base | 4 : base;
+}
+
+/*
+ * Textured Gouraud quad (code 0x3c): a colour per corner and the material word at +0x38. Alpha is 0xff
+ * without blending, else by the blend mode in bits 5..6 of byte 0xa, or the primitive's own (flag 4, bits
+ * 7..14). The v coordinate of the last two corners is biased by -0.01 instead of +0.01.
+ */
+BMX_ADDR(0x0045ffd0)
+void ngifDrawPolyGT4(const uint8_t *prim, int blend)
+{
+    const uint32_t material = rd32(prim, 0x38);
+    const uint32_t pf = rd32(prim, 0x3c);
+    const uint32_t base = quadFlags(pf, (pf & 0x20) != 0 ? 0u : 0x2000000u);
+    uint8_t alpha = 0xff;
+    uint32_t flags;
+    float width;
+    double height;
+    ZrwDbgVertex v0, v1, v2, v3;
+    NgifPoly4 poly = {material, {&v0, &v1, &v2, &v3}};
+
+    textureSize(material, &width, &height);
+    if (blend == 0) {
+        flags = base | 0x120a;
+    } else {
+        flags = blendFlags(base, blend, (prim[0xa] >> 5) & 3, &alpha);
+        if ((pf & 4) != 0) {
+            alpha = (uint8_t)(pf >> 7);
+        }
+    }
+    fillVertex(&v0, prim, pf, 0x18, 0x74, prim + 0x14, alpha);
+    setTexel(&v0, prim, pf, 0x1c, 0x4c, width, height, 0.01);
+    fillVertex(&v1, prim, pf, 0xc, 0x64, prim + 4, alpha);
+    setTexel(&v1, prim, pf, 0x10, 0x44, width, height, 0.01);
+    fillVertex(&v2, prim, pf, 0x24, 0x84, prim + 0x20, alpha);
+    setTexel(&v2, prim, pf, 0x28, 0x54, width, height, -0.01);
+    fillVertex(&v3, prim, pf, 0x30, 0x94, prim + 0x2c, alpha);
+    setTexel(&v3, prim, pf, 0x34, 0x5c, width, height, -0.01);
+    gNgifDrawQuads(flags, &poly, 1, NULL, 0);
+}
+
+/*
+ * Flags of the flat quads (F4, FT4): without the 0x40 flag the base is 0x2000001 whatever the float flag
+ * says; without blending only 8 is added (no 0x1200 as in the other kinds). The blend mode is the whole
+ * byte at `modeOff` (values above 3 select the default 0x2202).
+ */
+static uint32_t flatQuadFlags(const uint8_t *prim, uint32_t pf, int blend, unsigned modeOff, uint8_t *alpha)
+{
+    uint32_t base = (pf & 0x20) != 0 ? 0u : 0x2000000u;
+    uint32_t flags;
+
+    if ((pf & 0x40) == 0) {
+        base = 0x2000001u;
+    }
+    base = quadFlags(pf, base);
+    *alpha = 0xff;
+    if (blend == 0) {
+        return base | 8;
+    }
+    flags = blendFlags(base, blend, prim[modeOff], alpha);
+    if ((pf & 4) != 0) {
+        *alpha = (uint8_t)(pf >> 7);
+    }
+    return flags;
+}
+
+/* Textured flat quad (code 0x2c): material word at +0x30; nothing is drawn without one. */
+BMX_ADDR(0x00460b40)
+void ngifDrawPolyFT4(const uint8_t *prim, int blend)
+{
+    const uint32_t material = rd32(prim, 0x30);
+    uint32_t pf;
+    uint32_t flags;
+    uint8_t alpha;
+    float width;
+    double height;
+    ZrwDbgVertex v0, v1, v2, v3;
+    NgifPoly4 poly = {material, {&v0, &v1, &v2, &v3}};
+
+    if (material == 0) {
+        return;
+    }
+    textureSize(material, &width, &height);
+    pf = rd32(prim, 0x34);
+    flags = flatQuadFlags(prim, pf, blend, 0x38, &alpha);
+    fillVertex(&v0, prim, pf, 0x12, 0x6c, prim + 4, alpha);
+    setTexel(&v0, prim, pf, 0x16, 0x44, width, height, 0.01);
+    fillVertex(&v1, prim, pf, 8, 0x5c, prim + 4, alpha);
+    setTexel(&v1, prim, pf, 0xc, 0x3c, width, height, 0.01);
+    fillVertex(&v2, prim, pf, 0x1c, 0x7c, prim + 4, alpha);
+    setTexel(&v2, prim, pf, 0x20, 0x4c, width, height, -0.01);
+    fillVertex(&v3, prim, pf, 0x26, 0x8c, prim + 4, alpha);
+    setTexel(&v3, prim, pf, 0x2a, 0x54, width, height, -0.01);
+    gNgifDrawQuads(flags, &poly, 1, NULL, 0);
+}
+
+/* Flat quad (code 0x28): one colour, no texture (texture word and UVs zero). */
+BMX_ADDR(0x004611d0)
+void ngifDrawPolyF4(const uint8_t *prim, int blend)
+{
+    const uint32_t pf = rd32(prim, 0x1c);
+    uint8_t alpha;
+    const uint32_t flags = flatQuadFlags(prim, pf, blend, 0x20, &alpha);
+    ZrwDbgVertex v0, v1, v2, v3;
+    NgifPoly4 poly = {0, {&v0, &v1, &v2, &v3}};
+
+    fillVertex(&v0, prim, pf, 0xc, 0x54, prim + 4, alpha);
+    fillVertex(&v1, prim, pf, 8, 0x44, prim + 4, alpha);
+    fillVertex(&v2, prim, pf, 0x10, 0x64, prim + 4, alpha);
+    fillVertex(&v3, prim, pf, 0x14, 0x74, prim + 4, alpha);
     gNgifDrawQuads(flags, &poly, 1, NULL, 0);
 }
 
