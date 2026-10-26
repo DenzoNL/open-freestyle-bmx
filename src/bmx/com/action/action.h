@@ -81,11 +81,4 @@ uint32_t actionStopSounds(void);
 uint32_t actionUpdate(void);
 void actionShutdown(void);
 
-/*
- * Callees that are not ported yet. Names are guessed from what the functions do.
- */
-ORIG_FN(0x00405780, void, actionStepPlayers, (void));
-ORIG_FN(0x0042e2f0, void, propUpdate, (void));
-ORIG_FN(0x00430410, void, replaySetMode, (uint32_t handle, uint32_t mode));
-
 #endif

@@ -163,12 +163,154 @@ static void setupUpdate(DtCtx *c)
     }
 }
 
+/* ---- replaySetMode -------------------------------------------------------------------------------- */
+
+static ZVec3 bikePos[3];
+
+static void BMX_CDECL stubFaceMatrix(void *actor, const ZMatrix *m)
+{
+    dtgpLog(0x4763b001u);
+    dtgpLogP(actor);
+    dtgpLogP(m);
+}
+
+static void BMX_CDECL stubSetPos(void *actor, const ZVec3 *pos)
+{
+    dtgpLog(0x47291001u);
+    dtgpLogP(actor);
+    dtgpLogN(pos, 3);
+}
+
+static void BMX_CDECL stubSetHeight(void *actor, float height)
+{
+    dtgpLog(0x47622001u);
+    dtgpLogP(actor);
+    dtgpLogF(height);
+}
+
+static ZVec3 *BMX_CDECL stubGetPos(void *actor)
+{
+    dtgpLog(0x47294001u);
+    dtgpLogP(actor);
+    return &bikePos[dt_u32() % 3];
+}
+
+static float BMX_CDECL stubGetHeight(const void *actor)
+{
+    dtgpLog(0x47628001u);
+    dtgpLogP(actor);
+    return dt_float_edgy(-100.0f, 100.0f);
+}
+
+static void BMX_CDECL stubLoadProps(const void *state)
+{
+    dtgpLog(0x42eb7001u);
+    dtgpLogP(state);
+}
+
+static void BMX_CDECL stubResetRider(int player, int full)
+{
+    dtgpLog(0x40c19001u);
+    dtgpLog((uint32_t)player);
+    dtgpLog((uint32_t)full);
+}
+
+/* Valid actor pointers in a rider image (the live rider or a snapshot of one). */
+static void riderActors(PhysRider *rider, uint8_t *actorImage)
+{
+    uint8_t *actor = dt_alloc(0x278);
+    uint8_t *block = dt_alloc(0xd60);
+    uint8_t *rig = dt_alloc(0xe88);
+
+    dt_fill(actor, 0x278);
+    dt_fill(block, 0xd60);
+    dt_fill(rig, 0xe88);
+    *(uint8_t **)(actor + 0x48) = block;
+    if (actorImage != NULL) {
+        *(uint8_t **)(actorImage + 0x48) = dt_alloc(0xd60);
+    }
+    rider->actor = actor;
+    rider->actor2 = rig;
+    rider->bikeObj = (void *)(uintptr_t)(0x00370000u + (dt_u32() & 0xff) * 0x10u);
+}
+
+static void setupSetMode(DtCtx *c)
+{
+    uint8_t flags;
+    uint32_t size, total, at, handle, mode;
+    Replay *r;
+
+    dtgpBegin(c, DTGP_DEBUG | DTGP_GAME);
+    flags = (uint8_t)((dt_u32() & 3) == 0 ? dt_u32() : dt_u32() & 7);
+    size = (uint32_t)dt_range(0x10, 0x60) & ~3u;
+    total = 0x40 + size + 0x5bd0 + 0x1680 + 0x4e;
+    at = 0x40 + size;
+    handle = (uint32_t)dt_range(0, 4);
+    dt_stub(0x004763b0, NULL, (void *)stubFaceMatrix);
+    dt_stub(0x00472910, NULL, (void *)stubSetPos);
+    dt_stub(0x00476220, NULL, (void *)stubSetHeight);
+    dt_stub(0x00472940, NULL, (void *)stubGetPos);
+    dt_stub(0x00476280, NULL, (void *)stubGetHeight);
+    dt_stub(0x0042eb70, NULL, (void *)stubLoadProps);
+    dt_stub(0x0040c190, NULL, (void *)stubResetRider);
+    randomReplays(0);
+    dt_fill(bikePos, sizeof bikePos);
+    dt_fill(&gPropState, sizeof gPropState);
+    dt_fill(&gContrlerPads, sizeof gContrlerPads);
+    gCurrentLevel = (uint8_t)((dt_u32() & 7) == 0 ? dt_u32() : (uint32_t)dt_range(0, 7));
+    dtgp.mode = (dt_u32() & 3) == 0 ? (uint32_t)dt_range(1, 3) : 0;
+    dtgp.subMode = (dt_u32() & 3) == 0 ? (uint32_t)dt_range(1, 3) : 0;
+    dtgp.goalInfo = dt_alloc(0x27);
+    dt_fill(dtgp.goalInfo, 0x27);
+
+    r = dt_alloc(total);
+    dt_fill(r, total);
+    r->flags = flags;
+    r->rider = (uint8_t)dt_range(0, 1);
+    r->headerSize = 0x40;
+    r->size = size;
+    r->state = (uint8_t)((dt_u32() & 7) == 0 ? dt_u32() : (uint32_t)dt_range(0, 4));
+    r->field10 = (dt_u32() & 3) == 0 ? 0 : (uint32_t)dt_range(1, 200);
+    r->cursor = (uint8_t *)r + ((dt_u32() & 3) == 0 ? 0x40 + size - 3 + (uint32_t)dt_range(-1, 1)
+                                                    : (uint32_t)dt_range(0x40, 0x40 + (int)size - 4));
+    if ((flags & 1) == 0) {
+        r->partA = at;
+        r->partAEnd = at + 0x2de8;
+        riderActors((PhysRider *)(void *)((uint8_t *)r + r->partA), (uint8_t *)r + r->partA + 0xf70);
+        riderActors((PhysRider *)(void *)((uint8_t *)r + r->partAEnd), (uint8_t *)r + r->partAEnd + 0xf70);
+        at += 0x5bd0;
+    }
+    if ((flags & 2) == 0) {
+        r->partB = at;
+        r->partBEnd = at + 0xb40;
+        at += 0x1680;
+    }
+    if ((flags & 4) == 0) {
+        r->partC = at;
+        r->partCEnd = at + 0x27;
+    }
+    dt_fill(&gPhysRiders[r->rider], sizeof(PhysRider));
+    riderActors(&gPhysRiders[r->rider], NULL);
+    gProfiles[r->rider].controller = (dt_u32() & 15) == 0 ? (uint8_t)dt_u32() : (uint8_t)dt_range(0, 1);
+    if ((dt_u32() & 15) == 0) {
+        handle = (uint32_t)dt_range(5, 7); /* past the table: asserts, then uses the slot anyway */
+    }
+    ((uint32_t *)&gReplays[0])[handle] = (dt_u32() & 15) == 0 ? 0 : (uint32_t)(uintptr_t)r;
+    mode = (dt_u32() & 3) == 0 ? r->state : (uint32_t)dt_range(0, 4);
+    if ((dt_u32() & 15) == 0) {
+        mode |= dt_u32() & 0xffffff00u;
+    }
+    DT_ARG_INT(c, 0, (dt_u32() & 1) != 0 ? (dt_u32() & 0xffffff00u) | handle : handle);
+    DT_ARG_INT(c, 1, mode);
+}
+
 DT_CASES(replay_cases) = {
     {"replayUpdate", 0x0042fd50, replayUpdate, 0, DT_RET_VOID, setupUpdate, 3000, 0},
     {"replayInit", 0x0042fce0, replayInit, 0, DT_RET_VOID, setupInit, 10, 0},
     {"replayDestroyAll", 0x0042fd10, replayDestroyAll, 0, DT_RET_VOID, setupDestroyAll, 100, 0},
     {"replayCreate", 0x00430180, replayCreate, 1, DT_RET_INT8, setupCreate, 1500, 0},
     {"replayDestroy", 0x00430380, replayDestroy, 1, DT_RET_VOID, setupDestroy, 300, 0},
+    {"replaySetMode", 0x00430410, replaySetMode, 2, DT_RET_INT8, setupSetMode, 1500, 0},
     {"replayGetState", 0x00430b70, replayGetState, 1, DT_RET_INT, setupHandle, 300, 0},
     {"replaySetRider", 0x00430bf0, replaySetRider, 2, DT_RET_INT, setupSetRider, 300, 0},
     {"replayGetRider", 0x00430c70, replayGetRider, 1, DT_RET_INT, setupHandle, 300, 0},

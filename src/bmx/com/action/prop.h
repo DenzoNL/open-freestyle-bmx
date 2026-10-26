@@ -75,7 +75,9 @@ typedef PropNodeState PropNodeStates[64];
 #define gPropDefaults   ORIG_VAR(0x0056c4f8, PropState, gPropDefaults)
 
 /* Starts a prop moving (collect: release == 0) or putting it back (release != 0). */
-ORIG_FN(0x0042f0d0, void, propSwitch, (PropRecord * prop, uint32_t player, int release));
+void propSwitch(PropRecord *prop, uint32_t player, int release);
+/* Per frame update of the props of the level: timers, movement, rider pushes, looping sounds. */
+void propUpdate(void);
 
 /* The prop node whose tag has this id (NULL if none). */
 PhysPropNode *propFindNode(uint32_t id);

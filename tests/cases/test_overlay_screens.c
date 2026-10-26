@@ -1,4 +1,5 @@
 /* Overlay menu screens (screens 1..18 and 25): enter, update, draw and refresh callbacks. */
+#include "bmx/com/action/game.h"
 #include "bmx/com/action/overlay.h"
 #include "dt.h"
 #include "dt_overlay.h"
@@ -173,6 +174,33 @@ static void setup_goal_line(DtCtx *c)
     DT_ARG_INT(c, 4, dt_u32() % 2);
 }
 
+/* Screen 8 draw: judges ranked 0..9 (with the player's hidden rider standing in for judge 5), the rows
+ * fading in, 0..3 runs (or the count of -1 that skips the run columns). */
+static uint32_t screen8Runs;
+
+static uint32_t BMX_CDECL stubScreen8Runs(void)
+{
+    return screen8Runs;
+}
+
+static void setup_screen8_draw(DtCtx *c)
+{
+    dtOvlBegin(c, DTS_STRING | DTS_TEXTWIDTH | DTS_DRAWTEXT | DTS_DRAWRECT | DTS_SOUND | DTS_HEADER |
+                      DTS_RIDERREC);
+    dt_stub(0x0040bdc0, NULL, (void *)stubScreen8Runs);
+    screen8Runs = dt_u32() % 8 == 0 ? 0xffffffffu : (uint32_t)dt_range(0, 3);
+    gCurrentPlayer = (uint8_t)dt_range(0, 1);
+    gProfiles[gCurrentPlayer].character = (uint8_t)(dt_u32() % 2 ? dt_range(0, 9) : dt_range(10, 12));
+    for (int i = 0; i < 10; i++) {
+        gGameJudgeRank[i] = (uint8_t)(dt_u32() % 4 == 0 ? 5 : dt_range(0, 9));
+    }
+    if (dt_u32() % 4 == 0) {
+        gGameJudgeRank[dt_range(0, 9)] = gProfiles[gCurrentPlayer].character;
+    }
+    dt_fill(&gGameJudgeScores, sizeof gGameJudgeScores);
+    gOvlFrame = dt_u32() % 4 == 0 ? dt_u32() : (uint32_t)dt_range(0, 0xb0);
+}
+
 DT_CASES(overlay_screen_cases) = {
     {"ovlScreen1Enter", 0x004157e0, ovlScreen1Enter, 1, DT_RET_VOID, setup_screen1_enter, 300, 0},
     {"ovlScreen1Update", 0x00415a00, ovlScreen1Update, 0, DT_RET_INT, setup_screen1_update, 600, 0},
@@ -207,6 +235,7 @@ DT_CASES(overlay_screen_cases) = {
     {"ovlScreen18Draw", 0x004192b0, ovlScreen18Draw, 0, DT_RET_VOID, setup_screen18_draw, 400, 0},
     {"ovlScreen7Enter", 0x00419380, ovlScreen7Enter, 1, DT_RET_VOID, setup_screen7_enter, 300, 0},
     {"ovlScreen7Update", 0x004194c0, ovlScreen7Update, 0, DT_RET_INT, setup_screen7_update, 800, 0},
+    {"ovlScreen8Draw", 0x004196c0, ovlScreen8Draw, 0, DT_RET_VOID, setup_screen8_draw, 1000, 0},
     {"ovlScreen8Update", 0x00419ca0, ovlScreen8Update, 0, DT_RET_INT, setup_screen8_update, 500, 0},
     {"ovlScreen9Draw", 0x00419d90, ovlScreen9Draw, 0, DT_RET_VOID, setup_screen9_draw, 400, 0},
     {"ovlDrawRunTimes", 0x00419eb0, ovlDrawRunTimes, 1, DT_RET_VOID, setup_run_times_arg, 800, 0},

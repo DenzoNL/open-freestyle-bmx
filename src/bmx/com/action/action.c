@@ -467,7 +467,7 @@ L_4563:
             } else {
                 refreshView(player);
             }
-            actionStepPlayers();
+            cameraUpdate();
             gAction.step = 4;
             gAction.timer = 0;
             break;
@@ -686,7 +686,7 @@ L_4ae6:
     goto L_4725;
 
 L_4720:
-    actionStepPlayers();
+    cameraUpdate();
 L_4725:
     zrollerRunDrawCallbacks();
     if (gActionFrameReload == -1) {

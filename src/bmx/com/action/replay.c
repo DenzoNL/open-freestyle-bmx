@@ -7,6 +7,8 @@
 #include "bmx/com/action/game.h"
 #include "bmx/com/action/overlay.h"
 #include "bmx/com/action/physics.h"
+#include "bmx/com/action/prop.h"
+#include "bmx/com/zge/zactor.h"
 #include "compat/crt.h"
 #include "zge/zdebug.h"
 #include "zge/zmem.h"
@@ -264,6 +266,159 @@ void replayDestroy(uint32_t handle)
     gReplays[index] = NULL;
 }
 
+/*
+ * Snapshot of a rider in part A (0x2de8 bytes): the rider record, its actor (and the block at +0x48 of
+ * it), its rig, the bike actor's position and height, and the pad's buttons.
+ */
+enum {
+    kSnapActor = 0xf70,
+    kSnapActorBlock = 0x11e8,
+    kSnapRig = 0x1f48,
+    kSnapBikePos = 0x2dd0,
+    kSnapBikeHeight = 0x2de0,
+    kSnapButtons = 0x2de4,
+};
+
+static void *actorBlock(const PhysRider *r)
+{
+    return *(void **)((uint8_t *)r->actor + 0x48);
+}
+
+static void snapshotSave(uint8_t *snap, PhysRider *r, const ContrlerPad *pad)
+{
+    zmemCopy(snap, r, sizeof *r);
+    zmemCopy(snap + kSnapActor, r->actor, 0x278);
+    zmemCopy(snap + kSnapActorBlock, actorBlock(r), 0xd60);
+    zmemCopy(snap + kSnapRig, r->actor2, 0xe88);
+    ((uint32_t *)(snap + kSnapBikePos))[0] = ((const uint32_t *)zactorGetPos(r->bikeObj))[0];
+    ((uint32_t *)(snap + kSnapBikePos))[1] = ((const uint32_t *)zactorGetPos(r->bikeObj))[1];
+    ((uint32_t *)(snap + kSnapBikePos))[2] = ((const uint32_t *)zactorGetPos(r->bikeObj))[2];
+    *(float *)(snap + kSnapBikeHeight) = zactorGetHeight(r->bikeObj);
+    *(uint32_t *)(snap + kSnapButtons) = pad->state.buttons;
+}
+
+/* Puts a snapshot back (the rider record first: the actor pointers are the restored ones). */
+static void snapshotRestore(PhysRider *r, const uint8_t *snap, int rig)
+{
+    zmemCopy(r, snap, sizeof *r);
+    zmemCopy(r->actor, snap + kSnapActor, 0x278);
+    zmemCopy(actorBlock(r), snap + kSnapActorBlock, 0xd60);
+    if (rig != 0) {
+        zmemCopy(r->actor2, snap + kSnapRig, 0xe88);
+    }
+    zactorFaceMatrix(r->bikeObj, &r->basis);
+    zactorSetPos(r->bikeObj, (const ZVec3 *)(snap + kSnapBikePos));
+    zactorSetHeight(r->bikeObj, *(const float *)(snap + kSnapBikeHeight));
+}
+
+/* Whether the goal info is part of the replay: part C kept and the game mode has one (mode 0, sub 0, level <
+ * 6). */
+static int keepsGoalInfo(const Replay *r)
+{
+    return (r->flags & 4) == 0 && gameGetMode() == 0 && gameGetSubMode() == 0 && gCurrentLevel < 6;
+}
+
+/*
+ * Mode switch of a recorder. Leaving a recording closes it with a final counter record; leaving a playback
+ * for mode 0 / 1 restores the live rider (without its rig), props and goal info saved when playback began.
+ */
+BMX_ADDR(0x00430410)
+uint8_t replaySetMode(uint32_t handle, uint32_t mode)
+{
+    Replay *const rp = replayLookup(handle, 0x175, 0x177);
+    PhysRider *const r = &gPhysRiders[rp->rider];
+    const ContrlerPad *const pad =
+        (const ContrlerPad *)contrlerGet(((const OvlProfile *)gProfiles)[rp->rider].controller);
+    const uint32_t old = rp->state;
+
+    if (mode == old) {
+        return rp->state;
+    }
+    if (old == 1) {
+        if ((uintptr_t)rp->cursor < bufferLimit(rp)) {
+            *rp->cursor = (uint8_t)(rp->counter + 1);
+            rp->cursor++;
+            *rp->cursor = 0;
+            rp->cursor[1] = 0;
+            rp->counter = 0;
+            rp->cursor += 2;
+        }
+    } else if ((old == 2 || old == 4) && mode <= 1) {
+        if ((rp->flags & 1) == 0) {
+            snapshotRestore(r, (uint8_t *)rp + rp->partAEnd, 0);
+        }
+        if ((rp->flags & 2) == 0) {
+            propLoadState((uint8_t *)rp + rp->partBEnd);
+        }
+        if (keepsGoalInfo(rp)) {
+            zmemCopy(comdataGetGoalInfo(rp->rider, gCurrentLevel), (uint8_t *)rp + rp->partCEnd, 0x27);
+        }
+    }
+    if (mode == 1) {
+        rp->padIndex = r->padIndex;
+        if ((rp->flags & 2) == 0) {
+            zmemCopy((uint8_t *)rp + rp->partB, &gPropState, 0xb40);
+        }
+        if (keepsGoalInfo(rp)) {
+            zmemCopy((uint8_t *)rp + rp->partC, comdataGetGoalInfo(rp->rider, gCurrentLevel), 0x27);
+        }
+        if ((rp->flags & 1) == 0) {
+            snapshotSave((uint8_t *)rp + rp->partA, r, pad);
+            rp->buttons = pad->state.buttons;
+        } else {
+            rp->buttons = 0;
+        }
+        rp->sticks[0] = 0;
+        rp->sticks[1] = 0;
+        rp->field08 = 0;
+        rp->cursor = (uint8_t *)rp + rp->headerSize;
+        rp->field10 = 0;
+        rp->counter = 0;
+    } else if (mode == 2) {
+        if (rp->field10 == 0) {
+            /* nothing recorded: the recorder switches off */
+            rp->state = 0;
+            return 0;
+        }
+        r->padIndex = (uint8_t)rp->padIndex;
+        if (rp->state <= 1) {
+            if ((rp->flags & 2) == 0) {
+                zmemCopy((uint8_t *)rp + rp->partBEnd, &gPropState, 0xb40);
+            }
+            if (keepsGoalInfo(rp)) {
+                zmemCopy((uint8_t *)rp + rp->partCEnd, comdataGetGoalInfo(rp->rider, gCurrentLevel), 0x27);
+            }
+        }
+        if ((rp->flags & 2) == 0) {
+            propLoadState((uint8_t *)rp + rp->partB);
+        }
+        if (keepsGoalInfo(rp)) {
+            zmemCopy(comdataGetGoalInfo(rp->rider, gCurrentLevel), (uint8_t *)rp + rp->partC, 0x27);
+        }
+        if ((rp->flags & 1) == 0) {
+            const uint8_t *const start = (const uint8_t *)rp + rp->partA;
+
+            if (rp->state <= 1) {
+                snapshotSave((uint8_t *)rp + rp->partAEnd, r, pad);
+            }
+            snapshotRestore(r, start, 1);
+            rp->buttons = *(const uint32_t *)(start + kSnapButtons);
+        } else {
+            gameResetRider(rp->rider, 1);
+            rp->buttons = 0;
+        }
+        rp->sticks[0] = 0;
+        rp->sticks[1] = 0;
+        rp->field08 = 0;
+        rp->cursor = (uint8_t *)rp + rp->headerSize;
+        rp->state = (uint8_t)mode;
+        rp->counter = *rp->cursor & 0x1f;
+        return (uint8_t)mode;
+    }
+    rp->state = (uint8_t)mode;
+    return rp->state;
+}
+
 BMX_ADDR(0x00430b70)
 uint32_t replayGetState(uint32_t handle)
 {
@@ -295,7 +450,7 @@ void replayGetBuffer(uint32_t source, uint8_t **data, int *size)
 {
     const Replay *const r = replayLookup(source, 0x282, 0x284);
 
-    *data = (uint8_t *)r->pad0c;
+    *data = (uint8_t *)&r->padIndex;
     *size = (int)r->size + 0x34;
     if ((r->flags & 1) == 0) {
         *size += 0x5bd0;

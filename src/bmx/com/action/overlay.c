@@ -1877,6 +1877,114 @@ confirm:
     return 1;
 }
 
+/* Text colour of a judge's row at brightness `shade`: grey, or (the player's own rider) a warm tint. */
+static uint32_t ovlJudgeColor(uint32_t shade, int own)
+{
+    uint32_t c;
+
+    if (own == 0) {
+        return 0x2000000u | shade << 16 | shade << 8 | shade;
+    }
+    c = (shade * 0xd000u) & 0xffff00ffu;
+    c |= shade * 0x90u;
+    c &= 0xffffff00u;
+    return c | shade >> 4 | 0x2000000u;
+}
+
+/* A judge's score byte as points out of 100 with one decimal ("%02d.%d", 255 = 100.0). */
+static void ovlJudgeScoreText(char *buf, uint8_t score)
+{
+    const double v = (double)score * 0x1.919192p-2f;
+    const int32_t whole = bmxFtol(v);
+    const float wholeF = (float)whole;
+    const int32_t tenth = bmxFtol((v - wholeF) * 10.0f);
+
+    zstrFormat(buf, "%02d.%d", bmxFtol(wholeF), tenth);
+}
+
+/*
+ * Screen 8 draw: the competition results. One row per judge (in ranking order) with the place, the judge's
+ * name, the score of each run and the average; the rows fade in one after the other (16 frames each, a
+ * click as each starts), outlined while lit. Judge 5 stands for the player's own rider when that is one
+ * of the hidden riders (10 and up).
+ */
+BMX_ADDR(0x004196c0)
+void ovlScreen8Draw(void)
+{
+    const uint32_t character = ovlProfile(gCurrentPlayer)->character;
+    const char *text;
+    char buf[32];
+    int y = 0x89;
+    uint32_t row = 0;
+
+    overlympDrawHeader(zstringGet(0x10a2));
+    zoverDrawText(&gOvlFontTiny, zstringGet(0x10a3), 0x35, 0x72, 0x23040e0, 0);
+    text = zstringGet(0x10a4);
+    zoverDrawText(&gOvlFontTiny, text, ovlCentreX(0xba, zoverTextWidth(text, &gOvlFontTiny)), 0x72, 0x23040e0,
+                  0);
+    text = zstringGet(0x10a5);
+    zoverDrawText(&gOvlFontTiny, text, ovlCentreX(0x189, zoverTextWidth(text, &gOvlFontTiny)), 0x72,
+                  0x23040e0, 0);
+    text = zstringGet(0x10a6);
+    zoverDrawText(&gOvlFontTiny, text, 0x24a - zoverTextWidth(text, &gOvlFontTiny), 0x72, 0x23040e0, 0);
+    for (uint32_t place = 1; place < 11; place++, row++, y += 0x17) {
+        uint32_t judge = gGameJudgeRank[place - 1];
+        const uint32_t frame = gOvlFrame;
+        uint8_t shade;
+        int x;
+
+        if (character >= 10 && judge == 5) {
+            judge = character;
+        }
+        if (frame >> 4 < row) {
+            shade = 0;
+        } else if (frame >> 4 == row) {
+            const uint32_t step = frame & 0xf;
+            int32_t level = bmxFtol((double)step * 1.2f);
+
+            if (level > 15) {
+                level = 15;
+            }
+            shade = (uint8_t)(level << 4);
+            if (step == 1) {
+                bmxSoundPlayAt(0x1390, NULL, 0, 0, 0);
+            }
+        } else {
+            shade = 0xf0;
+        }
+        zstrFormat(buf, "%ld", (long)place);
+        zoverDrawText(&gOvlFontTiny, buf, ovlCentreX(0x40, zoverTextWidth(buf, &gOvlFontTiny)), y,
+                      ovlJudgeColor(shade, judge == character), 0);
+        zstrFormat(buf, "%s", ngifzresGetRiderRecord(judge * 5) + 8);
+        zoverDrawText(&gOvlFontTiny, buf, 0x8d, y, ovlJudgeColor(shade, judge == character), 0);
+        if (character >= 10 && judge == character) {
+            judge = 5;
+        }
+        x = 0x171;
+        if (gameGetRunCount() + 1 != 0) {
+            uint32_t run = 0;
+
+            do {
+                ovlJudgeScoreText(buf, (&gGameJudgeScores[0][0])[judge * 3 + run]);
+                zoverDrawText(&gOvlFontTiny, buf, ovlCentreX(x, zoverTextWidth(buf, &gOvlFontTiny)) + 1, y,
+                              0x3000000u | shade * 0x10101u, 0);
+                if (shade != 0) {
+                    zoverDrawRect(x - 0x15, y, 0x2b, 0x16, 0xc0c0c0);
+                }
+                x += 0x2d;
+                run++;
+            } while (run < gameGetRunCount() + 1);
+        }
+        ovlJudgeScoreText(buf, (&gGameJudgeScores[0][0])[judge * 3 + 2]);
+        zoverDrawText(&gOvlFontTiny, buf, ovlCentreX(0x235, zoverTextWidth(buf, &gOvlFontTiny)), y,
+                      0x3000000u | shade * 0x10101u, 0);
+        if (shade != 0) {
+            zoverDrawRect(0x21f, y, 0x2b, 0x16, 0x903030);
+        }
+    }
+    ovlDrawMenuItems(8, 0);
+}
+
 /* Screen 8 update: reward screen of a level; goes on to the unlock screen or saves. */
 BMX_ADDR(0x00419ca0)
 int ovlScreen8Update(void)

@@ -6,6 +6,7 @@
 #include "bmx/com/action/overlay.h"
 #include "bmx/com/action/physics.h"
 #include "bmx/com/action/prop.h"
+#include "bmx/com/zge/bmx/zoverii.h"
 #include "bmx/com/zge/ngif/ngifzroller.h"
 #include "dt.h"
 #include "dt_gameplay.h"
@@ -364,10 +365,225 @@ static void setupInit(DtCtx *c)
     }
 }
 
+/* ---- propSwitch / propUpdate ---------------------------------------------------------------------- */
+
+/* World object callees and the props a switch or an update hands on to, logged. */
+static void BMX_CDECL stubSignal(void *object, int signal)
+{
+    dtgpLog(0x46661001u);
+    dtgpLogP(object);
+    dtgpLog((uint32_t)signal);
+}
+
+static void BMX_CDECL stubSetPosition(void *object, const ZVec3 *pos)
+{
+    dtgpLog(0x4662b001u);
+    dtgpLogP(object);
+    dtgpLogN(pos, 3);
+}
+
+static void BMX_CDECL stubSetRotation(void *object, const int16_t *rot)
+{
+    dtgpLog(0x4661c001u);
+    dtgpLogP(object);
+    dtgpLog((uint16_t)rot[0]);
+    dtgpLog((uint16_t)rot[1]);
+    dtgpLog((uint16_t)rot[2]);
+}
+
+static void BMX_CDECL stubHandOn(uint32_t player, uint8_t *prop)
+{
+    dtgpLog(0x42ee4001u);
+    dtgpLog(player);
+    dtgpLogP(prop);
+}
+
+static void BMX_CDECL stubSwitch(PropRecord *prop, uint32_t player, int release)
+{
+    dtgpLog(0x42f0d001u);
+    dtgpLogP(prop);
+    dtgpLog(player);
+    dtgpLog((uint32_t)release);
+    prop->mode = dt_u32() & 1;
+}
+
+static int BMX_CDECL stubGoal(int player, void *prop)
+{
+    dtgpLog(0x40ca6001u);
+    dtgpLog((uint32_t)player);
+    dtgpLogP(prop);
+    return (int)(dt_u32() & 1);
+}
+
+static float propShape[4];
+
+static const uint8_t *BMX_CDECL stubCollideObject(uint32_t id)
+{
+    dtgpLog(0x46953001u);
+    dtgpLog(id & 0xffff);
+    return (const uint8_t *)propShape;
+}
+
+static uint8_t BMX_CDECL stubSetState(PhysRider *r, int state)
+{
+    dtgpLog(0x420cb001u);
+    dtgpLogP(r);
+    dtgpLog((uint32_t)state);
+    return 2;
+}
+
+static void BMX_CDECL stubBurst(void)
+{
+    dtgpLog(0x408a8001u);
+}
+
+static void switchStubs(void)
+{
+    dt_stub(0x00466610, NULL, (void *)stubSignal);
+    dt_stub(0x004662b0, NULL, (void *)stubSetPosition);
+    dt_stub(0x004661c0, NULL, (void *)stubSetRotation);
+}
+
+/* A definition of any type (mostly 0 .. 5) and kind (mostly 0 .. 21). */
+static void randomSwitchDef(PropDef *d)
+{
+    d->type = (dt_u32() & 1) != 0 ? 0 : ((dt_u32() & 7) == 0 ? (uint8_t)dt_u32() : (uint8_t)dt_range(1, 5));
+    d->kind = (dt_u32() & 15) == 0 ? (uint8_t)dt_u32() : (uint8_t)dt_range(0, 21);
+}
+
+static PhysPropObject *propObject(void)
+{
+    PhysPropObject *o = dt_alloc(sizeof *o);
+
+    dt_fill(o, sizeof *o);
+    o->scale[0] = dt_float(0.5f, 3.0f);
+    o->scale[1] = dt_float(0.5f, 3.0f);
+    o->scale[2] = dt_float(0.5f, 3.0f);
+    return o;
+}
+
+/* Linked prop ids (paramA / paramB) that propFind may or may not resolve. */
+static void randomLinks(PropRecord *r)
+{
+    r->paramA = (dt_u32() & 3) == 0 ? 0 : (uint32_t)pickId();
+    r->paramB = (dt_u32() & 3) == 0 ? 0 : (uint32_t)pickId();
+}
+
+static void setupSwitch(DtCtx *c)
+{
+    PropRecord *rec;
+    const uint32_t player = (uint32_t)dt_range(0, 3);
+
+    dtgpBegin(c, DTGP_DEBUG | DTGP_SOUND);
+    switchStubs();
+    dt_stub(0x0042ee40, NULL, (void *)stubHandOn);
+    randomDefs();
+    randomRecords();
+    rec = &gPropRecords[dt_range(0, 15)];
+    rec->object = propObject();
+    if ((dt_u32() & 3) != 0) {
+        rec->mode = dt_u32() & 1;
+    }
+    randomLinks(rec);
+    randomSwitchDef(&gPropDefs[gCurrentLevel][rec->index]);
+    gPhysRiders[player].vel.x = dt_float_edgy(-100.0f, 100.0f);
+    gPhysRiders[player].vel.y = dt_float_edgy(-100.0f, 100.0f);
+    gPhysRiders[player].vel.z = dt_float_edgy(-100.0f, 100.0f);
+    DT_ARG_PTR(c, 0, rec);
+    DT_ARG_INT(c, 1, player);
+    DT_ARG_INT(c, 2, (dt_u32() & 1) != 0 ? 0 : ((dt_u32() & 3) == 0 ? dt_u32() : 1));
+}
+
+/* A rider near the prop (or far away), on it or not, in a state that is carried along or not. */
+static void randomPushRider(PhysRider *r, const PropRecord *rec)
+{
+    static const uint8_t surfaces[] = {0xc, 0xc, 9, 9, 0, 3};
+    const float range = (dt_u32() & 3) == 0 ? 2000.0f : 250.0f;
+
+    dt_fill(r, sizeof *r);
+    r->flags = dt_u32();
+    if ((dt_u32() & 3) != 0) {
+        r->flags |= 1;
+    }
+    r->player = (uint8_t)dt_range(0, 1);
+    r->soundCooldown = (dt_u32() & 3) != 0 ? 0 : (uint8_t)dt_u32();
+    r->state = (uint8_t)((dt_u32() & 1) != 0 ? 4 + 2 * dt_range(0, 1) : dt_range(0, 8));
+    r->surface = surfaces[dt_u32() % sizeof surfaces];
+    if (r->surface == 9) {
+        PhysEdge *e = dt_alloc(sizeof *e);
+
+        dt_fill(e, sizeof *e);
+        e->prop = (dt_u32() & 3) != 0 ? rec->object : NULL;
+        r->contact = e;
+    } else {
+        r->contact = (dt_u32() & 3) != 0 ? (void *)rec->object : NULL;
+    }
+    r->pos.x = rec->pos.x + dt_float(-range, range);
+    r->pos.y = rec->pos.y + dt_float(-range * 0.5f, range * 0.5f);
+    r->pos.z = rec->pos.z + dt_float(-range, range);
+    r->step.x = (dt_u32() & 7) == 0 ? dt_float_edgy(-1e-4f, 1e-4f) : dt_float(-5.0f, 5.0f);
+    r->step.y = (dt_u32() & 7) == 0 ? dt_float_edgy(-1e-4f, 1e-4f) : dt_float(-5.0f, 5.0f);
+    r->step.z = (dt_u32() & 7) == 0 ? dt_float_edgy(-1e-4f, 1e-4f) : dt_float(-5.0f, 5.0f);
+    r->up.y = dt_float(-1.0f, 1.0f);
+    r->actor2 = dt_alloc(sizeof(ZRig));
+}
+
+static void setupUpdate(DtCtx *c)
+{
+    static const uint8_t timers[] = {0, 1, 1, 2, 5};
+
+    dtgpBegin(c, DTGP_DEBUG | DTGP_SOUND);
+    switchStubs();
+    dt_stub(0x0042f0d0, NULL, (void *)stubSwitch);
+    dt_stub(0x0042ed80, NULL, (void *)stubHandOn);
+    dt_stub(0x0040ca60, NULL, (void *)stubGoal);
+    dt_stub(0x00469530, NULL, (void *)stubCollideObject);
+    dt_stub(0x00420cb0, NULL, (void *)stubSetState);
+    dt_stub(0x00408a80, NULL, (void *)stubBurst);
+    randomDefs();
+    randomRecords();
+    for (int i = 0; i < 16; i++) {
+        PropRecord *r = &gPropRecords[i];
+        PropDef *d = &gPropDefs[gCurrentLevel][i];
+
+        randomSwitchDef(d);
+        if ((dt_u32() & 1) != 0) {
+            d->kind = (uint8_t)dt_range(8, 12);
+        }
+        r->object = (dt_u32() & 7) == 0 ? NULL : propObject();
+        r->state = (dt_u32() & 7) == 0 ? (uint8_t)dt_u32() : (uint8_t)dt_range(1, 5);
+        r->timer = (dt_u32() & 7) == 0 ? (dt_u32() & 1) - 1u : timers[dt_u32() % sizeof timers];
+        r->pos.x = dt_float(-500.0f, 500.0f);
+        r->pos.y = dt_float(-500.0f, 500.0f);
+        r->pos.z = dt_float(-500.0f, 500.0f);
+        r->paramA = (dt_u32() & 7) == 0 ? dt_u32() : (uint32_t)dt_range(0, 3);
+        if ((dt_u32() & 1) != 0) {
+            randomLinks(r);
+        }
+    }
+    {
+        const PropRecord *rec = &gPropRecords[dt_range(0, 15)];
+
+        if (rec->object == NULL) {
+            rec = &gPropRecords[0];
+        }
+        if (rec->object != NULL) {
+            randomPushRider(&gPhysRiders[0], rec);
+            randomPushRider(&gPhysRiders[1], rec);
+        }
+    }
+    gPhysPlayerCount = (uint8_t)dt_range(0, 2);
+    propShape[0] = dt_float(-1.0f, 1.0f);
+    propShape[1] = dt_float(20.0f, 200.0f);
+    propShape[2] = dt_float(20.0f, 200.0f);
+    propShape[3] = dt_float(20.0f, 200.0f);
+}
+
 DT_CASES(prop_cases) = {
     {"propInit", 0x0042deb0, propInit, 0, DT_RET_VOID, setupInit, 800, 0},
     {"propFindNode", 0x0042de70, propFindNode, 1, DT_RET_INT, setupFindNode, 300, 0},
     {"propStopSounds", 0x0042e270, propStopSounds, 0, DT_RET_VOID, setupStopSounds, 300, 0},
+    {"propUpdate", 0x0042e2f0, propUpdate, 0, DT_RET_VOID, setupUpdate, 1000, 0},
     {"propReturnZero", 0x0042eb50, propReturnZero, 0, DT_RET_INT, setupNone, 1, 0},
     {"propLoadState", 0x0042eb70, propLoadState, 1, DT_RET_VOID, setupLoad, 600, 0},
     {"propsReset", 0x0042ecf0, propsReset, 0, DT_RET_VOID, setupReset, 300, 0},
@@ -376,6 +592,7 @@ DT_CASES(prop_cases) = {
     {"propRelease", 0x0042ee40, propRelease, 2, DT_RET_VOID, setupCollect, 800, 0},
     {"propTouch", 0x0042eec0, propTouch, 2, DT_RET_INT, setupTouch, 800, 0},
     {"propHitFace", 0x0042ef60, propHitFace, 2, DT_RET_VOID, setupHitFace, 800, 0},
+    {"propSwitch", 0x0042f0d0, propSwitch, 3, DT_RET_VOID, setupSwitch, 1500, 0},
     {"propApplyTurn", 0x0042f8f0, propApplyTurn, 1, DT_RET_VOID, setupRecordOnly, 400, 0},
     {"propOrient", 0x0042f930, propOrient, 1, DT_RET_VOID, setupRecordOnly, 1000, 0},
     {"propNop", 0x0042fab0, propNop, 0, DT_RET_VOID, setupNone, 1, 0},

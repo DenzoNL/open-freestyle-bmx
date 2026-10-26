@@ -336,6 +336,8 @@ void ovlScreen4Draw(void);
 void ovlScreen4Refresh(void);
 void ovlScreen7Enter(int create);
 int ovlScreen7Update(void);
+/* Screen 8 draw: the competition results (judges' scores of each run). */
+void ovlScreen8Draw(void);
 int ovlScreen8Update(void);
 void ovlScreen9Draw(void);
 int ovlScreen9Update(void);

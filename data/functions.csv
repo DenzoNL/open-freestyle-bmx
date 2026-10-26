@@ -11,7 +11,7 @@ addr,size,file,confidence,name,status
 004056a0,11,bmx/com/action/camera.c,affinity,FUN_004056a0,ported
 004056c0,121,bmx/com/action/camera.c,affinity,FUN_004056c0,ported
 00405760,1,bmx/com/action/camera.c,affinity,FUN_00405760,ported
-00405780,5772,bmx/com/action/camera.c,affinity,FUN_00405780,orig
+00405780,5772,bmx/com/action/camera.c,affinity,cameraUpdate,ported
 00407470,60,bmx/com/action/camera.c,affinity,FUN_00407470,ported
 004074c0,68,bmx/com/action/camera.c,affinity,FUN_004074c0,ported
 00407530,147,bmx/com/action/camera.c,assert,FUN_00407530,ported
@@ -166,7 +166,7 @@ addr,size,file,confidence,name,status
 004192b0,148,bmx/com/action/overlay.c,contiguous,FUN_004192b0,ported
 00419380,251,bmx/com/action/overlay.c,contiguous,FUN_00419380,ported
 004194c0,368,bmx/com/action/overlay.c,contiguous,FUN_004194c0,ported
-004196c0,1193,bmx/com/action/overlay.c,contiguous,FUN_004196c0,orig
+004196c0,1193,bmx/com/action/overlay.c,contiguous,ovlScreen8Draw,ported
 00419ca0,191,bmx/com/action/overlay.c,contiguous,FUN_00419ca0,ported
 00419d90,222,bmx/com/action/overlay.c,contiguous,FUN_00419d90,ported
 00419eb0,946,bmx/com/action/overlay.c,contiguous,FUN_00419eb0,ported
@@ -294,7 +294,7 @@ addr,size,file,confidence,name,status
 0042de70,41,bmx/com/action/prop.c,affinity,FUN_0042de70,ported
 0042deb0,761,bmx/com/action/prop.c,assert,FUN_0042deb0,ported
 0042e270,81,bmx/com/action/prop.c,affinity,FUN_0042e270,ported
-0042e2f0,1645,bmx/com/action/prop.c,affinity,FUN_0042e2f0,orig
+0042e2f0,1645,bmx/com/action/prop.c,affinity,propUpdate,ported
 0042eb50,3,bmx/com/action/prop.c,affinity,FUN_0042eb50,ported
 0042eb70,300,bmx/com/action/prop.c,affinity,FUN_0042eb70,ported
 0042ecf0,12,bmx/com/action/prop.c,affinity,FUN_0042ecf0,ported
@@ -303,7 +303,7 @@ addr,size,file,confidence,name,status
 0042ee40,91,bmx/com/action/prop.c,affinity,FUN_0042ee40,ported
 0042eec0,113,bmx/com/action/prop.c,affinity,FUN_0042eec0,ported
 0042ef60,274,bmx/com/action/prop.c,affinity,FUN_0042ef60,ported
-0042f0d0,1593,bmx/com/action/prop.c,affinity,FUN_0042f0d0,orig
+0042f0d0,1593,bmx/com/action/prop.c,affinity,propSwitch,ported
 0042f8f0,33,bmx/com/action/prop.c,affinity,FUN_0042f8f0,ported
 0042f930,291,bmx/com/action/prop.c,affinity,FUN_0042f930,ported
 0042fab0,1,bmx/com/action/prop.c,affinity,FUN_0042fab0,ported
@@ -314,7 +314,7 @@ addr,size,file,confidence,name,status
 0042fd50,840,bmx/com/action/replay.c,affinity,FUN_0042fd50,ported
 00430180,391,bmx/com/action/replay.c,assert,replay_c_CreateReplay,ported
 00430380,106,bmx/com/action/replay.c,assert,FUN_00430380,ported
-00430410,1501,bmx/com/action/replay.c,assert,FUN_00430410,orig
+00430410,1501,bmx/com/action/replay.c,assert,replaySetMode,ported
 00430b70,83,bmx/com/action/replay.c,assert,FUN_00430b70,ported
 00430bf0,90,bmx/com/action/replay.c,assert,FUN_00430bf0,ported
 00430c70,83,bmx/com/action/replay.c,assert,FUN_00430c70,ported

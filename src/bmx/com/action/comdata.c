@@ -68,7 +68,7 @@ void comdataSetView(uint32_t player, uint32_t view)
     PhysRider *const rider = &gPhysRiders[player];
 
     cam->timer = 0;
-    cam->pad01 = 0;
+    cam->phase = 0;
     cam->changed = 1;
     gCameraReset = 0;
     switch (view) {

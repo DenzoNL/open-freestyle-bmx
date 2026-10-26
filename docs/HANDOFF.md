@@ -99,6 +99,8 @@ Without it, `DT_NEEDS_ASSETS` cases are skipped. The community labels used for n
   `dt_canon`) or uninitialised bytes. Terminate every table a scan relies on.
 - Unicorn: flush the translation cache when patching code; per-address code hooks are slower than
   patching. Python `-I` drops the script dir from `sys.path`.
+- A stub must never call `dt_fill` during the run: the fill stream isn't rewound between the original
+  and the port, so the two sides see different bytes (false failures).
 - Never `pkill` test processes, because other agents' runs die too.
 
 ## Budget
