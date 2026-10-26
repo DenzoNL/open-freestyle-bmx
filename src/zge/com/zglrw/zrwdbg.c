@@ -647,7 +647,9 @@ int BMX_CDECL DebugUpdateFunction(void *arg)
 BMX_ADDR(0x0047f850)
 int zrwDbgInitialize(void)
 {
-    int32_t desc[2];
+    /* RtCharsetDesc is 5 words (the original reserves 0x14 bytes); RtCharsetGetDesc writes all of them.
+     * A 2-word buffer let it overwrite the saved registers and return address in the real game. */
+    int32_t desc[5];
 
     gZrwDbgInitialized = 1;
     zrwListInit(&gZrwDbgCallbacks);

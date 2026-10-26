@@ -243,18 +243,18 @@ static void BMX_CDECL stubSceneEnd(void *a)
     ngLog((uint32_t)(uintptr_t)a);
 }
 
-static void *BMX_CDECL stubSceneFind(void *a, void *b)
+static void *BMX_CDECL stubSceneFind(void *a)
 {
     ngLog(0x4b82a0);
     ngLogPtr(a);
-    ngLogPtr(b);
     return (void *)(uintptr_t)0x1234;
 }
 
-static void BMX_CDECL stubSceneRelease(void *s)
+static void BMX_CDECL stubSceneRelease(void *s, void *camera)
 {
     ngLog(0x4b8240);
     ngLog((uint32_t)(uintptr_t)s);
+    ngLogPtr(camera);
 }
 
 static void *randomBlock(uint32_t size)

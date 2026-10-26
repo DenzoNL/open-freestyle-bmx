@@ -15,3 +15,8 @@ EXPORTS
     Sleep@4
     AddVectoredExceptionHandler@8
     IsBadReadPtr@8
+    CreateThread@24
+    OpenThread@12
+    SuspendThread@4
+    ResumeThread@4
+    GetThreadContext@8

@@ -26,7 +26,7 @@ echo "== functions.csv"
 "${PYTHON:-python3}" -I -m py_compile tools/*.py tests/oracle/*.py
 echo "== differential tests"
 if [[ -e ${BMX_EXE:-work/NgBMX.exe} ]]; then
-    tests/oracle/run.sh
+    tests/oracle/run.sh ${BMX_JOBS:+-j "$BMX_JOBS"} # BMX_JOBS: fewer workers when the PC is in use
 else
     echo "skipped: NgBMX.exe not available"
 fi

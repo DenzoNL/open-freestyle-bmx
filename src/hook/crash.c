@@ -59,6 +59,26 @@ enum {
 };
 
 static uintptr_t gDllLo, gDllHi;
+
+#ifdef BMX_CALLTRACE
+/* -finstrument-functions on the game objects (cmake -DBMX_CALLTRACE=ON): ring of the last function
+ * entries/exits, dumped with the crash. Bit 0 of an entry: 1 = exit. */
+enum { kRing = 256 };
+static uint32_t gRing[kRing];
+static uint32_t gRingPos;
+
+__attribute__((no_instrument_function)) void __cyg_profile_func_enter(void *fn, void *site)
+{
+    gRing[gRingPos++ % kRing] = (uint32_t)(uintptr_t)fn;
+}
+
+__attribute__((no_instrument_function)) void __cyg_profile_func_exit(void *fn, void *site)
+{
+    gRing[gRingPos++ % kRing] = (uint32_t)(uintptr_t)fn | 1u;
+}
+
+#endif
+
 static volatile long gBusy;
 static char gOut[16384];
 static uint32_t gLen;
@@ -88,6 +108,90 @@ static int isCode(uint32_t v)
 {
     return (v >= kExeCodeLo && v < kExeCodeHi) || (v >= gDllLo && v < gDllHi);
 }
+
+#ifdef BMX_CALLTRACE
+static void putRing(void)
+{
+    put("last calls of our functions, oldest first (> enter, < exit):\n");
+    for (uint32_t i = 0; i < kRing; i++) {
+        const uint32_t e = gRing[(gRingPos + i) % kRing];
+
+        if (e != 0) {
+            putHex((e & 1u) != 0 ? "  < " : "  > ", e & ~1u);
+            put("\n");
+        }
+    }
+}
+
+__declspec(dllimport) HANDLE __stdcall CreateThread(void *sec, size_t stack, DWORD(__stdcall *fn)(void *),
+                                                    void *arg, DWORD flags, DWORD *id);
+__declspec(dllimport) void __stdcall Sleep(DWORD ms);
+__declspec(dllimport) HANDLE __stdcall OpenThread(DWORD access, BOOL inherit, DWORD id);
+__declspec(dllimport) DWORD __stdcall SuspendThread(HANDLE thread);
+__declspec(dllimport) DWORD __stdcall ResumeThread(HANDLE thread);
+__declspec(dllimport) BOOL __stdcall GetThreadContext(HANDLE thread, Context *context);
+__declspec(dllimport) DWORD __stdcall GetCurrentThreadId(void);
+
+static HANDLE gMainThread; /* the thread that loaded us: the game thread */
+
+/* The game thread's eip and the code addresses on its stack, read while it is briefly suspended. */
+static void putMainStack(void)
+{
+    Context c;
+
+    c.flags = 0x10003; /* CONTEXT_i386 | CONTROL | INTEGER */
+    if (gMainThread == NULL || SuspendThread(gMainThread) == (DWORD)-1) {
+        return;
+    }
+    if (GetThreadContext(gMainThread, &c)) {
+        putHex("game thread eip ", c.eip);
+        putHex(" esp ", c.esp);
+        put("\ncode addresses on its stack:\n");
+        for (uint32_t i = 0; i < 1024; i++) {
+            const uint32_t *w = (const uint32_t *)(uintptr_t)(c.esp + i * 4);
+
+            if (IsBadReadPtr(w, 4)) {
+                break;
+            }
+            if (isCode(*w)) {
+                putHex("  +", i * 4);
+                putHex(": ", *w);
+                put("\n");
+            }
+        }
+    }
+    ResumeThread(gMainThread);
+}
+
+/* For hangs: every 2 s, rewrite bmxring.txt with the ring (no crash needed to see what is looping). */
+static DWORD __stdcall ringWatch(void *arg)
+{
+    static char out[sizeof gOut];
+
+    for (;;) {
+        Sleep(2000);
+        while (__atomic_exchange_n(&gBusy, 1, __ATOMIC_ACQUIRE) != 0) {
+        }
+        gLen = 0;
+        putHex("dll ", (uint32_t)gDllLo);
+        putHex(" calls ", gRingPos);
+        put("\n");
+        putMainStack();
+        putRing();
+        __builtin_memcpy(out, gOut, gLen);
+        const uint32_t len = gLen;
+        __atomic_store_n(&gBusy, 0, __ATOMIC_RELEASE);
+
+        HANDLE file = CreateFileA("bmxring.txt", 0x40000000, 1, NULL, 2, 0x80, NULL);
+        if (file != INVALID_HANDLE_VALUE) {
+            DWORD written;
+            WriteFile(file, out, len, &written, NULL);
+            CloseHandle(file);
+        }
+    }
+    return 0;
+}
+#endif
 
 static long __stdcall handler(ExceptionPointers *ep)
 {
@@ -135,6 +239,9 @@ static long __stdcall handler(ExceptionPointers *ep)
             put("\n");
         }
     }
+#ifdef BMX_CALLTRACE
+    putRing();
+#endif
     file = CreateFileA("bmxcrash.txt", 0x40000000, 1, NULL, 2, 0x80, NULL);
     if (file != INVALID_HANDLE_VALUE) {
         WriteFile(file, gOut, gLen, &written, NULL);
@@ -152,4 +259,8 @@ void bmxCrashInstall(void *module)
     gDllLo = (uintptr_t)base;
     gDllHi = gDllLo + *(const uint32_t *)(base + pe + 0x50); /* OptionalHeader.SizeOfImage */
     AddVectoredExceptionHandler(1, handler);
+#ifdef BMX_CALLTRACE
+    gMainThread = OpenThread(0x1fffff, 0, GetCurrentThreadId());
+    CreateThread(NULL, 0, ringWatch, NULL, 0, NULL);
+#endif
 }

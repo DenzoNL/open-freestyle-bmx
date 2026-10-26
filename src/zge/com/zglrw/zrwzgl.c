@@ -101,12 +101,15 @@ typedef int(BMX_STDCALL *MessageFn)(const void *msg);
 typedef void(BMX_STDCALL *SleepFn)(uint32_t ms);
 typedef int(BMX_STDCALL *ShowCursorFn)(int show);
 typedef int(BMX_STDCALL *DialogBoxFn)(void *instance, uintptr_t name, void *parent, void *proc, int param);
-#define gPeekMessage       ORIG_VAR(0x006997b4, PeekMessageFn, gPeekMessage)
-#define gTranslateMessage  ORIG_VAR(0x00699768, MessageFn, gTranslateMessage)
-#define gDispatchMessage   ORIG_VAR(0x00699758, MessageFn, gDispatchMessage)
-#define gSleep             ORIG_VAR(0x006995f8, SleepFn, gSleep)
-#define gShowCursor        ORIG_VAR(0x006997a8, ShowCursorFn, gShowCursor)
-#define gDialogBox         ORIG_VAR(0x00699778, DialogBoxFn, gDialogBox)
+#define gPeekMessage      ORIG_VAR(0x006997b4, PeekMessageFn, gPeekMessage)
+#define gTranslateMessage ORIG_VAR(0x00699768, MessageFn, gTranslateMessage)
+#define gDispatchMessage  ORIG_VAR(0x00699758, MessageFn, gDispatchMessage)
+#define gSleep            ORIG_VAR(0x006995f8, SleepFn, gSleep)
+#define gShowCursor       ORIG_VAR(0x006997a8, ShowCursorFn, gShowCursor)
+#define gDialogBox        ORIG_VAR(0x00699778, DialogBoxFn, gDialogBox)
+/* winmm timeGetTime import slot. Not gTimeGetTime (0x561480): that game pointer holds 0x489cb0, i.e. this
+ * port. */
+#define gTimeGetTimeImport ORIG_VAR(0x00699838, ZrwTimeFn, gTimeGetTimeImport)
 #define gZglInstance       ORIG_VAR(0x00697784, void *, gZglInstance)
 #define gZglWantDepth      ORIG_VAR(0x006977a8, int, gZglWantDepth)
 #define gZglWantW2         ORIG_VAR(0x006977a0, int, gZglWantW2)
@@ -263,7 +266,7 @@ void zrwPrintMaterialUsage(void)
 BMX_ADDR(0x00489cb0)
 uint32_t zrwTimeGetTime(void)
 {
-    return gTimeGetTime();
+    return gTimeGetTimeImport(); /* the original is JMP [0x699838] */
 }
 
 BMX_ADDR(0x00489ce0)

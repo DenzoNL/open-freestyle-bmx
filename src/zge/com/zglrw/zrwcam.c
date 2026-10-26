@@ -162,8 +162,9 @@ ORIG_FN(0x004db820, int, rwRenderStateSet, (int state, int value));
 /* Scene hooks around a camera's update (the engine's lighting and sorting state). */
 ORIG_FN(0x004b81f0, void, rwSceneBegin, (void *state, void *camera));
 ORIG_FN(0x005065d0, void, rwSceneEnd, (void *camera));
-ORIG_FN(0x004b82a0, void *, rwSceneFind, (void *camera, void *camera2));
-ORIG_FN(0x004b8240, void, rwSceneRelease, (void *scene));
+ORIG_FN(0x004b82a0, void *, rwSceneFind, (void *camera));
+/* Two arguments: the original reuses its second push of the camera (rwSceneFind takes one). */
+ORIG_FN(0x004b8240, void, rwSceneRelease, (void *scene, void *camera));
 void zrwResetRenderState(void);
 
 #define gZrwCurrentCamera ORIG_VAR(0x00674020, ZrwCamera *, gZrwCurrentCamera)
@@ -502,7 +503,7 @@ int zrwCameraEnd(void)
     gZrwInUpdate = 0;
     RwRasterPopContext();
     RwCameraEndUpdate(gZrwActiveRw);
-    rwSceneRelease(rwSceneFind(gZrwActiveRw, gZrwActiveRw));
+    rwSceneRelease(rwSceneFind(gZrwActiveRw), gZrwActiveRw);
     gZrwActiveRw = NULL;
     gZrwCurrentCamera = NULL;
     return 1;

@@ -1728,7 +1728,8 @@ BMX_ADDR(0x0047b220)
 ZPrimAsset *zprimLoadGroupPicture(uint16_t group, uint16_t entry)
 {
     ZPrimAsset *node = NULL;
-    if (zassetFind(gZprimLibrary, (int16_t)group, 0) != 1) {
+    /* Zero-extended like the original (AND EAX,0xffff), see zprimLoadGroup. */
+    if (zassetFind(gZprimLibrary, (int)group, 0) != 1) {
         gZdebugPrint("ZPRIM: Failed to find group\n");
         return NULL;
     }
@@ -1788,7 +1789,8 @@ int zprimLoadGroup(uint16_t slot, uint16_t group)
     }
     int32_t handle = 0;
     for (;;) {
-        while (zassetFind(gZprimLibrary, (int16_t)group, 0) != 1) {
+        /* Zero-extended (AND EDI,0xffff): group 0xe000 must stay 57344, not -8192 (endless retry in-game). */
+        while (zassetFind(gZprimLibrary, (int)group, 0) != 1) {
             printf("ZPRIM: Failed to find group\n");
         }
         if (handle == 0) {

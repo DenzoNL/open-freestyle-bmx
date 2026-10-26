@@ -68,8 +68,12 @@ static void BMX_CDECL stubCharsetDesc(void *charset, int32_t *desc)
 {
     ngLog(0x4cb3f0);
     ngLogPtr(charset);
+    /* All 5 words of RtCharsetDesc, like the real function: a too-small caller buffer must break here too. */
     desc[0] = dt_range(1, 20);
     desc[1] = dt_range(1, 30);
+    desc[2] = dt_range(1, 20);
+    desc[3] = dt_range(1, 30);
+    desc[4] = dt_range(1, 256);
 }
 
 static void BMX_CDECL stubCharsetDestroy(void *charset)

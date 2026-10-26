@@ -552,7 +552,9 @@ static void setup_load_group(DtCtx *c)
     dt_zprim_env();
     dt_fake_lib_begin(&lib, 12, 0x10000);
     gZprimLibrary = (int32_t)(uintptr_t)lib.lib;
-    const uint32_t group = (uint32_t)dt_range(0x100, 0x1ff);
+    /* Ids >= 0x8000 too (the frontend loads 0xe000): the original zero-extends the group. */
+    const uint32_t group =
+        c->seed % 3 == 2 ? (uint32_t)dt_range(0x8000, 0xffff) : (uint32_t)dt_range(0x100, 0x1ff);
     DtBlob g = gen_group_blob(dt_range(1, 4), 0, 0);
     dt_fake_lib_add(&lib, group, g.data, g.size);
     const uint32_t slot = (uint32_t)dt_range(0, 3);
@@ -570,7 +572,9 @@ static void setup_free_group(DtCtx *c)
     dt_zprim_env();
     dt_fake_lib_begin(&lib, 12, 0x10000);
     gZprimLibrary = (int32_t)(uintptr_t)lib.lib;
-    const uint32_t group = (uint32_t)dt_range(0x100, 0x1ff);
+    /* Ids >= 0x8000 too (the frontend loads 0xe000): the original zero-extends the group. */
+    const uint32_t group =
+        c->seed % 3 == 2 ? (uint32_t)dt_range(0x8000, 0xffff) : (uint32_t)dt_range(0x100, 0x1ff);
     DtBlob g = gen_group_blob(dt_range(1, 4), 0, 0);
     dt_fake_lib_add(&lib, group, g.data, g.size);
     const uint32_t slot = (uint32_t)dt_range(0, 3);
