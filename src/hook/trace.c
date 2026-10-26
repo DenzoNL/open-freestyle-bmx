@@ -111,9 +111,15 @@ static void put32(uint32_t v)
 static uint32_t __stdcall traceTime(void)
 {
     const uint32_t t = gRealTime();
+    const DWORD thread = GetCurrentThreadId();
 
+    /* Once gameplay polls start, other threads' reads are dropped: the sound thread spins on
+     * timeGetTime (~280M reads, 1.4 GB per minute on Windows 11) and they can't be replayed anyway. */
+    if (gGameThread != 0 && thread != gGameThread) {
+        return t;
+    }
     lock();
-    put8(GetCurrentThreadId() == gGameThread ? kTagTime : kTagTimeOther);
+    put8(thread == gGameThread ? kTagTime : kTagTimeOther);
     put32(t);
     unlock();
     return t;
