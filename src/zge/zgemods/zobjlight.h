@@ -40,7 +40,7 @@ int zobjLightSetParam(ZObjLight *light, uint32_t param);
 /* Points the light along the axis of a rotation quaternion. */
 int zobjLightSetRotation(ZObjLight *light, const ZQuat *rotation);
 /* Fatal when called twice. */
-void zobjLightInitialize(void);
+int zobjLightInitialize(void);
 
 /* The light's renderer handle is at +0x2c of the object; these forward to the renderer (0x563420 table). */
 void zobjLightSetColor(void *light, const uint8_t *rgba);

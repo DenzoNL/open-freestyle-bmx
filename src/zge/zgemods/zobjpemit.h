@@ -77,7 +77,7 @@ int zobjPEmitSetPosition(ZobjPEmitObject *object, const float *position);
 int zobjPEmitSetRect(ZobjPEmitObject *object, const float *rect);
 int zobjPEmitSetDirection(ZobjPEmitObject *object, const float *direction);
 int zobjPEmitSetValue(ZobjPEmitObject *object, uint32_t value);
-void zobjPEmitInitialize(void);
+int zobjPEmitInitialize(void);
 
 #define gZobjPEmitInitialized ORIG_VAR(0x006741b4, int, gZobjPEmitInitialized)
 

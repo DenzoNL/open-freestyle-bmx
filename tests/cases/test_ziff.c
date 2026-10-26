@@ -788,7 +788,7 @@ static void setup_free_skeleton(DtCtx *c)
 }
 
 DT_CASES(ziff_cases) = {
-    {"ziffInitialize", 0x0049a6d0, ziffInitialize, 0, DT_RET_VOID, setup_initialize, 20, 0},
+    {"ziffInitialize", 0x0049a6d0, ziffInitialize, 0, DT_RET_INT, setup_initialize, 20, 0},
     {"ziffSetupCallback", 0x0049aad0, ziffSetupCallback, 3, DT_RET_INT, setup_setup_callback, 400, 0},
     {"ziffOpen", 0x0049a790, ziffOpen, 3, DT_RET_INT | DT_NEEDS_ASSETS, setup_open, 600, 0},
     {"ziffClose", 0x0049a8a0, ziffClose, 1, DT_RET_VOID | DT_NEEDS_ASSETS, setup_close, 300, 0},

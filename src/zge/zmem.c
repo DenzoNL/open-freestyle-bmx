@@ -19,8 +19,9 @@ static uint32_t zmemHeaderWithSize(uint32_t header, uint32_t size)
     return (header & ~(uint32_t)kZmemSizeMask) | (size & kZmemSizeMask);
 }
 
+/* Returns 1: the original ends with MOV EAX,1 (Ghidra shows void) and its caller tests EAX. */
 BMX_ADDR(0x004859f0)
-void zmemInitialize(void)
+int zmemInitialize(void)
 {
     if (gZmem.initialized != 0) {
         zdebugFail("Already initialized", zmemFile, 0x202, 0);
@@ -28,6 +29,7 @@ void zmemInitialize(void)
     zmemInstallHooks();
     zmemFill(&gZmem, 0, 0x24);
     gZmem.initialized = 1;
+    return 1;
 }
 
 /* Allocates size bytes (rounded up to 4) from the redirect pool if set, else the renderer's malloc. */

@@ -416,5 +416,5 @@ DT_CASES(zobjpemit_cases) = {
     {"zobjPEmitSetRect", 0x00495b00, zobjPEmitSetRect, 2, DT_RET_INT, setup_setter, 100, 0},
     {"zobjPEmitSetDirection", 0x00495b30, zobjPEmitSetDirection, 2, DT_RET_INT, setup_setter, 100, 0},
     {"zobjPEmitSetValue", 0x00495b60, zobjPEmitSetValue, 2, DT_RET_INT, setup_set_value, 100, 0},
-    {"zobjPEmitInitialize", 0x00495b80, zobjPEmitInitialize, 0, DT_RET_VOID, setup_initialize, 20, 0},
+    {"zobjPEmitInitialize", 0x00495b80, zobjPEmitInitialize, 0, DT_RET_INT, setup_initialize, 20, 0},
 };

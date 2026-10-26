@@ -338,11 +338,13 @@ int zobjPEmitSetValue(ZobjPEmitObject *object, uint32_t value)
     return 1;
 }
 
+/* Returns 1: the original ends with MOV EAX,1 (Ghidra shows void) and its caller tests EAX. */
 BMX_ADDR(0x00495b80)
-void zobjPEmitInitialize(void)
+int zobjPEmitInitialize(void)
 {
     if (gZobjPEmitInitialized != 0) {
         zdebugFail("Already initialized", kPEmitFile, 0xd3, 0);
     }
     gZobjPEmitInitialized = 1;
+    return 1;
 }

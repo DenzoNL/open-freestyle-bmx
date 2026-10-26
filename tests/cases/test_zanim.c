@@ -265,6 +265,6 @@ DT_CASES(zanim_cases) = {
     {"zobjLightDestroy", 0x0048ff50, zobjLightDestroy, 1, DT_RET_INT, setup_destroy, 20, 0},
     {"zobjLightSetParam", 0x0048ff70, zobjLightSetParam, 2, DT_RET_INT, setup_param, 50, 0},
     {"zobjLightSetRotation", 0x0048ff90, zobjLightSetRotation, 2, DT_RET_INT, setup_rotation, 400, 0},
-    {"zobjLightInitialize", 0x0048ffc0, zobjLightInitialize, 0, DT_RET_VOID, setup_light_init, 20, 0},
+    {"zobjLightInitialize", 0x0048ffc0, zobjLightInitialize, 0, DT_RET_INT, setup_light_init, 20, 0},
     {"zobjLightCreate", 0x00490010, zobjLightCreate, 2, DT_RET_INT, setup_create, 300, 0},
 };

@@ -92,7 +92,7 @@ typedef ZMemFreeList ZMemFreeListTable[128];
 #define gRwFree    ORIG_VAR(0x005614a0, ZMemFreeFn, gRwFree)
 #define gRwRealloc ORIG_VAR(0x005614a4, ZMemReallocFn, gRwRealloc)
 
-void zmemInitialize(void);
+int zmemInitialize(void);
 void *zmemAlloc(uint32_t size);
 void zmemFree(void *block);
 void *zmemResize(void *block, uint32_t size);

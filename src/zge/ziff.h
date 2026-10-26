@@ -61,7 +61,7 @@ _Static_assert(sizeof(ZiffState) == 0x1c, "ziff state");
 #define gZiff ORIG_VAR(0x006746d0, ZiffState, gZiff)
 
 /* Sets up the allocators; fatal when called twice. */
-void ziffInitialize(void);
+int ziffInitialize(void);
 /*
  * Registers (or replaces) the handler for chunk `id`; returns the registration. The original takes only
  * the id and the handler (flags is never read); handlers get a second, user argument.

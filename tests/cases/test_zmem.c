@@ -475,7 +475,7 @@ static void setup_deferred_flush(DtCtx *c)
 }
 
 DT_CASES(zmem_cases) = {
-    {"zmemInitialize", 0x004859f0, zmemInitialize, 0, DT_RET_VOID, setup_init, 40, 0},
+    {"zmemInitialize", 0x004859f0, zmemInitialize, 0, DT_RET_INT, setup_init, 40, 0},
     {"zmemAlloc", 0x00485aa0, zmemAlloc, 1, DT_RET_INT, setup_alloc, 300, 0},
     {"zmemFree", 0x00485b20, zmemFree, 1, DT_RET_VOID, setup_free, 300, 0},
     {"zmemResize", 0x00485b50, zmemResize, 2, DT_RET_INT, setup_resize, 400, 0},

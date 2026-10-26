@@ -36,13 +36,15 @@ int zobjLightSetRotation(ZObjLight *light, const ZQuat *rotation)
     return 1;
 }
 
+/* Returns 1: the original ends with MOV EAX,1 (Ghidra shows void) and its caller tests EAX. */
 BMX_ADDR(0x0048ffc0)
-void zobjLightInitialize(void)
+int zobjLightInitialize(void)
 {
     if (gZobjLightInitialized != 0) {
         zdebugFail("Already initialized", kZobjLightFile, 0x99, 0);
     }
     gZobjLightInitialized = 1;
+    return 1;
 }
 
 BMX_ADDR(0x00490010)

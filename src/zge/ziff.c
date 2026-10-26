@@ -19,8 +19,9 @@ static void failIdMessage(const char *fmt, uint32_t id, int line)
     zdebugFail(zstrFormatTemp(fmt, ID_CHARS(id)), kZiffFile, line, 0);
 }
 
+/* Returns 1: the original ends with MOV EAX,1 (Ghidra shows void) and its caller tests EAX. */
 BMX_ADDR(0x0049a6d0)
-void ziffInitialize(void)
+int ziffInitialize(void)
 {
     if (gZiff.initialized != 0) {
         zdebugFail("Already initialized", kZiffFile, 0x11a, 0);
@@ -29,6 +30,7 @@ void ziffInitialize(void)
     gZiff.callbacks = zmemFreeListCreate(0x10, 0x40, NULL);
     gZiff.readers = zmemFreeListCreate(0x108, 0x10, NULL);
     gZiff.initialized = 1;
+    return 1;
 }
 
 BMX_ADDR(0x0049aad0)
