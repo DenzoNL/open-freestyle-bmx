@@ -6,6 +6,7 @@
 #include "bmx/com/action/overlay.h"
 #include "bmx/com/menu/frontend.h"
 #include "bmx/com/menu/gui/guiinput.h"
+#include "compat/trace.h"
 #include "zge/zdebug.h"
 
 static const char contrlerFile[] = "C:\\zaxis\\Bmx\\Src\\com\\action\\contrler.c";
@@ -104,6 +105,7 @@ uint32_t contrlerPoll(void)
 {
     uint32_t result = 0;
 
+    BMX_TRACE_POLL();
     for (int i = 0; i < kPadCount; i++) {
         ContrlerPad *const pad = &gContrlerPads[i];
         const PlayerSetup *const setup = &gPlayers[i];

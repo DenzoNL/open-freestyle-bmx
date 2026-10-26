@@ -22,6 +22,7 @@ __declspec(dllimport) HMODULE __stdcall LoadLibraryA(const char *name);
 __declspec(dllimport) FARPROC __stdcall GetProcAddress(HMODULE module, const char *name);
 
 #define PAGE_EXECUTE_READWRITE 0x40
+#define DLL_PROCESS_DETACH     0
 #define DLL_PROCESS_ATTACH     1
 
 static void patchJump(uint32_t from, const void *to)
@@ -54,10 +55,19 @@ __declspec(dllexport) long __stdcall bmxDirectInputCreateEx(void *inst, DWORD ve
 BOOL __stdcall DllMain(HMODULE module, DWORD reason, void *reserved)
 {
     if (reason == DLL_PROCESS_ATTACH) {
+        const int mode = bmxTraceMode();
+
         for (uint32_t i = 0; i < bmxHookCount; i++) {
-            patchJump(bmxHooks[i].orig, bmxHooks[i].impl);
+            /* Golden traces run the original game: only the controller poll (the trace hook point) is ours.
+             */
+            if (mode != kBmxTraceOriginal || bmxHooks[i].orig == kBmxTracePollAddr) {
+                patchJump(bmxHooks[i].orig, bmxHooks[i].impl);
+            }
         }
         FlushInstructionCache(GetCurrentProcess(), NULL, 0);
+        bmxTraceStart(mode);
+    } else if (reason == DLL_PROCESS_DETACH) {
+        bmxTraceStop();
     }
     return 1;
 }

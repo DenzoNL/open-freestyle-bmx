@@ -41,7 +41,7 @@ if(BMX_HOOK)
   target_link_options(bmxtest PRIVATE -Wl,-base:0x10000000 -Wl,-fixed)
 
   # In-game hook DLL (dev only): dinput.dll proxy that redirects ported functions.
-  add_library(bmxhook SHARED src/hook/hook.c ${CMAKE_BINARY_DIR}/hooks_table.c $<TARGET_OBJECTS:bmx_game>)
+  add_library(bmxhook SHARED src/hook/hook.c src/hook/trace.c ${CMAKE_BINARY_DIR}/hooks_table.c $<TARGET_OBJECTS:bmx_game>)
   target_include_directories(bmxhook PRIVATE src)
   target_compile_definitions(bmxhook PRIVATE BMX_HOOK=1)
   target_compile_options(bmxhook PRIVATE ${BMX_WARNINGS})

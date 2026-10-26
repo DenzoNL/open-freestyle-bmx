@@ -6,3 +6,10 @@ EXPORTS
     GetSystemDirectoryA@8
     LoadLibraryA@4
     GetProcAddress@8
+    GetFileAttributesA@4
+    CreateFileA@28
+    WriteFile@20
+    CloseHandle@4
+    GetTickCount@0
+    GetCurrentThreadId@0
+    Sleep@4

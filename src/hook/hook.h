@@ -13,4 +13,14 @@ typedef struct BmxHook {
 extern const BmxHook bmxHooks[];
 extern const uint32_t bmxHookCount;
 
+/*
+ * Gameplay trace (src/hook/trace.c), chosen by a marker file in the game's working directory:
+ * bmxtrace.orig traces the original game (golden traces), bmxtrace.on traces our port.
+ */
+enum { kBmxTraceOff, kBmxTraceOriginal, kBmxTracePort };
+#define kBmxTracePollAddr 0x004080f0u /* contrlerPoll: the hook point, ours in both modes */
+int bmxTraceMode(void);
+void bmxTraceStart(int mode);
+void bmxTraceStop(void);
+
 #endif
