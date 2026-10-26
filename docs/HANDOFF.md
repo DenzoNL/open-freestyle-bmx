@@ -11,7 +11,8 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   directly, but batch pushes (CI runs on main).
 - The original exe lives **only** on the orphan branch `oracle`. Never merge it into main. Never push
   `oracle` to a public host. If the repo ever moves to GitHub, push main only and delete `oracle`.
-- CI (Forgejo, Linux docker runner) runs the gate on every push to main. It has no exe or assets, so
+- CI (Forgejo, Linux docker runner) runs only on pull requests and manually (Actions → ci → Run
+  workflow), not on push: run `tools/check.sh` locally before pushing. It has no assets, so
   the differential cases are skipped there and run locally.
 
 ## Next up (2026-10-26)
