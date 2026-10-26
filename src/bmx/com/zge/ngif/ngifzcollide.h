@@ -9,13 +9,38 @@
 #include "zge/com/zglrw/zrwcol.h"
 #include "zge/zmath.h"
 
-/* Casts a ray from -> to and fills a 0xd8 byte hit record; returns nonzero on a hit. */
-ORIG_FN(0x00469b00, int, zcollideRay, (const ZVec3 *from, const ZVec3 *to, void *hit));
+/* Casts a ray from -> to and fills a 0xd8 byte hit record (PhysRayHit); returns 1 on a hit. */
+int zcollideRay(const ZVec3 *from, const ZVec3 *to, void *out);
 /*
  * Builds the collision edges of a prop object into `edges` (the box of a prop: four edges) and returns
  * how many it made.
  */
-ORIG_FN(0x0046a4d0, int, zcollideFillPropEdges, (PhysPropObject * object, PhysEdge *edges));
+int zcollideFillPropEdges(PhysPropObject *object, PhysEdge *edges);
+/*
+ * NULL-terminated list (static, 32 slots) of pointers to edge pointers: the level edges of the renderer's
+ * collision tree near p and the roller's prop edges within `radius`, each only when one end lies behind p
+ * along dir.
+ */
+PhysEdge ***zcollideFindEdgesBehind(const ZVec3 *p, const ZVec3 *dir, float radius);
+
+/* Line test result of the renderer (zrwcolLineTest): the hit triangle, then the hit point. */
+typedef struct ZcollideLineHit {
+    ZrwColHit hit;
+    ZVec3 point; /* 0x4c */
+    uint32_t pad58;
+} ZcollideLineHit;
+
+_Static_assert(sizeof(ZcollideLineHit) == 0x5c, "ZcollideLineHit size");
+
+/* End points of the prop box edges zcollideFillPropEdges builds (indices into its 8 corners). */
+typedef struct ZcollideBoxEdge {
+    uint8_t a;
+    uint8_t b;
+    uint8_t side;
+} ZcollideBoxEdge;
+typedef ZcollideBoxEdge ZcollideBoxEdges[4];
+#define gZcollideBoxEdges ORIG_VAR(0x0055d4f8, ZcollideBoxEdges, gZcollideBoxEdges) /* shape kind 2 */
+#define gZcollideBarEdge  ORIG_VAR(0x0055d504, ZcollideBoxEdge, gZcollideBarEdge)   /* shape kind 4 */
 
 /* Result of zcollideProbeHeight: a one point "face" list over the terrain (0x58 bytes). */
 typedef struct ZcollideProbe {

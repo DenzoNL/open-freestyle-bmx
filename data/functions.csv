@@ -935,7 +935,7 @@ addr,size,file,confidence,name,status
 00466d10,32,bmx/com/zge/ngif/ngifzbsp.c,assert,FUN_00466d10,ported
 00466d40,30,bmx/com/zge/ngif/ngifzbsp.c,assert,FUN_00466d40,ported
 00466d70,261,bmx/com/zge/ngif/ngifzbsp.c,contiguous,FUN_00466d70,ported
-00466ed0,1060,bmx/com/zge/ngif/ngifzbsp.c,assert,FUN_00466ed0,orig
+00466ed0,1060,bmx/com/zge/ngif/ngifzbsp.c,assert,zbspFindEdgesNear,ported
 00467410,497,bmx/com/zge/ngif/ngifzbsp.c,contiguous,FUN_00467410,ported
 00467690,23,bmx/com/zge/ngif/ngifzbsp.c,contiguous,FUN_00467690,ported
 004676c0,30,bmx/com/zge/ngif/ngifzbsp.c,assert,FUN_004676c0,ported
@@ -974,7 +974,7 @@ addr,size,file,confidence,name,status
 00467fd0,32,bmx/com/zge/ngif/ngifzbsp.c,assert,FUN_00467fd0,ported
 00468000,32,bmx/com/zge/ngif/ngifzbsp.c,assert,FUN_00468000,ported
 00468030,35,bmx/com/zge/ngif/ngifzbsp.c,assert,FUN_00468030,ported
-00468070,1624,bmx/com/zge/ngif/ngifzbsp.c,assert,NgIFzbsp_c_NotDefined_1,orig
+00468070,1624,bmx/com/zge/ngif/ngifzbsp.c,assert,zbspFindFaceNear,ported
 00468870,30,bmx/com/zge/ngif/ngifzbsp.c,assert,FUN_00468870,ported
 004688a0,35,bmx/com/zge/ngif/ngifzbsp.c,assert,FUN_004688a0,ported
 004688e0,35,bmx/com/zge/ngif/ngifzbsp.c,assert,FUN_004688e0,ported
@@ -989,8 +989,8 @@ addr,size,file,confidence,name,status
 004691c0,655,bmx/com/zge/ngif/ngifzbsp.c,assert,FUN_004691c0,ported
 00469500,32,bmx/com/zge/ngif/ngifzbsp.c,assert,FUN_00469500,ported
 00469530,32,bmx/com/zge/ngif/ngifzbsp.c,affinity,FUN_00469530,ported
-00469560,1138,bmx/com/zge/ngif/ngifzcollide.c,affinity,FUN_00469560,orig
-00469b00,1244,bmx/com/zge/ngif/ngifzcollide.c,assert,FUN_00469b00,orig
+00469560,1138,bmx/com/zge/ngif/ngifzcollide.c,affinity,zcollideFindEdgesBehind,ported
+00469b00,1244,bmx/com/zge/ngif/ngifzcollide.c,assert,zcollideRay,ported
 0046a120,35,bmx/com/zge/ngif/ngifzcollide.c,assert,FUN_0046a120,ported
 0046a160,260,bmx/com/zge/ngif/ngifzcollide.c,contiguous,FUN_0046a160,ported
 0046a2c0,32,bmx/com/zge/ngif/ngifzcollide.c,assert,FUN_0046a2c0,ported
@@ -1000,7 +1000,7 @@ addr,size,file,confidence,name,status
 0046a390,30,bmx/com/zge/ngif/ngifzcollide.c,assert,FUN_0046a390,ported
 0046a3c0,30,bmx/com/zge/ngif/ngifzcollide.c,assert,FUN_0046a3c0,ported
 0046a3f0,158,bmx/com/zge/ngif/ngifzcollide.c,assert,FUN_0046a3f0,ported
-0046a4d0,1094,bmx/com/zge/ngif/ngifzcollide.c,assert,FUN_0046a4d0,orig
+0046a4d0,1094,bmx/com/zge/ngif/ngifzcollide.c,assert,zcollideFillPropEdges,ported
 0046aa50,339,bmx/com/zge/ngif/ngifzcollide.c,contiguous,FUN_0046aa50,ported
 0046ac10,30,bmx/com/zge/ngif/ngifzcollide.c,assert,FUN_0046ac10,ported
 0046ac40,22,bmx/com/zge/ngif/ngifzcollide.c,affinity,FUN_0046ac40,ported

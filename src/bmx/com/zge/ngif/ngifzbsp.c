@@ -6,6 +6,8 @@
 #include "bmx/com/zge/ngif/ngifzcollide.h"
 #include "bmx/com/zge/ngif/ngifzroller.h"
 #include "compat/crt.h"
+#include "zge/com/zglrw/zrwcol.h"
+#include "zge/com/zglrw/zrwmodelrender.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zobjcamera.h"
 #include "zge/zgemods/ztaginf.h"
@@ -667,6 +669,279 @@ void **zbspFindTaggedEdges(int lo, int hi)
         }
     }
     return gZbspHits;
+}
+
+/*
+ * Turns `q` into its offset from p (stored as floats) and returns the squared length. The z offset is
+ * squared unrounded against its rounded copy, like the original's FST / FMUL.
+ */
+static double offsetLengthSq(ZVec3 *q, const ZVec3 *p)
+{
+    double dz;
+
+    q->x = (float)((double)q->x - p->x);
+    q->y = (float)((double)q->y - p->y);
+    dz = (double)q->z - p->z;
+    q->z = (float)dz;
+    return (dz * q->z + (double)q->y * q->y) + (double)q->x * q->x;
+}
+
+/*
+ * Edges within `radius` of p: first the tagged level edges (kind != 0; their records are cached per face
+ * edge and rebuilt), then the roller's prop edges whose object is neither flagged, signalled, touched nor
+ * hidden. The prop edges are only listed when the level has faces. A NaN distance counts as near.
+ */
+BMX_ADDR(0x00466ed0)
+void **zbspFindEdgesNear(const ZVec3 *p, float radius)
+{
+    const float r2 = (float)((double)radius * radius);
+    void **cursor = &gZbspHits[0];
+    uint32_t count;
+    ZbspLevelFace *face;
+
+    gZbspHits[0] = NULL;
+    count = ztaginfGetFaceCount();
+    face = ztaginfGetFaces();
+    if (count == 0) {
+        return gZbspHits;
+    }
+    if (gZbspEdgePool == NULL) {
+        gZbspEdgePool = zmemFreeListCreate(sizeof(PhysEdge), 0x100, NULL);
+    }
+    for (; count != 0; count--, face++) {
+        for (int k = 0; k < 3; k++) {
+            const ZbspEdgeTag *tag = face->edgeTag[k];
+            ZVec3 q;
+            PhysEdge *e;
+
+            if (tag == NULL || tag->kind == 0) {
+                continue;
+            }
+            zbspClosestPointOnSegment(faceVertex(face, k), faceVertex(face, (k + 1) % 3), p, &q);
+            if (!lessOrUnordered(offsetLengthSq(&q, p), r2)) {
+                continue;
+            }
+            if (face->edge[k] == NULL) {
+                face->edge[k] = zmemFreeListAlloc(gZbspEdgePool);
+            }
+            e = face->edge[k];
+            fillEdgeRecord(e, face, k, tag);
+            e->prop = NULL;
+            if (cursor >= &gZbspHits[0x100]) {
+                zdebugFail("edge list overflow", kBspFile, 0x91f, 0);
+            }
+            cursor[0] = e;
+            cursor[1] = NULL;
+            cursor++;
+        }
+    }
+    for (PhysEdge *e = zlistFirst(gZrollerEdges); e != NULL; e = zlistNext(gZrollerEdges)) {
+        const uint16_t flags = ((const PhysPropObject *)e->prop)->flags;
+        ZVec3 a;
+        ZVec3 b;
+        ZVec3 q;
+
+        if (flags & (kZbspObjFlagged | kZbspObjSignalled | kZbspObjTouched | kZbspObjHidden)) {
+            continue;
+        }
+        a.x = (float)e->a[0];
+        a.y = (float)e->a[1];
+        a.z = (float)e->a[2];
+        b.x = (float)e->b[0];
+        b.y = (float)e->b[1];
+        b.z = (float)e->b[2];
+        zbspClosestPointOnSegment(&a, &b, p, &q);
+        if (lessOrUnordered(offsetLengthSq(&q, p), r2)) {
+            if (cursor >= &gZbspHits[0x100]) {
+                zdebugFail("edge list overflow", kBspFile, 0x940, 0);
+            }
+            cursor[0] = e;
+            cursor[1] = NULL;
+            cursor++;
+        }
+    }
+    return gZbspHits;
+}
+
+/* Corner i of a renderer hit (the corners are 0x10 bytes apart from +0x10). */
+static const ZVec3 *hitCorner(const ZrwColHit *hit, int i)
+{
+    return (const ZVec3 *)((const uint8_t *)hit + 0x10 + (size_t)i * 0x10);
+}
+
+/* Face flag bits from byte 3 of a level tag: bit 0 -> 4, bit 1 -> 3, bits 2-3 -> 5-6. */
+static uint8_t tagFaceFlags(uint8_t b)
+{
+    return (uint8_t)(((((b & 1) << 1 | (b & 0xc)) << 1) | (b & 2)) << 2);
+}
+
+/* Tag id of a level tag: the low 12 bits for 0x1xxx tags without a link (+8), else the whole word. */
+static uint16_t tagFaceId(const uint8_t *tag)
+{
+    uint16_t id = *(const uint16_t *)tag;
+
+    if ((id & 0xf000) == 0x1000 && *(const uint32_t *)(tag + 8) == 0) {
+        id &= 0xfff;
+    }
+    return id;
+}
+
+/*
+ * Faces near p: the renderer's sphere test (radius + 1) lists triangles, last first; each becomes a face
+ * record (normal, plane, int16 corners, tag and flags of the level triangle under its centroid). A face is
+ * kept when |normal.y| <= cosLimit + 0.001, p lies less than `radius` above its plane (props' faces also
+ * not below it), and the projection of p is inside it or within the remaining radius of a corner or an edge
+ * (tested in whole units). The hit gets the plane distance, the closest point and the prop's collision
+ * object. A rejected triangle still overwrites the (reused) record slot. NULL when nothing is kept.
+ */
+BMX_ADDR(0x00468070)
+void *zbspFindFaceNear(const ZVec3 *p, float radius, float cosLimit)
+{
+    PhysFace *face = gZbspNearFaces;
+    ZbspNearCorners *corners = gZbspNearCorners;
+    ZbspFaceHit *out = gZbspNearHits;
+    uint32_t count = 0;
+
+    if (!zrwcolSphereTest(&p->x, (float)((double)radius + 1.0), 3, NULL, (uint32_t *)&gZbspSphere)) {
+        return NULL;
+    }
+    zmemFill(&gZbspFaceQuery, 0, sizeof gZbspFaceQuery);
+    for (uint32_t i = gZbspSphere.count; i != 0; i--) {
+        const ZrwColHit *src = &gZbspSphere.hits[i - 1];
+        int32_t object = 0;
+        const ZrwRenderColHit *tri;
+        ZVec3 center;
+        ZVec3 proj;
+        ZVec3 point;
+        double dist;
+        float distf;
+        float r2;
+        int last;
+
+        if (face >= &gZbspNearFaces[kZbspNearFaceMax]) {
+            continue;
+        }
+        if (src->objectData != 0) {
+            const PhysPropFrame *frame = gZbspObjectFrameFn(src->objectData);
+
+            for (PhysPropNode *n = *zobjPropList(); n != NULL; n = n->next) {
+                if (n->object == NULL) {
+                    zbspBuildCollObject(n);
+                }
+                if (n->frame == frame) {
+                    object = (int32_t)(uintptr_t)n->object;
+                    break;
+                }
+            }
+        }
+        face->flags = 0;
+        face->kind = 0;
+        face->tag = 0;
+        center.x =
+            (float)((((double)src->vertex[1][0] + src->vertex[2][0]) + src->vertex[0][0]) * 0x1.555556p-2f);
+        center.y =
+            (float)((((double)src->vertex[1][1] + src->vertex[2][1]) + src->vertex[0][1]) * 0x1.555556p-2f);
+        center.z =
+            (float)((((double)src->vertex[2][2] + src->vertex[0][2]) + src->vertex[1][2]) * 0x1.555556p-2f);
+        tri = zrwModelFindTriangle(&center, 2.0f);
+        if (tri != NULL) {
+            const uint8_t *tag = (const uint8_t *)(uintptr_t)tri->tag;
+            uint16_t id = 0;
+
+            if (tag != NULL) {
+                face->flags |= tagFaceFlags(tag[3]);
+                id = tagFaceId(tag);
+            }
+            face->tag = id;
+        }
+        face->normal.x = src->normal[0];
+        face->normal.y = src->normal[1];
+        face->normal.z = src->normal[2];
+        dist = zvec3Dot((const ZVec3 *)src->normal, hitCorner(src, 0));
+        face->owner = (void *)src;
+        face->d = (float)-dist;
+        face->vert[0] = corners->v[0];
+        face->vert[1] = corners->v[1];
+        face->vert[2] = corners->v[2];
+        for (int k = 0; k < 3; k++) {
+            corners->v[k][0] = toShort(hitCorner(src, k)->x);
+            corners->v[k][1] = toShort(hitCorner(src, k)->y);
+            corners->v[k][2] = toShort(hitCorner(src, k)->z);
+        }
+        if (lessOrUnordered((double)cosLimit + 0.001, __builtin_fabs(face->normal.y))) {
+            continue;
+        }
+        dist = (((double)p->x * face->normal.x + (double)p->z * face->normal.z) +
+                (double)face->normal.y * p->y) +
+               face->d;
+        distf = (float)dist;
+        if (lessOrUnordered(dist, 0.0) && object != 0) {
+            continue;
+        }
+        if (!lessOrUnordered(distf, radius)) {
+            continue;
+        }
+        r2 = (float)((double)radius * radius - (double)distf * distf);
+        proj.x = (float)((double)p->x - (double)distf * src->normal[0]);
+        proj.y = (float)((double)p->y - (double)distf * src->normal[1]);
+        proj.z = (float)((double)p->z - (double)distf * src->normal[2]);
+        if (zbspPointInFace(face, proj.x, proj.y, proj.z)) {
+            point = proj;
+            goto keep;
+        }
+        last = (face->flags & 1) + 2;
+        {
+            const int32_t ix = bmxFtol(proj.x);
+            const int32_t iy = bmxFtol(proj.y);
+            const int32_t iz = bmxFtol(proj.z);
+
+            for (int k = last; k >= 0; k--) {
+                const int16_t *v = face->vert[k];
+                const uint32_t dx = U(v[0]) - U(ix);
+                const uint32_t dy = U(v[1]) - U(iy);
+                const uint32_t dz = U(v[2]) - U(iz);
+
+                if (lessOrUnordered((double)(int32_t)(dz * dz + dy * dy + dx * dx), r2)) {
+                    point = *hitCorner(src, k);
+                    goto keep;
+                }
+            }
+        }
+        for (int k = last; k >= 0; k--) {
+            const int16_t *va = face->vert[k];
+            const int16_t *vb = face->vert[(k + 1) % 3];
+            const ZVec3 a = {(float)va[0], (float)va[1], (float)va[2]};
+            const ZVec3 b = {(float)vb[0], (float)vb[1], (float)vb[2]};
+            ZVec3 q;
+
+            zbspClosestPointOnSegment(&a, &b, &proj, &q);
+            if (lessOrUnordered((double)bmxFtol(offsetLengthSq(&q, &proj)), r2)) {
+                point.x = (float)((double)q.x + proj.x);
+                point.y = (float)((double)q.y + proj.y);
+                point.z = (float)((double)q.z + proj.z);
+                goto keep;
+            }
+        }
+        continue;
+    keep:
+        out->face = face;
+        out->object = object;
+        out->dist = distf;
+        out->point = point;
+        out++;
+        face++;
+        corners++;
+        count++;
+    }
+    if (count == 0) {
+        return NULL;
+    }
+    if (count >= 0x100) {
+        zdebugFail("Buffer overflow", kBspFile, 0xde9, 0);
+    }
+    gZbspFaceQuery.hits = gZbspNearHits;
+    gZbspNearHits[count].face = NULL;
+    return &gZbspFaceQuery;
 }
 
 /* ---- debug-print stubs ----------------------------------------------------------------------------- */

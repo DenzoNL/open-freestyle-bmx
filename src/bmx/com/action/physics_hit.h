@@ -100,22 +100,28 @@ typedef struct PhysRayHit {
     };
     int32_t id; /* terrain section the face belongs to */
     ZVec3 point;
-    uint8_t pad14[0x8];
+    uint8_t pad14[0x4];
+    float distance; /* 0x18: the renderer's hit distance */
     ZVec3 normal;
     float normalW;
-    uint8_t pad2c[0x4];
+    uint32_t onFace; /* 0x2c: 1 when the hit acts as terrain */
     PhysFace *face;
-    uint8_t pad34[0x4];
+    void *propCopy;           /* 0x34: objectData again for prop hits (zcollideRay) */
     const uint32_t *material; /* bits 0-3 surface material, bits 19-20 hazard kind */
     int32_t object;           /* collision object handle */
     union {
         PhysCollObject *objectData;
         PhysEdge *edge;
     };
-    uint8_t pad44[0x94];
+    uint8_t pad44[0x4];
+    PhysFace faceRecord;   /* 0x48: what `face` points at after zcollideRay */
+    uint32_t materialWord; /* 0xd0: what `material` points at after zcollideRay */
+    uint32_t padd4;
 } PhysRayHit;
 
 _Static_assert(sizeof(PhysRayHit) == 0xd8, "PhysRayHit size");
+_Static_assert(offsetof(PhysRayHit, faceRecord) == 0x48, "PhysRayHit.faceRecord");
+_Static_assert(offsetof(PhysRayHit, materialWord) == 0xd0, "PhysRayHit.materialWord");
 _Static_assert(offsetof(PhysRayHit, normal) == 0x1c, "PhysRayHit.normal");
 _Static_assert(offsetof(PhysRayHit, face) == 0x30, "PhysRayHit.face");
 _Static_assert(offsetof(PhysRayHit, material) == 0x38, "PhysRayHit.material");

@@ -116,6 +116,9 @@ typedef PhysFace ZbspPropFaceTable[1];
 #define gZbspEdgeRecord  ORIG_VAR(0x005f1070, PhysEdge, gZbspEdgeRecord)
 #define gZbspMatRefValue ORIG_VAR(0x005e7fd8, uint32_t, gZbspMatRefValue)
 #define gZbspNoShapeKind ORIG_VAR(0x005f8d68, uint8_t, gZbspNoShapeKind)
+/* Renderer entry that maps a world object's user data to its scene frame (0x560ee0). */
+typedef PhysPropFrame *(BMX_CDECL *ZbspObjectFrameFn)(uint32_t objectData);
+#define gZbspObjectFrameFn ORIG_VAR(0x00560ee0, ZbspObjectFrameFn, gZbspObjectFrameFn)
 /* Renderer entry used by zbspGetMatRef (0x561038). */
 typedef const uint32_t *(BMX_CDECL *ZbspMaterialFn)(const void *material);
 #define gZbspMaterialFn ORIG_VAR(0x00561038, ZbspMaterialFn, gZbspMaterialFn)
@@ -124,8 +127,11 @@ typedef const uint32_t *(BMX_CDECL *ZbspMaterialFn)(const void *material);
 
 /* Centroid of the three float vertices of a face record (at +0x30, stride 0x10). */
 void zbspFaceCentroid(const void *face, ZVec3 *out);
-/* Null-terminated list of edges within `radius` of p (static buffer). */
-ORIG_FN(0x00466ed0, void **, zbspFindEdgesNear, (const ZVec3 *p, float radius));
+/*
+ * Null-terminated list of edges within `radius` of p (static buffer): tagged level edges (records cached per
+ * face edge) followed by the roller's prop edges.
+ */
+void **zbspFindEdgesNear(const ZVec3 *p, float radius);
 /*
  * The `index`-th edge tagged `id` (only the low 16 bits count), rebuilt in a static record, or NULL. The
  * first and last parameters are unused.
@@ -139,7 +145,7 @@ void **zbspFindTaggedFaces(int lo, int hi);
  * Faces near p (within `radius`, |normal.y| within `cosLimit`) as a ZbspFaceQuery in a static record, or
  * NULL.
  */
-ORIG_FN(0x00468070, void *, zbspFindFaceNear, (const ZVec3 *p, float radius, float cosLimit));
+void *zbspFindFaceNear(const ZVec3 *p, float radius, float cosLimit);
 /* Null-terminated list of the collision objects of props whose class lies in [lo, hi] (static buffer). */
 void **zbspFindPropsNear(int lo, int hi);
 /* Which side of an edge is solid: 1 (flag 1), -1 (flag 2) or 0. */
@@ -189,6 +195,26 @@ typedef struct ZbspFaceQuery {
 } ZbspFaceQuery;
 
 _Static_assert(sizeof(ZbspFaceHit) == 0x1c, "ZbspFaceHit size");
+_Static_assert(sizeof(ZbspFaceQuery) == 0x40, "ZbspFaceQuery size");
+
+/* zbspFindFaceNear's buffers: the renderer's sphere test result, face records and their int16 corners. */
+typedef struct ZbspSphereResult {
+    struct ZrwColHit *hits;
+    uint32_t count;
+} ZbspSphereResult;
+/* Corners of one zbspFindFaceNear face record: three int16 points, 12 bytes apart. */
+typedef struct ZbspNearCorners {
+    int16_t v[3][6];
+} ZbspNearCorners;
+enum { kZbspNearFaceMax = 255 };
+typedef PhysFace ZbspNearFaceTable[kZbspNearFaceMax];
+typedef ZbspNearCorners ZbspNearCornerTable[kZbspNearFaceMax];
+typedef ZbspFaceHit ZbspNearHitTable[kZbspNearFaceMax + 1];
+#define gZbspSphere      ORIG_VAR(0x005f0c20, ZbspSphereResult, gZbspSphere)
+#define gZbspFaceQuery   ORIG_VAR(0x005f0c28, ZbspFaceQuery, gZbspFaceQuery)
+#define gZbspNearFaces   ORIG_VAR(0x005e8420, ZbspNearFaceTable, gZbspNearFaces)
+#define gZbspNearCorners ORIG_VAR(0x005f10a8, ZbspNearCornerTable, gZbspNearCorners)
+#define gZbspNearHits    ORIG_VAR(0x005e63d8, ZbspNearHitTable, gZbspNearHits)
 
 /* ---- debug-print stubs ---------------------------------------------------------------------------
  * The original build left these hooks as empty bodies that only print their name (file, line, name).
