@@ -76,8 +76,12 @@ static void setupClose(DtCtx *c)
 static void setupRead(DtCtx *c)
 {
     dtgpBegin(c, DTGP_DEBUG);
-    startFileSystem((dt_u32() & 15) == 0 ? 0x100 : 0x40000);
-    switch (dt_range(0, 5)) {
+    const int kind = dt_range(0, 5);
+
+    /* A tiny static region tests the reader's allocation failure; the original writer behind
+     * createValidFile runs out of RAM in it (an assert in setup), so that kind always gets room. */
+    startFileSystem(kind != 1 && (dt_u32() & 15) == 0 ? 0x100 : 0x40000);
+    switch (kind) {
     case 0:
         break;
     case 1:

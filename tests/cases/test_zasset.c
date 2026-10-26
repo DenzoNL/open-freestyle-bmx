@@ -8,6 +8,7 @@
 #include "dt_ngif.h"
 #include "dt_realfile.h"
 #include "zge/zasset.h"
+#include "zge/zfile.h"
 
 typedef int(BMX_CDECL *OpenFn)(const char *);
 typedef void(BMX_CDECL *CloseFn)(int);
@@ -306,6 +307,9 @@ static void setup_open_made(DtCtx *c)
 }
 
 /* An open made-up library, with the cursor on a random entry; returns it (and the spec through *spec). */
+/* Image of the last made-up library (linked entries name their loose file inside it). */
+static const uint8_t *gMadeImage;
+
 static int open_made(ZalSpec *spec, uint32_t *size)
 {
     uint8_t *img;
@@ -315,6 +319,7 @@ static int open_made(ZalSpec *spec, uint32_t *size)
     spec->method = (uint32_t)dt_range(0, 1);
     spec->linked = (spec->stored == 0 && dt_u32() % 3 == 0) ? 1 : 0;
     img = build_zal(spec, size);
+    gMadeImage = img;
     return ORIG_OPEN(dt_ramdisk_name(img, *size));
 }
 
@@ -363,7 +368,16 @@ static void setup_read_made(DtCtx *c)
     DT_ARG_INT(c, 0, lib);
     DT_ARG_PTR(c, 1, dt_alloc(0x8000)); /* room for the largest loose file (Scene.Txt, 20031 bytes) */
     if (lib != 0 && (dt_u32() & 1) && ((const ZassetLibrary *)(uintptr_t)lib)->linked) {
-        ORIG_SIZE(lib); /* the size call caches the loose file: the second read path */
+        /* The size call caches the loose file (the second read path), but asserts in setup when the
+         * file is missing: the deliberate bad name, or any real asset when no install is available. */
+        const uint8_t *cursor = ((const ZassetLibrary *)(uintptr_t)lib)->cursor;
+        const char *name = (const char *)gMadeImage + *(const uint32_t *)cursor + 0x10;
+        ZfileHandle *loose = zfileOpen(name, 1, 0);
+
+        if (loose != NULL) {
+            zfileClose(loose, 0);
+            ORIG_SIZE(lib);
+        }
     }
 }
 

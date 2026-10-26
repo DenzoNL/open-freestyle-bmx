@@ -189,9 +189,9 @@ round floats (so the hook build uses SSE2, not x87). Rules are in CONTRIBUTING.m
   constants; ship them as generated data computed from the original's formula).
 
 
-- **Fixture bugs (not port bugs).** `saveFileRead` runs the emulated heap out of RAM in setup (iter 86);
-  `zassetRead_made` asserts in setup without game assets; with `BMX_GAME_DIR` set and full iterations,
-  18 `ziff*` cases fault inside the original at iter 153.
+- **Fixture bugs (not port bugs).** `saveFileRead` and `zassetRead_made` fixed 2026-10-26. Still open:
+  with `BMX_GAME_DIR` set and full iterations, 18 `ziff*` cases were seen faulting inside the original at
+  iter 153 (not reproduced in the 2026-10-26 full runs; recheck).
 - **Signalling NaNs through x87 load/store.** The original copies some float words with FLD/FSTP
   (FT4/GT4 u/v in ngifpsx.c), which quietens an sNaN on real hardware. Unicorn keeps the bits, so the
   port copies bits to match the emulator. Decide which to follow (real hardware is the truth; the
