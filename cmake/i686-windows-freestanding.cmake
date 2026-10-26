@@ -20,7 +20,9 @@ set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
 # an x87 register at 53-bit precision, float = value stored to memory), which only holds with strict
 # IEEE semantics. LLVM's x87 backend does not round float operations to 24 bits.
 set(CMAKE_C_FLAGS_INIT "-ffreestanding -fno-builtin -fno-stack-protector -fno-math-errno -msse2 -mfpmath=sse -fms-extensions")
-set(CMAKE_SHARED_LINKER_FLAGS_INIT "-fuse-ld=lld -nostdlib -Wl,-machine:x86 -Wl,-noentry")
+# No -noentry here: it silently overrides a target's -entry (the hook DLL's DllMain never ran).
+# bmxtest sets it itself; the emulator loads that DLL without calling an entry point.
+set(CMAKE_SHARED_LINKER_FLAGS_INIT "-fuse-ld=lld -nostdlib -Wl,-machine:x86")
 
 # No Windows SDK or MSVC runtime: drop CMake's default import libraries and runtime selection.
 set(CMAKE_C_STANDARD_LIBRARIES "" CACHE STRING "" FORCE)

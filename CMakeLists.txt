@@ -38,7 +38,7 @@ if(BMX_HOOK)
   # write-only statics are intended; newer clang (21+) flags them as unused-but-set globals.
   target_compile_options(bmxtest PRIVATE ${BMX_WARNINGS} -O0 -Wno-unknown-warning-option
     -Wno-unused-but-set-global)
-  target_link_options(bmxtest PRIVATE -Wl,-base:0x10000000 -Wl,-fixed)
+  target_link_options(bmxtest PRIVATE -Wl,-base:0x10000000 -Wl,-fixed -Wl,-noentry)
 
   # In-game hook DLL (dev only): dinput.dll proxy that redirects ported functions.
   add_library(bmxhook SHARED src/hook/hook.c src/hook/trace.c ${CMAKE_BINARY_DIR}/hooks_table.c $<TARGET_OBJECTS:bmx_game>)
