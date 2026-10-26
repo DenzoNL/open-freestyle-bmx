@@ -150,6 +150,28 @@ round floats (so the hook build uses SSE2, not x87). Rules are in CONTRIBUTING.m
 - DLSS / FSR upscaling: needs depth + motion vectors (also needed for render interpolation). SDL3 GPU
   may not expose enough for the vendor SDKs; decide in P4 whether a D3D12/Vulkan backend is needed.
 - Modding: asset override folder (menus, riders, bikes), custom music, later a Blender level exporter.
+- Level remaster (render-only replacement pack, opt-in):
+  - **Rule:** collision always stays on the original triangles. Grinds, lips and landings depend on
+    the exact faces and edges, and the physics is bit-exact against them. Render meshes stay within
+    ~1–2 cm of the original surfaces.
+  - **Pipeline:** export each level to glTF (geometry, UVs, vertex colours, textures; gameplay
+    metadata such as edges, spawns and props in glTF extras), then a reproducible Blender Python
+    script rather than hand rebuilds or MCP-driven modelling:
+    - subdivide only the curved surfaces (quarter pipes, bowls, pipes, rails), detected by small
+      dihedral angles between neighbouring faces;
+    - crease and slightly bevel the hard edges; weighted normals;
+    - displacement or normal maps for surface detail (brick, gravel).
+  - **Materials:** map each original texture to a tileable CC0 PBR material (ambientCG, Poly Haven)
+    tinted to the original palette; AI-upscaled originals for unique art (signs, graffiti, logos).
+    Drop the baked vertex lighting when relighting, but keep it as an optional AO/dirt mask.
+  - **Targets:** our SDL3 renderer with simple PBR as the portable baseline (Android, older Macs),
+    and/or Unreal Engine 5 with Lumen (real-time GI, no lightmap baking) and Nanite (cheap
+    high-poly/displacement), linking the C game logic as a library with UE as the renderer only.
+    Lumen and Nanite need DX12/Vulkan-class desktop GPUs.
+  - **First step:** after the asset loaders exist, export one level and judge the script plus a
+    handful of PBR materials in Blender before building the full pipeline.
+  - **Legal:** converted levels derive from the user's install and can't be redistributed (CC0
+    materials can).
 - Dev: 64-bit build, ASan/UBSan builds.
 - Not planned by us, PRs welcome if the repo goes public: online multiplayer (rollback is feasible:
   deterministic sim, input-based replays), speedrun timer/practice mode.
