@@ -73,7 +73,29 @@ static struct {
     DsResult createHr;
     int loadFails;
     int procFails;
+    uint32_t calls;  /* fallible device and buffer calls made so far (winchanInit) */
+    uint32_t failAt; /* the call that fails, 0 for none */
 } gScript;
+
+/* Result of a scripted call: `hr`, or an error when it is the call the script fails. */
+static DsResult scripted(DsResult hr)
+{
+    gScript.calls++;
+    return gScript.calls == gScript.failAt ? (DsResult)0x80004005 : hr;
+}
+
+static void logFormat(const void *p)
+{
+    const DsWaveFormat *f = p;
+
+    logU(f->formatTag);
+    logU(f->channels);
+    logU(f->samplesPerSec);
+    logU(f->avgBytesPerSec);
+    logU(f->blockAlign);
+    logU(f->bitsPerSample);
+    logU(*(const uint16_t *)(f + 1)); /* WAVEFORMATEX.cbSize */
+}
 
 static uint32_t BMX_STDCALL fb_release(DsBuffer *self)
 {
@@ -147,8 +169,28 @@ static DsResult BMX_STDCALL fb_restore(DsBuffer *self)
     return 0;
 }
 
+static DsResult BMX_STDCALL fb_play(DsBuffer *self, uint32_t reserved, uint32_t priority, uint32_t flags)
+{
+    logU(0x208);
+    logU(((FakeBuffer *)self)->id);
+    logU(reserved);
+    logU(priority);
+    logU(flags);
+    return scripted(0);
+}
+
+static DsResult BMX_STDCALL fb_setFormat(DsBuffer *self, const void *format)
+{
+    logU(0x209);
+    logU(((FakeBuffer *)self)->id);
+    logFormat(format);
+    return scripted(0);
+}
+
 static const DsBufferVtbl gBufferVtbl = {
     .release = fb_release,
+    .play = fb_play,
+    .setFormat = (void *)fb_setFormat,
     .getCurrentPosition = fb_getCurrentPosition,
     .getStatus = fb_getStatus,
     .lock = fb_lock,
@@ -170,11 +212,38 @@ static DsResult BMX_STDCALL fd_setCooperativeLevel(DsDevice *self, void *window,
     logU(((FakeDevice *)self)->id);
     logU((uint32_t)(uintptr_t)window);
     logU(level);
-    return gScript.coopHr;
+    return scripted(gScript.coopHr);
+}
+
+static FakeBuffer gBufferA;
+static FakeBuffer gBufferB;
+
+/* Primary buffers are gBufferB, the output buffer gBufferA. */
+static DsResult BMX_STDCALL fd_createSoundBuffer(DsDevice *self, const DsBufferDesc *desc, DsBuffer **buffer,
+                                                 void *outer)
+{
+    const DsResult hr = scripted(0);
+
+    logU(0x213);
+    logU(((FakeDevice *)self)->id);
+    logU(desc->size);
+    logU(desc->flags);
+    logU(desc->bufferBytes);
+    logU(desc->reserved);
+    logU(desc->format != NULL);
+    if (desc->format != NULL) {
+        logFormat(desc->format);
+    }
+    logU((uint32_t)(uintptr_t)outer);
+    if (hr == 0) {
+        *buffer = (DsBuffer *)((desc->flags & 1) != 0 ? &gBufferB : &gBufferA);
+    }
+    return hr;
 }
 
 static const DsDeviceVtbl gDeviceVtbl = {
     .release = fd_release,
+    .createSoundBuffer = fd_createSoundBuffer,
     .setCooperativeLevel = fd_setCooperativeLevel,
 };
 
@@ -767,6 +836,151 @@ static void setup_pump(DtCtx *c)
     }
 }
 
+/* ---- winchanInit --------------------------------------------------------------------------------- */
+
+static void setup_init(DtCtx *c)
+{
+    WinchanInitDesc *d;
+    uint32_t ring;
+
+    begin(c);
+    d = dt_alloc(sizeof *d);
+    d->window = c->seed % 23 == 5 ? NULL : (void *)(uintptr_t)(0x1000 + c->seed);
+    d->format = dt_u32();
+    d->rate = c->seed % 9 == 4 ? 0 : (uint32_t)dt_range(4000, 48000);
+    d->chunkMillis = c->seed % 4 == 0 ? 0 : (uint32_t)dt_range(1, 200);
+    d->echoSeconds = c->seed % 5 == 0 ? 0.0f : dt_float(0.0f, 2.0f);
+    gScript.loadFails = c->seed % 17 == 1;
+    gScript.procFails = c->seed % 17 == 2;
+    gScript.createHr = c->seed % 17 == 3 ? (DsResult)0x8878000a : 0;
+    gScript.coopHr = 0;
+    gScript.calls = 0;
+    gScript.failAt = c->seed % 2 == 0 ? (uint32_t)dt_range(1, 8) : 0;
+    gScript.lockHr[0] = c->seed % 13 == 9 ? (DsResult)0x80004005 : 0;
+    gScript.lockCalls = 0;
+    ring = (d->chunkMillis == 0 ? 50 : d->chunkMillis) * d->rate / 1000 * 8;
+    gScript.dest = dt_alloc(ring < 0x100000 ? ring + 16 : 16);
+    gScript.lockBytes1 = (uint32_t)dt_range(0, 64);
+    gScript.lockBytes2 = (uint32_t)dt_range(0, 4);
+    gWinchanDirectSound = NULL;
+    gWinchanPrimary = NULL;
+    gWinchanBuffer = NULL;
+    gWinchanInitialized = 0;
+    gWinchanDsoundCreate = NULL;
+    /* the slot past the handles is the mixer's scratch word */
+    gWinchanHandles[64].allocated = rand_byte();
+    gWinchanHandles[64].channelNum = rand_byte();
+    DT_ARG_PTR(c, 0, d);
+}
+
+/* ---- winchanMix ---------------------------------------------------------------------------------- */
+
+enum { kMixPadFrames = 64 };
+
+static float mix_float(float lo, float hi)
+{
+    switch (dt_u32() % 9) {
+    case 0:
+        return 0.0f;
+    case 1:
+        return -0.0f;
+    case 2:
+        return dt_float(-1e7f, 1e7f); /* clamps and FISTP overflow */
+    default:
+        return dt_float(lo, hi);
+    }
+}
+
+static const ZsdSample *mix_sample(void)
+{
+    ZsdSample *s = dt_alloc(sizeof *s);
+    const uint32_t frames = (uint32_t)dt_range(1, 300);
+    const uint32_t bytes = (frames + kMixPadFrames) * 4;
+
+    s->format = (uint16_t)(dt_u32() & 0xf);
+    s->loopStart = dt_range(0, (int32_t)frames - 1);
+    s->data = dt_alloc(bytes);
+    dt_fill((void *)s->data, bytes);
+    s->rate = frames; /* the fixture keeps the frame count here */
+    return s;
+}
+
+static void setup_mix(DtCtx *c)
+{
+    uint32_t frames, n, i;
+    int k;
+
+    dt_seed(c);
+    dt_zmem_env();
+    gLogN = 0;
+    dt_stub(0x004a4de8, NULL, (void *)stub_assert);
+    memset(&gWinchanChannels, 0, sizeof gWinchanChannels);
+    memset(&gWinchanHandles, 0, sizeof gWinchanHandles);
+    gWinchanRate = (uint32_t)dt_range(8000, 48000);
+    gWinchanActive = dt_range(0, 24);
+    for (k = 0; k < kWinchanNumChannels; k++) {
+        WinchanChannel *ch = &gWinchanChannels[k];
+        ZsdVoice *v = dt_alloc(sizeof *v);
+        const ZsdSample *s = mix_sample();
+        const uint32_t len = s->rate;
+
+        v->decay = dt_u32() % 3 == 0 ? 0 : (dt_u32() % 2 ? 0x7f : rand_byte());
+        v->fade = dt_u32() % 3 == 0 ? 0x7f : rand_byte();
+        ch->state = dt_u32() % 4 == 0 ? (uint8_t)dt_range(0, 3) : kWinchanPlaying;
+        ch->flags = (uint8_t)(dt_u32() & 3);
+        ch->handle = (uint8_t)k;
+        gWinchanHandles[k].allocated = 1;
+        gWinchanHandles[k].channelNum = (uint8_t)k;
+        ch->voice = v;
+        ch->sample = s;
+        ch->length = len;
+        ch->step = (uint32_t)(dt_u32() % 4 == 0 ? dt_range(-0x3000, -1) : dt_range(0, 0x3000));
+        ch->position = (uint32_t)dt_range(s->loopStart, (int32_t)len - 1);
+        ch->fraction = dt_u32() % 4096;
+        ch->phase = dt_u32() % 8 == 0 ? rand_byte() : (uint8_t)dt_range(0, 3);
+        ch->gainLeft = mix_float(-2.0f, 2.0f);
+        ch->gainRight = mix_float(-2.0f, 2.0f);
+        ch->phaseFrames = dt_u32() % 3 == 0 ? 0 : (uint32_t)dt_range(1, 6);
+        ch->level = mix_float(-1.0f, 2.0f);
+        ch->levelStep = mix_float(-0.1f, 0.1f);
+        ch->decayStep = mix_float(-0.1f, 0.1f);
+        ch->sustainLevel = mix_float(0.0f, 1.0f);
+        ch->fadeStep = mix_float(-0.1f, 0.1f);
+    }
+    /* echo */
+    gWinchanEffectMaxFrames = (uint32_t)dt_range(1, 600);
+    gWinchanEchoBuffer = dt_alloc(gWinchanEffectMaxFrames * sizeof(WinchanFrame));
+    for (i = 0; i < gWinchanEffectMaxFrames; i++) {
+        gWinchanEchoBuffer[i][0] = dt_float(-40000.0f, 40000.0f);
+        gWinchanEchoBuffer[i][1] = dt_float(-40000.0f, 40000.0f);
+    }
+    gWinchanEffectAFrames = c->seed % 3 == 0 ? 0 : (uint32_t)dt_range(1, (int32_t)gWinchanEffectMaxFrames);
+    gWinchanEchoPos = dt_range(0, (int32_t)gWinchanEffectMaxFrames - 1);
+    gWinchanEffectAGain = mix_float(-1.0f, 1.0f);
+    gWinchanEchoFeedback = mix_float(-1.0f, 1.0f);
+    /* flanger: the delay stays within the line */
+    for (i = 0; i < 4096; i++) {
+        gWinchanLfoTable[i] = (uint16_t)dt_range(0, 4096);
+    }
+    for (i = 0; i < 1024; i++) {
+        gWinchanFlangerLine[i][0] = dt_float(-40000.0f, 40000.0f);
+        gWinchanFlangerLine[i][1] = dt_float(-40000.0f, 40000.0f);
+    }
+    gWinchanEffectBTailStart = c->seed % 3 == 1 ? 0 : dt_range(1, 0x200);
+    gWinchanEffectBFrames = (uint32_t)dt_range(0, 0x200);
+    gWinchanEffectBGain = mix_float(-1.0f, 1.0f);
+    gWinchanEffectBTail = dt_range(0, 0x200000);
+    gWinchanFlangerPhase = dt_range(0, 0xffffff);
+    gWinchanFlangerPos = dt_range(0, 0x3ff);
+    gWinchanFlangerDelay = dt_range(0, 0x400 << 12);
+    gWinchanMixLeft = (int32_t)dt_u32();
+    gWinchanMixRight = (int32_t)dt_u32();
+    frames = c->seed % 7 == 0 ? 0 : (uint32_t)dt_range(1, 48);
+    n = frames * 4;
+    DT_ARG_PTR(c, 0, dt_alloc(n + 4));
+    DT_ARG_INT(c, 1, n);
+}
+
 DT_CASES(winchan_cases) = {
     {"winchanCardStub6e0", 0x0046d6e0, winchanCardStub6e0, 0, DT_RET_INT, setup_none, 2, 0},
     {"winchanCardStub700", 0x0046d700, winchanCardStub700, 0, DT_RET_VOID, setup_none, 2, 0},
@@ -787,6 +1001,8 @@ DT_CASES(winchan_cases) = {
     {"winchanEnd", 0x0046d8e0, winchanEnd, 0, DT_RET_VOID, setup_none, 2, 0},
     {"winchanCardStub900", 0x0046d900, winchanCardStub900, 0, DT_RET_VOID, setup_none, 2, 0},
     {"winchanCardStub920", 0x0046d920, winchanCardStub920, 0, DT_RET_INT, setup_none, 2, 0},
+    {"winchanInit", 0x0046d940, winchanInit, 1, DT_RET_INT, setup_init, 600, 0},
+    {"winchanMix", 0x0046f5f0, winchanMix, 2, DT_RET_VOID, setup_mix, 400, 0},
     {"winchanShutdown", 0x0046df20, winchanShutdown, 0, DT_RET_VOID, setup_shutdown, 200, 0},
     {"winchanShutdown_uninit", 0x0046df20, winchanShutdown, 0, DT_RET_VOID, setup_shutdown_uninit, 4, 0},
     {"winchanPump", 0x0046e010, winchanPump, 0, DT_RET_INT, setup_pump, 1500, 0},

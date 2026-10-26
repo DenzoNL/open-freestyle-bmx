@@ -162,9 +162,9 @@ static int BMX_CDECL stub_winchanInit(const WinchanInitDesc *desc)
 {
     logU(0x111);
     logU((uint32_t)(uintptr_t)desc->window);
-    logU(desc->reserved);
+    logU(desc->format);
     logU(desc->rate);
-    logU(desc->pad0c[0] | (uint32_t)desc->pad0c[7]);
+    logU(desc->chunkMillis | (uint32_t)(desc->echoSeconds != 0.0f));
     return step(1);
 }
 

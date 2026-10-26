@@ -636,7 +636,7 @@ addr,size,file,confidence,name,status
 0044e090,98,bmx/com/zge/bmx/bmxsound.c,assert,bmxsound_c_sound_close,ported
 0044e120,338,bmx/com/zge/bmx/bmxsound.c,contiguous,FUN_0044e120,ported
 0044e2e0,15,bmx/com/zge/bmx/bmxsound.c,contiguous,FUN_0044e2e0,ported
-0044e300,5747,bmx/com/zge/bmx/bmxsound.c,assert,FUN_0044e300,orig
+0044e300,5747,bmx/com/zge/bmx/bmxsound.c,assert,bmxSoundPlayAt,ported
 0044ffb0,75,bmx/com/zge/bmx/bmxsound.c,affinity,FUN_0044ffb0,ported
 00450020,36,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00450020,ported
 00450060,36,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00450060,ported
@@ -744,7 +744,7 @@ addr,size,file,confidence,name,status
 0045a380,3,bmx/com/zge/ngif/ngapp.c,affinity,FUN_0045a380,ported
 0045a3a0,3,bmx/com/zge/ngif/ngapp.c,affinity,FUN_0045a3a0,ported
 0045a3c0,198,bmx/com/zge/ngif/ngapp.c,affinity,FUN_0045a3c0,ported
-0045a4d0,1317,bmx/com/zge/ngif/ngapp.c,affinity,FUN_0045a4d0,orig
+0045a4d0,1317,bmx/com/zge/ngif/ngapp.c,affinity,ngappDrawDebug,ported
 0045ab50,35,bmx/com/zge/ngif/ngapp.c,affinity,FUN_0045ab50,ported
 0045ab90,30,bmx/com/zge/ngif/ngapp.c,affinity,FUN_0045ab90,ported
 0045abc0,96,bmx/com/zge/ngif/ngapp.c,affinity,FUN_0045abc0,ported
@@ -762,7 +762,7 @@ addr,size,file,confidence,name,status
 0045b6e0,343,bmx/com/zge/ngif/ngapp.c,contiguous,FUN_0045b6e0,ported
 0045b8a0,1541,bmx/com/zge/ngif/ngapp.c,assert,MainMenu_,ported
 0045c040,207,bmx/com/zge/ngif/ngapp.c,affinity,FUN_0045c040,ported
-0045c150,1060,bmx/com/zge/ngif/ngapp.c,affinity,FUN_0045c150,orig
+0045c150,1060,bmx/com/zge/ngif/ngapp.c,affinity,ngappDrawLoading,ported
 0045c690,40,bmx/com/zge/ngif/ngiffx.c,affinity,FUN_0045c690,ported
 0045c6d0,7,bmx/com/zge/ngif/ngiffx.c,affinity,FUN_0045c6d0,ported
 0045c6f0,1,bmx/com/zge/ngif/ngiffx.c,affinity,FUN_0045c6f0,ported
@@ -1127,7 +1127,7 @@ addr,size,file,confidence,name,status
 0046d8e0,1,bmx/pc/zge/sound/winchan.c,affinity,FUN_0046d8e0,ported
 0046d900,1,bmx/pc/zge/sound/winchan.c,affinity,FUN_0046d900,ported
 0046d920,3,bmx/pc/zge/sound/winchan.c,affinity,FUN_0046d920,ported
-0046d940,1189,bmx/pc/zge/sound/winchan.c,assert,DSOUND_LOADLIBRARY,orig
+0046d940,1189,bmx/pc/zge/sound/winchan.c,assert,winchanInit,ported
 0046df20,184,bmx/pc/zge/sound/winchan.c,assert,FUN_0046df20,ported
 0046e010,742,bmx/pc/zge/sound/winchan.c,contiguous,FUN_0046e010,ported
 0046e3c0,60,bmx/pc/zge/sound/winchan.c,contiguous,FUN_0046e3c0,ported
@@ -1147,7 +1147,7 @@ addr,size,file,confidence,name,status
 0046f470,140,bmx/pc/zge/sound/winchan.c,assert,FUN_0046f470,ported
 0046f530,53,bmx/pc/zge/sound/winchan.c,affinity,FUN_0046f530,ported
 0046f580,75,bmx/pc/zge/sound/winchan.c,affinity,FUN_0046f580,ported
-0046f5f0,1051,bmx/pc/zge/sound/winchan.c,affinity,FUN_0046f5f0,orig
+0046f5f0,1051,bmx/pc/zge/sound/winchan.c,affinity,winchanMix,ported
 0046fb20,382,bmx/pc/zge/sound/winload.c,assert,FUN_0046fb20,ported
 0046fd00,737,bmx/pc/zge/sound/winload.c,assert,FUN_0046fd00,ported
 004700b0,58,bmx/pc/zge/sound/winload.c,contiguous,FUN_004700b0,ported

@@ -5,8 +5,6 @@
  * a mixer channel while the voice sounds. Handles and small values are passed as full words with
  * undefined upper bits.
  *
- * Not ported here (separate pass): winchanInit (0x0046d940) and the mixer itself, winchanMix (0x0046f5f0).
- *
  * The first block of functions are empty stubs: the PS1-style memory card API of the console port, which
  * the packet files under winchan.c (probably a separate source file).
  */
@@ -118,14 +116,35 @@ typedef WinchanHandle WinchanHandleTable[kWinchanNumHandles + 1];
 #define gWinchanMixOffset   ORIG_VAR(0x005ffef4, uint32_t, gWinchanMixOffset)
 #define gWinchanLastPlay    ORIG_VAR(0x005ffef8, uint32_t, gWinchanLastPlay)
 /* Effect state set by winchanSetEffect (the mixer reads it). */
-#define gWinchanEffectMaxFrames  ORIG_VAR(0x005fb76c, uint32_t, gWinchanEffectMaxFrames)
-#define gWinchanEffectAFrames    ORIG_VAR(0x005ffeec, uint32_t, gWinchanEffectAFrames)
-#define gWinchanEffectAGain      ORIG_VAR(0x005fbe34, float, gWinchanEffectAGain)
-#define gWinchanEffectAParam     ORIG_VAR(0x005ffef0, uint32_t, gWinchanEffectAParam)
+#define gWinchanEffectMaxFrames ORIG_VAR(0x005fb76c, uint32_t, gWinchanEffectMaxFrames)
+#define gWinchanEffectAFrames   ORIG_VAR(0x005ffeec, uint32_t, gWinchanEffectAFrames)
+#define gWinchanEffectAGain     ORIG_VAR(0x005fbe34, float, gWinchanEffectAGain)
+#define gWinchanEffectAParam    ORIG_VAR(0x005ffef0, uint32_t, gWinchanEffectAParam)
+/* The same word as the mixer reads it: the echo feedback. */
+#define gWinchanEchoFeedback     ORIG_VAR(0x005ffef0, float, gWinchanEchoFeedback)
 #define gWinchanEffectBFrames    ORIG_VAR(0x005ffee0, uint32_t, gWinchanEffectBFrames)
 #define gWinchanEffectBGain      ORIG_VAR(0x005ffee8, float, gWinchanEffectBGain)
 #define gWinchanEffectBTailStart ORIG_VAR(0x005ffefc, int32_t, gWinchanEffectBTailStart)
 #define gWinchanEffectBTail      ORIG_VAR(0x005fff04, int32_t, gWinchanEffectBTail)
+/*
+ * Mixer effects. Effect A is an echo: a ring of gWinchanEffectMaxFrames stereo frames (allocated by
+ * winchanInit); each output frame adds the frame AFrames back times AGain and writes itself plus that
+ * frame times the feedback. Effect B is a flanger: a 1024 frame delay line read at a delay (20.12 fixed
+ * point) of BFrames plus BTailStart times a raised cosine LFO whose phase advances by BTail per frame.
+ */
+typedef float WinchanFrame[2];
+typedef WinchanFrame WinchanFlangerLine[1024];
+typedef uint16_t WinchanLfoTable[4096];
+#define gWinchanEchoBuffer   ORIG_VAR(0x005ffed0, WinchanFrame *, gWinchanEchoBuffer)
+#define gWinchanEchoPos      ORIG_VAR(0x005fdec4, int32_t, gWinchanEchoPos)
+#define gWinchanFlangerLine  ORIG_VAR(0x005fbebc, WinchanFlangerLine, gWinchanFlangerLine)
+#define gWinchanFlangerPos   ORIG_VAR(0x005fff00, int32_t, gWinchanFlangerPos)
+#define gWinchanFlangerDelay ORIG_VAR(0x005fb764, int32_t, gWinchanFlangerDelay)
+#define gWinchanFlangerPhase ORIG_VAR(0x005ffecc, int32_t, gWinchanFlangerPhase)
+#define gWinchanLfoTable     ORIG_VAR(0x005fdec8, WinchanLfoTable, gWinchanLfoTable)
+/* The last output frame before clamping (the left word overlaps the spare 65th handle entry). */
+#define gWinchanMixLeft  ORIG_VAR(0x005fbeb8, int32_t, gWinchanMixLeft)
+#define gWinchanMixRight ORIG_VAR(0x005fbe30, int32_t, gWinchanMixRight)
 /* DirectSound objects and the DLL they come from. */
 #define gWinchanBuffer       ORIG_VAR(0x005fb760, DsBuffer *, gWinchanBuffer)
 #define gWinchanPrimary      ORIG_VAR(0x005fff20, DsBuffer *, gWinchanPrimary)
@@ -212,17 +231,22 @@ double winchanEnvelopeStep(int32_t amount, int32_t millis);
 
 /* Parameters of winchanInit. */
 typedef struct WinchanInitDesc {
-    void *window;      /* 0x00 window handle (first field of the platform object 0x15) */
-    uint32_t reserved; /* 0x04 */
-    uint32_t rate;     /* 0x08 mixer output rate in Hz */
-    uint8_t pad0c[8];
+    void *window;         /* 0x00 window handle (first field of the platform object 0x15) */
+    uint32_t format;      /* 0x04 primary buffer format: bit 0 8 bit, bit 1 mono */
+    uint32_t rate;        /* 0x08 mixer output rate in Hz (0: 22050 for the primary buffer) */
+    uint32_t chunkMillis; /* 0x0c length of a ring buffer chunk (0: 50, written back) */
+    float echoSeconds;    /* 0x10 length of the echo buffer */
 } WinchanInitDesc;
 
 _Static_assert(sizeof(WinchanInitDesc) == 0x14, "init descriptor");
 
-/* Creates the DirectSound objects, the ring buffer and the channel tables; returns 0 or an error code. */
-ORIG_FN(0x0046d940, int, winchanInit, (const WinchanInitDesc *desc));
-/* Renders `bytes` of audio of the playing channels into the ring buffer at `ring`. */
-ORIG_FN(0x0046f5f0, void, winchanMix, (uint8_t *ring, uint32_t bytes));
+/*
+ * Resets the channel tables, allocates the ring and echo buffers, builds the LFO table and creates the
+ * DirectSound device, primary buffer and looping output buffer. Returns 0 or an error code (0x101 ..
+ * 0x10b). Writes the default chunk length back into `desc`.
+ */
+int winchanInit(WinchanInitDesc *desc);
+/* Renders `bytes` (a multiple of 4) of 16 bit stereo audio of the playing channels into `ring`. */
+void winchanMix(uint8_t *ring, uint32_t bytes);
 
 #endif

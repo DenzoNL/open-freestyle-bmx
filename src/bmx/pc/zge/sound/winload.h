@@ -49,10 +49,10 @@ typedef struct ZsdVoice {
  */
 typedef struct ZsdSample {
     uint16_t sampleFile; /* 0x00 index into the sample file table, 0xffff none */
-    uint16_t format;     /* 0x02 bit 1: stereo, bit 2: 8 bit */
+    uint16_t format;     /* 0x02 bit 0: loops, bit 1: stereo, bit 2: 8 bit, bit 3: ping-pong loop */
     uint32_t rate;       /* 0x04 */
     const uint8_t *data; /* 0x08 resident data (set by the loader) */
-    uint8_t pad0c[4];
+    int32_t loopStart;   /* 0x0c first frame of the loop */
     uint8_t pad10[6];
     uint16_t file; /* 0x16 */
 } ZsdSample;

@@ -3,6 +3,7 @@
 
 #include "bmx/pc/zge/sound/winapi.h"
 #include "compat/crt.h"
+#include "compat/x87.h"
 
 /*
  * Floating point follows the original x87 code: `double` is a value held in an x87 register, `float` is a
@@ -13,7 +14,8 @@ static const char winchanFile[] = "C:\\zaxis\\Bmx\\src\\Pc\\zge\\sound\\winChan.
 
 /* Exe tables: volume curve, envelope times (ms), semitone and cent pitch factors (12 bit fixed point). */
 typedef float GainTable[128];
-typedef uint16_t EnvelopeTable[128];
+/* The envelope table has 128 entries; voice times up to 255 read on into the following data. */
+typedef uint16_t EnvelopeTable[256];
 typedef uint16_t SemitoneTable[73];
 typedef uint16_t CentTable[100];
 #define gGainCurve   ORIG_VAR(0x0055e97c, GainTable, gGainCurve)
@@ -753,4 +755,390 @@ uint32_t winchanPump(void)
         gWinchanMixOffset += elapsed - gWinchanRingBytes;
     }
     return result;
+}
+
+/* Frees the device on an error after DirectSoundCreate. */
+static int releaseDevice(int rc)
+{
+    gWinchanDirectSound->vtbl->release(gWinchanDirectSound);
+    gWinchanDirectSound = 0;
+    return rc;
+}
+
+/* Releases the primary buffer and the device on an error after the primary buffer exists. */
+static int releasePrimary(int rc)
+{
+    gWinchanPrimary->vtbl->release(gWinchanPrimary);
+    return releaseDevice(rc);
+}
+
+/* WAVEFORMATEX */
+typedef struct WinchanWaveFormatEx {
+    DsWaveFormat pcm;
+    uint16_t extraBytes;
+} WinchanWaveFormatEx;
+
+typedef DsResult(BMX_STDCALL *DsSetFormatFn)(DsBuffer *self, const WinchanWaveFormatEx *format);
+
+/* winchanInit after the device exists: cooperative levels, primary format, the looping output buffer. */
+static int createBuffers(const WinchanInitDesc *desc)
+{
+    WinchanWaveFormatEx format;
+    DsBufferDesc bufferDesc;
+    void *ptr1, *ptr2;
+    uint32_t bytes1, bytes2;
+    uint32_t rate;
+
+    if (desc->window == 0) {
+        _assert("init->hWnd", winchanFile, 0x16a);
+    }
+    if (gWinchanDirectSound->vtbl->setCooperativeLevel(gWinchanDirectSound, desc->window, 1) != 0) {
+        return releaseDevice(0x105);
+    }
+    memset(&bufferDesc, 0, sizeof bufferDesc);
+    bufferDesc.size = sizeof bufferDesc;
+    bufferDesc.flags = 1; /* DSBCAPS_PRIMARYBUFFER */
+    if (gWinchanDirectSound->vtbl->createSoundBuffer(gWinchanDirectSound, &bufferDesc, &gWinchanPrimary, 0) !=
+        0) {
+        return releaseDevice(0x106);
+    }
+    if (gWinchanDirectSound->vtbl->setCooperativeLevel(gWinchanDirectSound, desc->window, 2) != 0) {
+        return releasePrimary(0x105);
+    }
+    rate = desc->rate;
+    if (rate == 0) {
+        rate = 22050;
+    }
+    format.pcm.formatTag = 1;
+    format.pcm.samplesPerSec = rate;
+    format.extraBytes = 0;
+    format.pcm.bitsPerSample = (desc->format & 1) != 0 ? 8 : 16;
+    format.pcm.channels = (desc->format & 2) != 0 ? 1 : 2;
+    format.pcm.blockAlign = (uint16_t)((format.pcm.bitsPerSample >> 3) * format.pcm.channels);
+    format.pcm.avgBytesPerSec = format.pcm.blockAlign * rate;
+    if (((DsSetFormatFn)gWinchanPrimary->vtbl->setFormat)(gWinchanPrimary, &format) != 0) {
+        return releasePrimary(0x104);
+    }
+    gWinchanRate = rate;
+    gWinchanDirectSound->vtbl->setCooperativeLevel(gWinchanDirectSound, desc->window, 1);
+    if (gWinchanPrimary->vtbl->play(gWinchanPrimary, 0, 0, kDsPlayLooping) != 0) {
+        return releasePrimary(0x103);
+    }
+    /* The output buffer is 16 bit stereo at the primary rate. */
+    format.pcm.avgBytesPerSec = rate * 4;
+    memset(&bufferDesc, 0, sizeof bufferDesc);
+    bufferDesc.flags = kDsCapsControlFrequency | kDsCapsControlPan | kDsCapsControlVolume;
+    bufferDesc.format = &format.pcm;
+    format.pcm.bitsPerSample = 16;
+    format.pcm.channels = 2;
+    format.pcm.blockAlign = 4;
+    bufferDesc.size = sizeof bufferDesc;
+    bufferDesc.bufferBytes = gWinchanRingBytes;
+    if (gWinchanDirectSound->vtbl->createSoundBuffer(gWinchanDirectSound, &bufferDesc, &gWinchanBuffer, 0) !=
+        0) {
+        return releasePrimary(0x10a);
+    }
+    if (gWinchanBuffer->vtbl->lock(gWinchanBuffer, 0, gWinchanRingBytes, &ptr1, &bytes1, &ptr2, &bytes2, 0) !=
+        0) {
+        return releasePrimary(0x109);
+    }
+    /* Clears a whole ring length from the first region, whatever size the lock returned. */
+    memset(ptr1, 0, gWinchanRingBytes);
+    gWinchanBuffer->vtbl->unlock(gWinchanBuffer, ptr1, gWinchanRingBytes, 0, 0);
+    gWinchanWriteOffset = 0;
+    gWinchanLastPlay = 0;
+    if (gWinchanBuffer->vtbl->play(gWinchanBuffer, 0, 0, kDsPlayLooping) != 0) {
+        /* The output buffer is not released. */
+        return releasePrimary(0x10b);
+    }
+    gWinchanInitialized = 1;
+    return 0;
+}
+
+BMX_ADDR(0x0046d940)
+int winchanInit(WinchanInitDesc *desc)
+{
+    typedef int32_t(BMX_STDCALL * DirectSoundCreateFn)(void *guid, DsDevice **device, void *outer);
+    int i, rc;
+
+    for (i = 0; i < kWinchanNumHandles + 1; i++) {
+        gWinchanHandles[i].allocated = 0;
+        gWinchanHandles[i].channelNum = kWinchanNoChannel;
+    }
+    for (i = 0; i < kWinchanNumChannels; i++) {
+        gWinchanChannels[i].state = kWinchanFree;
+    }
+    gWinchanActive = 0;
+    if (desc->chunkMillis == 0) {
+        desc->chunkMillis = 50;
+    }
+    gWinchanChunkBytes = desc->chunkMillis * desc->rate / 1000u * 4;
+    gWinchanRingBytes = gWinchanChunkBytes * 2;
+    gWinchanRing = malloc(gWinchanRingBytes);
+    if (gWinchanRing == 0) {
+        return 0x108;
+    }
+    memset(gWinchanRing, 0, gWinchanRingBytes);
+    gWinchanMixOffset = 0;
+    gWinchanCopyOffset = gWinchanRingBytes - gWinchanChunkBytes;
+    gWinchanEffectMaxFrames = (uint32_t)bmxFtol((double)desc->rate * (double)desc->echoSeconds);
+    /* A failure here keeps the ring buffer. */
+    gWinchanEchoBuffer = malloc(gWinchanEffectMaxFrames * sizeof(WinchanFrame));
+    if (gWinchanEchoBuffer == 0) {
+        return 0x108;
+    }
+    gWinchanEffectAFrames = 0;
+    gWinchanEffectAGain = 0.0f;
+    gWinchanEffectAParam = 0;
+    gWinchanEchoPos = 0;
+    /* Raised cosine, 0 .. 4096 .. 0 over the table. */
+    for (i = 0; i < 4096; i++) {
+        gWinchanLfoTable[i] =
+            (uint16_t)bmxFtol((0.5 - bmxX87CosScaled(i, 0x1.921fb54411744p-10) * 0.5) * 4096.0);
+    }
+    gWinchanEffectBFrames = 0;
+    gWinchanEffectBGain = 0.0f;
+    gWinchanEffectBTailStart = 0;
+    gWinchanEffectBTail = 0;
+    gWinchanFlangerPhase = 0;
+    gWinchanFlangerPos = 0;
+    gWinchanFlangerDelay = 0;
+    gWinchanDsoundModule = gWinLoadLibrary("DSOUND.DLL");
+    if (gWinchanDsoundModule == 0) {
+        rc = 0x101;
+    } else {
+        gWinchanDsoundCreate = gWinGetProcAddress(gWinchanDsoundModule, "DirectSoundCreate");
+        if (gWinchanDsoundCreate == 0) {
+            rc = 0x102;
+        } else if (((DirectSoundCreateFn)gWinchanDsoundCreate)(0, &gWinchanDirectSound, 0) != 0) {
+            rc = 0x107;
+        } else {
+            rc = createBuffers(desc);
+            if (rc == 0) {
+                return 0;
+            }
+        }
+    }
+    /* Errors free the ring buffer (not the echo buffer) and leave the DLL loaded. */
+    free(gWinchanRing);
+    return rc;
+}
+
+/* x87 FISTP in the round-to-nearest mode: NaN and values outside int32 store 0x80000000. */
+static int32_t fistp32(double v)
+{
+    if (!(v >= -2147483648.5 && v < 2147483647.5)) {
+        return INT32_MIN;
+    }
+    return (int32_t)((v + 0x1.8p52) - 0x1.8p52);
+}
+
+/* An 8 bit (unsigned) sample as the 16 bit value the mixer multiplies by. */
+static int32_t sample8(uint8_t v)
+{
+    return (int16_t)(uint16_t)(((uint32_t)v << 8) ^ 0x8000u);
+}
+
+/* Ends a channel the mixer ran out of: stopped, and released when it was flagged to free its handle. */
+static void mixStop(WinchanChannel *ch)
+{
+    ch->state = kWinchanStopped;
+    ch->phaseFrames = 0;
+    if ((ch->flags & kWinchanFlagFreeHandle) != 0) {
+        winchanChannelRelease(ch);
+    }
+}
+
+/*
+ * Advances a channel's envelope by one frame. Returns 0 when the last phase ended (the channel is
+ * stopped). The level of a new phase is loaded and then overwritten by the running sum, so a phase
+ * change never jumps the level (original quirk).
+ */
+static int mixEnvelope(WinchanChannel *ch)
+{
+    const double level = (double)ch->level + (double)ch->levelStep;
+
+    ch->phaseFrames--;
+    if (ch->phaseFrames == 0) {
+        if ((int8_t)ch->phase >= kWinchanPhaseSustain) {
+            mixStop(ch);
+            return 0;
+        }
+        if (ch->phase == kWinchanPhaseAttack) {
+            ch->phase++;
+            if (ch->voice->decay != 0) {
+                ch->levelStep = ch->decayStep;
+                ch->phaseFrames = envelopeFrames(gEnvelopeMs[ch->voice->decay]);
+                ch->level = (float)level;
+                return 1;
+            }
+        }
+        ch->phase++;
+        ch->levelStep = ch->fadeStep;
+        ch->phaseFrames = ch->voice->fade == 0x7f ? 0 : envelopeFrames(gEnvelopeMs[ch->voice->fade]);
+    }
+    ch->level = (float)level;
+    return 1;
+}
+
+/* Advances a channel's sample position by its step, looping or ending at the sample's bounds. */
+static void mixAdvance(WinchanChannel *ch)
+{
+    const ZsdSample *sample = ch->sample;
+    const int32_t step = (int32_t)ch->step;
+
+    if (step >= 0) {
+        const uint32_t sum = ch->fraction + (uint32_t)step;
+
+        ch->fraction = sum & 0xfff;
+        ch->position += sum >> 12;
+        if ((int32_t)ch->position >= (int32_t)ch->length) {
+            if ((sample->format & 1) == 0) {
+                mixStop(ch);
+            } else if ((sample->format & 8) != 0) {
+                ch->step = (uint32_t)-step;
+                ch->position = ch->length - 1;
+                ch->fraction = 0;
+            } else {
+                ch->position -= ch->length - (uint32_t)sample->loopStart;
+            }
+        }
+    } else {
+        const int32_t sum = (int32_t)ch->fraction + step;
+
+        ch->fraction = (uint32_t)sum & 0xfff;
+        if (sum >= 0) {
+            ch->position += (uint32_t)sum >> 12;
+        } else {
+            ch->position += (uint32_t)(sum >> 12);
+        }
+        if ((int32_t)ch->position < sample->loopStart) {
+            ch->step = (uint32_t)-step;
+            ch->position = (uint32_t)sample->loopStart;
+            ch->fraction = 0;
+        }
+    }
+}
+
+/*
+ * Hand written x87 in the original. Per frame: the sum of every playing channel (gain * envelope level *
+ * sample), its envelope and position stepped; then the flanger and the echo; then rounded, clamped to
+ * -0x10000 .. 0xffff and halved into the 16 bit output.
+ */
+BMX_ADDR(0x0046f5f0)
+void winchanMix(uint8_t *ring, uint32_t bytes)
+{
+    int16_t *out = (int16_t *)ring;
+
+    while (bytes != 0) {
+        double left = 0.0, right = 0.0;
+        int32_t pos, mixLeft, mixRight;
+        int i;
+
+        for (i = 0; i < kWinchanNumChannels; i++) {
+            WinchanChannel *ch = &gWinchanChannels[i];
+            const ZsdSample *sample;
+            double l, r;
+
+            if (ch->state != kWinchanPlaying) {
+                continue;
+            }
+            sample = ch->sample;
+            l = (double)ch->gainLeft * (double)ch->level;
+            r = (double)ch->gainRight * (double)ch->level;
+            if ((sample->format & 4) != 0) {
+                const uint8_t *data = sample->data;
+
+                if ((sample->format & 2) != 0) {
+                    l *= (double)sample8(data[ch->position * 2]);
+                    r *= (double)sample8(data[ch->position * 2 + 1]);
+                } else {
+                    const int32_t v = sample8(data[ch->position]);
+
+                    l *= (double)v;
+                    r *= (double)v;
+                }
+            } else {
+                const int16_t *data = (const int16_t *)sample->data;
+
+                if ((sample->format & 2) != 0) {
+                    l *= (double)data[ch->position * 2];
+                    r *= (double)data[ch->position * 2 + 1];
+                } else {
+                    l *= (double)data[ch->position];
+                    r *= (double)data[ch->position];
+                }
+            }
+            left += l;
+            right += r;
+            if (ch->phaseFrames != 0 && !mixEnvelope(ch)) {
+                continue;
+            }
+            mixAdvance(ch);
+        }
+
+        /* Flanger: the dry frame goes into the delay line, the frame `delay` back is mixed in. */
+        pos = gWinchanFlangerPos;
+        gWinchanFlangerLine[pos][0] = (float)left;
+        gWinchanFlangerLine[pos][1] = (float)right;
+        if (gWinchanEffectBTailStart != 0) {
+            const int32_t back = gWinchanFlangerDelay >> 12;
+            const double gain = (double)gWinchanEffectBGain;
+            const double dry = 1.0 - gain;
+
+            if (pos < back) {
+                pos += 0x400;
+            }
+            pos -= back;
+            left = left * dry + (double)gWinchanFlangerLine[pos][0] * gain;
+            right = right * dry + (double)gWinchanFlangerLine[pos][1] * gain;
+        }
+        gWinchanFlangerPos = gWinchanFlangerPos + 1 < 0x400 ? gWinchanFlangerPos + 1 : 0;
+        gWinchanFlangerDelay = (int32_t)((uint32_t)gWinchanLfoTable[gWinchanFlangerPhase >> 12] *
+                                             (uint32_t)gWinchanEffectBTailStart +
+                                         (gWinchanEffectBFrames << 12));
+        gWinchanFlangerPhase = (int32_t)((uint32_t)gWinchanFlangerPhase + (uint32_t)gWinchanEffectBTail);
+        if (gWinchanFlangerPhase >= 0x1000000) {
+            gWinchanFlangerPhase -= 0x1000000;
+        }
+
+        /* Echo: the frame AFrames back is added; the ring keeps this frame plus that one times feedback. */
+        pos = gWinchanEchoPos;
+        if (gWinchanEffectAFrames != 0) {
+            WinchanFrame *echo = gWinchanEchoBuffer;
+            int32_t back = pos;
+            double echoLeft, echoRight, feedback;
+
+            if (back < (int32_t)gWinchanEffectAFrames) {
+                back += (int32_t)gWinchanEffectMaxFrames;
+            }
+            back -= (int32_t)gWinchanEffectAFrames;
+            echoRight = (double)echo[back][1];
+            echoLeft = (double)echo[back][0];
+            feedback = (double)gWinchanEchoFeedback;
+            echo[pos][0] = (float)(feedback * echoLeft + left);
+            echo[pos][1] = (float)(feedback * echoRight + right);
+            left += echoLeft * (double)gWinchanEffectAGain;
+            right += echoRight * (double)gWinchanEffectAGain;
+        } else {
+            gWinchanEchoBuffer[pos][0] = (float)left;
+            gWinchanEchoBuffer[pos][1] = (float)right;
+        }
+        pos++;
+        if (pos >= (int32_t)gWinchanEffectMaxFrames) {
+            pos = 0;
+        }
+        gWinchanEchoPos = pos;
+
+        gWinchanMixLeft = fistp32(left);
+        gWinchanMixRight = fistp32(right);
+        mixLeft = gWinchanMixLeft > 0xffff ? 0xffff : gWinchanMixLeft < -0x10000 ? -0x10000 : gWinchanMixLeft;
+        mixRight = gWinchanMixRight > 0xffff     ? 0xffff
+                   : gWinchanMixRight < -0x10000 ? -0x10000
+                                                 : gWinchanMixRight;
+        out[0] = (int16_t)(mixLeft >> 1);
+        out[1] = (int16_t)(mixRight >> 1);
+        out += 2;
+        bytes -= 4;
+    }
 }

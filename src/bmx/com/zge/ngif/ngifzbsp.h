@@ -29,7 +29,8 @@ typedef struct ZbspLevelFace {
     float pad1c;
     ZVec3 v2;
     float pad2c;
-    uint8_t pad30[0x10];
+    ZVec3 normal; /* 0x30 */
+    float pad3c;
     const uint16_t *tag;           /* low 12 bits: tag id (0xfa1..0xfa4 respawn faces, ...) */
     const ZbspEdgeTag *edgeTag[3]; /* tag of the edge from vertex k to vertex k + 1 */
     uint8_t pad50[0xc];

@@ -1,7 +1,7 @@
 /*
  * The NgIF application shell (C:\zaxis\Bmx\src\com\zge\NgIF\NgApp.c): start-up and shutdown of the NextGen
  * interface, the per frame menu / action switch, the legal screens and the loading screen, and the lighting
- * set up when a level is entered. The big per frame callbacks 0x45a4d0 and 0x45c150 are not ported yet.
+ * set up when a level is entered, and two renderer callbacks: the debug overlay and the loading screen.
  */
 #ifndef BMX_COM_ZGE_NGIF_NGAPP_H
 #define BMX_COM_ZGE_NGIF_NGAPP_H
@@ -50,6 +50,10 @@ void ngappShowLoading(void);
 int ngappDrawSprite(void *sprite);
 /* Per frame function of the shell: legal screens first, then the menu and the action loop. */
 int ngifRunFrame(float dt);
+/* Renderer callback: the collision debug overlay (faces, edges, roller edges, prop wireframe). Returns 1. */
+int ngappDrawDebug(void *unused);
+/* Renderer callback: the loading picture `sprite` and the progress bar. Returns 1. */
+int ngappDrawLoading(void *sprite);
 /* Every third frame: tints the main light with the colour of the ground below the rider. */
 void ngappUpdateSun(void);
 

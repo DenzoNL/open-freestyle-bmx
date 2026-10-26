@@ -19,6 +19,14 @@ static inline float bmxX87SinScaled(int32_t n, float k)
     return r;
 }
 
+/* fcos((double)n * k), rounded to double. */
+static inline double bmxX87CosScaled(int32_t n, double k)
+{
+    double r;
+    __asm__("fildl %1\n\tfmull %2\n\tfcos\n\tfstpl %0" : "=m"(r) : "m"(n), "m"(k) : "st");
+    return r;
+}
+
 /* asin(n * step) * scale as the CRT computes it for |n * step| < 1: x / sqrt((1 + x) * (1 - x)) via FPATAN.
  */
 static inline double bmxX87AsinScaled(int32_t n, double step, float scale)
@@ -81,6 +89,10 @@ static inline void bmxX87Rotate(float *r1, float *r2, float a, float b, const fl
 static inline float bmxX87SinScaled(int32_t n, float k)
 {
     return (float)sin((double)n * k);
+}
+static inline double bmxX87CosScaled(int32_t n, double k)
+{
+    return cos((double)n * k);
 }
 static inline double bmxX87AsinScaled(int32_t n, double step, float scale)
 {

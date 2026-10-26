@@ -5,6 +5,7 @@
 
 #include "bmx/com/action/camera.h"
 #include "bmx/com/action/contrler.h"
+#include "bmx/com/action/physics_hit.h"
 #include "bmx/com/menu/gui/guimain.h"
 #include "bmx/com/zge/bmx/bmxsound.h"
 #include "bmx/com/zge/ngif/ngiffx.h"
@@ -171,6 +172,145 @@ void moviePlay(struct MovieDesc *const *list)
     bmxSoundOpen();
     ngifInit();
     ngifBegin();
+}
+
+/* Debug overlay colours (words of the exe's data). */
+#define gNgDebugFaceColor   ORIG_VAR(0x0055bc7c, uint32_t, gNgDebugFaceColor)
+#define gNgDebugEdgeColor   ORIG_VAR(0x0055bc80, uint32_t, gNgDebugEdgeColor)
+#define gNgDebugTaggedColor ORIG_VAR(0x0055bc84, uint32_t, gNgDebugTaggedColor)
+#define gNgDebugRollerColor ORIG_VAR(0x0055bc88, uint32_t, gNgDebugRollerColor)
+
+/* Position of the current player's camera object. */
+static const ZVec3 *debugEye(void)
+{
+    return (const ZVec3 *)(gNgRiderObject(gNgPlayer) + 0xc);
+}
+
+static void debugColor(ZrwDbgVertex *verts, uint32_t color)
+{
+    int k;
+
+    for (k = 0; k < 3; k++) {
+        memcpy(verts[k].color, &color, 4);
+    }
+}
+
+/*
+ * The per frame debug overlay (renderer update callback). Flag 0x68ffa0 draws the level faces near the
+ * camera (1: tagged ones, 2: all), flag 0x68ffa1 their tagged edges and the roller edges (1: tagged, 2:
+ * all); a change of flag 0x68ffa2 toggles the wireframe flag of every prop model. Returns 1.
+ */
+BMX_ADDR(0x0045a4d0)
+int ngappDrawDebug(void *unused)
+{
+    struct ZbspLevelFace *face = ztaginfGetFaces();
+    uint32_t count = ztaginfGetFaceCount();
+    ZrwDbgVertex verts[3];
+    ZrwDbgPoly2 line = {0, {&verts[0], &verts[1]}};
+    const ZrwDbgPoly3 tri = {0, {&verts[0], &verts[1], &verts[2]}};
+    ZVec3 d;
+
+    (void)unused;
+    if (gNgFlags68ffa0 != 0 || gNgFlags68ffa1 != 0) {
+        for (; count != 0; count--, face++) {
+            const ZVec3 *corner[3] = {&face->v0, &face->v1, &face->v2};
+            double cx = 0.0, cy = 0.0, cz = 0.0;
+            float cyStored, czStored;
+            int k;
+
+            /* The face pushed 9 units out along its normal (and 10 down), and its centre. */
+            for (k = 0; k < 3; k++) {
+                memcpy(verts[k].color, &gNgDebugFaceColor, 4);
+                verts[k].x = (float)((double)face->normal.x * 9.0 + (double)corner[k]->x);
+                verts[k].y = (float)(((double)face->normal.y * 9.0 + (double)corner[k]->y) - 10.0);
+                verts[k].z = (float)((double)face->normal.z * 9.0 + (double)corner[k]->z);
+                verts[k].u = 0;
+                verts[k].v = 0;
+                cx += (double)corner[k]->x * (double)0x1.555556p-2f;
+                cy += (double)corner[k]->y * (double)0x1.555556p-2f;
+                cz += (double)corner[k]->z * (double)0x1.555556p-2f;
+            }
+            czStored = (float)cz;
+            cyStored = (float)cy;
+            if (gNgFlags68ffa0 != 0 && face->tag != NULL &&
+                ((*face->tag != 0 && gNgFlags68ffa0 == 1) || gNgFlags68ffa0 == 2)) {
+                const ZVec3 *eye = debugEye();
+
+                /* x keeps the unrounded centre. */
+                d.x = (float)((double)eye->x - cx);
+                d.y = (float)((double)eye->y - (double)cyStored);
+                d.z = (float)((double)eye->z - (double)czStored);
+                if (!(zvec3Length(&d) >= 1500.0)) {
+                    if (*face->tag == 0) {
+                        debugColor(verts, gNgDebugTaggedColor);
+                    }
+                    gZrwDrawTriangle(0x2202, &tri, 1, NULL, 0);
+                }
+            }
+            if (gNgFlags68ffa1 != 0) {
+                for (k = 1; k <= 3; k++) {
+                    const ZbspEdgeTag *tag = face->edgeTag[k - 1];
+                    const int j = k % 3;
+                    const ZVec3 *eye;
+
+                    if (tag == NULL || !((tag->kind != 0 && gNgFlags68ffa1 == 1) || gNgFlags68ffa1 == 2)) {
+                        continue;
+                    }
+                    eye = debugEye();
+                    d.x = (float)((double)eye->x - ((double)corner[k - 1]->x + (double)corner[j]->x) * 0.5);
+                    d.y = (float)((double)eye->y - ((double)corner[k - 1]->y + (double)corner[j]->y) * 0.5);
+                    d.z = (float)((double)eye->z - ((double)corner[j]->z + (double)corner[k - 1]->z) * 0.5);
+                    if (!(zvec3Length(&d) >= 2000.0)) {
+                        debugColor(verts, gNgDebugEdgeColor);
+                        line.verts[0] = &verts[k - 1];
+                        line.verts[1] = &verts[j];
+                        gZrwDrawPolys(0x2202, &line, 1, NULL, 0);
+                    }
+                }
+            }
+        }
+        if (gNgFlags68ffa1 != 0) {
+            const PhysEdge *edge;
+
+            for (edge = zlistFirst(gNgRoller); edge != NULL; edge = zlistNext(gNgRoller)) {
+                const uint16_t flags = ((const uint16_t *)edge->prop)[1];
+                const ZVec3 *eye;
+
+                if ((flags & 0xc0) != 0 || (flags & 0x300) != 0) {
+                    continue;
+                }
+                verts[0].x = (float)edge->a[0];
+                verts[0].y = (float)((double)edge->a[1] - 20.0);
+                verts[0].z = (float)edge->a[2];
+                verts[1].x = (float)edge->b[0];
+                verts[1].y = (float)((double)edge->b[1] - 20.0);
+                verts[1].z = (float)edge->b[2];
+                eye = debugEye();
+                d.x = (float)((double)eye->x - ((double)verts[1].x + (double)verts[0].x) * 0.5);
+                d.y = (float)((double)eye->y - ((double)verts[1].y + (double)verts[0].y) * 0.5);
+                d.z = (float)((double)eye->z - ((double)verts[1].z + (double)verts[0].z) * 0.5);
+                if (!(zvec3Length(&d) >= 2000.0)) {
+                    debugColor(verts, gNgDebugRollerColor);
+                    line.verts[0] = &verts[0];
+                    line.verts[1] = &verts[1];
+                    gZrwDrawPolys(0x2202, &line, 1, NULL, 0);
+                }
+            }
+        }
+    }
+    if (gNgFlags68ffa2 != gNgFlags68ffa3) {
+        const PhysPropNode *node;
+
+        for (node = *zobjPropList(); node != NULL; node = node->next) {
+            if (gNgFlags68ffa2 != 0) {
+                gZobjSetFlags(node->frame->model, 0, 4);
+            } else {
+                gZobjSetFlags(node->frame->model, 4, 0);
+            }
+        }
+        gNgFlags68ffa3 = gNgFlags68ffa2;
+    }
+    return 1;
 }
 
 BMX_ADDR(0x0045ab50)
@@ -535,6 +675,78 @@ int ngappDrawSprite(void *sprite)
     quad.vertices[2] = &topRight;
     quad.vertices[3] = &topLeft;
     zrwprimDrawQuads(0x2000000, &quad, 1, 0);
+    return 1;
+}
+
+/* Renderer queries (10: horizontal, 11: vertical screen scale) and the quad hook, called through pointers. */
+typedef void(BMX_CDECL *NgQueryFn)(int what, void *out, int arg);
+#define gNgQuery     ORIG_VAR(0x00561488, NgQueryFn, gNgQuery)
+#define gNgDrawQuads ORIG_VAR(0x00561738, ZrwDrawFn, gNgDrawQuads)
+
+static void loadingVertex(ZrwPrimVertex *v, float x, float y, const uint8_t *color)
+{
+    memset(v, 0, sizeof *v);
+    v->x = x;
+    v->y = y;
+    memcpy(v->color, color, 4);
+}
+
+/*
+ * Loading screen frame (renderer callback): the picture and a progress bar on a 640x480 layout, scaled to
+ * the screen. The bar grows by 4 units of the loading counter per frame over the level's expected count.
+ * The two corners of the bar's end are clamped at 536 differently: one tests the rounded float, the other
+ * the unrounded value (original quirk). Levels past the 12 entry table read the original's stack.
+ */
+BMX_ADDR(0x0045c150)
+int ngappDrawLoading(void *sprite)
+{
+    static const uint16_t kLevelFrames[12] = {0x180, 0x158, 0x13c, 0x124, 0x108, 0xe4,
+                                              0x12c, 0xdc,  0x10c, 0x114, 0x114, 0x11c};
+    static const uint8_t kFrameColor[4] = {0x18, 0x29, 0x39, 0xff};
+    static const uint8_t kBarColor[4] = {0xb4, 0xad, 0x42, 0xff};
+    ZrwPrimVertex frame[4], bar[4];
+    ZrwPrimQuad frameQuad, barQuad;
+    double end;
+    float endStored, top, scaleX, scaleY;
+    int k;
+
+    zrwCameraBegin(zrwCameraFirst());
+    gNgLoadFlag = (uint16_t)(gNgLoadFlag + 4);
+    end = (double)(int32_t)gNgLoadFlag * 436.0 / (double)(int32_t)kLevelFrames[gNgLevel] + 104.0;
+    endStored = (float)end;
+    top = endStored;
+    if ((double)endStored > 536.0) {
+        top = 536.0f;
+    }
+    loadingVertex(&frame[0], 100.0f, 320.0f, kFrameColor);
+    loadingVertex(&frame[1], 540.0f, 320.0f, kFrameColor);
+    loadingVertex(&frame[2], 540.0f, 360.0f, kFrameColor);
+    loadingVertex(&frame[3], 100.0f, 360.0f, kFrameColor);
+    loadingVertex(&bar[0], 104.0f, 356.0f, kBarColor);
+    loadingVertex(&bar[1], end > 536.0 ? 536.0f : endStored, 356.0f, kBarColor);
+    loadingVertex(&bar[2], top, 324.0f, kBarColor);
+    loadingVertex(&bar[3], 104.0f, 324.0f, kBarColor);
+    gNgQuery(10, &scaleX, 0);
+    scaleX = (float)((double)scaleX * (double)0x1.99999ap-10f);
+    gNgQuery(11, &scaleY, 0);
+    scaleY = (float)((double)scaleY * (double)0x1.111112p-9f);
+    for (k = 0; k < 4; k++) {
+        frame[k].x = (float)((double)scaleX * (double)frame[k].x);
+        frame[k].y = (float)((double)scaleY * (double)frame[k].y);
+        bar[k].x = (float)((double)scaleX * (double)bar[k].x);
+        bar[k].y = (float)((double)scaleY * (double)bar[k].y);
+    }
+    frameQuad.texture = 0;
+    barQuad.texture = 0;
+    for (k = 0; k < 4; k++) {
+        frameQuad.vertices[k] = &frame[3 - k];
+        barQuad.vertices[k] = &bar[k];
+    }
+    ngappDrawSprite(sprite);
+    gNgDrawQuads(0x2000000, &frameQuad, 1, NULL, 0);
+    gNgDrawQuads(0x2000000, &barQuad, 1, NULL, 0);
+    zrwCameraEnd();
+    zrwShowRaster(1);
     return 1;
 }
 
