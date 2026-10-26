@@ -301,14 +301,16 @@ int zrwFileGetSize(ZrwFileHandle *handle, uint32_t *size, const ZrwFileCallback 
     return 1;
 }
 
+/* Returns 1: the original leaves 1 in EAX (Ghidra shows void), and zrwFileSystemsInitialize checks it. */
 BMX_ADDR(0x0049ea10)
-void zrwFileSystemInitialize(void)
+int zrwFileSystemInitialize(void)
 {
     if (gZrwFileInitialized != 0) {
         zdebugFail("File system has already been intialized.", kZrwFileFile, 0x24b, 0);
     }
     memcpy(&gZrwFileOps, (const void *)RwOSGetFileInterface(), sizeof gZrwFileOps);
     gZrwFileInitialized = 1;
+    return 1;
 }
 
 BMX_ADDR(0x0049ea60)

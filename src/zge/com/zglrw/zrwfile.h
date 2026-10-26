@@ -65,7 +65,7 @@ int zrwFileRead(ZrwFileHandle *handle, void *buffer, int count, const ZrwFileCal
 int zrwFileWrite(ZrwFileHandle *handle, const void *buffer, int count, const ZrwFileCallback *callback);
 int zrwFileSeek(ZrwFileHandle *handle, uint32_t offset, int whence, const ZrwFileCallback *callback);
 int zrwFileGetSize(ZrwFileHandle *handle, uint32_t *size, const ZrwFileCallback *callback);
-void zrwFileSystemInitialize(void);
+int zrwFileSystemInitialize(void);
 int zrwFileSystemShutdown(void);
 
 #endif

@@ -427,7 +427,7 @@ DT_CASES(zrwfile_cases) = {
     {"zrwFileSeek", 0x0049e830, zrwFileSeek, 4, DT_RET_INT, setupSeek, 400, 0},
     {"zrwFileNotImplementedC", 0x0049e910, zrwFileNotImplementedC, 0, DT_RET_INT, setupNoArgs, 20, 0},
     {"zrwFileGetSize", 0x0049e950, zrwFileGetSize, 3, DT_RET_INT, setupSize, 300, 0},
-    {"zrwFileSystemInitialize", 0x0049ea10, zrwFileSystemInitialize, 0, DT_RET_VOID, setupFsInit, 50, 0},
+    {"zrwFileSystemInitialize", 0x0049ea10, zrwFileSystemInitialize, 0, DT_RET_INT, setupFsInit, 50, 0},
     {"zrwFileSystemShutdown", 0x0049ea60, zrwFileSystemShutdown, 0, DT_RET_INT, setupFsShutdown, 20, 0},
     {"zrwModelSetOnUpdate", 0x0049dfe0, zrwModelSetOnUpdate, 2, DT_RET_VOID, setupModelOnUpdate, 20, 0},
     {"zrwModelGeomNotCoded", 0x0049dff0, zrwModelGeomNotCoded, 0, DT_RET_INT, setupNoArgs, 20, 0},
