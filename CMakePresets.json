@@ -8,7 +8,18 @@
       "binaryDir": "${sourceDir}/build/hook",
       "toolchainFile": "${sourceDir}/cmake/i686-windows-freestanding.cmake",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "BMX_HOOK": "ON" }
+    },
+    {
+      "name": "native32",
+      "displayName": "i686 native exe (bmxnative.exe, llvm-mingw)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/native32",
+      "toolchainFile": "${sourceDir}/cmake/i686-mingw.cmake",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "BMX_HOOK": "OFF", "BMX_NATIVE32": "ON" }
     }
   ],
-  "buildPresets": [{ "name": "hook", "configurePreset": "hook" }]
+  "buildPresets": [
+    { "name": "hook", "configurePreset": "hook" },
+    { "name": "native32", "configurePreset": "native32" }
+  ]
 }
