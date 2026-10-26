@@ -1060,7 +1060,7 @@ void gameResetRider(int player, int full)
     zvec3Negate(&r->up, &r->up);
     zmatrixRotateEuler(frame, frame, &rot);
     if (full != 0) {
-        riderUpdateInput();
+        riderUpdateAll();
     }
     physUpdateRiders();
 }

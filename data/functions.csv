@@ -323,7 +323,7 @@ addr,size,file,confidence,name,status
 00430e30,1,bmx/com/action/rider.c,affinity,FUN_00430e30,ported
 00430e50,1,bmx/com/action/rider.c,affinity,FUN_00430e50,ported
 00430e70,313,bmx/com/action/rider.c,affinity,FUN_00430e70,ported
-00431000,1376,bmx/com/action/rider.c,assert,FUN_00431000,orig
+00431000,1376,bmx/com/action/rider.c,assert,FUN_00431000,ported
 004316c0,774,bmx/com/action/rider.c,contiguous,FUN_004316c0,ported
 00431aa0,372,bmx/com/action/rider.c,contiguous,FUN_00431aa0,ported
 00431c80,1,bmx/com/action/rider.c,contiguous,FUN_00431c80,ported
@@ -331,12 +331,12 @@ addr,size,file,confidence,name,status
 00431dd0,47,bmx/com/action/rider.c,assert,FUN_00431dd0,ported
 00431e10,110,bmx/com/action/rider.c,contiguous,FUN_00431e10,ported
 00431ea0,802,bmx/com/action/rider.c,contiguous,FUN_00431ea0,ported
-004322b0,2161,bmx/com/action/rider.c,contiguous,FUN_004322b0,orig
+004322b0,2161,bmx/com/action/rider.c,contiguous,FUN_004322b0,ported
 00432d50,179,bmx/com/action/rider.c,contiguous,FUN_00432d50,ported
 00432e40,179,bmx/com/action/rider.c,contiguous,FUN_00432e40,ported
 00432f30,525,bmx/com/action/rider.c,contiguous,FUN_00432f30,ported
 004331d0,530,bmx/com/action/rider.c,contiguous,FUN_004331d0,ported
-00433480,1058,bmx/com/action/rider.c,contiguous,FUN_00433480,orig
+00433480,1058,bmx/com/action/rider.c,contiguous,FUN_00433480,ported
 004339d0,654,bmx/com/action/rider.c,contiguous,FUN_004339d0,ported
 00433d10,511,bmx/com/action/rider.c,contiguous,FUN_00433d10,ported
 00433f90,205,bmx/com/action/rider.c,contiguous,FUN_00433f90,ported
@@ -344,7 +344,7 @@ addr,size,file,confidence,name,status
 004342f0,735,bmx/com/action/rider.c,contiguous,FUN_004342f0,ported
 004346a0,6,bmx/com/action/rider.c,contiguous,FUN_004346a0,ported
 004346c0,121,bmx/com/action/rider.c,contiguous,FUN_004346c0,ported
-00434760,1907,bmx/com/action/rider.c,contiguous,FUN_00434760,orig
+00434760,1907,bmx/com/action/rider.c,contiguous,FUN_00434760,ported
 004350f0,523,bmx/com/action/rider.c,contiguous,FUN_004350f0,ported
 004353a0,776,bmx/com/action/rider.c,contiguous,FUN_004353a0,ported
 00435790,659,bmx/com/action/rider.c,contiguous,FUN_00435790,ported

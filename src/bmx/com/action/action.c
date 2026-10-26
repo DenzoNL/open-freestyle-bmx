@@ -367,7 +367,7 @@ uint32_t actionUpdate(void)
     }
 
 L_4211:
-    riderUpdateInput();
+    riderUpdateAll();
     physUpdateRiders();
     propUpdate();
     gameTick();
@@ -504,7 +504,7 @@ L_4699:
     replayUpdate();
     value = replayGetState(player);
     if (value == 2) {
-        riderUpdateInput();
+        riderUpdateAll();
         physUpdateRiders();
         propUpdate();
         gameTick();
@@ -652,7 +652,7 @@ L_4a2d:
     replayUpdate();
     value = replayGetState(player);
     if (value == 2) {
-        riderUpdateInput();
+        riderUpdateAll();
         physUpdateRiders();
         propUpdate();
         gAction.timer++;

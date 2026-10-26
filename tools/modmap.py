@@ -87,7 +87,7 @@ def main():
         addrs.sort()
     out = ROOT / "data/functions.csv"
     with out.open("w", newline="") as fh:
-        w = csv.writer(fh)
+        w = csv.writer(fh, lineterminator="\n")
         w.writerow(["addr", "size", "file", "confidence", "name", "status"])
         for a in addrs:
             b = bundles[a]

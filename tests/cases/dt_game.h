@@ -30,7 +30,7 @@ enum {
     DTG_PAD = 1u << 11,     /* controller */
     DTG_ZOVER = 1u << 12,   /* motion objects and actors */
     DTG_FX = 1u << 13,      /* effects, fx nodes, name table handlers */
-    DTG_RIDERFN = 1u << 14, /* riderReset (ported), riderUpdateInput */
+    DTG_RIDERFN = 1u << 14, /* riderReset (ported), riderUpdateAll */
     DTG_ALL = 0x7fffu,
 };
 

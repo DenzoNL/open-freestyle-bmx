@@ -39,7 +39,7 @@ def main():
             sys.exit("data/functions.csv is stale: run tools/progress.py")
     elif changed:
         with CSV.open("w", newline="") as fh:
-            w = csv.DictWriter(fh, fieldnames=list(rows[0]))
+            w = csv.DictWriter(fh, fieldnames=list(rows[0]), lineterminator="\n")
             w.writeheader()
             w.writerows(rows)
     per = defaultdict(lambda: [0, 0, 0, 0])

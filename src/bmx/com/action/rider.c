@@ -8,6 +8,7 @@
 #include "bmx/com/action/game.h"
 #include "bmx/com/action/overlay.h"
 #include "bmx/com/action/physics.h"
+#include "bmx/com/action/physics_air.h"
 #include "bmx/com/menu/gui/guiinput.h"
 #include "bmx/com/zge/bmx/bmxsound.h"
 #include "bmx/com/zge/bmx/zoverii.h"
@@ -17,6 +18,7 @@
 #include "bmx/com/zge/ngif/ngifzroller.h"
 #include "bmx/com/zge/zactor.h"
 #include "compat/crt.h"
+#include "zge/com/zglrw/zrwmat.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zobjcamera.h"
 #include "zge/zmath.h"
@@ -54,6 +56,35 @@ typedef uint16_t RiderWords256[256];
 #define gRiderTrickCombo     ORIG_VAR(0x00558b40, RiderBytes256, gRiderTrickCombo)
 #define gRiderPoseFlags      ORIG_VAR(0x00558fd0, RiderBytes256, gRiderPoseFlags)
 #define gRiderPoseAnim       ORIG_VAR(0x00559030, RiderWords256, gRiderPoseAnim)
+
+/* Air turning (degrees per frame): the rate a held turn starts at and its cap (scaled by stat[2]), the nudge
+ * of the stick alone, and how fast the turn dies out without input. */
+#define gRiderAirTurnNudge ORIG_VAR(0x00558898, float, gRiderAirTurnNudge)
+#define gRiderAirTurnStart ORIG_VAR(0x0055889c, float, gRiderAirTurnStart)
+#define gRiderAirTurnMax   ORIG_VAR(0x005588a0, float, gRiderAirTurnMax)
+#define gRiderAirYawDamp   ORIG_VAR(0x00557808, float, gRiderAirYawDamp)
+/* Bike spin of a spinning air trick (orientBRot.z, degrees per frame and cap, scaled by stat[2]). */
+#define gRiderBikeSpinStep ORIG_VAR(0x005588a4, float, gRiderBikeSpinStep)
+#define gRiderBikeSpinMax  ORIG_VAR(0x005588a8, float, gRiderBikeSpinMax)
+
+/* A rider's signature air tricks: up to `count` stick directions that select anim and ik pose. */
+typedef struct RiderSignatureTrick {
+    uint8_t count;
+    uint8_t dirs[3];
+    uint8_t anim;
+    uint8_t pose;
+} RiderSignatureTrick;
+typedef RiderSignatureTrick RiderSignatureTable[12][4];
+typedef uint8_t RiderBytes4k[0x1000];
+#define gRiderSignatureTricks ORIG_VAR(0x00553840, RiderSignatureTable, gRiderSignatureTricks)
+/* Air trick by stick directions: [prev * 8 + last] for two directions, [last] for one (0xff: none). */
+#define gRiderAirTrickPick ORIG_VAR(0x00558af7, RiderBytes256, gRiderAirTrickPick)
+/* Modifier ik pose of an air trick, [anim * 0x26 + combo pose] (0xff: none). */
+#define gRiderAirTrickMod ORIG_VAR(0x00558b8c, RiderBytes4k, gRiderAirTrickMod)
+/* Per trick: first motion of its animation, and flags (bits 0..2 spin class, bit 3 held). The pose tables
+ * gRiderPoseAnim / gRiderPoseFlags are the same tables from entry 0x1c on. */
+#define gRiderTrickAnim  ORIG_VAR(0x00558ff8, RiderWords256, gRiderTrickAnim)
+#define gRiderTrickFlags ORIG_VAR(0x00558fb4, RiderBytes256, gRiderTrickFlags)
 
 enum {
     kAngleLimit = 0x238e, /* 50 degrees */
@@ -219,6 +250,171 @@ void riderReadPads(void)
             const int32_t d = bmxFtol((double)readFloat(pad, 0x18 + j * 8) * 127.0f);
             r->stick[j * 2] = (float)((double)(int8_t)d * (double)0x1.020408p-7f);
             r->stick[j * 2 + 1] = (float)((double)(int8_t)c * (double)0x1.020408p-7f);
+        }
+    }
+}
+
+/*
+ * Adds the stick directions that were just entered to the direction buffer (dirList, at most four, the
+ * oldest dropped). `held` is the pad's direction bits plus the deflected main stick; a direction counts as
+ * new when it shows in exactly one of the stick and the second axis pair, or in inputBits2.
+ */
+static void bufferDirections(PhysRider *r)
+{
+    uint8_t *bytes = (uint8_t *)r;
+    uint32_t held = r->inputBits & 0xf;
+    uint32_t fresh = r->inputBits2 & 0xf;
+    const double dead = 0.5f;
+
+    if (absd((double)r->stick[0]) > dead) {
+        held |= r->stick[0] < 0.0f ? 4 : 8;
+        if (!(absd((double)r->axis[0]) > dead)) {
+            fresh |= r->stick[0] < 0.0f ? 4 : 8;
+        }
+    } else if (absd((double)r->axis[0]) > dead) {
+        fresh |= r->axis[0] < 0.0f ? 4 : 8;
+    }
+    if (absd((double)r->stick[1]) > dead) {
+        held |= r->stick[1] < 0.0f ? 1 : 2;
+        if (!(absd((double)r->axis[1]) > dead)) {
+            fresh |= r->stick[1] < 0.0f ? 1 : 2;
+        }
+    } else if (absd((double)r->axis[1]) > dead) {
+        fresh |= r->axis[1] < 0.0f ? 1 : 2;
+    }
+    if (fresh != 0) {
+        if (fresh == held) {
+            if (r->dirCount == 4) {
+                for (int i = 0; i < 3; i++) {
+                    r->dirList[i] = r->dirList[i + 1];
+                }
+                r->dirCount--;
+            }
+            bytes[6 + r->dirCount] = gRiderStickDir[held];
+            r->dirCount++;
+        } else if ((fresh & held) != 0) {
+            /* a direction changed while held: the last entry is replaced */
+            if (r->dirCount != 0) {
+                bytes[5 + r->dirCount] = gRiderStickDir[held];
+            } else {
+                bytes[6] = gRiderStickDir[held];
+                r->dirCount++;
+            }
+        }
+    }
+    if (r->dirCount > 4) {
+        zdebugFail("direction buffer out of range (post)\n", riderFile, 0x14d, 0);
+    }
+}
+
+/* Whether the rider actor's first motion channel still has keys to play. */
+static int motionPlaying(const PhysRider *r)
+{
+    const ZMotionPlayer *player = ((const ZActor *)r->actor)->player;
+    const uint8_t *cursor = player->ch[1].cursor;
+    uint32_t key = 0;
+    if (cursor != NULL) {
+        memcpy(&key, cursor, sizeof key);
+    }
+    return cursor != NULL && key != 0;
+}
+
+/* Adds a motion step's root displacement to the rider's motion offset; y follows the actor's height. */
+static void addMotionStep(PhysRider *r, const ZMotionDelta *d)
+{
+    r->fieldBFC.y = (float)-(double)zactorGetHeight(r->actor);
+    r->fieldBFC.x = (float)((double)d->delta.x + (double)r->fieldBFC.x);
+    r->fieldBA4 &= 0xfffffffdu;
+    r->fieldBFC.z = (float)((double)d->delta.z + (double)r->fieldBFC.z);
+}
+
+static const ZMotion *riderMotion(uint32_t index)
+{
+    return (const ZMotion *)gPhysMotions[index];
+}
+
+/*
+ * Per frame update of every rider: direction buffer, respawn when out of the world bounds, the mode step
+ * functions until one finishes, then the animation (one motion, or two blended while bit 0x200 of fieldBA4
+ * is set). Flag 0x200 of flags is set while no motion is playing.
+ */
+BMX_ADDR(0x00431000)
+void riderUpdateAll(void)
+{
+    for (uint32_t i = 0; i < (gPlayerCount == 0 ? 1u : gPlayerCount); i++) {
+        PhysRider *r = &gPhysRiders[i];
+        if ((r->flags & 1) == 0) {
+            continue;
+        }
+        if ((r->flags & 0x10) != 0) {
+            bufferDirections(r);
+        }
+        const float *bounds = zrollerGetWorldBounds();
+        const double margin = 100.0f;
+        if (!((double)bounds[5] + margin >= (double)r->pos.y) ||
+            (double)bounds[0] - margin > (double)r->pos.x ||
+            !((double)bounds[4] + margin >= (double)r->pos.x) ||
+            (double)bounds[2] - margin > (double)r->pos.z ||
+            !((double)bounds[6] + margin >= (double)r->pos.z)) {
+            physRespawn(r);
+            riderSetStateLevel(r, 0, kRiderRoll);
+        }
+        r->flags &= 0xfffdff7fu;
+        r->fieldC60 = 0.0f;
+        r->fieldC64 = 0.0f;
+        const RiderStepFn step = gRiderModeStep[r->stateLevel[0]];
+        if (step == NULL) {
+            zdebugFail("Invalid main update proc. (NULL)", riderFile, 0x168, 0);
+        }
+        int done = step(r);
+        while (done == 0) {
+            done = gRiderModeStep[r->stateLevel[0]](r);
+        }
+        const uint32_t anim = r->fieldBA4 | 0x80;
+        r->stateTimer[0]++;
+        r->fieldBA4 = anim;
+        if ((anim & 0x100) == 0) {
+            if ((anim & 2) != 0) {
+                zvec3Zero(&r->fieldBFC);
+            }
+            if ((r->fieldBA4 & 0x200) == 0) {
+                ZMotionDelta *d =
+                    zactorPlayMotion(r->actor, riderMotion((uint16_t)r->fieldB9C), r->animSpeed, r->fieldBA4);
+                r->fieldBA0 = d;
+                if (d != NULL) {
+                    addMotionStep(r, d);
+                    zactorCopySecondaryJoints(r->actor, r->bikeObj);
+                }
+                if (d != NULL && motionPlaying(r)) {
+                    r->flags &= 0xfffffdffu;
+                } else {
+                    r->flags |= 0x200;
+                }
+            } else {
+                const uint16_t blendFlags[2] = {(uint16_t)r->fieldBA4, r->motionFlags};
+                ZMotionDelta **d =
+                    zactorBlendMotions(r->actor, riderMotion((uint16_t)r->fieldB9C),
+                                       riderMotion(r->motionIndex), blendFlags, r->motionWeight);
+                if (d != NULL && d[0] != NULL && d[1] != NULL) {
+                    r->fieldBA0 = d[0];
+                    r->motionSample = d[1];
+                    addMotionStep(r, d[1]);
+                    r->motionFlags &= 0xfffdu;
+                    zactorCopySecondaryJoints(r->actor, r->bikeObj);
+                    r->flags &= 0xfffffdffu;
+                } else {
+                    r->fieldBA0 = NULL;
+                    r->motionSample = NULL;
+                    r->flags |= 0x200;
+                }
+                r->fieldBA4 &= 0xfffffdffu;
+            }
+            r->fieldBA4 &= 0xffffff7fu;
+            zactorSyncPose(r->actor);
+            zrwmatUpdate((void *)(uintptr_t)((const ZActor *)r->actor)->object);
+        }
+        if (r->soundCooldown != 0) {
+            r->soundCooldown--;
         }
     }
 }
@@ -483,6 +679,226 @@ int riderStepRoll(PhysRider *r)
     RUN_SUBSTATES(gRiderRollStep, kRiderRoll);
 }
 
+/* Landing from the air: a held manual (up up, or down down plus the stick) carries over, else mode 5. */
+static int landFromAir(PhysRider *r)
+{
+    gameScoreJump(r->player, 1);
+    if ((r->flags & 0x400000) != 0 && r->dirCount > 1) {
+        const uint8_t *bytes = (const uint8_t *)r;
+        uint32_t manual = 0;
+        if (bytes[5 + r->dirCount] == 4 && bytes[4 + r->dirCount] == 4 &&
+            (double)contrlerAxes(inputState(r), 0)[1] > (double)0.5f) {
+            manual = 0x100000;
+        } else if (bytes[5 + r->dirCount] == 3 && bytes[4 + r->dirCount] == 3 &&
+                   !((double)contrlerAxes(inputState(r), 0)[1] >= (double)-0.5f)) {
+            manual = 0x200000;
+        }
+        if (manual != 0) {
+            r->flags |= manual;
+            riderSetStateLevel(r, 0, kRiderManual);
+            r->flags |= 0x80;
+            return 0;
+        }
+    }
+    riderSetStateLevel(r, 0, kRiderMode5);
+    return 0;
+}
+
+/* Turning in the air with a turn button held: starts at gRiderAirTurnStart and speeds up to the cap. */
+static void airTurnHeld(PhysRider *r)
+{
+    const int16_t cap =
+        (int16_t)bmxFtol((double)gRiderAirTurnMax * (double)r->stat[2] * (double)kDegreesToAngle);
+    const int16_t yaw = r->rot.y;
+    if (yaw != 0 && (pressed(r, 0xa, kStatusPressed) ^ (yaw < 0)) == 0) {
+        double t = (double)(int32_t)yaw * (double)0x1.68p-8f;
+        t = t * 1.25f;
+        t = t * (double)kDegreesToAngle;
+        const int16_t faster = (int16_t)bmxFtol(t);
+        const int smaller = faster < cap ? faster : cap;
+        r->rot.y = (ZAngle)(-(int)cap > smaller ? -(int)cap : smaller);
+        return;
+    }
+    double start = (double)gRiderAirTurnStart;
+    if (pressed(r, 0xa, kStatusPressed) != 0) {
+        start = -start;
+    }
+    r->rot.y = (ZAngle)bmxFtol(start * (double)kDegreesToAngle);
+}
+
+/* Turning in the air with the stick alone; without any input the turn dies out. */
+static void airTurnFree(PhysRider *r)
+{
+    const double steer = contrlerAxes(inputState(r), 0)[0];
+    const int16_t yaw = r->rot.y;
+    if (!(steer < 0.0f || steer > 0.0f)) {
+        double t = (double)(int32_t)yaw * (double)0x1.68p-8f;
+        t = t * (double)gRiderAirYawDamp;
+        t = t * (double)kDegreesToAngle;
+        r->rot.y = (ZAngle)(yaw - bmxFtol(t));
+        if (absd((double)r->rot.y) < 91.0f) {
+            r->rot.y = 0;
+        }
+        return;
+    }
+    const int32_t cap = bmxFtol((double)gRiderAirTurnMax * (double)r->stat[2] * (double)kDegreesToAngle);
+    double v;
+    if (yaw != 0 && ((steer < 0.0f ? 1 : 0) ^ (yaw < 0)) == 0) {
+        double t = (double)(int32_t)yaw * (double)0x1.68p-8f;
+        t = t * 1.25f;
+        const float limit = (float)((double)(int16_t)cap * (double)0x1.68p-8f);
+        v = t < (double)limit ? t : (double)limit;
+        if ((double)-limit > v) {
+            v = (double)-limit;
+        }
+    } else {
+        v = (double)gRiderAirTurnNudge;
+        if (steer < 0.0f) {
+            v = -v;
+        }
+    }
+    r->rot.y = (ZAngle)bmxFtol(v * (double)kDegreesToAngle);
+}
+
+/* Restarts a running air sub state at 0, running its handler once. Returns whether it did. */
+static int airSubRestart(PhysRider *r)
+{
+    if (riderGetStateLevel(r, 1) == 0) {
+        return 0;
+    }
+    riderSetStateLevel(r, 1, 0);
+    gRiderAirStep[r->stateLevel[1]](r);
+    r->flags |= 0x80;
+    return 1;
+}
+
+/*
+ * Flying: follows the physics state (landing, bail, grind), else bail buttons, turning, the manual pre
+ * trim of yawTrim and the trick buttons (3 and 4 start the air sub states 1 and 2, 7 grabs a grind or lip,
+ * 8 a lip trick), then runs the air sub state.
+ */
+BMX_ADDR(0x004322b0)
+int riderStepAir(PhysRider *r)
+{
+    switch (physGetState(r)) {
+    case 0:
+        return landFromAir(r);
+    case 2:
+        gameScoreJump(r->player, 0);
+        riderSetStateLevel(r, 0, kRiderBail);
+        return 0;
+    case 3:
+        riderSetStateLevel(r, 0, kRiderGrind);
+        return 0;
+    default:
+        break;
+    }
+    if (pressed(r, 0x10, 0) != 0 || pressed(r, 0x11, 0) != 0) {
+        physSetState(r, 2);
+        r->bailReason = 0xb;
+        riderSetStateLevel(r, 0, kRiderBail);
+        return 0;
+    }
+    const int turnB = pressed(r, 0xb, kStatusPressed);
+    const int turnA = pressed(r, 0xa, kStatusPressed);
+    if ((turnB ^ turnA) != 0) {
+        airTurnHeld(r);
+    } else {
+        airTurnFree(r);
+    }
+    r->spin = (int32_t)((uint32_t)r->spin + (uint32_t)(int32_t)r->rot.y);
+    if ((r->flags & 0x1000) != 0 && r->timer != 0) {
+        if (absd((double)r->orientARot.y) < absd((double)r->rot.y)) {
+            r->flags &= 0xffffefffu;
+            r->timer = 0;
+        } else {
+            r->spin = (int32_t)((uint32_t)r->spin + (uint32_t)(int32_t)r->orientARot.y);
+        }
+    }
+    r->rot.z = (ZAngle)(r->rot.z >> 1);
+    if (absd((double)r->rot.z) < 91.0f) {
+        r->rot.z = 0;
+    }
+    if (r->dirCount > 1) {
+        const float stick = contrlerAxes(inputState(r), 0)[1];
+        if (absd((double)stick) > (double)0.5f) {
+            const uint8_t *bytes = (const uint8_t *)r;
+            const uint8_t last = bytes[5 + r->dirCount];
+            if (last == 4 && bytes[4 + r->dirCount] == 4 && stick > 0.5f) {
+                const int trim = r->yawTrim + 0x2d8;
+                r->yawTrim = (int16_t)(trim > 0x18e3 ? 0x18e3 : trim);
+            } else if (last == 3 && bytes[4 + r->dirCount] == 3 && stick < -0.5f) {
+                const int trim = r->yawTrim - 0x1c7;
+                r->yawTrim = (int16_t)(trim < -0x18e3 ? -0x18e3 : trim);
+            }
+        }
+    }
+    int buttons = riderGetStateLevel(r, 1) == 0;
+    if (!buttons) {
+        buttons = (riderGetStateLevel(r, 1) == 1 && (uint32_t)riderGetStateLevel(r, 2) >= 3) ||
+                  (riderGetStateLevel(r, 1) == 2 && (uint32_t)riderGetStateLevel(r, 2) >= 3);
+    }
+    if (buttons) {
+        if (pressed(r, 3, 0) != 0 || ((r->flags & 0x20) != 0 && r->dirCount != 0)) {
+            if (r->dirCount != 0) {
+                if (airSubRestart(r)) {
+                    r->rot.z = 0;
+                }
+                riderSetStateLevel(r, 1, 1);
+                return 0;
+            }
+            r->stateTimer[3] = 0;
+            r->flags = (r->flags & 0xffffffbfu) | 0x20;
+        } else if ((r->flags & 0x20) != 0) {
+            const uint32_t f = r->flags;
+            r->stateTimer[3]++;
+            if ((uint16_t)r->stateTimer[3] > 7) {
+                r->flags = f & 0xffffffdfu;
+            }
+        }
+        if (pressed(r, 4, 0) != 0 || ((r->flags & 0x40) != 0 && r->dirCount != 0)) {
+            if (r->dirCount != 0) {
+                airSubRestart(r);
+                riderSetStateLevel(r, 1, 2);
+                r->rot.z = 0;
+                return 0;
+            }
+            r->stateTimer[3] = 0;
+            r->flags = (r->flags & 0xffffffdfu) | 0x40;
+        } else if ((r->flags & 0x40) != 0) {
+            const uint32_t f = r->flags;
+            r->stateTimer[3]++;
+            if ((uint16_t)r->stateTimer[3] > 7) {
+                r->flags = f & 0xffffffbfu;
+            }
+        }
+        if (pressed(r, kInputJump, kStatusPressed) != 0 && riderGetStateLevel(r, 2) != 0) {
+            const uint8_t state = physSetState(r, 3);
+            if (state == 3) {
+                airSubRestart(r);
+                riderSetStateLevel(r, 0, kRiderGrind);
+                return 0;
+            }
+            if (state == 5) {
+                airSubRestart(r);
+                riderSetStateLevel(r, 0, kRiderLip);
+                r->anim = (uint8_t)riderGetTrickB(r);
+                return 0;
+            }
+        }
+        if (pressed(r, 8, 0) != 0 && riderGetTrickKind(r) != 0xff) {
+            if (physSetState(r, 5) == 5) {
+                airSubRestart(r);
+                riderSetStateLevel(r, 0, kRiderLip);
+                r->anim = (uint8_t)riderGetTrickKind(r);
+                return 0;
+            }
+            riderLatchDirection(r, 1);
+        }
+    }
+    RUN_SUBSTATES(gRiderAirStep, kRiderAir);
+}
+
 BMX_ADDR(0x00432d50)
 int riderStepGrind(PhysRider *r)
 {
@@ -570,6 +986,127 @@ int riderStepMode5(PhysRider *r)
         r->stateTimer[1]++;
         if ((uint16_t)r->stateTimer[1] > 6) {
             riderSetStateLevel(r, 0, kRiderRoll);
+            return 0;
+        }
+    }
+    return 1;
+}
+
+/* Lets go of whatever the rider rig's hands hold. */
+static void bailReleaseHands(PhysRider *r)
+{
+    zoverRigReleaseHands(r->actor2);
+    r->flags &= 0xfbffffffu;
+}
+
+/*
+ * Bailing: sub state 1 tumbles (the stick pitches and yaws the rag doll while falling, button 0x12 goes limp,
+ * 0x13 grabs), 2 hangs on, 3 waits to respawn, 4 and 5 sink in water for a second and respawn.
+ */
+BMX_ADDR(0x00433480)
+int riderStepBail(PhysRider *r)
+{
+    switch ((uint32_t)riderGetStateLevel(r, 1)) {
+    case 0:
+        bailReleaseHands(r);
+        riderSetStateLevel(r, 1, 1);
+        return 1;
+    case 1: {
+        zoverRigEndLimp(r->actor2);
+        zoverRigEndStiff(r->actor2);
+        zoverRigClearPitch(r->actor2);
+        zoverRigClearYaw(r->actor2);
+        r->flags &= 0xfeffffffu;
+        if (r->surface == 0xd) {
+            riderSetStateLevel(r, 1, 4);
+            return 0;
+        }
+        PhysGroundHit ground;
+        if (physProbeGround(&r->pos, &ground) != 0 &&
+            absd((double)ground.pos.y - (double)r->pos.y) > (double)100.0f) {
+            if (pressed(r, 0x12, kStatusPressed) != 0 && (r->flags & 0x4000000) == 0) {
+                zoverRigGoLimp(r->actor2, r->actor);
+                r->flags |= 0x1000000;
+            }
+            const double pitch = contrlerAxes(inputState(r), 0)[1];
+            if (absd(pitch) > (double)0.5f) {
+                zoverRigRequestPitch(r->actor2, r->actor,
+                                     (int16_t)bmxFtol(pitch * (double)-10.0f * (double)kDegreesToAngle));
+            }
+            const double yaw = contrlerAxes(inputState(r), 0)[0];
+            if (absd(yaw) > (double)0.5f) {
+                zoverRigRequestYaw(r->actor2, r->actor,
+                                   (int16_t)bmxFtol(yaw * (double)10.0f * (double)kDegreesToAngle));
+            }
+        }
+        if ((r->flags & 0x1000000) == 0) {
+            if (pressed(r, 0x13, kStatusPressed) != 0) {
+                zoverRigEase(r->actor2, r->actor);
+                r->flags |= 0x4000000;
+                if (zoverRigHandsHolding() != 0) {
+                    riderSetStateLevel(r, 1, 2);
+                    zoverRigClearPitch(r->actor2);
+                    zoverRigClearYaw(r->actor2);
+                    return 0;
+                }
+            } else {
+                bailReleaseHands(r);
+            }
+        }
+        if ((uint16_t)r->stateTimer[0] > 0x96) {
+            riderSetStateLevel(r, 1, 3);
+            return 0;
+        }
+        break;
+    }
+    case 2:
+        if (pressed(r, 0x13, kStatusPressed) == 0 || zoverRigHandsHolding() == 0) {
+            bailReleaseHands(r);
+            riderSetStateLevel(r, 1, 1);
+            r->stateTimer[0] = 0;
+            return 0;
+        }
+        if ((uint16_t)r->stateTimer[0] > 300) {
+            riderSetStateLevel(r, 1, 3);
+            return 0;
+        }
+        break;
+    case 3:
+        if ((r->flags & 6) == 0) {
+            zoverRigClearPitch(r->actor2);
+            zoverRigClearYaw(r->actor2);
+            r->flags &= 0xfeffffffu;
+            r->fieldBA4 |= 0x80;
+            physRespawn(r);
+            riderSetStateLevel(r, 0, kRiderRoll);
+            return 0;
+        }
+        return 1;
+    case 4:
+        fxWaterSplash(r->actor, 0, &gPhysZero.x);
+        bmxSoundPlayAt(0xfa2, &r->pos, 3, 0, 0);
+        zactorHide(r->actor);
+        zactorHide(r->bikeObj);
+        riderSetStateLevel(r, 1, 5);
+        /* fall through */
+    case 5:
+        r->stateTimer[1]++;
+        if (r->stateTimer[1] == 0x3c) {
+            zactorShow(r->actor);
+            zactorShow(r->bikeObj);
+            physRespawn(r);
+            riderSetStateLevel(r, 0, kRiderRoll);
+            return 0;
+        }
+        return 1;
+    default:
+        return 1;
+    }
+    /* sub states 1 and 2: give up when rolling slowly for long enough */
+    if (!(r->speed >= 3.0f)) {
+        r->stateTimer[1]++;
+        if ((uint16_t)r->stateTimer[1] > 0xf) {
+            riderSetStateLevel(r, 1, 3);
             return 0;
         }
     }
@@ -889,6 +1426,243 @@ static uint8_t comboPose(const PhysRider *r)
         }
     }
     return gRiderTrickCombo[((const uint8_t *)r)[5 + count]];
+}
+
+/* The air trick for the stick directions entered: a signature trick of the rider, else the direction tables.
+ */
+static void pickAirTrick(PhysRider *r)
+{
+    const uint8_t *bytes = (const uint8_t *)r;
+    const uint32_t count = r->dirCount;
+    r->anim = 0xff;
+    if (count == 0) {
+        return;
+    }
+    const RiderSignatureTrick *sig = gRiderSignatureTricks[gProfiles[r->player].character];
+    for (int k = 0; k < 4; k++) {
+        const uint32_t n = sig[k].count;
+        if (n == 0 || count < n) {
+            continue;
+        }
+        const uint8_t *dirs = &sig[k].count + 1;
+        uint32_t i = 0;
+        while (i < n && bytes[6 + count - n + i] == dirs[i]) {
+            i++;
+        }
+        if (i == n) {
+            r->anim = sig[k].anim;
+            r->ikPose = sig[k].pose;
+            break;
+        }
+    }
+    const uint32_t last = bytes[5 + count];
+    if (count > 1) {
+        if (r->anim != 0xff) {
+            return;
+        }
+        r->anim = gRiderAirTrickPick[bytes[4 + count] * 8 + last];
+    }
+    if (r->anim == 0xff) {
+        r->anim = gRiderAirTrickPick[last];
+    }
+}
+
+/* Raises the weight of the modifier pose (ikBlend) towards 1 while one is active. */
+static void ikBlendIn(PhysRider *r)
+{
+    if ((r->flags & 0x400) != 0) {
+        const double v = (double)r->ikBlend + (double)0x1.99999ap-3f;
+        r->ikBlend = !(1.0f >= v) ? 1.0f : (float)v;
+    }
+}
+
+/* Counts ik pose frames of a held trick without a modifier (ikPose 0). */
+static void countHoldFrame(PhysRider *r)
+{
+    if (r->ikPose == 0 && (r->ikBlend < 0.0f || r->ikBlend > 0.0f) && (r->stateTimer[1] & 0xf) == 0) {
+        r->ikFrame++;
+    }
+}
+
+/*
+ * Air sub state 1 (the table slot is shared with the rolling sub states, see gRiderAirStep): the air trick.
+ * Level 2: 0 picks the trick from the stick directions, 1 and 2 play it (button 4 adds a modifier pose; a
+ * spinning trick turns the bike by orientBRot.z up to its class's limit), 3 and 4 end it.
+ */
+BMX_ADDR(0x00434760)
+int riderRollSub7(PhysRider *r)
+{
+    if (pressed(r, 3, kStatusReleased) != 0) {
+        r->flags &= 0xfffffeffu;
+    }
+    if (r->ikPose != 0xff && pressed(r, 4, kStatusReleased) != 0) {
+        r->flags &= 0xfffffeffu;
+    }
+    if ((r->flags & 0x800) != 0) {
+        /* the bike spins back from the last trick */
+        ZAngle *angles[3] = {&r->orientBRot.x, &r->orientBRot.y, &r->orientBRot.z};
+        for (int i = 0; i < 3; i++) {
+            const int16_t a = *angles[i];
+            double t = (double)(int32_t)a * (double)0x1.68p-8f;
+            t = t * (double)0x1.333334p-3f;
+            t = t * (double)kDegreesToAngle;
+            *angles[i] = (ZAngle)(a - bmxFtol(t));
+        }
+    }
+    switch ((uint32_t)riderGetStateLevel(r, 2)) {
+    case 0:
+        pickAirTrick(r);
+        if (r->anim == 0xff) {
+            riderLatchDirection(r, 1);
+            r->fieldB9C = 0x18;
+            riderSetStateLevel(r, 1, 0);
+            break;
+        }
+        r->fieldB9C = (int16_t)gRiderTrickAnim[r->anim];
+        r->fieldBA4 = (r->fieldBA4 & 0xfffffff7u) | 2;
+        zmatrixCopyRotation(&r->orientB, (const ZMatrix *)(const void *)&r->fwd);
+        r->orientBRot.x = 0;
+        r->orientBRot.y = 0;
+        r->orientBRot.z = 0;
+        if ((gRiderTrickFlags[r->anim] & 7) != 0) {
+            r->flags |= 0x800;
+            if ((r->flags & 0x1000) != 0) {
+                r->flags &= 0xffffefffu;
+                r->timer = 0;
+            }
+        }
+        if (pressed(r, 3, kStatusPressed) != 0) {
+            r->flags |= 0x100;
+        } else {
+            r->flags &= 0xfffffeffu;
+        }
+        riderLatchDirection(r, 1);
+        riderSetStateLevel(r, 2, 1);
+        r->animSpeed = r->stat[6];
+        if (r->ikPose != 0xff) {
+            zoverLimbsBegin(r->actor, r->ik);
+            r->ikBlend = 0.0f;
+            r->flags |= 0x400;
+        }
+        break;
+    case 1:
+    case 2: {
+        if (pressed(r, 4, 0) != 0 || ((r->flags & 0x40) != 0 && r->dirCount != 0)) {
+            if (r->dirCount == 0) {
+                r->flags |= 0x40;
+            } else {
+                const uint8_t pose = gRiderAirTrickMod[r->anim * 0x26 + comboPose(r)];
+                if (pose != 0xff) {
+                    r->ikPose = pose;
+                    riderLatchDirection(r, 1);
+                    zoverLimbsBegin(r->actor, r->ik);
+                    r->flags |= 0x400;
+                    r->ikBlend = 0.0f;
+                    if (pressed(r, 4, kStatusPressed) != 0) {
+                        r->flags |= 0x100;
+                    } else {
+                        r->flags &= 0xfffffeffu;
+                    }
+                }
+            }
+        }
+        const uint32_t spinClass = gRiderTrickFlags[r->anim] & 7;
+        if (spinClass == 0) {
+            const int level2 = riderGetStateLevel(r, 2);
+            if (level2 == 1) {
+                if ((r->flags & 0x200) != 0) {
+                    if ((r->flags & 0x100) == 0 && (gRiderTrickFlags[r->anim] & 8) == 0) {
+                        riderSetStateLevel(r, 2, 3);
+                        return 0;
+                    }
+                    r->fieldBA4 |= 2;
+                    r->fieldB9C = (int16_t)(gRiderTrickAnim[r->anim] + 1);
+                    riderSetStateLevel(r, 2, 2);
+                    r->animSpeed = r->stat[6];
+                }
+            } else if (level2 == 2) {
+                countHoldFrame(r);
+                if ((r->flags & 0x200) != 0) {
+                    if ((gRiderTrickFlags[r->anim] & 8) != 0) {
+                        r->flags &= 0xfffffeffu;
+                    }
+                    if ((r->flags & 0x100) == 0) {
+                        riderSetStateLevel(r, 2, 3);
+                        return 0;
+                    }
+                    r->fieldBA4 |= 2;
+                }
+            }
+            ikBlendIn(r);
+            break;
+        }
+        uint32_t maxSpin;
+        int16_t target;
+        double limit;
+        if (spinClass == 4 || spinClass == 5) {
+            /* the reverse spins: three quarter speed the other way */
+            maxSpin = spinClass == 4 ? 0xeaaau : 0x1eaaau;
+            double t = (double)gRiderBikeSpinStep * (double)0.75f;
+            t = t * (double)r->stat[2];
+            t = -t * (double)kDegreesToAngle;
+            target = (int16_t)((int16_t)bmxFtol(t) + r->orientBRot.z);
+            limit = (double)gRiderBikeSpinMax * (double)0.75f;
+        } else {
+            maxSpin = spinClass == 2 ? 0x1d555u : spinClass == 3 ? 0x2d555u : 0xd555u;
+            double t = (double)gRiderBikeSpinStep * (double)r->stat[2];
+            t = t * (double)kDegreesToAngle;
+            target = (int16_t)((int16_t)bmxFtol(t) + r->orientBRot.z);
+            limit = (double)gRiderBikeSpinMax;
+        }
+        limit = limit * (double)r->stat[2];
+        const int16_t cap = (int16_t)bmxFtol(limit * (double)kDegreesToAngle);
+        const int32_t spin = r->field54;
+        const uint32_t magnitude = spin < 0 ? 0u - (uint32_t)spin : (uint32_t)spin;
+        if (magnitude >= maxSpin) {
+            riderSetStateLevel(r, 2, 3);
+            return 0;
+        }
+        const int smaller = target < cap ? target : cap;
+        const int16_t turn = (int16_t)(-(int)cap > smaller ? -(int)cap : smaller);
+        r->orientBRot.z = turn;
+        r->field54 = (int32_t)((uint32_t)(int32_t)turn + (uint32_t)spin);
+        const int level2 = riderGetStateLevel(r, 2);
+        if (level2 == 1) {
+            if ((r->flags & 0x200) != 0) {
+                r->fieldBA4 |= 2;
+                r->fieldB9C = (int16_t)(gRiderTrickAnim[r->anim] + 1);
+                riderSetStateLevel(r, 2, 2);
+            }
+        } else if (level2 == 2) {
+            countHoldFrame(r);
+        }
+        ikBlendIn(r);
+        break;
+    }
+    case 3:
+        r->fieldB9C = (int16_t)(gRiderTrickAnim[r->anim] + 2);
+        riderSetStateLevel(r, 2, 4);
+        r->fieldBA4 |= 2;
+        ikBlendIn(r);
+        break;
+    case 4:
+        if ((r->flags & 0x200) != 0) {
+            riderSetStateLevel(r, 1, 0);
+            r->fieldB9C = 0x17;
+            return 0;
+        }
+        if ((r->flags & 0x400) != 0) {
+            const double v = (double)r->ikBlend - (double)0x1.333334p-2f;
+            r->ikBlend = 0.0f > v ? 0.0f : (float)v;
+        }
+        break;
+    default:
+        break;
+    }
+    if (r->ikBlend < 0.0f || r->ikBlend > 0.0f) {
+        r->stateTimer[1]++;
+    }
+    return 1;
 }
 
 /* Ground trick: picks the pose from the entered stick directions and plays it through. */
