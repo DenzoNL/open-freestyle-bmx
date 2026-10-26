@@ -107,6 +107,9 @@ Without it, `DT_NEEDS_ASSETS` cases are skipped. The community labels used for n
 
 ## Lessons that cost real time (don't relearn them)
 
+- Ghidra shows some functions as `void` that leave a value in EAX (init functions ending in `MOV EAX,1`)
+  that callers test. Void ports pass their tests but break the real game (first in-game run: "no devices
+  connected", zfile.c:240). Run `python3 -I tools/void_eax_audit.py .` after porting; it must report none.
 - Ghidra pseudo-C regroups FP sums and drops pushed arguments. FP and argument lists come from the
   disassembly.
 - The x87 model: `double` = register, `float` = stored. LLVM's x87 backend doesn't round floats, so the hook
