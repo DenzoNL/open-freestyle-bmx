@@ -406,7 +406,8 @@ typedef struct PhysFace {
     int16_t q1[3];
     uint8_t pad072[0x6];
     int16_t q2[3];
-    uint8_t pad07e[0xa];
+    uint8_t pad07e[0x6];
+    void *owner; /* geometry the face belongs to: a point of the plane at +0x10, the material at +0x48 */
 } PhysFace;
 
 _Static_assert(sizeof(PhysFace) == 0x88, "PhysFace size");
@@ -423,6 +424,7 @@ _Static_assert(offsetof(PhysFace, p2) == 0x50, "PhysFace.p2");
 _Static_assert(offsetof(PhysFace, q0) == 0x60, "PhysFace.q0");
 _Static_assert(offsetof(PhysFace, q1) == 0x6c, "PhysFace.q1");
 _Static_assert(offsetof(PhysFace, q2) == 0x78, "PhysFace.q2");
+_Static_assert(offsetof(PhysFace, owner) == 0x84, "PhysFace.owner");
 
 typedef struct PhysGroundHit {
     uint32_t flags;

@@ -186,6 +186,7 @@
 0x060 int16_t q0[3]
 0x06c int16_t q1[3]
 0x078 int16_t q2[3]
+0x084 void_ptr owner /* geometry the face belongs to: a point of the plane at +0x10, the material at +0x48 */
 
 # Result of physProbeGround (flags 1: edge hit).
 @PhysGroundHit 0x30

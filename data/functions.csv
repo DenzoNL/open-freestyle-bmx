@@ -654,9 +654,9 @@ addr,size,file,confidence,name,status
 00450e80,814,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00450e80,ported
 00451280,15,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00451280,ported
 004512a0,178,bmx/com/zge/bmx/zoverii.c,affinity,FUN_004512a0,ported
-00451390,1820,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00451390,orig
+00451390,1820,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00451390,ported
 00451c80,163,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00451c80,ported
-00451d60,1220,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00451d60,orig
+00451d60,1220,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00451d60,ported
 00452370,258,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00452370,ported
 004524d0,328,bmx/com/zge/bmx/zoverii.c,affinity,FUN_004524d0,ported
 00452680,1,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00452680,ported
@@ -691,7 +691,7 @@ addr,size,file,confidence,name,status
 004546d0,92,bmx/com/zge/bmx/zoverii.c,affinity,FUN_004546d0,ported
 00454750,43,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00454750,ported
 00454790,31,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00454790,ported
-004547c0,1784,bmx/com/zge/bmx/zoverii.c,affinity,FUN_004547c0,orig
+004547c0,1784,bmx/com/zge/bmx/zoverii.c,affinity,FUN_004547c0,ported
 00455080,136,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00455080,ported
 00455140,580,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00455140,ported
 00455430,261,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00455430,ported
@@ -711,7 +711,7 @@ addr,size,file,confidence,name,status
 00455ef0,1,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00455ef0,ported
 00455f10,216,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00455f10,ported
 00456030,192,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00456030,ported
-00456120,4581,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00456120,orig
+00456120,4581,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00456120,ported
 00457790,263,bmx/com/zge/bmx/zoverii.c,affinity,FUN_00457790,ported
 004578f0,409,bmx/com/zge/bmx/zoverii.c,affinity,FUN_004578f0,ported
 00457b00,870,bmx/com/zge/bmx/zoverii.c,assert,FUN_00457b00,ported

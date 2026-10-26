@@ -397,8 +397,8 @@ void zoverRigRelax(ZRig *rig)
         for (i = 0; i < rig->pointCount; i++) {
             p = &rig->points[i];
             if (p->mode != 0) {
-                uint32_t hitId;
-                uint8_t hit[0x100];
+                float impact;
+                ZRigHit hit;
 
                 p->pos.x = (float)((double)rig->center.x + p->pos.x);
                 p->pos.y = (float)((double)p->pos.y + rig->center.y);
@@ -406,8 +406,8 @@ void zoverRigRelax(ZRig *rig)
                 p->vel.x = (float)((double)p->pos.x - p->prev.x);
                 p->vel.y = (float)((double)p->pos.y - p->prev.y);
                 p->vel.z = (float)((double)p->pos.z - p->prev.z);
-                if (zoverRigCollidePoint(p, &hitId, hit) != 0 && rig->onHit != NULL) {
-                    rig->onHit(rig, i, hitId, hit);
+                if (zoverRigCollidePoint(p, &impact, &hit) != 0 && rig->onHit != NULL) {
+                    rig->onHit(rig, i, impact, &hit);
                 }
                 p->pos.x = (float)((double)p->pos.x - rig->center.x);
                 p->pos.y = (float)((double)p->pos.y - rig->center.y);
@@ -424,7 +424,7 @@ void zoverRigRelax(ZRig *rig)
             } else {
                 p->pos = p->prev;
             }
-            if ((p->flags & kZoverPointFrozen) == 0) {
+            if ((p->flags & kZoverPointTouching) == 0) {
                 p->vel.x = (float)((double)p->pos.x - p->prev.x);
                 p->vel.y = (float)((double)p->pos.y - p->prev.y);
                 p->vel.z = (float)((double)p->pos.z - p->prev.z);
@@ -468,6 +468,196 @@ void zoverRigBuildFrame(ZRig *rig, int a, int b, int c, ZMatrix *out)
     zvec3Cross3(&out->up, &out->right, &out->pos, &out->at);
 }
 
+/* ---- level contact ---------------------------------------------------------------------------- */
+
+/* The sweep test of a fast point against a face plane goes through exe globals. */
+typedef struct ZoverSweep {
+    float mid;       /* 0x00 projection of the swept segment's midpoint on the normal */
+    float depth;     /* 0x04 half its extent along the normal, plus the contact gap */
+    float planeDist; /* 0x08 distance of the plane from the origin */
+    float zero;      /* 0x0c */
+    ZVec3 normal;    /* 0x10 */
+} ZoverSweep;
+
+#define gZoverSweep ORIG_VAR(0x0068ffc0, ZoverSweep, gZoverSweep)
+
+/* Distance the rig keeps its points off a face. */
+#define CONTACT_GAP 20.0f
+
+/*
+ * Where a point moving from `from` to `to` (by `move`) is put against the face of h, CONTACT_GAP off the
+ * plane; returns 0 when the swept segment does not come near the plane. Refreshes the face's plane distance
+ * from its owner and returns the normalised normal in n. A slow point goes out from the face's closest point
+ * along the normal; a fast one is bisected (four steps) towards where it is CONTACT_GAP above the plane.
+ */
+static int rigFaceContact(const ZbspFaceHit *h, const ZVec3 *move, const ZVec3 *from, const ZVec3 *to,
+                          ZVec3 *n, ZVec3 *target)
+{
+    PhysFace *f = h->face;
+    ZVec3 lo, hi, mid, v;
+
+    *n = f->normal;
+    zvec3NormalizeScaled(n, n);
+    f->d = (float)-zvec3Dot(n, (const ZVec3 *)((const uint8_t *)f->owner + 0x10));
+    if (!(zvec3Dot(move, move) >= 0x1.99999ap-4f)) {
+        target->x = (float)((double)f->normal.x * CONTACT_GAP + h->point.x);
+        target->y = (float)((double)f->normal.y * CONTACT_GAP + h->point.y);
+        target->z = (float)((double)f->normal.z * CONTACT_GAP + h->point.z);
+        return 1;
+    }
+    gZoverSweep.normal = f->normal;
+    zoverRigProject(from, to, CONTACT_GAP, &gZoverSweep.mid, &gZoverSweep.depth, &gZoverSweep.normal);
+    gZoverSweep.planeDist = -f->d;
+    gZoverSweep.zero = 0.0f;
+    if (__builtin_fabs((double)gZoverSweep.planeDist - gZoverSweep.mid) > gZoverSweep.depth) {
+        return 0;
+    }
+    lo = *from;
+    hi = *to;
+    mid = *from;
+    zvec3Add(&mid, &mid, &hi);
+    zvec3Scale(&mid, &mid, HALF);
+    for (int i = 4; i != 0; i--) {
+        if (zvec3Dot(&mid, &gZoverSweep.normal) - gZoverSweep.planeDist >= CONTACT_GAP) {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+        mid = lo;
+        zvec3Add(&mid, &mid, &hi);
+        zvec3Scale(&mid, &mid, HALF);
+    }
+    v = gZoverSweep.normal;
+    zvec3Scale(&v, &v, (float)(CONTACT_GAP - (zvec3Dot(&mid, &gZoverSweep.normal) - gZoverSweep.planeDist)));
+    zvec3Add(&mid, &mid, &v);
+    *target = mid;
+    return 1;
+}
+
+/* The faces near the segment from-to (radius: half the move plus CONTACT_GAP), or NULL. */
+static const ZbspFaceHit *rigFacesNear(const ZVec3 *from, const ZVec3 *to, const ZVec3 *move)
+{
+    const float radius = (float)(zvec3Length(move) * HALF + CONTACT_GAP);
+    const ZbspFaceQuery *q;
+    ZVec3 center = *from;
+
+    zvec3Add(&center, &center, to);
+    zvec3Scale(&center, &center, HALF);
+    q = zbspFindFaceNear(&center, radius, ONE);
+    return q != NULL ? q->hits : NULL;
+}
+
+/*
+ * Collides a moving point (unless it moves faster than 100 units a frame) with the level faces along its
+ * move: the point goes to the average of its contact positions, and if it moves into the averaged plane its
+ * velocity loses the normal part, is damped by 1 - 0.35 restitution and gets 0.95 friction of the impact
+ * speed back along the normal; slower than 1 it stops. Returns 1 with the impact speed and the hit record
+ * filled, 0 when nothing was hit (the record may be cleared or partly filled then).
+ */
+BMX_ADDR(0x00451390)
+int zoverRigCollidePoint(ZRigPoint *p, float *impact, ZRigHit *hit)
+{
+    ZVec3 from, to, n, target, sumTarget, sumNormal, v;
+    const ZbspFaceHit *h;
+    uint32_t count = 0;
+    double d;
+
+    zvec3Zero(&sumTarget);
+    zvec3Zero(&sumNormal);
+    p->flags &= (uint16_t)~kZoverPointTouching;
+    if (zvec3Dot(&p->vel, &p->vel) > 10000.0f) {
+        return 0;
+    }
+    hit->normal.x = 0.0f;
+    hit->normal.y = 0.0f;
+    hit->normal.z = 0.0f;
+    hit->d = 0.0f;
+    memset(hit, 0, sizeof *hit);
+    from = p->prev;
+    to = p->pos;
+    zvec3Add(&to, &to, &p->vel);
+    h = rigFacesNear(&from, &to, &p->vel);
+    if (h == NULL || h->face == NULL) {
+        return 0;
+    }
+    for (; h->face != NULL; h++) {
+        const PhysFace *f = h->face;
+
+        if (!rigFaceContact(h, &p->vel, &from, &to, &n, &target)) {
+            continue;
+        }
+        p->flags |= kZoverPointTouching;
+        count++;
+        zvec3Add(&sumTarget, &sumTarget, &target);
+        zvec3Add(&sumNormal, &sumNormal, &n);
+        hit->normal.x = (float)((double)f->normal.x + hit->normal.x);
+        hit->normal.y = (float)((double)f->normal.y + hit->normal.y);
+        hit->normal.z = (float)((double)f->normal.z + hit->normal.z);
+        hit->d = (float)((double)f->d + hit->d);
+        if (h->object != 0) {
+            const void *object = (const void *)(uintptr_t)(uint32_t)h->object;
+
+            hit->kind = kZoverHitObject;
+            hit->tag = *(const uint16_t *)object;
+            hit->object = object;
+        } else {
+            hit->tag = 0;
+            hit->kind = kZoverHitLevel;
+            hit->matRef = zbspGetMatRef(f);
+        }
+    }
+    if (count == 0) {
+        return 0;
+    }
+    if (!(zvec3Dot(&sumNormal, &sumNormal) >= 0x1.0624dep-10f)) {
+        /* the contacts cancel out: push straight up */
+        sumNormal.x = 0.0f;
+        sumNormal.y = 1.0f;
+        sumNormal.z = 0.0f;
+        zvec3Scale(&sumTarget, &sumTarget, (float)((double)ONE / count));
+        hit->normal.x = 0.0f;
+        hit->normal.y = 1.0f;
+        hit->normal.z = 0.0f;
+        hit->d = 0.0f;
+        p->vel.x = 0.0f;
+        p->vel.y = 3.0f;
+        p->vel.z = 0.0f;
+    } else {
+        float fcount;
+
+        zvec3NormalizeScaled(&sumNormal, &sumNormal);
+        fcount = (float)count;
+        zvec3Scale(&sumTarget, &sumTarget, (float)((double)ONE / fcount));
+        hit->normal.x = (float)((double)hit->normal.x / fcount);
+        hit->normal.y = (float)((double)hit->normal.y / fcount);
+        hit->normal.z = (float)((double)hit->normal.z / fcount);
+        hit->d = (float)((double)hit->d / fcount);
+    }
+    v = sumNormal;
+    d = zvec3Dot(&v, &p->vel);
+    if (d > ZERO) {
+        return 0;
+    }
+    {
+        const float depth = (float)-d;
+
+        *impact = depth;
+        if (!(zvec3Dot(&p->vel, &p->vel) >= ONE)) {
+            zvec3Zero(&p->vel);
+            p->flags |= kZoverPointStopped;
+        } else {
+            zvec3Scale(&v, &v, depth);
+            zvec3Add(&p->vel, &p->vel, &v);
+            zvec3Scale(&p->vel, &p->vel, (float)(ONE - (double)p->restitution * 0x1.666666p-2f));
+            zvec3Scale(&v, &v, (float)((double)p->friction * 0x1.e66666p-1f));
+            zvec3Add(&p->vel, &p->vel, &v);
+        }
+    }
+    p->pos = sumTarget;
+    hit->point = sumTarget;
+    return 1;
+}
+
 /*
  * Projects the segment a-b on the axis n: *outMid gets half the sum of the two projections, *outDepth
  * half the absolute projection of the segment plus `depth`.
@@ -490,6 +680,47 @@ void zoverRigProject(const ZVec3 *a, const ZVec3 *b, float depth, float *outMid,
     }
     *outMid = mid;
     *outDepth = (float)(r3 * HALF + depth);
+}
+
+/*
+ * Moves a point that was placed from outside (by its move since prev) to the average of its contact
+ * positions with the level faces along that move, as zoverRigCollidePoint does, without touching its
+ * velocity. Points that came to rest are left alone.
+ */
+BMX_ADDR(0x00451d60)
+void zoverRigResolvePoint(ZRigPoint *p)
+{
+    ZVec3 move, from, to, n, target, sumTarget, sumNormal;
+    const ZbspFaceHit *h;
+    uint32_t count = 0;
+
+    move = p->prev;
+    zvec3Negate(&move, &move);
+    zvec3Add(&move, &move, &p->pos);
+    zvec3Zero(&sumTarget);
+    zvec3Zero(&sumNormal);
+    if ((p->flags & kZoverPointStopped) != 0) {
+        return;
+    }
+    from = p->prev;
+    to = p->pos;
+    zvec3Add(&to, &to, &move);
+    h = rigFacesNear(&from, &to, &move);
+    if (h == NULL || h->face == NULL) {
+        return;
+    }
+    for (; h->face != NULL; h++) {
+        if (!rigFaceContact(h, &move, &from, &to, &n, &target)) {
+            continue;
+        }
+        count++;
+        zvec3Add(&sumTarget, &sumTarget, &target);
+        zvec3Add(&sumNormal, &sumNormal, &n);
+    }
+    if (count != 0) {
+        zvec3Scale(&sumTarget, &sumTarget, (float)((double)ONE / count));
+        p->pos = sumTarget;
+    }
 }
 
 /* Pulls a and b towards the rest length: both get a weighted target position added to their sums. */
@@ -1084,7 +1315,7 @@ void zoverRigGoLimp(ZRig *rig, ZActor *rider)
     }
     gZoverLimp[gZoverRigIndex] = 1;
     for (uint32_t i = 0; i < rig->pointCount; i++) {
-        if ((rig->points[i].flags & kZoverPointFrozen) != 0) {
+        if ((rig->points[i].flags & kZoverPointTouching) != 0) {
             return;
         }
     }
@@ -1145,13 +1376,13 @@ void zoverRigClearSticky(ZRig *rig)
     gZoverSticky[gZoverRigIndex] = 0;
 }
 
-/* Pins every frozen point and stops it. */
+/* Pins every point that touches the level and stops it. */
 BMX_ADDR(0x004543b0)
 void zoverRigFreezeFlagged(ZRig *rig)
 {
     for (uint32_t i = 0; i < rig->pointCount; i++) {
         ZRigPoint *p = &rig->points[i];
-        if ((p->flags & kZoverPointFrozen) != 0) {
+        if ((p->flags & kZoverPointTouching) != 0) {
             p->mode = kZoverPointPinned;
             p->vel.x = 0.0f;
             p->vel.y = 0.0f;
@@ -1283,6 +1514,143 @@ void zoverRigClearYaw(ZRig *rig)
 {
     zoverRigSelect(rig);
     gZoverYawOn[gZoverRigIndex] = 0;
+}
+
+/*
+ * Segment frames of the rider rig that zoverStepRiderMotion keeps in exe globals (named by the rig points
+ * they span: 0 pelvis, 1 and 2 hips, 3 and 4 knees, 5 and 6 feet, 7 and 8 shoulders, 9 and 10 elbows, 11
+ * and 12 hands, 13 head).
+ */
+#define gZoverFrameHead        ORIG_VAR(0x00574a54, ZMatrix, gZoverFrameHead)
+#define gZoverFrameShin46      ORIG_VAR(0x00574794, ZMatrix, gZoverFrameShin46)
+#define gZoverFrameShin35      ORIG_VAR(0x005747f4, ZMatrix, gZoverFrameShin35)
+#define gZoverFrameForearm911  ORIG_VAR(0x00574854, ZMatrix, gZoverFrameForearm911)
+#define gZoverFrameForearm1012 ORIG_VAR(0x00574938, ZMatrix, gZoverFrameForearm1012)
+
+/*
+ * Steps the rider rig after a bail and poses the rider actor from it: applies the pending state requests,
+ * relaxes the rig, builds a frame for every body segment (shins and forearms bend like hinges unless the rig
+ * is sticky or limp), stores the frames in the rig points and turns them into the joint angles of the actor's
+ * blend channel (each segment relative to its parent; the hands, feet and two more joints get zero). The
+ * actor goes to a weighted mean of the pelvis and hip points. Original quirk: the y of that mean takes the
+ * hip point 1 where the pelvis is meant, the z hip point 2.
+ */
+BMX_ADDR(0x004547c0)
+void zoverStepRiderMotion(void *rigp, void *actorp)
+{
+    ZRig *rig = rigp;
+    ZActor *actor = actorp;
+    ZAngle3 *joints = actor->player->ch[1].joints;
+    ZMatrix chest, hips, thigh24, thigh13, upperArm810, upperArm79, parent, m;
+    const ZRigPoint *p = rig->points;
+    ZVec3 pos;
+
+    zoverRigSelect(rig);
+    if (gZoverRelaxed[gZoverRigIndex] != 0) {
+        zoverRigFreezeFlagged(rig);
+    }
+    if (gZoverSticky[gZoverRigIndex] != 0) {
+        zoverRigClearHinges(rig);
+    }
+    if (gZoverRelaxed[gZoverRigIndex] == 0) {
+        if (gZoverPitchOn[gZoverRigIndex] != 0 && rig->hingesOff == 0) {
+            zoverRigApplyPitch(rig, actor);
+        }
+        if (gZoverYawOn[gZoverRigIndex] != 0 && rig->hingesOff == 0) {
+            zoverRigApplyYaw(rig, actor);
+        }
+    }
+    if (gZoverStiff[gZoverRigIndex] != 0) {
+        zoverRigAimHands(rig);
+    }
+    if (gZoverLimp[gZoverRigIndex] != 0) {
+        zoverRigBlendToPose(rig);
+    }
+    if (gZoverHandsEased[gZoverRigIndex] != 0) {
+        zoverRigGrabEdges(rig);
+    }
+    zoverRigRelax(rig);
+
+    zoverFrameFromPoints(rig, 7, 8, 8, 0, &chest);
+    zoverFrameFromPoints(rig, 1, 2, 0, 1, &hips);
+    zoverFrameFollow(rig, 2, 4, &hips, &thigh24);
+    zoverFrameFollow(rig, 1, 3, &hips, &thigh13);
+    zoverFrameFollowFlipped(rig, 8, 10, &chest, &upperArm810);
+    zoverFrameFollowFlipped(rig, 7, 9, &chest, &upperArm79);
+    zoverFrameFromPoints(rig, 7, 8, 13, 7, &gZoverFrameHead);
+    if (gZoverSticky[gZoverRigIndex] == 0 && gZoverLimp[gZoverRigIndex] == 0) {
+        zoverFrameSnap(rig, 4, 6, &thigh24, &gZoverFrameShin46);
+        zoverFrameSnap(rig, 3, 5, &thigh13, &gZoverFrameShin35);
+        zoverFrameReflect(rig, 10, 12, &upperArm810, &gZoverFrameForearm1012, 1);
+        zoverFrameReflect(rig, 9, 11, &upperArm79, &gZoverFrameForearm911, 0);
+    } else {
+        zoverFrameFollow(rig, 4, 6, &thigh24, &gZoverFrameShin46);
+        zoverFrameFollow(rig, 3, 5, &thigh13, &gZoverFrameShin35);
+        zoverFrameFollow(rig, 10, 12, &upperArm810, &gZoverFrameForearm1012);
+        zoverFrameFollow(rig, 9, 11, &upperArm79, &gZoverFrameForearm911);
+    }
+    if (gZoverStiff[gZoverRigIndex] != 0) {
+        zoverRigAimHands(rig);
+        zoverRigEndStiff(rig);
+    }
+    if (gZoverLimp[gZoverRigIndex] != 0) {
+        zoverRigBlendToPose(rig);
+        zoverRigEndLimp(rig);
+    }
+
+    zmatrixCopyRotation(&rig->points[7].basis, &chest);
+    zmatrixCopyRotation(&rig->points[8].basis, &chest);
+    zmatrixCopyRotation(&rig->points[0].basis, &hips);
+    zmatrixCopyRotation(&rig->points[1].basis, &hips);
+    zmatrixCopyRotation(&rig->points[2].basis, &hips);
+    zmatrixCopyRotation(&rig->points[13].basis, &gZoverFrameHead);
+    zmatrixCopyRotation(&rig->points[4].basis, &thigh24);
+    zmatrixCopyRotation(&rig->points[3].basis, &thigh13);
+    zmatrixCopyRotation(&rig->points[6].basis, &gZoverFrameShin46);
+    zmatrixCopyRotation(&rig->points[5].basis, &gZoverFrameShin35);
+    zmatrixCopyRotation(&rig->points[9].basis, &upperArm79);
+    zmatrixCopyRotation(&rig->points[10].basis, &upperArm810);
+    zmatrixCopyRotation(&rig->points[11].basis, &gZoverFrameForearm911);
+    zmatrixCopyRotation(&rig->points[12].basis, &gZoverFrameForearm1012);
+
+    zoverActorAnglesFromFrame(actor, &hips, &joints[0]);
+    zoverTransposeRotation(&chest, &parent);
+    zoverMul3(&m, &parent, &gZoverFrameHead);
+    zoverMatrixToAngles(&m, &joints[2]);
+    zoverMul3(&m, &parent, &upperArm810);
+    zoverMatrixToAngles(&m, &joints[3]);
+    zoverMul3(&m, &parent, &upperArm79);
+    zoverMatrixToAngles(&m, &joints[6]);
+    zoverTransposeRotation(&hips, &parent);
+    zoverMul3(&m, &parent, &thigh24);
+    zoverMatrixToAngles(&m, &joints[9]);
+    zoverMul3(&m, &parent, &thigh13);
+    zoverMatrixToAngles(&m, &joints[12]);
+    zoverMul3(&m, &parent, &chest);
+    zoverMatrixToAngles(&m, &joints[1]);
+    zoverTransposeRotation(&thigh13, &parent);
+    zoverMul3(&m, &parent, &gZoverFrameShin35);
+    zoverMatrixToAngles(&m, &joints[13]);
+    zoverTransposeRotation(&thigh24, &parent);
+    zoverMul3(&m, &parent, &gZoverFrameShin46);
+    zoverMatrixToAngles(&m, &joints[10]);
+    zoverTransposeRotation(&upperArm79, &parent);
+    zoverMul3(&m, &parent, &gZoverFrameForearm911);
+    zoverMatrixToAngles(&m, &joints[7]);
+    zoverTransposeRotation(&upperArm810, &parent);
+    zoverMul3(&m, &parent, &gZoverFrameForearm1012);
+    zoverMatrixToAngles(&m, &joints[4]);
+    zoverZeroAngles(&joints[5]);
+    zoverZeroAngles(&joints[11]);
+    zoverZeroAngles(&joints[8]);
+    zoverZeroAngles(&joints[14]);
+
+    pos.x = (float)(((double)p[2].pos.x * 0.25f + (double)p[1].pos.x * 0.25f) + (double)p[0].pos.x * HALF);
+    pos.y = (float)(((double)p[2].pos.y * 0.25f + (double)p[1].pos.y * 0.25f) + (double)p[1].pos.y * HALF);
+    pos.z = (float)(((double)p[1].pos.z * 0.25f + (double)p[2].pos.z * 0.25f) + (double)p[2].pos.z * HALF);
+    zactorSetHeight(actor, 0.0f);
+    zactorSetPos(actor, &pos);
+    rig->hingesOff = 0;
 }
 
 /* ---- frames (helpers of the rider rig step) --------------------------------------------------- */
@@ -1593,6 +1961,207 @@ void zoverCombine3(const float *w, const ZVec3 *a, const ZVec3 *b, const ZVec3 *
     *out = va;
     zvec3Add(out, out, &vb);
     zvec3Add(out, out, &vc);
+}
+
+/* State of the limb solver; it all lives in exe globals. */
+#define gZoverLimbOffset     ORIG_VAR(0x00574cf8, ZVec3, gZoverLimbOffset) /* local point of the part queries */
+#define gZoverLimbSynced     ORIG_VAR(0x00574d08, int32_t, gZoverLimbSynced) /* the actor's pose is current */
+#define gZoverLimbDir        ORIG_VAR(0x00574b6c, ZVec3, gZoverLimbDir)
+#define gZoverLimbDistCopy   ORIG_VAR(0x00574bcc, float, gZoverLimbDistCopy)
+#define gZoverLimbLowerLen   ORIG_VAR(0x00574c50, float, gZoverLimbLowerLen)
+#define gZoverLimbUpperLen   ORIG_VAR(0x00574a08, float, gZoverLimbUpperLen)
+#define gZoverLimbCos        ORIG_VAR(0x00574b80, float, gZoverLimbCos)
+#define gZoverLimbAngle      ORIG_VAR(0x00574a40, ZAngle, gZoverLimbAngle)
+#define gZoverLimbSin        ORIG_VAR(0x00574a0c, float, gZoverLimbSin)
+#define gZoverLimbTransposed ORIG_VAR(0x00574c10, ZMatrix, gZoverLimbTransposed)
+#define gZoverLimbProduct    ORIG_VAR(0x00574b2c, ZMatrix, gZoverLimbProduct)
+#define gZoverActorFrame     ORIG_VAR(0x00574adc, ZMatrix, gZoverActorFrame)
+#define gZoverSpineFrame     ORIG_VAR(0x00574894, ZMatrix, gZoverSpineFrame) /* actor frame turned by joint 1 */
+#define gZoverLegDist        ORIG_VAR(0x00574b7c, float, gZoverLegDist)
+#define gZoverLegSide        ORIG_VAR(0x00574a20, ZVec3, gZoverLegSide)
+#define gZoverArmDist        ORIG_VAR(0x0057492c, float, gZoverArmDist)
+#define gZoverArmSide        ORIG_VAR(0x005746c4, ZVec3, gZoverArmSide)
+/* Per limb: target (relative to the root once solved), bend direction, root, upper bone (negated), frames. */
+#define gZoverLimb0Target ORIG_VAR(0x005747e4, ZVec3, gZoverLimb0Target)
+#define gZoverLimb0Bend   ORIG_VAR(0x005747d4, ZVec3, gZoverLimb0Bend)
+#define gZoverLimb0Root   ORIG_VAR(0x00574a30, ZVec3, gZoverLimb0Root)
+#define gZoverLimb0Elbow  ORIG_VAR(0x00574724, ZVec3, gZoverLimb0Elbow)
+#define gZoverLimb0Upper  ORIG_VAR(0x00574c64, ZMatrix, gZoverLimb0Upper)
+#define gZoverLimb0Lower  ORIG_VAR(0x00574754, ZMatrix, gZoverLimb0Lower) /* first the spine rotation */
+#define gZoverLimb1Target ORIG_VAR(0x00574834, ZVec3, gZoverLimb1Target)
+#define gZoverLimb1Bend   ORIG_VAR(0x00574a10, ZVec3, gZoverLimb1Bend)
+#define gZoverLimb1Root   ORIG_VAR(0x005749b8, ZVec3, gZoverLimb1Root)
+#define gZoverLimb1Elbow  ORIG_VAR(0x005748fc, ZVec3, gZoverLimb1Elbow)
+#define gZoverLimb1Upper  ORIG_VAR(0x005746e4, ZMatrix, gZoverLimb1Upper)
+#define gZoverLimb1Lower  ORIG_VAR(0x00574a94, ZMatrix, gZoverLimb1Lower)
+#define gZoverLimb2Target ORIG_VAR(0x00574844, ZVec3, gZoverLimb2Target)
+#define gZoverLimb2Bend   ORIG_VAR(0x00574c54, ZVec3, gZoverLimb2Bend)
+#define gZoverLimb2Root   ORIG_VAR(0x005748dc, ZVec3, gZoverLimb2Root)
+#define gZoverLimb2Elbow  ORIG_VAR(0x005748ec, ZVec3, gZoverLimb2Elbow)
+#define gZoverLimb2Upper  ORIG_VAR(0x005749c8, ZMatrix, gZoverLimb2Upper)
+#define gZoverLimb2Lower  ORIG_VAR(0x00574bd0, ZMatrix, gZoverLimb2Lower)
+#define gZoverLimb3Target ORIG_VAR(0x00574744, ZVec3, gZoverLimb3Target)
+#define gZoverLimb3Bend   ORIG_VAR(0x0057490c, ZVec3, gZoverLimb3Bend)
+#define gZoverLimb3Root   ORIG_VAR(0x00574a44, ZVec3, gZoverLimb3Root)
+#define gZoverLimb3Elbow  ORIG_VAR(0x005746d4, ZVec3, gZoverLimb3Elbow)
+#define gZoverLimb3Upper  ORIG_VAR(0x00574978, ZMatrix, gZoverLimb3Upper)
+#define gZoverLimb3Lower  ORIG_VAR(0x00574b84, ZMatrix, gZoverLimb3Lower)
+
+/* The globals one limb is solved in. */
+typedef struct ZoverLimb {
+    ZVec3 *target;
+    ZVec3 *bend;
+    ZVec3 *root;
+    ZVec3 *elbow;
+    ZVec3 *side;
+    float *dist;
+    ZMatrix *upper;
+    ZMatrix *lower;
+} ZoverLimb;
+
+/* World position of a point given in a part's frame; the first query of a solve brings the pose up to date.
+ */
+static void limbPartPosition(ZActor *actor, int part, ZVec3 *out)
+{
+    if (gZoverLimbSynced == 0) {
+        zactorGetPartPosition(actor, part, &gZoverLimbOffset, out);
+    } else {
+        zactorGetPartPositionNoSync(actor, part, &gZoverLimbOffset, out);
+    }
+    gZoverLimbSynced = 1;
+}
+
+/* Default target and bend of a leg without one: the end part's position and the root part's x axis. */
+static void limbDefaults(ZActor *actor, int root, int end, const ZoverLimb *l)
+{
+    limbPartPosition(actor, end, l->target);
+    gZoverLimbOffset.x = 1.0f;
+    zactorGetPartPosition(actor, root, &gZoverLimbOffset, l->bend);
+    gZoverLimbOffset.x = 0.0f;
+    zactorGetPartPosition(actor, root, &gZoverLimbOffset, l->root);
+    zoverVecSub(l->bend, l->root, l->bend);
+}
+
+/* x: the bend direction, y: v normalised (negated when flipUp), z: x cross y normalised (negated if not). */
+static void limbFrame(ZMatrix *m, const ZVec3 *bend, const ZVec3 *v, int flipUp)
+{
+    m->right = *bend;
+    m->up = *v;
+    zvec3NormalizeScaled(&m->up, &m->up);
+    zoverCrossNeg(&m->right, &m->up, &m->at);
+    zvec3NormalizeScaled(&m->at, &m->at);
+    zvec3Scale(flipUp ? &m->up : &m->at, flipUp ? &m->up : &m->at, -1.0f);
+}
+
+/*
+ * Two bone IK of one limb rooted at `part`: the reach to the target is clamped, the bend direction made
+ * perpendicular to it, the elbow (knee) placed by the law of cosines on the side of the bend direction
+ * (arms: the other side), and the angles of both bones, the upper relative to `ref`, written to the joints.
+ */
+static void limbSolve(ZActor *actor, int part, const ZoverLimb *l, float reach, float upperLen,
+                      float lowerLen, int otherSide, const ZMatrix *ref, ZAngle3 *upperAngles,
+                      ZAngle3 *lowerAngles)
+{
+    ZAngle angle;
+    double sideLen;
+
+    limbPartPosition(actor, part, l->root);
+    zoverVecSub(l->target, l->root, &gZoverLimbDir);
+    *l->dist = (float)__builtin_sqrt(zvec3Dot(&gZoverLimbDir, &gZoverLimbDir));
+    zvec3Scale(&gZoverLimbDir, &gZoverLimbDir, (float)((double)ONE / *l->dist));
+    if (*l->dist > reach) {
+        *l->dist = reach;
+    }
+    zoverCrossNeg(&gZoverLimbDir, l->bend, l->side);
+    zvec3NormalizeScaled(l->side, l->side);
+    zoverCrossNeg(l->side, &gZoverLimbDir, l->bend);
+    zvec3NormalizeScaled(l->bend, l->bend);
+    gZoverLimbLowerLen = lowerLen;
+    gZoverLimbDistCopy = *l->dist;
+    gZoverLimbUpperLen = upperLen;
+    gZoverLimbCos = (float)(((double)gZoverLimbUpperLen * gZoverLimbUpperLen + (double)*l->dist * *l->dist -
+                             (double)gZoverLimbLowerLen * gZoverLimbLowerLen) /
+                            ((double)gZoverLimbUpperLen * *l->dist + (double)gZoverLimbUpperLen * *l->dist));
+    angle = zmathAcos(gZoverLimbCos);
+    gZoverLimbAngle = angle;
+    gZoverLimbSin = (float)zmathSin(angle);
+    *l->target = gZoverLimbDir;
+    zvec3Scale(l->target, l->target, *l->dist);
+    zvec3Scale(&gZoverLimbDir, &gZoverLimbDir, (float)((double)gZoverLimbCos * gZoverLimbUpperLen));
+    sideLen = (double)gZoverLimbSin * gZoverLimbUpperLen;
+    zvec3Scale(l->side, l->side, (float)(otherSide ? -sideLen : sideLen));
+    *l->elbow = gZoverLimbDir;
+    zvec3Add(l->elbow, l->elbow, l->side);
+    zvec3Scale(l->elbow, l->elbow, -1.0f);
+    zvec3Add(l->target, l->target, l->elbow);
+    limbFrame(l->upper, l->bend, l->elbow, 1);
+    limbFrame(l->lower, l->bend, l->target, 0);
+    zoverTransposeRotation(ref, &gZoverLimbTransposed);
+    zoverMul3(&gZoverLimbProduct, &gZoverLimbTransposed, l->upper);
+    zoverMatrixToAngles(&gZoverLimbProduct, upperAngles);
+    zoverTransposeRotation(l->upper, &gZoverLimbTransposed);
+    zoverMul3(&gZoverLimbProduct, &gZoverLimbTransposed, l->lower);
+    zoverMatrixToAngles(&gZoverLimbProduct, lowerAngles);
+}
+
+/*
+ * Bends the rider's legs (limbs 0 and 1, rooted at parts 3 and 6, relative to the spine) and arms (2 and 3,
+ * parts 9 and 0xc, relative to the actor) towards the targets in the limb block whose mask bit is set, then
+ * clears the mask. A leg without a target still gets its default target and bend direction stored.
+ */
+BMX_ADDR(0x00456120)
+void zoverSolveLimbs(void *actorp, void *limbsp)
+{
+    ZActor *actor = actorp;
+    ZLimbs *limbs = limbsp;
+    ZAngle3 *joints = actor->player->ch[0].joints;
+    const ZoverLimb leg0 = {&gZoverLimb0Target, &gZoverLimb0Bend, &gZoverLimb0Root,  &gZoverLimb0Elbow,
+                            &gZoverLegSide,     &gZoverLegDist,   &gZoverLimb0Upper, &gZoverLimb0Lower};
+    const ZoverLimb leg1 = {&gZoverLimb1Target, &gZoverLimb1Bend, &gZoverLimb1Root,  &gZoverLimb1Elbow,
+                            &gZoverLegSide,     &gZoverLegDist,   &gZoverLimb1Upper, &gZoverLimb1Lower};
+    const ZoverLimb arm2 = {&gZoverLimb2Target, &gZoverLimb2Bend, &gZoverLimb2Root,  &gZoverLimb2Elbow,
+                            &gZoverArmSide,     &gZoverArmDist,   &gZoverLimb2Upper, &gZoverLimb2Lower};
+    const ZoverLimb arm3 = {&gZoverLimb3Target, &gZoverLimb3Bend, &gZoverLimb3Root,  &gZoverLimb3Elbow,
+                            &gZoverArmSide,     &gZoverArmDist,   &gZoverLimb3Upper, &gZoverLimb3Lower};
+
+    gZoverLimbSynced = 0;
+    if ((limbs->mask & 1) == 0) {
+        limbDefaults(actor, 3, 5, &leg0);
+    } else {
+        gZoverLimb0Target = limbs->target[0].a;
+        gZoverLimb0Bend = limbs->target[0].b;
+    }
+    if ((limbs->mask & 2) == 0) {
+        limbDefaults(actor, 6, 8, &leg1);
+    } else {
+        gZoverLimb1Target = limbs->target[1].a;
+        gZoverLimb1Bend = limbs->target[1].b;
+    }
+    zactorGetMatrix(actor, &gZoverActorFrame);
+    zmatrixIdentity(&gZoverLimb0Lower);
+    zmatrixRotateEuler(&gZoverLimb0Lower, &gZoverLimb0Lower, &actor->player->ch[0].joints[1]);
+    zoverMul3(&gZoverSpineFrame, &gZoverActorFrame, &gZoverLimb0Lower);
+    if ((limbs->mask & 2) != 0) {
+        limbSolve(actor, 6, &leg1, limbs->reachSum[1], limbs->length[4], limbs->length[5], 0,
+                  &gZoverSpineFrame, &joints[6], &joints[7]);
+    }
+    if ((limbs->mask & 1) != 0) {
+        limbSolve(actor, 3, &leg0, limbs->reachSum[0], limbs->length[0], limbs->length[1], 0,
+                  &gZoverSpineFrame, &joints[3], &joints[4]);
+    }
+    if ((limbs->mask & 4) != 0) {
+        gZoverLimb2Target = limbs->target[2].a;
+        gZoverLimb2Bend = limbs->target[2].b;
+        limbSolve(actor, 9, &arm2, limbs->reachSum[2], limbs->length[3], limbs->length[2], 1,
+                  &gZoverActorFrame, &joints[9], &joints[10]);
+    }
+    if ((limbs->mask & 8) != 0) {
+        gZoverLimb3Target = limbs->target[3].a;
+        gZoverLimb3Bend = limbs->target[3].b;
+        limbSolve(actor, 0xc, &arm3, limbs->reachSum[3], limbs->length[7], limbs->length[6], 1,
+                  &gZoverActorFrame, &joints[12], &joints[13]);
+    }
+    limbs->mask = 0;
 }
 
 /* Stores a limb target pair for each limb in mask (1, 2, 4, 8) and marks the limbs as targeted. */

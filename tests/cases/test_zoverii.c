@@ -35,16 +35,16 @@ static void lgf(float v)
 }
 
 /* Point collision: sometimes hits, nudging the point and filling the hit record. */
-static int stubCollide(ZRigPoint *p, uint32_t *hitId, void *hit)
+static int stubCollide(ZRigPoint *p, float *impact, ZRigHit *hit)
 {
     const uint32_t r = dt_u32();
 
     lg(0xc0110000u);
     lg((uint32_t)(uintptr_t)p);
     if (r % 3 == 0) {
-        uint32_t *rec = hit;
+        uint32_t *rec = (uint32_t *)hit;
 
-        *hitId = r >> 8;
+        *impact = (float)(r >> 8);
         rec[0] = dt_u32();
         rec[1] = dt_u32();
         p->pos.x = (float)(p->pos.x + dt_float(-3.0f, 3.0f));
@@ -69,14 +69,14 @@ static void stubPoll(void)
     lg(0x9011000u);
 }
 
-static void BMX_CDECL hitCallback(ZRig *rig, uint32_t index, uint32_t hitId, void *hit)
+static void BMX_CDECL hitCallback(ZRig *rig, uint32_t index, float impact, ZRigHit *hit)
 {
-    const uint32_t *rec = hit;
+    const uint32_t *rec = (const uint32_t *)hit;
 
     lg(0xca110000u);
     lg((uint32_t)(uintptr_t)rig);
     lg(index);
-    lg(hitId);
+    lgf(impact);
     lg(rec[0]);
     lg(rec[1]);
     rig->points[index].pos.x = (float)(rig->points[index].pos.x + 0.5f);

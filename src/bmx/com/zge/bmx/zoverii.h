@@ -31,8 +31,11 @@ enum {
     kZoverRigMaxHinges = 7,
 };
 
-/* ZRigPoint.flags */
-enum { kZoverPointFrozen = 0x1 };
+/* ZRigPoint.flags, set by zoverRigCollidePoint */
+enum {
+    kZoverPointTouching = 0x1, /* touched level geometry in the last relaxation (its velocity is kept) */
+    kZoverPointStopped = 0x2,  /* came to rest on it (zoverRigResolvePoint leaves it alone) */
+};
 
 /* What zoverRigAddPoint reads. */
 typedef struct ZRigPointDef {
@@ -125,9 +128,35 @@ typedef struct ZRigHinge {
     float strength;  /* 0x24 (for bones: the distance) */
 } ZRigHinge;
 
+/* ZRigHit.kind */
+enum {
+    kZoverHitLevel = 1,  /* level geometry: matRef is set */
+    kZoverHitObject = 2, /* a prop's face: object and tag are set */
+};
+
+/* What zoverRigCollidePoint reports about a point's contacts with the level. */
+typedef struct ZRigHit {
+    uint32_t kind;          /* 0x00 kind of the last face that counted */
+    uint8_t pad04[4];       /* 0x04 */
+    ZVec3 point;            /* 0x08 where the point was put */
+    uint8_t pad14[8];       /* 0x14 */
+    ZVec3 normal;           /* 0x1c average plane of the faces */
+    float d;                /* 0x28 */
+    uint8_t pad2c[0xc];     /* 0x2c */
+    const uint32_t *matRef; /* 0x38 zbspGetMatRef of a level face */
+    uint16_t tag;           /* 0x3c first word of the object */
+    uint8_t pad3e[2];       /* 0x3e */
+    const void *object;     /* 0x40 */
+    uint8_t pad44[0xd8 - 0x44];
+} ZRigHit;
+
+_Static_assert(sizeof(ZRigHit) == 0xd8, "rig hit size");
+_Static_assert(__builtin_offsetof(ZRigHit, normal) == 0x1c, "rig hit layout");
+_Static_assert(__builtin_offsetof(ZRigHit, object) == 0x40, "rig hit layout");
+
 struct ZRig;
-/* Called when a point hits level geometry during zoverRigRelax. */
-typedef void(BMX_CDECL *ZRigHitFn)(struct ZRig *rig, uint32_t index, uint32_t hitId, void *hit);
+/* Called when a point hits level geometry during zoverRigRelax, with the impact speed along the normal. */
+typedef void(BMX_CDECL *ZRigHitFn)(struct ZRig *rig, uint32_t index, float impact, ZRigHit *hit);
 
 typedef struct ZRig {
     uint32_t pointCount;                                 /* 0x000 */
@@ -185,11 +214,6 @@ typedef int32_t ZoverIndices3[3];
 #define gZoverStickIdx ORIG_VAR(0x00574ccc, ZoverIndices8, gZoverStickIdx)
 #define gZoverBackIdx  ORIG_VAR(0x00574cec, ZoverIndices3, gZoverBackIdx)
 
-/* Level queries and the point resolution that stay in the exe. */
-/* Collides a point with the level; returns non-zero and fills the hit id and a 0xd8 byte record. */
-ORIG_FN(0x00451390, int, zoverRigCollidePoint, (ZRigPoint * p, uint32_t *hitId, void *hit));
-/* Pushes a point out of level geometry and bounces it. */
-ORIG_FN(0x00451d60, void, zoverRigResolvePoint, (ZRigPoint * p));
 /* Polls the input devices (called from the timer callback). */
 ORIG_FN(0x0046e010, void, zoverPollInput, (void));
 
@@ -218,6 +242,8 @@ void zoverRigSolveHinges(ZRig *rig);
 void zoverRigRelax(ZRig *rig);
 void zoverRigSetHitCallback(ZRig *rig, ZRigHitFn fn);
 void zoverRigBuildFrame(ZRig *rig, int a, int b, int c, ZMatrix *out);
+int zoverRigCollidePoint(ZRigPoint *p, float *impact, ZRigHit *hit);
+void zoverRigResolvePoint(ZRigPoint *p);
 void zoverRigProject(const ZVec3 *a, const ZVec3 *b, float depth, float *outMid, float *outDepth,
                      const ZVec3 *n);
 void zoverRigSolveStick(ZRigConstraint *c);
@@ -272,6 +298,7 @@ void zoverFrameReflect(const ZRig *rig, int ia, int ib, const ZMatrix *ref, ZMat
 void zoverMul3(ZMatrix *out, const ZMatrix *a, const ZMatrix *b);
 void zoverMatrixToAngles(const ZMatrix *m, ZAngle3 *out);
 void zoverActorAnglesFromFrame(ZActor *actor, const ZMatrix *frame, ZAngle3 *out);
+void zoverStepRiderMotion(void *rigp, void *actorp);
 
 /* ---- limbs ------------------------------------------------------------------------------------ */
 
@@ -310,8 +337,7 @@ void zoverSetLimbTargets(void *limbs, const ZVec3 *a, const ZVec3 *b, uint32_t m
 void zoverResetLimbs(void *limbs);
 /* Empty in the shipped build. */
 void zoverLimbsBegin(void *actor, void *limbs);
-ORIG_FN(0x00456120, void, zoverSolveLimbs, (void *actor, void *limbs));
-ORIG_FN(0x004547c0, void, zoverStepRiderMotion, (void *rig, void *actor));
+void zoverSolveLimbs(void *actorp, void *limbsp);
 
 /* ---- overlays --------------------------------------------------------------------------------- */
 
