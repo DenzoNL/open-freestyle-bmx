@@ -57,6 +57,8 @@ BOOL __stdcall DllMain(HMODULE module, DWORD reason, void *reserved)
     if (reason == DLL_PROCESS_ATTACH) {
         const int mode = bmxTraceMode();
 
+        bmxCrashInstall(module);
+
         for (uint32_t i = 0; i < bmxHookCount; i++) {
             /* Golden traces run the original game: only the controller poll (the trace hook point) is ours.
              */

@@ -23,4 +23,7 @@ int bmxTraceMode(void);
 void bmxTraceStart(int mode);
 void bmxTraceStop(void);
 
+/* crash.c: writes bmxcrash.txt on a crash (dev aid). module = this DLL (DllMain argument). */
+void bmxCrashInstall(void *module);
+
 #endif

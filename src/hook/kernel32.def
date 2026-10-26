@@ -13,3 +13,5 @@ EXPORTS
     GetTickCount@0
     GetCurrentThreadId@0
     Sleep@4
+    AddVectoredExceptionHandler@8
+    IsBadReadPtr@8
