@@ -12,7 +12,14 @@ cmake --preset hook >/dev/null
 cmake --build --preset hook
 echo "== clang-tidy"
 mapfile -t units < <(git ls-files -co --exclude-standard 'src/*.c' 'tests/cases/*.c')
-clang-tidy --quiet -p build/hook "${units[@]}"
+# nixpkgs' clang-tidy wrapper puts the host libc on CPATH, which breaks the freestanding i686-windows
+# units on Linux (gnu/stubs-32.h). Use the unwrapped clang-tidy next to the flake's cross clang.
+tidy=(clang-tidy)
+if [[ -n ${OPENDMFBMX_CROSS_CLANG:-} && -x $(dirname "$OPENDMFBMX_CROSS_CLANG")/clang-tidy ]]; then
+    tidy=("$(dirname "$OPENDMFBMX_CROSS_CLANG")/clang-tidy"
+        "--extra-arg=-resource-dir=$("$OPENDMFBMX_CROSS_CLANG" -print-resource-dir)")
+fi
+"${tidy[@]}" --quiet -p build/hook "${units[@]}"
 echo "== functions.csv"
 "${PYTHON:-python3}" -I tools/progress.py --check >/dev/null
 "${PYTHON:-python3}" -I -m py_compile tools/*.py tests/oracle/*.py

@@ -198,17 +198,17 @@ void zrollerUpdateShadow(void *state)
             const uint32_t k = i * kZrwShadowGrid + j;
             ZVec3 probe = eye;
             ZVec3 end;
-            ZrwColHit hit;
+            ZrwColLineHit hit;
 
             gZrwShadowMiss[k] = 1;
             zmatrixTransformPoint(&gZrwShadowPoints[k].pos, &frame, &gZrwShadowOffsets[k].pos);
             zvec3Lerp(&end, &probe, &gZrwShadowPoints[k].pos, 10.0f);
-            if (zrwcolQueryLine(&probe.x, &end.x, 1, 0, hit.normal) != 0) {
+            if (zrwcolQueryLine(&probe.x, &end.x, 1, NULL, &hit) != 0) {
                 ZrwShadowVertex *vertex = &gZrwShadowVertices[k];
                 double alpha;
 
-                zvec3Scale((ZVec3 *)hit.normal, (ZVec3 *)hit.normal, gZrwShadowScale);
-                zvec3Add(&vertex->pos, &unset, (ZVec3 *)hit.normal);
+                zvec3Scale((ZVec3 *)hit.hit.normal, (ZVec3 *)hit.hit.normal, gZrwShadowScale);
+                zvec3Add(&vertex->pos, &unset, (ZVec3 *)hit.hit.normal);
                 vertex->u = (float)((double)i * (double)0.2f);
                 vertex->v = (float)((double)(5 - j) * (double)0.2f);
                 alpha = (double)probe.y - (double)unset.y;

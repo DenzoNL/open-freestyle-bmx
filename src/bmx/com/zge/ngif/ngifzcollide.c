@@ -59,13 +59,10 @@ BMX_ADDR(0x00469560)
 PhysEdge ***zcollideFindEdgesBehind(const ZVec3 *p, const ZVec3 *dir, float radius)
 {
     const ZrwRenderColQuery *q;
-    uint32_t radiusBits;
     uint32_t n = 0;
 
     zmemFill((void *)gZcollideEdgeList, 0, sizeof gZcollideEdgeList);
-    /* The query's second argument is the radius itself, passed by value. */
-    memcpy(&radiusBits, &radius, sizeof radiusBits);
-    q = zrwModelQuery(p, (const void *)(uintptr_t)radiusBits);
+    q = zrwModelQuery(p, radius);
     if (q != NULL) {
         for (int i = 0; i < (int)q->found; i++) {
             const ZrwRenderColHit *r = &((const ZrwRenderColHit *)q->list)[i];

@@ -60,7 +60,6 @@ ORIG_FN(0x004638b0, void, ngifUnk4638b0, (void));
 ORIG_FN(0x004638f0, void, ngifUnk4638f0, (void));
 ORIG_FN(0x00463930, void, ngifUnk463930, (void));
 /* The colour bytes of the surface a collision hit found (shared with the level's material, not a copy). */
-ORIG_FN(0x004947e0, uint8_t *, zrwcolHitColor, (const void *hit));
 /* Window title call in the exe's import table. */
 typedef int(BMX_STDCALL *SetWindowTextFn)(void *window, const char *text);
 #define gNgSetWindowText ORIG_VAR(0x006997c0, SetWindowTextFn, gNgSetWindowText)
@@ -996,7 +995,7 @@ void ngappUpdateSun(void)
         to.y = (float)((double)from.y + (double)1000.0f);
         to.z = from.z;
         if (zrwcolLineTest(&from.x, &to.x, 1, 0, (float *)hit) != 0 && gNgMainLight != NULL) {
-            uint8_t *color = zrwcolHitColor(hit);
+            uint8_t *color = zrwcolHitColor((ZrwColLineHit *)hit);
 
             color[0] = (uint8_t)((color[0] >> 1) + 0x20);
             color[1] = (uint8_t)((color[1] >> 1) + 0x20);

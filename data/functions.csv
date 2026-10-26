@@ -1745,9 +1745,9 @@ addr,size,file,confidence,name,status
 0048c840,1002,zge/com/zglrw/zrwprim.c,affinity,FUN_0048c840,ported
 0048cc30,127,zge/com/zglrw/zrwprim.c,assert,zrwPrim_c_PrimSystemInitialize,ported
 0048ccb0,61,zge/com/zglrw/zrwprim.c,affinity,FUN_0048ccb0,ported
-0048ccf0,1065,zge/com/zglrw/zrwprim.c,affinity,FUN_0048ccf0,orig
+0048ccf0,1065,zge/com/zglrw/zrwprim.c,affinity,zrwprimDrawLines,ported
 0048d120,77,zge/com/zglrw/zrwprim.c,affinity,FUN_0048d120,ported
-0048d170,1067,zge/com/zglrw/zrwprim.c,affinity,FUN_0048d170,orig
+0048d170,1067,zge/com/zglrw/zrwprim.c,affinity,zrwprimDrawPolys,ported
 0048d5a0,185,zge/com/zglrw/zrwprim.c,affinity,FUN_0048d5a0,ported
 0048d660,135,zge/com/zglrw/zrwprim.c,affinity,FUN_0048d660,ported
 0048d6f0,72,zge/zgemods/ztaginf.c,affinity,FUN_0048d6f0,ported
@@ -1763,7 +1763,7 @@ addr,size,file,confidence,name,status
 0048e400,166,zge/com/zglrw/zrwmodelrender.c,affinity,FUN_0048e400,ported
 0048e4b0,407,zge/com/zglrw/zrwmodelrender.c,affinity,FUN_0048e4b0,ported
 0048e840,545,zge/com/zglrw/zrwmodelrender.c,affinity,FUN_0048e840,ported
-0048ee70,1108,zge/com/zglrw/zrwmodelrender.c,affinity,FUN_0048ee70,orig
+0048ee70,1108,zge/com/zglrw/zrwmodelrender.c,affinity,zrwColSearch,ported
 0048f320,66,zge/com/zglrw/zrwmodelrender.c,affinity,FUN_0048f320,ported
 0048f3e0,333,zge/com/zglrw/zrwmodelrender.c,affinity,FUN_0048f3e0,ported
 0048f530,59,zge/com/zglrw/zrwmodelrender.c,affinity,FUN_0048f530,ported
@@ -1852,7 +1852,7 @@ addr,size,file,confidence,name,status
 00493cc0,31,zge/pc/pcinput.c,affinity,FUN_00493cc0,ported
 00493d80,92,zge/com/zglrw/zrwcol.c,assert,zrwCol_c_ColSystemInitialize,ported
 00493de0,49,zge/com/zglrw/zrwcol.c,contiguous,FUN_00493de0,ported
-00493e20,1051,zge/com/zglrw/zrwcol.c,assert,FUN_00493e20,orig
+00493e20,1051,zge/com/zglrw/zrwcol.c,assert,zrwcolQueryLine,ported
 00494240,95,zge/com/zglrw/zrwcol.c,affinity,FUN_00494240,ported
 004942a0,104,zge/com/zglrw/zrwcol.c,affinity,FUN_004942a0,ported
 00494310,95,zge/com/zglrw/zrwcol.c,affinity,FUN_00494310,ported
@@ -1860,7 +1860,7 @@ addr,size,file,confidence,name,status
 00494490,704,zge/com/zglrw/zrwcol.c,affinity,FUN_00494490,ported
 00494750,104,zge/com/zglrw/zrwcol.c,affinity,FUN_00494750,ported
 004947c0,31,zge/com/zglrw/zrwcol.c,affinity,FUN_004947c0,ported
-004947e0,1086,zge/com/zglrw/zrwcol.c,affinity,FUN_004947e0,orig
+004947e0,1086,zge/com/zglrw/zrwcol.c,affinity,zrwcolHitColor,ported
 00494c20,21,zge/com/zglrw/zrwcol.c,affinity,FUN_00494c20,ported
 00494c70,41,zge/com/zglrw/zrwcol.c,affinity,FUN_00494c70,ported
 00494ca0,41,zge/com/zglrw/zrwcol.c,affinity,FUN_00494ca0,ported
@@ -1902,8 +1902,7 @@ addr,size,file,confidence,name,status
 00497450,15,zge/com/zglrw/zrwtxr.c,affinity,FUN_00497450,ported
 00497460,21,zge/com/zglrw/zrwtxr.c,affinity,FUN_00497460,ported
 00497480,21,zge/com/zglrw/zrwtxr.c,affinity,FUN_00497480,ported
-004974a0,16,zge/com/zglrw/zrwtxr.c,affinity,FUN_004974a0,ported
-004974b0,177,zge/com/zglrw/zrwtxr.c,affinity,FUN_004974b0,orig
+004974a0,193,zge/com/zglrw/zrwtxr.c,affinity,zrwWorldSetupPvs,ported
 00497570,61,zge/com/zglrw/zrwtxr.c,affinity,FUN_00497570,ported
 004975b0,104,zge/com/zglrw/zrwtxr.c,affinity,FUN_004975b0,ported
 00497620,24,zge/com/zglrw/zrwtxr.c,affinity,FUN_00497620,ported
@@ -2106,7 +2105,7 @@ addr,size,file,confidence,name,status
 004a3500,120,zge/zprofile.c,affinity,RegisterCallBacksForFileSystem,ported
 004a3580,51,zge/zprofile.c,affinity,ImageBufferSizeType,ported
 004a35c0,39,zge/zprofile.c,affinity,FUN_004a35c0,ported
-004a35f0,1384,zge/zprofile.c,affinity,FUN_004a35f0,orig
+004a35f0,1384,zge/zprofile.c,affinity,zprofileUpdate,ported
 004a3b60,333,zge/zprofile.c,assert,zprofile_c_ZProfileInitialize,ported
 004a4080,21,zge/pc/pcprofile.c,affinity,FUN_004a4080,ported
 004a4230,73,zge/pc/pcprofile.c,affinity,ZTimerInitialize,ported

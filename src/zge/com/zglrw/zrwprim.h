@@ -32,19 +32,26 @@ typedef struct ZrwPrimPoly {
     uint32_t count;
 } ZrwPrimPoly;
 
-/* The primitive system's buffers (0x672898, 0x18 bytes, cleared at initialisation). */
+/*
+ * The primitive system's vertex buffers (0x672898, 0x18 bytes, cleared at initialisation): one for
+ * RenderWare's 3D immediate mode (0x24 byte vertices) and one for its 2D mode (0x20 byte vertices), both used
+ * from the next 16 byte boundary and grown by the drawing routines in steps of 0x20 vertices.
+ */
 typedef struct ZrwPrimState {
     int initialized;     /* 0x00 */
     uint32_t vertexSize; /* 0x04 0x24 */
-    void *vertices;      /* 0x08 */
-    uint32_t vertexMax;  /* 0x0c 0x40 */
-    void *indices;       /* 0x10 */
-    uint32_t indexMax;   /* 0x14 0x40 */
+    void *im3d;          /* 0x08 */
+    uint32_t im3dMax;    /* 0x0c 0x40 */
+    void *im2d;          /* 0x10 */
+    uint32_t im2dMax;    /* 0x14 0x40 */
 } ZrwPrimState;
 
 _Static_assert(sizeof(ZrwPrimState) == 0x18, "prim state");
 
 #define gZrwPrim ORIG_VAR(0x00672898, ZrwPrimState, gZrwPrim)
+/* Frame counter seen by the last draw call (0x672890) and the 2D depth nudge (0x6728b0, reset per call). */
+#define gZrwPrimFrame     ORIG_VAR(0x00672890, int, gZrwPrimFrame)
+#define gZrwPrimDepthBias ORIG_VAR(0x006728b0, float, gZrwPrimDepthBias)
 
 /* Clip rectangle of the camera, left / top / right / bottom (at +0x94 of the camera record). */
 typedef float ZrwClipRect[4];
@@ -70,14 +77,27 @@ typedef struct ZrwPrimQuad {
     ZrwPrimVertex *vertices[4];
 } ZrwPrimQuad;
 
-void zrwprimDrawTriangles(uint32_t flags, const ZrwPrimTriangle *triangles, int count, uint32_t arg);
-/* Strips: {texture, vertex pointers, count}, drawn as triangles 0 1 2, 3 2 1, 2 3 4, ... */
-void zrwprimDrawStrips(uint32_t flags, const ZrwPrimPoly *strips, int count, uint32_t arg);
-void zrwprimDrawQuads(uint32_t flags, const ZrwPrimQuad *quads, int count, uint32_t arg);
+/* A line record: the texture, then both vertex pointers inline. */
+typedef struct ZrwPrimLine {
+    uint32_t texture;
+    ZrwPrimVertex *vertices[2];
+} ZrwPrimLine;
 
-/* Draws `count` polygons (not ported). */
-ORIG_FN(0x0048d170, void, zrwprimDrawPolys,
-        (uint32_t flags, const ZrwPrimPoly *polys, int count, uint32_t arg, uint32_t arg2));
+void zrwprimDrawTriangles(uint32_t flags, const ZrwPrimTriangle *triangles, int count, const ZMatrix *xform);
+/* Strips: {texture, vertex pointers, count}, drawn as triangles 0 1 2, 3 2 1, 2 3 4, ... */
+void zrwprimDrawStrips(uint32_t flags, const ZrwPrimPoly *strips, int count, const ZMatrix *xform);
+void zrwprimDrawQuads(uint32_t flags, const ZrwPrimQuad *quads, int count, const ZMatrix *xform);
+
+/*
+ * The drawing routines (0x48ccf0 is reached through the pointer at 0x561728). `texture` is the material whose
+ * first raster is set. Flag 0x2000000 draws in screen space (2D immediate mode), else the vertices are game
+ * space points (optionally transformed by `xform` first) moved into RenderWare's world; with flag 0x1000000
+ * they are relative to the current camera instead. The low 24 bits of the flags are the render state.
+ * `count` must not be 0 (it is decremented before it is tested). The callers push a fifth word 0 that is
+ * never read.
+ */
+void zrwprimDrawLines(uint32_t flags, const ZrwPrimLine *lines, int count, const ZMatrix *xform);
+void zrwprimDrawPolys(uint32_t flags, const ZrwPrimPoly *polys, int count, const ZMatrix *xform);
 /* The camera record whose clip rectangle and enable bit the quad drawing consults (pcinput.c). */
 ORIG_FN(0x00493070, uint8_t *, zrwGetClipCamera, (void));
 

@@ -15,9 +15,11 @@
 /*
  * In the hook build a ported function must stay a real call: test stubs and in-game hooks patch its
  * entry, which an inlined copy would bypass (clang 23 inlined gameBigGameFunction into gameStartMode).
+ * `weak` stops interprocedural facts too: clang inferred zcollideFillPropEdges returns 0..4 and unrolled
+ * its caller's loop for that range, so a stubbed -1 still listed 4 edges.
  */
 #ifdef BMX_HOOK
-#define BMX_ADDR(addr) __attribute__((noinline)) /* original address: addr */
+#define BMX_ADDR(addr) __attribute__((noinline, weak)) /* original address: addr */
 #else
 #define BMX_ADDR(addr) /* original address: addr */
 #endif

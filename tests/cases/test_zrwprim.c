@@ -6,19 +6,19 @@
  */
 #include "dt.h"
 #include "dt_ngif.h"
+#include "zge/com/zglrw/zrwcam.h"
 #include "zge/com/zglrw/zrwprim.h"
 
 #define kZMarker 0xc0de0000u
 
-static void BMX_CDECL stubDraw(uint32_t flags, const ZrwPrimPoly *polys, int count, uint32_t arg,
-                               uint32_t arg2)
+static void BMX_CDECL stubDraw(uint32_t flags, const ZrwPrimPoly *polys, int count, uint32_t arg)
 {
     ngLog(0x48d170);
     ngLog(flags);
     ngLog(dt_canon((uint32_t)(uintptr_t)polys));
     ngLog((uint32_t)count);
     ngLog(arg);
-    ngLog(arg2);
+    /* the fifth word the original callers push (0) is never read by the routine */
     for (int i = 0; i < count; i++) {
         ngLog(polys[i].texture);
         ngLog(polys[i].count);
@@ -245,8 +245,8 @@ static void setup_shutdown(DtCtx *c)
     ngBegin(c, 0);
     dt_fill(&gZrwPrim, sizeof gZrwPrim);
     gZrwPrim.initialized = (dt_u32() & 1);
-    gZrwPrim.vertices = (dt_u32() % 3 == 0) ? NULL : dt_zmemalloc(0x40);
-    gZrwPrim.indices = (dt_u32() % 3 == 0) ? NULL : dt_zmemalloc(0x40);
+    gZrwPrim.im3d = (dt_u32() % 3 == 0) ? NULL : dt_zmemalloc(0x40);
+    gZrwPrim.im2d = (dt_u32() % 3 == 0) ? NULL : dt_zmemalloc(0x40);
 }
 
 /* ---- lists ----------------------------------------------------------------------------------------- */
@@ -324,6 +324,258 @@ static void setup_quads(DtCtx *c)
     scrub_stack();
 }
 
+/* ---- drawing routines ------------------------------------------------------------------------------ */
+
+static float gNear;
+static float gNearZ;
+static int gTransformOk;
+static ZrwCamera *gPrimCamera;
+
+static float BMX_CDECL stubNear(void *camera)
+{
+    ngLog(0x4de610);
+    ngLogPtr(camera);
+    return gNear;
+}
+
+static float BMX_CDECL stubNearZ(void)
+{
+    ngLog(0x4db800);
+    return gNearZ;
+}
+
+static int BMX_CDECL stubIm2DRender(int type, const float *vertices, int count)
+{
+    ngLog(0x4db920);
+    ngLog((uint32_t)type);
+    ngLogPtr(vertices);
+    ngLog((uint32_t)count);
+    for (int i = 0; i < count && i < 64; i++) {
+        const float *v = vertices + 8 * i;
+
+        for (int k = 0; k < 8; k++) {
+            if (k != 5) { /* the word after the colour is never written */
+                ngLogFloat(v[k]);
+            }
+        }
+    }
+    return 1;
+}
+
+static int BMX_CDECL stubIm3DTransform(const float *vertices, int count, const void *matrix, int flags)
+{
+    ngLog(0x4df0b0);
+    ngLogPtr(vertices);
+    ngLog((uint32_t)count);
+    ngLogPtr(matrix);
+    ngLog((uint32_t)flags);
+    for (int i = 0; i < count && i < 64; i++) {
+        const float *v = vertices + 9 * i;
+
+        ngLogFloat(v[0]);
+        ngLogFloat(v[1]);
+        ngLogFloat(v[2]);
+        ngLogFloat(v[6]);
+        ngLogFloat(v[7]);
+        ngLogFloat(v[8]);
+    }
+    return gTransformOk;
+}
+
+static int BMX_CDECL stubIm3DRender(int type)
+{
+    ngLog(0x4def70);
+    ngLog((uint32_t)type);
+    return 1;
+}
+
+static int BMX_CDECL stubIm3DEnd(void)
+{
+    ngLog(0x4df090);
+    return 1;
+}
+
+/* Stand-in for RenderWare's vector transform: a fixed permutation and offset of each vector. */
+static void *BMX_CDECL stubTransformVectors(ZVec3 *out, const ZVec3 *in, int count, const ZMatrix *m)
+{
+    ngLog(0x4d3ae0);
+    ngLogPtr(out);
+    ngLogPtr(in);
+    ngLog((uint32_t)count);
+    ngLogPtr(m);
+    for (int i = 0; i < count; i++) {
+        const ZVec3 t = in[i];
+
+        ngLogVec(&t);
+        out[i].x = t.y * 0.5f + m->right.x;
+        out[i].y = t.z - m->up.y;
+        out[i].z = t.x;
+    }
+    return out;
+}
+
+/* The raster of a test material is the word it points to. */
+static void *BMX_CDECL stubGetRaster(const uint32_t *material, uint32_t index)
+{
+    ngLog(0x489b40);
+    ngLogPtr(material);
+    ngLog(index);
+    return (void *)(uintptr_t)*material;
+}
+
+static void BMX_CDECL stubStateHook(uint32_t state, void *raster)
+{
+    ngLog(0x561490);
+    ngLog(state);
+    ngLogPtr(raster);
+}
+
+static ZrwCamera *BMX_CDECL stubCurrentCamera(void)
+{
+    ngLog(0x493070);
+    return gPrimCamera;
+}
+
+#define gTestFrames      ORIG_VAR(0x00697744, int, gTestFrames)
+#define gTestScale       ORIG_VAR(0x00697720, float, gTestScale)
+#define gTestOrigin      ORIG_VAR(0x006976cc, ZVec3, gTestOrigin)
+#define gTestRwCamera    ORIG_VAR(0x006976f4, void *, gTestRwCamera)
+#define gTestRenderFlags ORIG_VAR(0x00697778, uint32_t, gTestRenderFlags)
+#define gTestRenderExtra ORIG_VAR(0x0069777c, uint32_t, gTestRenderExtra)
+#define gTestStateHook   ORIG_VAR(0x00561490, void *, gTestStateHook)
+
+static ZrwPrimVertex *draw_vertex(void)
+{
+    ZrwPrimVertex *v = dt_alloc(sizeof *v);
+
+    v->x = dt_float_edgy(-1000.0f, 1000.0f);
+    v->y = dt_float_edgy(-1000.0f, 1000.0f);
+    v->z = dt_float_edgy(-1000.0f, 1000.0f);
+    v->pad0c = 0;
+    v->u = dt_float_edgy(-2.0f, 2.0f);
+    v->v = dt_float_edgy(-2.0f, 2.0f);
+    for (int i = 0; i < 4; i++) {
+        v->color[i] = (uint8_t)dt_u32();
+    }
+    return v;
+}
+
+/* A texture word: none, or a material whose raster is `raster` (or another one). */
+static uint32_t draw_texture(uint32_t raster)
+{
+    uint32_t *material;
+
+    if (dt_u32() % 4 == 0) {
+        return 0;
+    }
+    material = dt_alloc(4);
+    *material = (dt_u32() & 1) ? raster : dt_u32();
+    return (uint32_t)(uintptr_t)material;
+}
+
+/* A zmem buffer of `max` vertices of `size` bytes plus the alignment slack (0 to 40, so some calls grow it).
+ */
+static void draw_buffer(void **buffer, uint32_t *max, uint32_t size)
+{
+    *max = (uint32_t)dt_range(0, 40);
+    *buffer = dt_zmemalloc(*max * size + 0xf);
+    dt_fill(*buffer, *max * size + 0xf);
+}
+
+/* Engine state and stubs of a draw call; returns the flags (2D, world or camera relative). */
+static uint32_t draw_state(DtCtx *c, uint32_t *raster)
+{
+    uint32_t flags;
+
+    ngBegin(c, 0);
+    dt_stub(0x004de610, NULL, (void *)stubNear);
+    dt_stub(0x004db800, NULL, (void *)stubNearZ);
+    dt_stub(0x004db920, NULL, (void *)stubIm2DRender);
+    dt_stub(0x004df0b0, NULL, (void *)stubIm3DTransform);
+    dt_stub(0x004def70, NULL, (void *)stubIm3DRender);
+    dt_stub(0x004df090, NULL, (void *)stubIm3DEnd);
+    dt_stub(0x004d3ae0, NULL, (void *)stubTransformVectors);
+    dt_stub(0x00489b40, NULL, (void *)stubGetRaster);
+    dt_stub(0x00493070, NULL, (void *)stubCurrentCamera);
+    gTestStateHook = (void *)stubStateHook;
+    flags = dt_u32();
+    switch (dt_u32() % 3) {
+    case 0:
+        flags |= 0x2000000u;
+        break;
+    case 1:
+        flags &= ~0x3000000u;
+        break;
+    default:
+        flags = (flags & ~0x2000000u) | 0x1000000u;
+        break;
+    }
+    *raster = dt_u32();
+    gTestFrames = (int)dt_u32();
+    gZrwPrimFrame = (dt_u32() & 1) ? gTestFrames : (int)dt_u32();
+    gZrwPrimDepthBias = dt_float(-1.0f, 1.0f);
+    gTestScale = dt_float_edgy(-4.0f, 4.0f);
+    gTestOrigin.x = dt_float_edgy(-500.0f, 500.0f);
+    gTestOrigin.y = dt_float_edgy(-500.0f, 500.0f);
+    gTestOrigin.z = dt_float_edgy(-500.0f, 500.0f);
+    gTestRwCamera = dt_alloc(4);
+    gTestRenderFlags = (dt_u32() & 1) ? (flags & 0xffffff) : dt_u32();
+    gTestRenderExtra = (dt_u32() & 1) ? *raster : ((dt_u32() & 1) ? 0 : dt_u32());
+    gNear = dt_float_edgy(0.0f, 10.0f);
+    gNearZ = dt_float_edgy(-1.0f, 1.0f);
+    gTransformOk = (dt_u32() % 4) != 0;
+    gPrimCamera = dt_alloc(sizeof *gPrimCamera);
+    dt_fill(gPrimCamera, sizeof *gPrimCamera);
+    for (int i = 0; i < 16; i++) {
+        ((float *)&gPrimCamera->world)[i] = dt_float_edgy(-100.0f, 100.0f);
+    }
+    draw_buffer(&gZrwPrim.im3d, &gZrwPrim.im3dMax, 0x24);
+    draw_buffer(&gZrwPrim.im2d, &gZrwPrim.im2dMax, 0x20);
+    return flags;
+}
+
+static void setup_lines(DtCtx *c)
+{
+    uint32_t raster;
+    const uint32_t flags = draw_state(c, &raster);
+    const int n = dt_range(1, 4);
+    ZrwPrimLine *lines = dt_alloc((uint32_t)n * sizeof *lines);
+
+    for (int i = 0; i < n; i++) {
+        lines[i].texture = draw_texture(raster);
+        lines[i].vertices[0] = draw_vertex();
+        lines[i].vertices[1] = (dt_u32() % 5 == 0) ? lines[i].vertices[0] : draw_vertex();
+    }
+    DT_ARG_INT(c, 0, flags);
+    DT_ARG_PTR(c, 1, lines);
+    DT_ARG_INT(c, 2, n);
+    DT_ARG_PTR(c, 3, (dt_u32() % 3 == 0) ? random_matrix() : NULL);
+}
+
+static void setup_polys(DtCtx *c)
+{
+    uint32_t raster;
+    const uint32_t flags = draw_state(c, &raster);
+    const int n = dt_range(1, 3);
+    ZrwPrimPoly *polys = dt_alloc((uint32_t)n * sizeof *polys);
+
+    for (int i = 0; i < n; i++) {
+        const int count = (dt_u32() % 4 == 0) ? dt_range(33, 70) : dt_range(1, 8);
+        ZrwPrimVertex **list = (ZrwPrimVertex **)dt_alloc((uint32_t)count * sizeof *list);
+
+        for (int k = 0; k < count; k++) {
+            list[k] = draw_vertex();
+        }
+        polys[i].texture = draw_texture(raster);
+        polys[i].vertices = list;
+        polys[i].count = (uint32_t)count;
+    }
+    DT_ARG_INT(c, 0, flags);
+    DT_ARG_PTR(c, 1, polys);
+    DT_ARG_INT(c, 2, n);
+    DT_ARG_PTR(c, 3, (dt_u32() % 3 == 0) ? random_matrix() : NULL);
+}
+
 DT_CASES(zrwprim_cases) = {
     {"zrwprimLerpAtX", 0x0048c620, zrwprimLerpAtX, 4, DT_RET_VOID, setup_lerp, 2000, 0},
     {"zrwprimLerpAtY", 0x0048c730, zrwprimLerpAtY, 4, DT_RET_VOID, setup_lerp, 2000, 0},
@@ -333,4 +585,6 @@ DT_CASES(zrwprim_cases) = {
     {"zrwprimDrawTriangles", 0x0048d120, zrwprimDrawTriangles, 4, DT_RET_VOID, setup_triangles, 100, 0},
     {"zrwprimDrawStrips", 0x0048d5a0, zrwprimDrawStrips, 4, DT_RET_VOID, setup_strips, 300, 0},
     {"zrwprimDrawQuads", 0x0048d660, zrwprimDrawQuads, 4, DT_RET_VOID, setup_quads, 500, 0},
+    {"zrwprimDrawLines", 0x0048ccf0, zrwprimDrawLines, 4, DT_RET_VOID, setup_lines, 1000, 0},
+    {"zrwprimDrawPolys", 0x0048d170, zrwprimDrawPolys, 4, DT_RET_VOID, setup_polys, 1000, 0},
 };

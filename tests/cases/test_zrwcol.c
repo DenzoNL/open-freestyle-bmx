@@ -18,6 +18,8 @@ static float rf(void)
 /* ---- RenderWare stand-ins -------------------------------------------------------------------------- */
 
 static ZMatrix gMatrix;
+/* Set by the line query case: the intersection volume is a line of six floats. */
+static int gLogLine;
 static uint8_t gTable[64];
 
 static void *BMX_CDECL stubWorldMaterial(void *world, uint32_t index)
@@ -103,6 +105,10 @@ static void BMX_CDECL stubIntersectTriangles(void *world, const ZrwColIntersecti
     ngLogFloat(volume->z);
     ngLogFloat(volume->radius);
     ngLog((uint32_t)volume->type);
+    if (gLogLine) { /* a line: the end point continues past the radius slot */
+        ngLog(volume->pad10[0]);
+        ngLog(volume->pad10[1]);
+    }
     ngLogPtr(callback);
     ngLogPtr(arg);
     if (dt_u32() % 2 == 0) { /* a hit */
@@ -121,6 +127,10 @@ static void BMX_CDECL stubIntersectObjects(void *world, const ZrwColIntersection
     ngLogFloat(volume->z);
     ngLogFloat(volume->radius);
     ngLog((uint32_t)volume->type);
+    if (gLogLine) { /* a line: the end point continues past the radius slot */
+        ngLog(volume->pad10[0]);
+        ngLog(volume->pad10[1]);
+    }
     ngLogPtr(callback);
     ngLogPtr(arg);
     if (dt_u32() % 2 == 0) {
@@ -351,6 +361,111 @@ static void setup_sphere_query(DtCtx *c)
     DT_ARG_PTR(c, 4, out);
 }
 
+/*
+ * The line query. The intersection stubs report a hit now and then; the nearest triangle, object and sector
+ * are set up beforehand, as the triangle callbacks would have left them.
+ */
+static void setup_line_query(DtCtx *c)
+{
+    float *from = dt_alloc(3 * sizeof *from);
+    float *to = dt_alloc(3 * sizeof *to);
+    ZrwColLineHit *out = dt_alloc(sizeof *out);
+    int *excluded = dt_alloc(4 * sizeof *excluded);
+    ZrwColTriangle *best;
+    ZrwColSector *sector = dt_alloc(sizeof *sector);
+    ZrwColObject *object = dt_alloc(sizeof *object);
+
+    begin(c);
+    dt_stub(0x0047ed10, NULL, (void *)ngFail);
+    gLogLine = 1;
+    random_state(2, 0);
+    random_box(gZrwColBox);
+    for (int i = 0; i < 3; i++) {
+        from[i] =
+            (dt_u32() % 4 == 0) ? dt_float_edgy(-300.0f, 300.0f) : dt_float(gZrwColBox[i], gZrwColBox[4 + i]);
+        to[i] =
+            (dt_u32() % 4 == 0) ? dt_float_edgy(-300.0f, 300.0f) : dt_float(gZrwColBox[i], gZrwColBox[4 + i]);
+    }
+    best = random_triangle();
+    __builtin_memcpy(gZrwCol.best, best, sizeof gZrwCol.best);
+    dt_fill(sector, sizeof *sector);
+    sector->map = dt_alloc(64);
+    dt_fill((void *)sector->map, 64);
+    dt_fill(object, sizeof *object);
+    switch (dt_u32() % 5) {
+    case 0:
+        gZrwCol.bestUser = 0;
+        gZrwCol.bestSub = 0;
+        break;
+    case 1:
+    case 2:
+        gZrwCol.bestUser = (uint32_t)(uintptr_t)object;
+        break;
+    default:
+        gZrwCol.bestUser = 0;
+        gZrwCol.bestSub = (uint32_t)(uintptr_t)sector;
+        break;
+    }
+    gZrwCol.nearest = dt_float_edgy(0.0f, 1.0f);
+    dt_fill(out, sizeof *out);
+    for (int i = 0; i < 4; i++) {
+        excluded[i] = dt_range(0, 6);
+    }
+    DT_ARG_PTR(c, 0, from);
+    DT_ARG_PTR(c, 1, to);
+    DT_ARG_INT(c, 2, dt_u32() & 0x3f);
+    DT_ARG_PTR(c, 3, excluded);
+    DT_ARG_PTR(c, 4, out);
+}
+
+/* A corner coordinate: random, or (to hit the degenerate cases) one shared with another corner. */
+static float color_coordinate(const float *other)
+{
+    return (dt_u32() % 6 == 0) ? *other : dt_float_edgy(-200.0f, 200.0f);
+}
+
+/* The colour at a line hit: the nearest triangle of a sector with prelit colours, or no sector. */
+static void setup_hit_color(DtCtx *c)
+{
+    ZrwColLineHit *hit = dt_alloc(sizeof *hit);
+    ZrwColSector *sector = dt_alloc(sizeof *sector);
+    uint8_t *map = dt_alloc(32);
+    uint8_t *prelit = dt_alloc(64);
+    ZrwColTriangle *best;
+
+    begin(c);
+    random_state(2, 0);
+    best = random_triangle();
+    best->index = dt_range(0, 7);
+    __builtin_memcpy(gZrwCol.best, best, sizeof gZrwCol.best);
+    dt_fill(sector, sizeof *sector);
+    dt_fill(map, 32);
+    dt_fill(prelit, 64);
+    for (int i = 0; i < 32; i++) {
+        if (i % 4 != 0) {
+            map[i] = (uint8_t)(map[i] % 16);
+        }
+    }
+    sector->map = map;
+    sector->prelit = prelit;
+    gZrwCol.bestSub = (dt_u32() % 8 == 0) ? 0 : (uint32_t)(uintptr_t)sector;
+    dt_fill(hit, sizeof *hit);
+    for (int i = 0; i < 3; i++) {
+        float *v = hit->hit.vertex[i];
+
+        v[0] = color_coordinate(&hit->hit.vertex[(i + 2) % 3][0]);
+        v[1] = dt_float_edgy(-200.0f, 200.0f);
+        v[2] = color_coordinate(&hit->hit.vertex[(i + 2) % 3][2]);
+    }
+    for (int i = 0; i < 3; i++) {
+        /* inside the triangle's box mostly, sometimes on a corner */
+        const float *corner = hit->hit.vertex[dt_range(0, 2)];
+
+        hit->point[i] = (dt_u32() % 5 == 0) ? corner[i] : dt_float(-200.0f, 200.0f);
+    }
+    DT_ARG_PTR(c, 0, hit);
+}
+
 static int BMX_CDECL stubTagInfo(void)
 {
     ngLog(0x48d6f0);
@@ -417,6 +532,8 @@ DT_CASES(zrwcol_cases) = {
     {"zrwcolFilterRecord", 0x00494750, zrwcolFilterRecord, 5, DT_RET_INT, setup_filter, 500, 0},
     {"zrwcolRecordObjectHit", 0x004947c0, zrwcolRecordObjectHit, 4, DT_RET_INT, setup_record_object_short,
      500, 0},
+    {"zrwcolQueryLine", 0x00493e20, zrwcolQueryLine, 5, DT_RET_INT, setup_line_query, 2000, 0},
+    {"zrwcolHitColor", 0x004947e0, zrwcolHitColor, 1, DT_RET_INT, setup_hit_color, 3000, 0},
     {"zrwcolEnableIfTagInfo", 0x00494c20, zrwcolEnableIfTagInfo, 0, DT_RET_INT, setup_enable, 50, 0},
     {"zrwcolLineTest", 0x00494c70, zrwcolLineTest, 5, DT_RET_INT, setup_line_test, 100, 0},
     {"zrwcolSphereTest", 0x00494ca0, zrwcolSphereTest, 5, DT_RET_INT, setup_sphere_test, 100, 0},

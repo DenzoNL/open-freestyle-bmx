@@ -2,12 +2,151 @@
 #include "zge/com/zglrw/zrwprim.h"
 
 #include "compat/crt.h"
+#include "zge/com/zglrw/zrwcam.h"
+#include "zge/com/zglrw/zrwmat.h"
+#include "zge/com/zglrw/zrwzgl.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zobjcamera.h"
 #include "zge/zmem.h"
 #include "zge/zstring.h"
 
 static const char kPrimFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwPrim.c";
+
+/* RenderWare (statically linked, not ported): immediate mode and camera queries. */
+ORIG_FN(0x004de610, float, RwCameraGetNearClipPlane, (void *camera));
+ORIG_FN(0x004db800, float, RwIm2DGetNearScreenZ, (void));
+ORIG_FN(0x004db920, int, RwIm2DRenderPrimitive, (int type, void *vertices, int count));
+ORIG_FN(0x004df0b0, int, RwIm3DTransform, (void *vertices, int count, const ZMatrix *matrix, int flags));
+ORIG_FN(0x004def70, int, RwIm3DRenderPrimitive, (int type));
+ORIG_FN(0x004df090, int, RwIm3DEnd, (void));
+ORIG_FN(0x004d3ae0, void *, RwV3dTransformVectors,
+        (ZVec3 * out, const ZVec3 *in, int count, const ZMatrix *m));
+
+/* The renderer's render state hook (0x561490): state bits and the raster to use. */
+typedef void(BMX_CDECL *ZrwPrimStateHookFn)(uint32_t state, void *raster);
+#define gZrwPrimStateHook ORIG_VAR(0x00561490, ZrwPrimStateHookFn, gZrwPrimStateHook)
+#define gZrwPrimCamera    ORIG_VAR(0x006976f4, void *, gZrwPrimCamera)
+
+enum { kPrimLineList = 1, kPrimTriFan = 5 };
+
+/* RenderWare's 2D immediate mode vertex (RwIm2DVertex, 0x20 bytes). */
+typedef struct ZrwIm2DVertex {
+    float x, y, z, rhw;
+    uint32_t color; /* 0x10 ARGB */
+    uint32_t pad14;
+    float u, v; /* 0x18 */
+} ZrwIm2DVertex;
+
+/* RenderWare's 3D immediate mode vertex (0x24 bytes); the normal is left as it is. */
+typedef struct ZrwIm3DVertex {
+    float x, y, z;
+    float normal[3];
+    uint8_t color[4]; /* 0x18 */
+    float u, v;       /* 0x1c */
+} ZrwIm3DVertex;
+
+_Static_assert(sizeof(ZrwIm2DVertex) == 0x20, "2D vertex");
+_Static_assert(sizeof(ZrwIm3DVertex) == 0x24, "3D vertex");
+
+static void *align16(void *p)
+{
+    return (void *)(((uintptr_t)p + 0xf) & ~(uintptr_t)0xf);
+}
+
+static void primBeginCall(void)
+{
+    if (gZrwPrimFrame != gZrwFrames) {
+        gZrwPrimFrame = gZrwFrames;
+    }
+    gZrwPrimDepthBias = 0.0f;
+}
+
+/* Screen depth of a 2D call: 1/near and the near screen z, each nudged by the bias, which then grows. */
+static void primScreenDepth(float *rhw, float *z)
+{
+    *rhw = (float)(1.0 / (double)RwCameraGetNearClipPlane(gZrwPrimCamera) + (double)gZrwPrimDepthBias);
+    *z = (float)((double)RwIm2DGetNearScreenZ() + (double)gZrwPrimDepthBias);
+    gZrwPrimDepthBias = (float)((double)0x1.0624dep-10f + (double)gZrwPrimDepthBias);
+}
+
+/* Fills a 2D vertex: position as given (or transformed), colour bytes r g b a packed as ARGB. */
+static void primFill2D(ZrwIm2DVertex *out, const ZrwPrimVertex *src, const ZMatrix *xform, float z, float rhw)
+{
+    if (xform != NULL) {
+        ZVec3 p;
+
+        zmatrixTransformPoint(&p, xform, (const ZVec3 *)src);
+        out->x = p.x;
+        out->y = p.y;
+    } else {
+        out->x = src->x;
+        out->y = src->y;
+    }
+    out->z = z;
+    out->rhw = rhw;
+    out->u = src->u;
+    out->v = src->v;
+    out->color = ((uint32_t)src->color[3] << 24) | ((uint32_t)src->color[0] << 16) |
+                 ((uint32_t)src->color[1] << 8) | src->color[2];
+}
+
+/*
+ * Fills a 3D vertex: the game space point (transformed by `xform` first if given) scaled into RenderWare's
+ * world (y and z mirrored about the world centre), or, `relative` to the camera, mirrored in x and y, rotated
+ * and moved by the camera matrix.
+ */
+static void primFill3D(ZrwIm3DVertex *out, const ZrwPrimVertex *src, const ZMatrix *xform,
+                       const ZMatrix *camera, int relative)
+{
+    const ZVec3 *p = (const ZVec3 *)src;
+    ZVec3 moved;
+    const double scale = gZrwInvScale;
+
+    if (xform != NULL) {
+        zmatrixTransformPoint(&moved, xform, p);
+        p = &moved;
+    }
+    if (relative) {
+        out->x = (float)-(scale * p->x);
+        out->y = (float)-((double)p->y * scale);
+        out->z = (float)((double)p->z * scale);
+        RwV3dTransformVectors((ZVec3 *)out, (const ZVec3 *)out, 1, camera);
+        out->x = (float)((double)camera->pos.x + (double)out->x);
+        out->y = (float)((double)camera->pos.y + (double)out->y);
+        out->z = (float)((double)camera->pos.z + (double)out->z);
+    } else {
+        out->x = (float)(scale * p->x + (double)gZrwOriginX);
+        out->y = (float)((double)gZrwOriginY - (double)p->y * scale);
+        out->z = (float)((double)gZrwOriginZ - (double)p->z * scale);
+    }
+    out->u = src->u;
+    out->v = src->v;
+    __builtin_memcpy(out->color, src->color, 4);
+}
+
+/*
+ * Hands the render state and the texture's raster to the hook, unless both are what is set already. The
+ * raster is looked up a second time for the hook.
+ */
+static void primSetTexture(uint32_t flags, uint32_t texture)
+{
+    const uint32_t state = flags & 0xffffff;
+    ZrwMaterial *material = (ZrwMaterial *)(uintptr_t)texture;
+
+    if (state == gZrwRenderFlags) {
+        const void *raster = (material == NULL) ? NULL : zrwmatGetRaster(material, 0);
+
+        if ((uint32_t)(uintptr_t)raster == (uint32_t)gZrwRenderExtra) {
+            return;
+        }
+    }
+    gZrwPrimStateHook(state, (material == NULL) ? NULL : zrwmatGetRaster(material, 0));
+}
+
+static const ZMatrix *primCameraMatrix(void)
+{
+    return zrwCameraGetWorldMatrix(zrwCameraGetCurrent());
+}
 
 /*
  * Colour channel of the point where `t` of the way from b to a: the products stay in the x87 register
@@ -163,7 +302,7 @@ uint32_t zrwprimClipPoly(uint32_t flags, uint32_t texture, ZrwPrimVertex *const 
     poly.texture = texture;
     poly.vertices = in;
     poly.count = n;
-    zrwprimDrawPolys(flags, &poly, 1, 0, 0);
+    zrwprimDrawPolys(flags, &poly, 1, NULL);
     return n;
 }
 
@@ -176,10 +315,10 @@ int zrwPrimSystemInitialize(void)
     zmemFill(&gZrwPrim, 0, sizeof gZrwPrim);
     gZrwPrim.initialized = 1;
     gZrwPrim.vertexSize = 0x24;
-    gZrwPrim.vertexMax = 0x40;
-    gZrwPrim.vertices = zmemAlloc(0x90f);
-    gZrwPrim.indexMax = 0x40;
-    gZrwPrim.indices = zmemAlloc(0x80f);
+    gZrwPrim.im3dMax = 0x40;
+    gZrwPrim.im3d = zmemAlloc(0x90f);
+    gZrwPrim.im2dMax = 0x40;
+    gZrwPrim.im2d = zmemAlloc(0x80f);
     return 1;
 }
 
@@ -187,31 +326,145 @@ BMX_ADDR(0x0048ccb0)
 int zrwPrimSystemShutdown(void)
 {
     if (gZrwPrim.initialized != 0) {
-        if (gZrwPrim.vertices != NULL) {
-            zmemFree(gZrwPrim.vertices);
+        if (gZrwPrim.im3d != NULL) {
+            zmemFree(gZrwPrim.im3d);
         }
-        if (gZrwPrim.indices != NULL) {
-            zmemFree(gZrwPrim.indices);
+        if (gZrwPrim.im2d != NULL) {
+            zmemFree(gZrwPrim.im2d);
         }
         gZrwPrim.initialized = 0;
     }
     return 1;
 }
 
+/* Draws `count` lines as 2 vertex line lists; the buffers only ever grow to 0x20 vertices here. */
+BMX_ADDR(0x0048ccf0)
+void zrwprimDrawLines(uint32_t flags, const ZrwPrimLine *lines, int count, const ZMatrix *xform)
+{
+    primBeginCall();
+    if ((flags & 0x2000000) != 0) {
+        float rhw;
+        float z;
+
+        primScreenDepth(&rhw, &z);
+        do {
+            ZrwIm2DVertex *base;
+
+            if (gZrwPrim.im2dMax < 2) {
+                gZrwPrim.im2dMax = 0x20;
+                gZrwPrim.im2d = zmemResize(gZrwPrim.im2d, 0x40f);
+            }
+            base = align16(gZrwPrim.im2d);
+            for (int i = 0; i < 2; i++) {
+                primFill2D(&base[i], lines->vertices[i], xform, z, rhw);
+            }
+            primSetTexture(flags, lines->texture);
+            RwIm2DRenderPrimitive(kPrimLineList, base, 2);
+            lines++;
+        } while (--count != 0);
+        return;
+    }
+    {
+        const int relative = (flags & 0x1000000) != 0;
+        const ZMatrix *camera = relative ? primCameraMatrix() : NULL;
+
+        do {
+            ZrwIm3DVertex *base;
+
+            if (gZrwPrim.im3dMax < 2) {
+                gZrwPrim.im3dMax = 0x20;
+                gZrwPrim.im3d = zmemResize(gZrwPrim.im3d, 0x48f);
+            }
+            base = align16(gZrwPrim.im3d);
+            for (int i = 0; i < 2; i++) {
+                primFill3D(&base[i], lines->vertices[i], xform, camera, relative);
+            }
+            if (RwIm3DTransform(base, 2, NULL, 1) != 0) {
+                primSetTexture(flags, lines->texture);
+                RwIm3DRenderPrimitive(kPrimLineList);
+                RwIm3DEnd();
+            }
+            lines++;
+        } while (--count != 0);
+    }
+}
+
 BMX_ADDR(0x0048d120)
-void zrwprimDrawTriangles(uint32_t flags, const ZrwPrimTriangle *triangles, int count, uint32_t arg)
+void zrwprimDrawTriangles(uint32_t flags, const ZrwPrimTriangle *triangles, int count, const ZMatrix *xform)
 {
     do {
         ZrwPrimPoly poly = {triangles->texture, triangles->vertices, 3};
 
-        zrwprimDrawPolys(flags, &poly, 1, arg, 0);
+        zrwprimDrawPolys(flags, &poly, 1, xform);
         triangles++;
         count--;
     } while (count != 0);
 }
 
+/* Draws `count` polygons as triangle fans of `count` vertices each (which must not be 0). */
+BMX_ADDR(0x0048d170)
+void zrwprimDrawPolys(uint32_t flags, const ZrwPrimPoly *polys, int count, const ZMatrix *xform)
+{
+    primBeginCall();
+    if ((flags & 0x2000000) != 0) {
+        float rhw;
+        float z;
+
+        primScreenDepth(&rhw, &z);
+        do {
+            ZrwIm2DVertex *base;
+            uint32_t n;
+
+            if (polys->count > gZrwPrim.im2dMax) {
+                gZrwPrim.im2dMax = (polys->count & ~0x1fu) + 0x20;
+                gZrwPrim.im2d = zmemResize(gZrwPrim.im2d, gZrwPrim.im2dMax * 0x20 + 0xf);
+            }
+            base = align16(gZrwPrim.im2d);
+            n = polys->count;
+            for (uint32_t i = 0;; i++) {
+                primFill2D(&base[i], polys->vertices[i], xform, z, rhw);
+                if (--n == 0) {
+                    break;
+                }
+            }
+            primSetTexture(flags, polys->texture);
+            RwIm2DRenderPrimitive(kPrimTriFan, base, (int)polys->count);
+            polys++;
+        } while (--count != 0);
+        return;
+    }
+    {
+        const int relative = (flags & 0x1000000) != 0;
+        const ZMatrix *camera = relative ? primCameraMatrix() : NULL;
+
+        do {
+            ZrwIm3DVertex *base;
+            uint32_t n;
+
+            if (polys->count > gZrwPrim.im3dMax) {
+                gZrwPrim.im3dMax = (polys->count & ~0x1fu) + 0x20;
+                gZrwPrim.im3d = zmemResize(gZrwPrim.im3d, gZrwPrim.im3dMax * 0x24 + 0xf);
+            }
+            base = align16(gZrwPrim.im3d);
+            n = polys->count;
+            for (uint32_t i = 0;; i++) {
+                primFill3D(&base[i], polys->vertices[i], xform, camera, relative);
+                if (--n == 0) {
+                    break;
+                }
+            }
+            if (RwIm3DTransform(base, (int)polys->count, NULL, 1) != 0) {
+                primSetTexture(flags, polys->texture);
+                RwIm3DRenderPrimitive(kPrimTriFan);
+                RwIm3DEnd();
+            }
+            polys++;
+        } while (--count != 0);
+    }
+}
+
 BMX_ADDR(0x0048d5a0)
-void zrwprimDrawStrips(uint32_t flags, const ZrwPrimPoly *strips, int count, uint32_t arg)
+void zrwprimDrawStrips(uint32_t flags, const ZrwPrimPoly *strips, int count, const ZMatrix *xform)
 {
     do {
         ZrwPrimVertex *other[3];
@@ -223,13 +476,13 @@ void zrwprimDrawStrips(uint32_t flags, const ZrwPrimPoly *strips, int count, uin
         while (a > 0) {
             const ZrwPrimPoly first = {strips->texture, cursor, 3};
 
-            zrwprimDrawPolys(flags, &first, 1, arg, 0);
+            zrwprimDrawPolys(flags, &first, 1, xform);
             a = b - 1;
             if (b > 0) {
                 other[0] = cursor[3];
                 other[1] = cursor[2];
                 other[2] = cursor[1];
-                zrwprimDrawPolys(flags, &second, 1, arg, 0);
+                zrwprimDrawPolys(flags, &second, 1, xform);
             }
             cursor += 2;
             b -= 2;
@@ -240,21 +493,20 @@ void zrwprimDrawStrips(uint32_t flags, const ZrwPrimPoly *strips, int count, uin
 }
 
 BMX_ADDR(0x0048d660)
-void zrwprimDrawQuads(uint32_t flags, const ZrwPrimQuad *quads, int count, uint32_t arg)
+void zrwprimDrawQuads(uint32_t flags, const ZrwPrimQuad *quads, int count, const ZMatrix *xform)
 {
     if ((flags & 0x2000000) != 0) {
         const uint8_t *camera = zrwGetClipCamera();
 
         if ((camera[8] & 1) != 0) {
-            zrwprimClipPoly(flags, quads->texture, quads->vertices, 4, (const ZMatrix *)(uintptr_t)arg,
-                            (const float *)(camera + 0x94));
+            zrwprimClipPoly(flags, quads->texture, quads->vertices, 4, xform, (const float *)(camera + 0x94));
             return;
         }
     }
     do {
         ZrwPrimPoly poly = {quads->texture, quads->vertices, 4};
 
-        zrwprimDrawPolys(flags, &poly, 1, arg, 0);
+        zrwprimDrawPolys(flags, &poly, 1, xform);
         quads++;
         count--;
     } while (count != 0);

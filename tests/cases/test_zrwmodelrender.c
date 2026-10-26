@@ -368,6 +368,9 @@ static void BMX_CDECL stubColSearch(int mode, void *root, void *result, const vo
     *(uint16_t *)result = (uint16_t)(dt_u32() % 3 == 0 ? 0 : dt_u32() | 1);
 }
 
+/* Set by the search case itself, which runs the real search. */
+static int gRealColSearch;
+
 static void stub_all(void)
 {
     gLineHookT = (void *)stubLine;
@@ -409,7 +412,9 @@ static void stub_all(void)
     dt_stub(0x004df090, NULL, (void *)stubTransformEnd);
     dt_stub(0x004df020, NULL, (void *)stubRenderIndexed);
     dt_stub(0x004defc0, NULL, (void *)stubRenderLine);
-    dt_stub(0x0048ee70, NULL, (void *)stubColSearch);
+    if (!gRealColSearch) {
+        dt_stub(0x0048ee70, NULL, (void *)stubColSearch);
+    }
 }
 
 static float rf(void)
@@ -654,6 +659,133 @@ static void setup_query(DtCtx *c)
     DT_ARG_PTR(c, 1, make_vec());
 }
 
+/* ---- the tree search ------------------------------------------------------------------------------ */
+
+typedef uint8_t ColListBytes[0xe00];
+#define gColListT ORIG_VAR(0x00672908, ColListBytes, gColListT)
+
+/*
+ * A coordinate for mode 1 searches: the search measures the corner at byte offset (bits << 4) of the
+ * coordinate the last split looked at, so the low 28 bits are 0, 1 or 2 (corner v0, v1, v2) and the top
+ * nibble picks about +-2 or +-5e-10.
+ */
+static float search_coordinate(void)
+{
+    static const uint32_t kTop[4] = {0x3, 0x4, 0xb, 0xc};
+    const uint32_t bits = (kTop[dt_u32() % 4] << 28) | (uint32_t)dt_range(0, 2);
+    float f;
+
+    __builtin_memcpy(&f, &bits, 4);
+    return f;
+}
+
+static float search_offset(float radius)
+{
+    switch (dt_u32() % 4) {
+    case 0:
+        return 0.0f;
+    case 1:
+        return dt_float(-radius, radius);
+    default:
+        return dt_float_edgy(-3.0f * radius - 1.0f, 3.0f * radius + 1.0f);
+    }
+}
+
+static ZrwRenderColTriangle *search_triangle(const ZVec3 *p, float radius)
+{
+    ZrwRenderColTriangle *t = dt_alloc(sizeof *t + 0x40);
+
+    dt_fill(t, sizeof *t + 0x40);
+    for (int k = 0; k < 3; k++) {
+        ZVec3 *v = (ZVec3 *)((uint8_t *)t + 0x10 * k);
+
+        v->x = p->x + search_offset(radius);
+        v->y = p->y + search_offset(radius);
+        v->z = p->z + search_offset(radius);
+        t->drawEdge[k] = (dt_u32() % 3 == 0) ? 0 : dt_u32();
+        t->drawPoint[k] = (dt_u32() % 3 == 0) ? 0 : dt_u32();
+    }
+    t->tag = (dt_u32() % 4 == 0) ? 0 : dt_u32();
+    return t;
+}
+
+/*
+ * A subtree around p: leaves (type 1) with 0..4 triangles, splits on x / y / z (types 2, 4, 8) near the
+ * point, and now and then a node of another type (which keeps the last split coordinate). `split` forces a
+ * split of type 2, 4 or 8.
+ */
+static ZrwRenderColNode *search_node(int depth, const ZVec3 *p, float radius, int split)
+{
+    ZrwRenderColNode *node = dt_alloc(sizeof *node);
+
+    dt_fill(node, sizeof *node);
+    if (!split && (depth == 0 || dt_u32() % 3 == 0)) {
+        node->type = 1;
+        node->triangleCount = (uint16_t)dt_range(0, 4);
+        node->triangles = (ZrwRenderColTriangle **)dt_alloc(4 * 4);
+        for (int i = 0; i < node->triangleCount; i++) {
+            node->triangles[i] = search_triangle(p, radius);
+        }
+        return node;
+    }
+    switch (dt_u32() % (split ? 3 : 4)) {
+    case 0:
+        node->type = 2;
+        node->split = p->x + search_offset(radius);
+        break;
+    case 1:
+        node->type = 4;
+        node->split = p->y + search_offset(radius);
+        break;
+    case 2:
+        node->type = 8;
+        node->split = p->z + search_offset(radius);
+        break;
+    default:
+        node->type = (uint8_t)((dt_u32() & 1) ? 0 : 0x10);
+        node->split = dt_float_edgy(-10.0f, 10.0f);
+        break;
+    }
+    node->below = search_node(depth - 1, p, radius, 0);
+    node->above = search_node(depth - 1, p, radius, 0);
+    return node;
+}
+
+static void setup_col_search(DtCtx *c)
+{
+    static const int kModes[8] = {1, 2, 3, 1, 2, 3, 0, 4};
+    ZVec3 *p = dt_alloc(sizeof *p);
+    uint16_t *found = dt_alloc(4);
+    int mode;
+    float radius;
+
+    gRealColSearch = 1;
+    begin(c);
+    mode = kModes[dt_u32() % 8];
+    if (mode == 1) {
+        p->x = search_coordinate();
+        p->y = search_coordinate();
+        p->z = search_coordinate();
+    } else {
+        p->x = rf();
+        p->y = rf();
+        p->z = (dt_u32() % 16 == 0) ? __builtin_nanf("") : rf();
+    }
+    radius = dt_float_edgy(0.0f, 8.0f);
+    if (dt_u32() % 16 == 0) {
+        radius = (dt_u32() & 1) ? -1.0f : __builtin_nanf("");
+    }
+    *found = (uint16_t)((dt_u32() & 1) ? dt_range(0, 3) : dt_range(0x3c, 0x40));
+    dt_fill(&gColListT, sizeof gColListT);
+    gZrwColDebug = (int)(dt_u32() & 1);
+    DT_ARG_INT(c, 0, mode);
+    /* mode 1 measures with the bits of a split coordinate, so its root is a split */
+    DT_ARG_PTR(c, 1, search_node(3, p, radius, mode == 1 || dt_u32() % 2 == 0));
+    DT_ARG_PTR(c, 2, found);
+    DT_ARG_PTR(c, 3, p);
+    DT_ARG_FLOAT(c, 4, radius);
+}
+
 /* ---- models --------------------------------------------------------------------------------------- */
 
 /* A model with a definition (flags at +8, draw hook at +0xb4) and a clump (a frame at +4, plugin data at
@@ -835,6 +967,7 @@ DT_CASES(zrwmodelrender_cases) = {
      1500, 0},
     {"zrwModelFindTriangle", 0x0048e840, zrwModelFindTriangle, 2, DT_RET_INT, setup_find_triangle, 1500, 0},
     {"zrwModelQuery", 0x0048f320, zrwModelQuery, 2, DT_RET_INT, setup_query, 100, 0},
+    {"zrwColSearch", 0x0048ee70, zrwColSearch, 5, DT_RET_VOID, setup_col_search, 2000, 0},
     {"zrwModelRenderBillboard", 0x0048f3e0, zrwModelRenderBillboard, 1, DT_RET_INT, setup_billboard, 200, 0},
     {"zrwModelRenderCallback", 0x0048f530, zrwModelRenderCallback, 1, DT_RET_INT, setup_render_callback, 100,
      0},

@@ -44,9 +44,6 @@ ORIG_FN(0x004df090, int, RwIm3DEnd, (void));
 ORIG_FN(0x004df020, int, RwIm3DRenderIndexedPrimitive, (int primitive, const uint16_t *indices, int count));
 ORIG_FN(0x004defc0, int, RwIm3DRenderLine, (int from, int to));
 ORIG_FN(0x00504490, void, zrwModelPostUpdate, (void *clump));
-/* The collision search over the triangle tree (large, not ported). */
-ORIG_FN(0x0048ee70, void, zrwColSearch,
-        (int mode, ZrwRenderColNode *root, ZrwRenderColQuery *result, const void *a, const void *b));
 
 /* Hooks into the renderer (function pointers in the exe's data). */
 typedef void(BMX_CDECL *ZrwRenderStateHookFn)(uint32_t flags, const void *raster);
@@ -74,8 +71,9 @@ typedef void(BMX_CDECL *ZrwModelCallFn)(void *object);
 /* Colour handed to zrwModelSetColor after drawing a model (0x561818, 0x56181c). */
 #define gZrwModelColor1 ORIG_VAR(0x00561818, uint32_t, gZrwModelColor1)
 #define gZrwModelColor2 ORIG_VAR(0x0056181c, uint32_t, gZrwModelColor2)
-/* The hit list the tree query fills (0x672908). */
-#define gZrwColList ORIG_VAR(0x00672908, uint32_t, gZrwColList)
+/* The hit list the tree query fills (0x672908, 0x40 records, followed by gZrwColHit). */
+typedef ZrwRenderColHit ZrwRenderColList[0x40];
+#define gZrwColList ORIG_VAR(0x00672908, ZrwRenderColList, gZrwColList)
 
 /* Vertex of RenderWare's immediate mode (0x24 bytes). */
 typedef struct ZrwImVertex {
@@ -317,12 +315,140 @@ ZrwRenderColHit *zrwModelFindTriangle(const ZVec3 *point, float maxDistance)
     return NULL;
 }
 
+/* Appends a hit of `kind` with the corners it has (NULL: left as is) to the list; the caller checks room. */
+static void colListAdd(uint16_t *found, uint8_t kind, const ZVec3 *v0, const ZVec3 *v1, const ZVec3 *v2,
+                       uint32_t tag)
+{
+    gZrwColList[*found].valid = kind;
+    gZrwColList[*found].v0 = *v0;
+    if (v1 != NULL) {
+        gZrwColList[*found].v1 = *v1;
+    }
+    if (v2 != NULL) {
+        gZrwColList[*found].v2 = *v2;
+    }
+    gZrwColList[*found].tag = tag;
+    (*found)++;
+}
+
+static float bitsToFloat(uint32_t bits)
+{
+    float f;
+
+    __builtin_memcpy(&f, &bits, 4);
+    return f;
+}
+
+/*
+ * Collects the collision features within `radius` of `point` into the hit list (at most 0x40, counted in
+ * *found): mode 1 whole triangles (kind 1), mode 2 marked edges (kind 2, drawn green while gZrwColDebug is
+ * set), mode 3 marked corners (kind 3). Split nodes closer to the point than the radius are searched on both
+ * sides (the lower side recursively). Original quirks: the split coordinate lives in the `found` argument's
+ * stack slot, so until the first split of type 2, 4 or 8 it is the pointer's bits; mode 1 measures three
+ * times the corner at byte offset (those bits << 4) of the triangle instead of each corner.
+ */
+BMX_ADDR(0x0048ee70)
+void zrwColSearch(int mode, const ZrwRenderColNode *node, uint16_t *found, const ZVec3 *point, float radius)
+{
+    uint32_t key = (uint32_t)(uintptr_t)found;
+
+    while (node->type != 1) {
+        double distance;
+
+        switch (node->type) {
+        case 2:
+            __builtin_memcpy(&key, &point->x, 4);
+            break;
+        case 4:
+            __builtin_memcpy(&key, &point->y, 4);
+            break;
+        case 8:
+            __builtin_memcpy(&key, &point->z, 4);
+            break;
+        default:
+            break;
+        }
+        distance = __builtin_fabs((double)bitsToFloat(key) - (double)node->split);
+        if (!(distance >= (double)radius)) {
+            zrwColSearch(mode, node->below, found, point, radius);
+            node = node->above;
+        } else if (!(bitsToFloat(key) >= node->split)) {
+            node = node->below;
+        } else {
+            node = node->above;
+        }
+    }
+    for (int i = 0; i < (int)node->triangleCount; i++) {
+        const ZrwRenderColTriangle *tri = node->triangles[i];
+        const ZVec3 *corners = &tri->v0;
+        ZVec3 d;
+
+        if (mode == 1) {
+            if (tri->tag != 0) {
+                const ZVec3 *corner = (const ZVec3 *)((uintptr_t)tri + (uint32_t)(key << 4));
+                float best = 9999.0f;
+
+                for (int k = 0; k < 3; k++) {
+                    double length;
+
+                    zvec3Sub(&d, point, corner);
+                    length = __builtin_fabs(zvec3Length(&d));
+                    if (!(length >= (double)best)) {
+                        best = (float)length;
+                    }
+                }
+                if (!(best >= radius) && *found < 0x40) {
+                    colListAdd(found, 1, &tri->v0, &tri->v1, &tri->v2, tri->tag);
+                }
+            }
+        } else if (mode == 2) {
+            for (int e = 0; e < 3; e++) {
+                const ZVec3 *from = (const ZVec3 *)((const uint8_t *)corners + 0x10 * e);
+                const ZVec3 *to = (const ZVec3 *)((const uint8_t *)corners + 0x10 * ((e + 1) % 3));
+                ZVec3 edge;
+                float along;
+
+                if (tri->drawEdge[e] == 0) {
+                    continue;
+                }
+                zvec3Sub(&d, point, from);
+                zvec3Sub(&edge, to, from);
+                zvec3NormalizeScaled(&edge, &edge);
+                along = (float)zvec3Dot(&d, &edge);
+                if (!(__builtin_sqrt(zvec3LengthSq(&d) - (double)along * along) >= (double)radius) &&
+                    *found < 0x40) {
+                    if (tri != NULL && gZrwColDebug != 0) {
+                        const uint8_t green[4] = {0, 0xff, 0, 0xff};
+                        uint32_t color;
+
+                        __builtin_memcpy(&color, green, 4);
+                        zrwModelDrawTriangleEdge(tri, (uint8_t)e, &color);
+                    }
+                    colListAdd(found, 2, from, to, NULL, tri->drawEdge[e]);
+                }
+            }
+        } else if (mode == 3) {
+            for (int k = 0; k < 3; k++) {
+                const ZVec3 *corner = (const ZVec3 *)((const uint8_t *)corners + 0x10 * k);
+
+                if (tri->drawPoint[k] == 0) {
+                    continue;
+                }
+                zvec3Sub(&d, point, corner);
+                if (!(__builtin_fabs(zvec3Length(&d)) >= (double)radius) && *found < 0x40) {
+                    colListAdd(found, 3, corner, NULL, NULL, tri->drawPoint[k]);
+                }
+            }
+        }
+    }
+}
+
 BMX_ADDR(0x0048f320)
-ZrwRenderColQuery *zrwModelQuery(const void *a, const void *b)
+ZrwRenderColQuery *zrwModelQuery(const ZVec3 *point, float radius)
 {
     gZrwColQuery.found = 0;
     gZrwColQuery.list = &gZrwColList;
-    zrwColSearch(2, &gZrwColRoot, &gZrwColQuery, a, b);
+    zrwColSearch(2, &gZrwColRoot, &gZrwColQuery.found, point, radius);
     return gZrwColQuery.found != 0 ? &gZrwColQuery : NULL;
 }
 

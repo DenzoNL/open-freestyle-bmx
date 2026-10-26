@@ -23,14 +23,22 @@ typedef struct ZrwColTriangle {
 
 _Static_assert(sizeof(ZrwColTriangle) == 0x28, "collision triangle");
 
-/* World sector: the base of its material handles (+4) and the per triangle material bytes (+0xc, stride 4).
+/*
+ * World sector: the base of its material handles (+4), the triangles (+0xc, 4 bytes each: material, then
+ * the three vertex indices) and the prelit vertex colours (+0x1c, r g b a).
  */
 typedef struct ZrwColSector {
     uint8_t pad00[4];
     int16_t base;       /* 0x04 */
     uint8_t pad06[6];   /* 0x06 */
     const uint8_t *map; /* 0x0c */
+    uint8_t pad10[0xc];
+    const uint8_t *prelit; /* 0x1c */
 } ZrwColSector;
+
+/* Colour of the last line hit (0x674158, r g b a). */
+typedef uint8_t ZrwColColor[4];
+#define gZrwColColor ORIG_VAR(0x00674158, ZrwColColor, gZrwColColor)
 
 /* Scene object: its frame (+4) and model (+0x1c). */
 typedef struct ZrwColObject {
@@ -59,6 +67,14 @@ typedef struct ZrwColHit {
 } ZrwColHit;
 
 _Static_assert(sizeof(ZrwColHit) == 0x4c, "collision hit");
+
+/* Result of the line query (0x58 bytes): the nearest hit and the point where the line meets it. */
+typedef struct ZrwColLineHit {
+    ZrwColHit hit;
+    float point[3]; /* 0x4c */
+} ZrwColLineHit;
+
+_Static_assert(sizeof(ZrwColLineHit) == 0x58, "line hit");
 
 /* State of the collision system (0x674160, 0x50 bytes, cleared at initialisation). */
 typedef struct ZrwColState {
@@ -91,6 +107,15 @@ typedef struct ZrwColIntersection {
     int32_t type; /* 0x18 */
 } ZrwColIntersection;
 
+/* The same volume as a line (start, end) of type 1. */
+typedef struct ZrwColLineVolume {
+    float start[3];
+    float end[3];
+    int32_t type; /* 0x18 */
+} ZrwColLineVolume;
+
+_Static_assert(sizeof(ZrwColLineVolume) == sizeof(ZrwColIntersection), "line volume");
+
 int zrwColSystemInitialize(void);
 int zrwColSystemShutdown(void);
 
@@ -116,8 +141,17 @@ int zrwcolEnableIfTagInfo(void);
 int zrwcolLineTest(const float *a, const float *b, int mode, int flags, float *out);
 int zrwcolSphereTest(const float *center, float radius, uint32_t flags, const int *excluded, uint32_t *out);
 
-/* Not ported: the line query (0x493e20, held by the pointer at 0x562068) and the tag table setup. */
-ORIG_FN(0x00493e20, int, zrwcolQueryLine, (const float *a, const float *b, int mode, int flags, float *out));
+/*
+ * Line query (held by the pointer at 0x562068): 1 and the nearest hit in *out when the line from `from` to
+ * `to` hits the world (flags bit 0) or objects (bits 1, 2; bit 3 skips the `excluded` ids). With bit 5 the
+ * line is first clipped to the world box, in place (0 when it misses the box).
+ */
+int zrwcolQueryLine(float *from, float *to, uint32_t flags, const int *excluded, ZrwColLineHit *out);
+/*
+ * Prelit colour of the world at the point of the last line hit (in gZrwColColor, alpha 0), opaque black when
+ * the hit was not on the world. Sorts the hit's corners by z in place.
+ */
+uint8_t *zrwcolHitColor(ZrwColLineHit *hit);
 
 /* RenderWare: matrices and points of frames, materials, and the intersection enumerators. */
 ORIG_FN(0x004d2b10, void *, rwFrameGetLTM, (void *frame));

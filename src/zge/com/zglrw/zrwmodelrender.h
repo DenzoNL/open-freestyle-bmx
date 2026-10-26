@@ -106,8 +106,13 @@ int zrwModelPointInTriangle(const ZVec3 *v0, const ZVec3 *v1, const ZVec3 *v2, c
                             const ZVec3 *point);
 /* The triangle closest to `point` (along its normal) within maxDistance, as &gZrwColHit, or NULL. */
 ZrwRenderColHit *zrwModelFindTriangle(const ZVec3 *point, float maxDistance);
-/* Runs the tree query (0x48ee70, not ported) with a fresh result. */
-ZrwRenderColQuery *zrwModelQuery(const void *a, const void *b);
+/*
+ * Collects the triangles (mode 1), marked edges (2) or marked corners (3) of the tree within `radius` of
+ * `point` into the hit list at 0x672908, counting them in *found (at most 0x40).
+ */
+void zrwColSearch(int mode, const ZrwRenderColNode *node, uint16_t *found, const ZVec3 *point, float radius);
+/* The marked edges near `point` as a fresh query result, or NULL when there are none. */
+ZrwRenderColQuery *zrwModelQuery(const ZVec3 *point, float radius);
 
 /* Callbacks of RenderWare objects (they return the object). */
 void *zrwModelRenderBillboard(void *object);
