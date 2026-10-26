@@ -13,7 +13,7 @@ set(BMX_WORK_DIR "${CMAKE_SOURCE_DIR}/work" CACHE PATH "Directory with labels.ra
 
 set(BMX_WARNINGS -Wall -Wextra -Werror -Wno-unused-parameter -Wno-microsoft-anon-tag)
 
-file(GLOB_RECURSE BMX_GAME_SOURCES CONFIGURE_DEPENDS src/zge/*.c src/bmx/*.c)
+file(GLOB_RECURSE BMX_GAME_SOURCES CONFIGURE_DEPENDS src/zge/*.c src/bmx/*.c src/rw/*.c)
 file(GLOB_RECURSE BMX_COMPAT_SOURCES CONFIGURE_DEPENDS src/compat/*.c)
 
 add_library(bmx_game OBJECT ${BMX_GAME_SOURCES} ${BMX_COMPAT_SOURCES})

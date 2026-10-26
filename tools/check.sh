@@ -11,7 +11,8 @@ echo "== build (hook preset)"
 cmake --preset hook >/dev/null
 cmake --build --preset hook
 echo "== clang-tidy"
-mapfile -t units < <(git ls-files -co --exclude-standard 'src/*.c' 'tests/cases/*.c')
+# src/native is only built by the native32 preset (hosted mingw), not in build/hook's compile database.
+mapfile -t units < <(git ls-files -co --exclude-standard 'src/*.c' 'tests/cases/*.c' ':!src/native/*')
 # nixpkgs' clang-tidy wrapper puts the host libc on CPATH, which breaks the freestanding i686-windows
 # units on Linux (gnu/stubs-32.h). Use the unwrapped clang-tidy next to the flake's cross clang.
 tidy=(clang-tidy)

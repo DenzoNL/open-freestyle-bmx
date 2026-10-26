@@ -17,7 +17,7 @@ Commands (from your worktree root, always through the nix devshell; the default 
   BMX_EXE=<repo>/work/NgBMX.exe nix develop -c tools/check.sh      (full gate: format, build, clang-tidy, all tests)
   nix develop -c clang-format -i <files>
   nix develop -c python3 -I tools/rdata.py <repo>/work/NgBMX.exe 0x54d048 ...
-  python3 -I tools/progress.py        (updates data/functions.csv from BMX_ADDR annotations)
+  python3 -I tools/progress.py        (updates data/functions.csv and data/functions-rw.csv from BMX_ADDR annotations)
 
 Task: port ALL functions in your packet with BMX_ADDR annotations, real names and types (infer struct layouts from offsets; name after behaviour; keep names the original leaks via assert strings or community labels where sensible), and write differential tests covering every function (tests/cases/test_<module>.c). Put code in the mirrored path of the original source file (e.g. C:\zaxis\Bmx\src\com\action\physics.c -> src/bmx/com/action/physics.c). The packet's file assignment for rows marked `affinity`/`edge` is a guess: if a function clearly belongs elsewhere, still port it but put it in the right file (or keep it with a `/* TODO(file): probably belongs to ... */` comment). Do not skip functions.
 
@@ -37,3 +37,5 @@ Rules:
 Done means: every function in the packet ported with a DT_CASES entry, `tools/check.sh` passes end to end at 0 ULP, `python3 -I tools/progress.py` run. Then verify your tests have teeth: introduce ~3 deliberate small bugs in different functions, confirm each is caught, revert them.
 
 Final report (under 400 words): functions ported / total; any not passing and why; functions relocated or misassigned (addr -> suggested file); struct types defined (names + what they are); test gaps (functions whose tests are weak and why); edits to shared files; harness/tool problems; hardest functions; approximate number of build/test iterations. Be factual; say plainly if something is unfinished.
+
+RenderWare slices (rw/<group>.c, bundles in <repo>/work/bundles-rw): RW functions often call through the device function-pointer tables in .data (`(**(code **)(DAT_0067696c + n))(...)`) and plugin callbacks; leave those indirect calls as they are (read the pointer from the exe's data through ORIG_VAR and call it). Callees marked `skip` (CRT, libpng, zlib) keep being called as ORIG_FN. Ported RW code goes to src/rw/<group>.c.

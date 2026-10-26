@@ -4,9 +4,10 @@ Ghidra shows some functions as void that leave a value in EAX (typically init fu
 MOV EAX,1) which callers test. A void port leaves garbage there; the differential test of a void
 function doesn't compare EAX, so only this check (or the real game) catches it.
 
-Usage: python3 -I tools/void_eax_audit.py .   (needs work/bundles)
+Usage: python3 -I tools/void_eax_audit.py .   (needs work/bundles and work/bundles-rw; $BMX_WORK overrides work/)
 """
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -31,7 +32,8 @@ def disasm(bundle):
 
 
 hits = {}
-for f in sorted((repo / "work/bundles").glob("*.json")):
+work = Path(os.environ.get("BMX_WORK", repo / "work"))
+for f in sorted([*(work / "bundles").glob("*.json"), *(work / "bundles-rw").glob("*.json")]):
     insns = disasm(json.loads(f.read_text()))
     for i, (addr, text) in enumerate(insns):
         m = re.match(r"CALL\s+0x([0-9a-f]+)$", text, re.I)

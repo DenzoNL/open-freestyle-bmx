@@ -75,8 +75,36 @@ goes through the device driver's function-pointer table (the D3D7 driver), which
 follow; that driver is what SDL3 replaces. The faithful-port part (engine, plugins, math, collision,
 world, clump, streams) is roughly 100-120 KB, about a quarter of the game code.
 
+## Tooling
+
+`data/functions-rw.csv` (same columns as `functions.csv`) lists the RW functions to port: the static call
+closure of the entry functions (ORIG_FN declarations and BMX_ADDR annotations at addresses >= 0x4a4a80),
+713 functions. 409 are `orig` (about 104 KB), grouped into `src/rw/<group>.c` (engine, plugins, math,
+collision, world, clump, stream, texture, light, camera, im, charset, and `core` for internals reached
+from three or more groups: errors, plugin registry, free lists). 304 are `skip` with file `lib/crt`,
+`lib/libpng` or `lib/zlib`: the MSVC CRT and the decoder behind RtPNGImageRead, which the replacement
+takes from the platform and a real image library. The heuristics are in the docstring of `tools/rwmap.py`.
+Group assignment is a first guess (address ranges per RW module, labels, who reaches a function): move a
+function by editing its file column and keeping it when you regenerate.
+
+```sh
+export BMX_WORK=<repo>/work        # only in a git worktree: work/ is gitignored and lives in the main checkout
+python3 -I tools/rwmap.py          # regenerate data/functions-rw.csv from work/bundles-rw, work/labels.raw and src/
+python3 -I tools/slice.py plan --rw                          # slices of whole groups, bottom-up
+python3 -I tools/slice.py packet rw/math.c rw/core.c         # packet -> $BMX_WORK/slices/rw-math+rw-core.md
+python3 -I tools/progress.py       # game and RW progress, reported separately (skip rows not counted)
+```
+
+A packet works like a game one (pseudo-C, call graph, disassembly for x87 functions, ORIG_FN list for
+callees outside the slice) and also lists the `skip` library callees. Ported RW code goes under `src/rw/`
+with `BMX_ADDR` annotations like the game code; `progress.py` recognises them and `CMakeLists.txt` builds
+`src/rw/*.c`. Rerun `rwmap.py` after porting: ported rows keep their file and status.
+
+Known gaps: calls through function-pointer tables (device driver, plugin callbacks) are not in the
+closure, and two callbacks the game passes by address (`rwBmpImageWrite` 0x4e7eb0 and
+`rwWorldPvsDefaultCallback` 0x4cd510) are not Ghidra functions, so they have no bundle or CSV row yet
+(create the functions in Ghidra and re-export to add them).
+
 ## Next
 
-1. Tooling: let `tools/slice.py`, `progress.py` and the oracle work with the RW range (a functions list
-   for it, with groups as files under `src/rw/`).
-2. Port engine core + memory + plugins (the first traps in `bmxnative.exe`), oracle-tested like the game.
+1. Port engine core + memory + plugins (the first traps in `bmxnative.exe`), oracle-tested like the game.

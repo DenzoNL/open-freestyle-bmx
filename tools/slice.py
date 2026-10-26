@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """Plan porting slices and build self-contained work packets for them.
 
-  tools/slice.py plan [--target 60]       print slices: groups of whole files, bottom-up by call graph
-  tools/slice.py packet FILE... [-o OUT]  write a Markdown work packet for those source files
+  tools/slice.py plan [--target 60] [--rw]  print slices: groups of whole files, bottom-up by call graph
+  tools/slice.py packet FILE... [-o OUT]    write a Markdown work packet for those source files
+
+Game functions come from data/functions.csv + work/bundles, the RenderWare library from
+data/functions-rw.csv + work/bundles-rw (files rw/<group>.c; `plan --rw` plans those). $BMX_WORK
+overrides the work/ directory (needed in a git worktree).
 
 A packet holds everything a porter needs and nothing else: the CSV rows, each function's pseudo-C,
 disassembly where the function touches the x87 FPU (pseudo-C is unreliable there), strings,
@@ -11,22 +15,33 @@ callers/callees with their port status, and ORIG_FN stubs for unported callees o
 import argparse
 import csv
 import json
+import os
 import re
 from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+WORK = Path(os.environ.get("BMX_WORK", ROOT / "work"))  # work/ is gitignored: worktrees point here
 FPU = re.compile(r"^\S+\s+F[A-Z]+", re.M)
 
 
-def load():
-    with (ROOT / "data/functions.csv").open() as fh:
-        rows = {int(r["addr"], 16): r for r in csv.DictReader(fh)}
-    bundles = {}
-    for a in rows:
-        p = ROOT / f"work/bundles/{a:08x}.json"
-        if p.exists():
-            bundles[a] = json.loads(p.read_text())
+def load(which="all"):
+    """Rows and bundles of the game (functions.csv, work/bundles) and the RenderWare range
+    (functions-rw.csv from tools/rwmap.py, work/bundles-rw); which: "game", "rw" or "all"."""
+    rows, bundles = {}, {}
+    for csvname, bdir in (("functions", "bundles"), ("functions-rw", "bundles-rw")):
+        if which != "all" and (which == "rw") != (csvname == "functions-rw"):
+            continue
+        path = ROOT / f"data/{csvname}.csv"
+        if not path.exists():
+            continue
+        with path.open() as fh:
+            part = {int(r["addr"], 16): r for r in csv.DictReader(fh)}
+        for a in part:
+            p = WORK / bdir / f"{a:08x}.json"
+            if p.exists():
+                bundles[a] = json.loads(p.read_text())
+        rows.update(part)
     return rows, bundles
 
 
@@ -36,8 +51,8 @@ def callees(b):
             yield int(c.split()[0], 16)
 
 
-def plan(target):
-    rows, bundles = load()
+def plan(target, rw=False):
+    rows, bundles = load("rw" if rw else "game")
     files = defaultdict(list)
     for a, r in rows.items():
         if r["status"] == "orig":
@@ -81,11 +96,19 @@ def packet(sel, out, addrs=None, exclude=()):
     for a in mine:
         r = rows[a]
         lines.append(f"| {r['addr']} | {r['size']} | {r['file']} | {r['confidence']} | {r['name']} | {r['status']} |")
-    ext = {}
+    ext, lib = {}, {}
     for a in mine:
         for c in callees(bundles[a]):
             if c not in mine_set and c in rows and rows[c]["status"] == "orig":
                 ext[c] = bundles.get(c, {}).get("signature", "?")
+            elif c not in mine_set and c in rows and rows[c]["status"] == "skip":
+                lib[c] = rows[c]
+    if lib:
+        lines += ["", "## Library callees (status skip: CRT, libpng, zlib; keep calling the platform/real library)", ""]
+        lines += [f"- {c:#010x} {r['name']} [{r['file']}]" for c, r in sorted(lib.items())]
+    if any(rows[a]["file"].startswith("rw/") for a in mine):
+        lines += ["", "RenderWare range: many calls go through device function-pointer tables in .data (`(**(code **)(DAT_... + n))(...)`)",
+                  "or through plugin callbacks; leave those indirect calls as they are (call through the pointer).", ""]
     if ext:
         lines += ["", "## Unported callees outside this slice", "",
                   "Declare these with ORIG_FN in the owning header if not already declared (fix the types):", "", "```c"]
@@ -125,6 +148,7 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("plan")
     p.add_argument("--target", type=int, default=60)
+    p.add_argument("--rw", action="store_true", help="plan the RenderWare range (functions-rw.csv)")
     k = sub.add_parser("packet")
     k.add_argument("files", nargs="*")
     k.add_argument("-o", type=Path)
@@ -132,12 +156,12 @@ def main():
     k.add_argument("--exclude", default="", help="comma-separated addresses to leave out of whole files")
     a = ap.parse_args()
     if a.cmd == "plan":
-        plan(a.target)
+        plan(a.target, a.rw)
     else:
         addrs = [int(x, 16) for x in a.addrs.split(",")] if a.addrs else None
         exclude = {int(x, 16) for x in a.exclude.split(",") if x}
-        name = "+".join(Path(f).stem for f in a.files) or "custom"
-        packet(a.files, a.o or ROOT / f"work/slices/{name}.md", addrs, exclude)
+        name = "+".join(("rw-" if f.startswith("rw/") else "") + Path(f).stem for f in a.files) or "custom"
+        packet(a.files, a.o or WORK / f"slices/{name}.md", addrs, exclude)
 
 
 if __name__ == "__main__":
