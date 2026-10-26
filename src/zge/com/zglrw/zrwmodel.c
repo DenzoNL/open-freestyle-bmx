@@ -4,6 +4,8 @@
 #include <stddef.h>
 
 #include "compat/crt.h"
+#include "rw/rwcore.h"
+#include "rw/rwplugins.h"
 #include "zge/com/zglrw/zrwmodelrender.h"
 #include "zge/zdebug.h"
 #include "zge/ziff.h"
@@ -27,13 +29,9 @@ ORIG_FN(0x004d3ae0, void *, RwV3dTransformVectors,
         (ZVec3 * out, const ZVec3 *in, int count, const ZMatrix *matrix));
 ORIG_FN(0x004d3a90, void *, RwV3dTransformPoints,
         (ZVec3 * out, const ZVec3 *in, int count, const ZMatrix *matrix));
-ORIG_FN(0x004d04d0, void *, RwMatrixUpdate, (ZMatrix * matrix));
-ORIG_FN(0x004d04f0, void *, RwMatrixMultiply, (ZMatrix * out, const ZMatrix *a, const ZMatrix *b));
 ORIG_FN(0x004d1400, void *, RwMatrixScale, (ZMatrix * matrix, const ZVec3 *scale, int combine));
 ORIG_FN(0x004d1fe0, ZMatrix *, RwMatrixCreate, (void));
 ORIG_FN(0x004d1fb0, int, RwMatrixDestroy, (ZMatrix * matrix));
-ORIG_FN(0x004b31e0, int, RpClumpRegisterPlugin,
-        (int size, uint32_t id, void(BMX_CDECL *ctor)(void *), void *(BMX_CDECL *dtor)(void *), void *copy));
 ORIG_FN(0x004b4ce0, int, RpGeometryGetNumMaterials, (void *geometry));
 ORIG_FN(0x004b47a0, void *, RpGeometryGetMaterial, (void *geometry, int index));
 ORIG_FN(0x004b9310, void *, RpMaterialSetColor, (void *material, const void *color));
@@ -43,7 +41,6 @@ int zrwModelCreateInitialize(void);
 int zrwModelCreateShutdown(void);
 void *zrwModelCreateFirstAtomic(void *clump);
 ORIG_FN(0x0048be30, void, zrwMatrixToGame, (void *out, const ZMatrix *matrix));
-ORIG_FN(0x00504490, void, zrwModelPostUpdate, (void *clump));
 
 /* Part sets are 12 bytes apart from +0x54; the index is a 16 bit field of the model, not range checked. */
 static ZrwPartSet *partSet(const ZrwModel *model, uint32_t index)
@@ -161,11 +158,12 @@ void zrwModelSetActive(const ZrwModel *model, int on)
 }
 
 BMX_ADDR(0x00487d90)
-void zrwMdlConstructor(void *clump)
+void *zrwMdlConstructor(void *clump)
 {
     if (gZrwMdlPluginOffset > 0) {
         *(uint32_t *)((uint8_t *)clump + gZrwMdlPluginOffset) = 0;
     }
+    return clump; /* the plugin registry treats NULL as failure */
 }
 
 BMX_ADDR(0x00487db0)
@@ -510,7 +508,7 @@ int zrwModelUpdate(ZrwModel *model)
     memcpy(matrix, gZrwModelState.scratch, sizeof *matrix);
     RwFrameUpdateObjects(((void **)clump)[1]);
     if (model->def->flags2 & 2) {
-        zrwModelPostUpdate(clump);
+        RpSkinClumpUpdate(clump);
     }
     if (model->onUpdate != NULL) {
         model->onUpdate(model);
@@ -528,8 +526,8 @@ BMX_ADDR(0x00488890)
 int zrwMdlRegisterPlugin(void)
 {
     gZrwMdlPluginOffset =
-        RpClumpRegisterPlugin(4, 0xff02, BMX_FNPTR(void(BMX_CDECL *)(void *), 0x00487d90, zrwMdlConstructor),
-                              BMX_FNPTR(void *(BMX_CDECL *)(void *), 0x00487db0, zrwMdlDestructor), NULL);
+        RpClumpRegisterPlugin(4, 0xff02, BMX_FNPTR(RwPluginObjectConstructor, 0x00487d90, zrwMdlConstructor),
+                              BMX_FNPTR(RwPluginObjectDestructor, 0x00487db0, zrwMdlDestructor), NULL);
     return gZrwMdlPluginOffset != -1;
 }
 

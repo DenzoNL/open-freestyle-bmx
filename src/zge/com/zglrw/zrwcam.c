@@ -2,6 +2,8 @@
 #include "zge/com/zglrw/zrwcam.h"
 
 #include "compat/crt.h"
+#include "rw/rwcore.h"
+#include "rw/rwplugins.h"
 #include "zge/com/zglrw/zrwmodelcreate.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zobjcamera.h"
@@ -140,7 +142,6 @@ ORIG_FN(0x004dea60, void, RwCameraSetFrame, (void *camera, void *frame));
 ORIG_FN(0x004dea80, void *, RwCameraGetFrame, (void *camera));
 ORIG_FN(0x004d3200, void, RwFrameSetIdentity, (void *frame));
 ORIG_FN(0x004d2b00, float *, RwFrameGetMatrix, (void *frame));
-ORIG_FN(0x004d04d0, void, RwMatrixUpdate, (float *matrix));
 ORIG_FN(0x004de920, void, RwCameraSetProjection, (void *camera, int projection));
 ORIG_FN(0x004dcc80, void, RwRasterSubRaster, (void *raster, void *parent, const int32_t *rect));
 ORIG_FN(0x004dcd70, void *, RwRasterGetParent, (void *raster));
@@ -158,10 +159,8 @@ ORIG_FN(0x004de790, int, RwCameraBeginUpdate, (void *camera));
 ORIG_FN(0x004de7f0, void, RwCameraEndUpdate, (void *camera));
 ORIG_FN(0x004dcd80, int, RwRasterPushContext, (void *raster));
 ORIG_FN(0x004dce20, void, RwRasterPopContext, (void));
-ORIG_FN(0x004db820, int, rwRenderStateSet, (int state, int value));
 /* Scene hooks around a camera's update (the engine's lighting and sorting state). */
 ORIG_FN(0x004b81f0, void, rwSceneBegin, (void *state, void *camera));
-ORIG_FN(0x005065d0, void, rwSceneEnd, (void *camera));
 ORIG_FN(0x004b82a0, void *, rwSceneFind, (void *camera));
 /* Two arguments: the original reuses its second push of the camera (rwSceneFind takes one). */
 ORIG_FN(0x004b8240, void, rwSceneRelease, (void *scene, void *camera));
@@ -357,7 +356,7 @@ void zrwCameraSetView(ZrwCamera *camera, const ZMatrix *view, const ZVec3 *eye)
     m[13] = (float)((double)gZrwWorldScale * y);
     m[12] = (float)(((double)eye->x + gZrwWorldOffset.x) * gZrwWorldScale);
     m[14] = (float)((double)gZrwWorldScale * z);
-    RwMatrixUpdate(m);
+    RwMatrixUpdate((RwMatrix *)m);
     memcpy(&camera->world, m, sizeof camera->world);
 }
 
@@ -471,21 +470,21 @@ int zrwCameraBegin(ZrwCamera *camera)
 
     gZrwCurrentCamera = camera;
     rwSceneBegin(gZrwSceneState, rw);
-    rwSceneEnd(gZrwActiveRw);
+    RpLODAtomicSetCamera(gZrwActiveRw);
     gZrwActiveRw = camera->rwCamera;
     if (RwCameraBeginUpdate(gZrwActiveRw) != 0 && RwRasterPushContext(RwCameraGetRaster(rw)) != 0) {
         zrwResetRenderState();
         if ((camera->state & 2) == 0) {
-            rwRenderStateSet(0xc, 0);
+            RwRenderStateSet(0xc, 0);
             gZrwInUpdate = 1;
             return 1;
         }
-        rwRenderStateSet(0xc, 1);
-        rwRenderStateSet(0xd, (int)(((uint32_t)(uint8_t)(camera->clearColor >> 24) << 24) |
+        RwRenderStateSet(0xc, 1);
+        RwRenderStateSet(0xd, (int)(((uint32_t)(uint8_t)(camera->clearColor >> 24) << 24) |
                                     ((uint32_t)(uint8_t)camera->clearColor << 16) |
                                     ((uint32_t)(uint8_t)(camera->clearColor >> 8) << 8) |
                                     (uint8_t)(camera->clearColor >> 16)));
-        rwRenderStateSet(0xe, 1);
+        RwRenderStateSet(0xe, 1);
         gZrwInUpdate = 1;
         return 1;
     }
@@ -499,7 +498,7 @@ int zrwCameraEnd(void)
         gZdebugPrint("RwCam: No camera\n");
         return 0;
     }
-    rwRenderStateSet(0xc, 0);
+    RwRenderStateSet(0xc, 0);
     gZrwInUpdate = 0;
     RwRasterPopContext();
     RwCameraEndUpdate(gZrwActiveRw);

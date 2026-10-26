@@ -4,6 +4,8 @@
 #include <stddef.h>
 
 #include "compat/crt.h"
+#include "rw/rwcore.h"
+#include "rw/rwplugins.h"
 #include "zge/zdebug.h"
 #include "zge/zfile.h"
 #include "zge/zgemods/zobjcamera.h"
@@ -17,7 +19,6 @@ static const char kZrwTxrFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwTxr.c";
 
 /* RenderWare library calls (statically linked in the exe, not ported). */
 ORIG_FN(0x004dfcb0, void *, RwTextureRead, (const char *name, const char *maskName));
-ORIG_FN(0x004ded90, void *, RwErrorGet, (void *error));
 ORIG_FN(0x004e6d90, void *, RtBMPImageRead, (const char *name));
 ORIG_FN(0x005068a0, void *, RtPNGImageRead, (const char *name));
 ORIG_FN(0x004e3a60, int, RwImageGetWidth, (void *image));
@@ -51,8 +52,6 @@ ORIG_FN(0x004dfc80, void *, RwTexDictionarySetCurrent, (void *dictionary));
 ORIG_FN(0x004e4a30, int, RwImageRegisterImageFormat, (const char *extension, void *read, void *write));
 ORIG_FN(0x004df580, int, RwTextureSetMipmapping, (int enable));
 ORIG_FN(0x004df980, void *, RwTextureAddRef, (void *texture));
-ORIG_FN(0x004dffd0, int, RwTextureRegisterPlugin,
-        (int size, uint32_t id, void(BMX_CDECL *ctor)(void *), void *(BMX_CDECL *dtor)(void *), void *copy));
 ORIG_FN(0x004df550, void *, RwTextureSetFindCallBack, (void *callback));
 ORIG_FN(0x004df540, void *, RwTextureGetReadCallBack, (void));
 ORIG_FN(0x004df520, int, RwTextureSetReadCallBack, (void *callback));
@@ -456,11 +455,12 @@ void *DDSImageRead(void)
 }
 
 BMX_ADDR(0x00497a90)
-void rwMatConstructor(void *material)
+void *rwMatConstructor(void *material)
 {
     if (gZrwMatPluginOffset > 0) {
         *(uint32_t *)((uint8_t *)material + gZrwMatPluginOffset) = 0;
     }
+    return material; /* the plugin registry treats NULL as failure */
 }
 
 BMX_ADDR(0x00497ab0)
@@ -490,7 +490,7 @@ ZrwTexture *LoadTexture(const void *data, uint32_t size, const char *name, int t
     void *texture;
     ZrwTexture *record;
     void *raster;
-    uint8_t error[8];
+    RwError error;
     int depth, width, height;
 
     if (data == NULL || size == 0) {
@@ -515,7 +515,7 @@ ZrwTexture *LoadTexture(const void *data, uint32_t size, const char *name, int t
     if (texture == NULL) {
         void *image;
 
-        RwErrorGet(error);
+        RwErrorGet(&error);
         RegisterCallBacksForFileSystem();
         ImageBufferSizeType(data, size, extension);
         image = RtBMPImageRead(name);
@@ -552,7 +552,7 @@ ZrwTexture *LoadTexture(const void *data, uint32_t size, const char *name, int t
             }
         }
         zrwFileRamDiskClear();
-        RwErrorGet(error);
+        RwErrorGet(&error);
         if (texture == NULL) {
             zdebugFail("Failed to create texture", kZrwTxrFile, 0x277, 0);
             return NULL;
@@ -899,8 +899,8 @@ BMX_ADDR(0x00498b10)
 int zrwMatRegisterPlugin(void)
 {
     gZrwMatPluginOffset =
-        RwTextureRegisterPlugin(4, 0xff01, BMX_FNPTR(void(BMX_CDECL *)(void *), 0x00497a90, rwMatConstructor),
-                                BMX_FNPTR(void *(BMX_CDECL *)(void *), 0x00497ab0, rwMatDestructor), NULL);
+        RwTextureRegisterPlugin(4, 0xff01, BMX_FNPTR(RwPluginObjectConstructor, 0x00497a90, rwMatConstructor),
+                                BMX_FNPTR(RwPluginObjectDestructor, 0x00497ab0, rwMatDestructor), NULL);
     return gZrwMatPluginOffset != -1;
 }
 

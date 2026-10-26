@@ -5,6 +5,7 @@
 #include <stddef.h>
 
 #include "compat/crt.h"
+#include "rw/rwcore.h"
 #include "zge/com/zglrw/zrwzgl.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zobjcamera.h"
@@ -14,7 +15,6 @@
 static const char kZrwDbgFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwDbg.c";
 
 /* RenderWare library calls (statically linked in the exe, not ported). */
-ORIG_FN(0x004d0120, const int32_t *, RwEngineGetMetrics, (void));
 ORIG_FN(0x004cbef0, void, RtCharsetPrint, (void *charset, const char *text, int x, int y));
 ORIG_FN(0x004cbfb0, void *, RtCharsetCreate, (const uint32_t *foreground, const uint32_t *background));
 ORIG_FN(0x004cb3f0, void, RtCharsetGetDesc, (void *charset, int32_t *desc));

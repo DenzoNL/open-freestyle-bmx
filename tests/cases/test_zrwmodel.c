@@ -984,7 +984,7 @@ DT_CASES(zrwmodel_cases) = {
      300, 0},
     {"zrwModelSetInWorld", 0x00487c20, zrwModelSetInWorld, 2, DT_RET_VOID, setup_model_int, 600, 0},
     {"zrwModelSetActive", 0x00487cd0, zrwModelSetActive, 2, DT_RET_VOID, setup_model_int, 600, 0},
-    {"zrwMdlConstructor", 0x00487d90, zrwMdlConstructor, 1, DT_RET_VOID, setup_plugin_ctor, 200, 0},
+    {"zrwMdlConstructor", 0x00487d90, zrwMdlConstructor, 1, DT_RET_INT, setup_plugin_ctor, 200, 0},
     {"zrwMdlDestructor", 0x00487db0, zrwMdlDestructor, 1, DT_RET_INT, setup_plugin_ctor, 50, 0},
     {"zrwMdlSetUserData", 0x00487dc0, zrwMdlSetUserData, 2, DT_RET_INT, setup_plugin_set, 200, 0},
     {"zrwQuatToMatrix", 0x00487e70, zrwQuatToMatrix, 2, DT_RET_VOID, setup_quat, 2000, 0},

@@ -164,7 +164,7 @@ void zrwModelSetInWorld(const ZrwModel *model, int add);
 void zrwModelSetActive(const ZrwModel *model, int on);
 
 /* Plugin slot hooks of the clump (constructor clears the slot; the destructor does nothing). */
-void zrwMdlConstructor(void *clump);
+void *zrwMdlConstructor(void *clump);
 void *zrwMdlDestructor(void *clump);
 int zrwMdlSetUserData(void *clump, uint32_t value);
 int zrwMdlRegisterPlugin(void);

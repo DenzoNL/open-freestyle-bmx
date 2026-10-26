@@ -4,6 +4,8 @@
 #include <stddef.h>
 
 #include "compat/crt.h"
+#include "rw/rwcore.h"
+#include "rw/rwplugins.h"
 #include "zge/com/zglrw/zrwcol.h"
 #include "zge/com/zglrw/zrwmat.h"
 #include "zge/com/zglrw/zrwmodelrender.h"
@@ -38,8 +40,6 @@ ORIG_FN(0x004d2b00, ZMatrix *, RwFrameGetMatrix, (void *frame));
 ORIG_FN(0x004d2eb0, void *, RwFrameForAllChildren, (void *frame, RwFrameCallback callback, void *data));
 ORIG_FN(0x004d2f00, int, RwFrameCount, (void *frame));
 ORIG_FN(0x004d3200, void *, RwFrameSetIdentity, (void *frame));
-ORIG_FN(0x00500220, uint32_t, RwFrameGetUserData, (void *frame));
-ORIG_FN(0x00500230, void, RwFrameSetUserData, (void *frame, uint32_t data));
 ORIG_FN(0x004b1990, void *, RpClumpForAllAtomics, (void *clump, RpAtomicCallback callback, void *data));
 ORIG_FN(0x004b1440, int, RpClumpGetNumAtomics, (void *clump));
 ORIG_FN(0x004b1ee0, void *, RpClumpClone, (void *clump));
@@ -58,11 +58,9 @@ ORIG_FN(0x004e23e0, void *, RwStreamOpen, (int type, int access, const void *dat
 ORIG_FN(0x004e2ec0, int, RwStreamFindChunk,
         (void *stream, uint32_t type, uint32_t *length, uint32_t *version));
 ORIG_FN(0x004e2660, int, RwStreamClose, (void *stream, void *data));
-ORIG_FN(0x004dba80, const uintptr_t *, RwOsGetMemoryInterface, (void));
 ORIG_FN(0x004b86a0, void *, RpWorldAddClump, (void *world, void *clump));
 ORIG_FN(0x004b8770, void *, RpWorldRemoveClump, (void *world, void *clump));
 ORIG_FN(0x004b8870, void *, RpClumpGetWorld, (void *clump));
-ORIG_FN(0x00505950, void, RpSkinClumpSetup, (void *clump));
 
 /* The RenderWare memory interface: allocation at +0, free at +4. */
 typedef void *(BMX_CDECL *RwAllocFn)(uint32_t size);
@@ -800,7 +798,7 @@ int zrwModelAddClump(ZrwModel *model, const uint32_t *memory, const char *imageP
         clump = RpClumpStreamRead(stream);
     }
     RwStreamClose(stream, NULL);
-    ((RwFreeFn)RwOsGetMemoryInterface()[1])((void *)(uintptr_t)memory[0]);
+    ((RwFreeFn)(uintptr_t)RwOsGetMemoryInterface()->rwfree)((void *)(uintptr_t)memory[0]);
     if (clump == NULL) {
         return 0;
     }
@@ -872,7 +870,7 @@ static int loadClumpChunk(void *iff, ZrwModel *model, int collision, int line)
     uint32_t memory[2];
     const uint32_t size = ziffChunkSize(iff);
 
-    memory[0] = (uint32_t)(uintptr_t)((RwAllocFn)RwOsGetMemoryInterface()[0])(size);
+    memory[0] = (uint32_t)(uintptr_t)((RwAllocFn)(uintptr_t)RwOsGetMemoryInterface()->rwmalloc)(size);
     memory[1] = size;
     ziffRead(iff, (void *)(uintptr_t)memory[0], size);
     if (zrwModelAddClump(model, memory, NULL, collision) == 0) {

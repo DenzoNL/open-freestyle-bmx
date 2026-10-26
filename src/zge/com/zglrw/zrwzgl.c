@@ -4,6 +4,8 @@
 #include <stddef.h>
 
 #include "compat/crt.h"
+#include "rw/rwcore.h"
+#include "rw/rwplugins.h"
 #include "zge/pc/pcinput.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zramdisk.h"
@@ -17,8 +19,6 @@ static const char kNotInitialized[] = "Not initialized";
 static const char kUnknownParameter[] = "Unknown parameter:%d";
 
 /* Statically linked RenderWare and engine routines this module calls (not ported). */
-ORIG_FN(0x004db820, int, rwRenderStateSet, (int state, int value));
-ORIG_FN(0x004db800, float, rwRenderStateGetFloat, (void));
 ORIG_FN(0x004929f0, void, zrwSetClipPlane, (const void *plane, int zero, float value));
 ORIG_FN(0x004930a0, void, zrwSetViewport, (const void *a, const void *b));
 ORIG_FN(0x004930b0, void, zrwSetViewWindow, (const void *a, const void *b));
@@ -35,16 +35,7 @@ ORIG_FN(0x0049ea60, void, zrwFileShutdown, (void));
 ORIG_FN(0x00496c40, void *, zrwCreateWorld, (void));
 ORIG_FN(0x00496de0, int, zrwWorldShutdown, (void));
 
-ORIG_FN(0x004d01f0, int, rwEngineInit, (uint32_t memoryFuncs, int flags));
-ORIG_FN(0x004bc1c0, int, rpWorldPluginAttach, (void));
-ORIG_FN(0x00500250, int, rpAnimPluginAttach, (void));
-ORIG_FN(0x00505870, int, rpBonePluginAttach, (void));
-ORIG_FN(0x005062b0, int, rpLodAtomicPluginAttach, (void));
-ORIG_FN(0x004ccac0, int, rpPvsPluginAttach, (void));
 ORIG_FN(0x00488890, int, zrwMdlRegisterPlugin, (void));
-ORIG_FN(0x004d0020, int, rwEngineOpen, (void *params));
-ORIG_FN(0x004cfd50, int, rwEngineStart, (void));
-ORIG_FN(0x004dba80, const uint32_t *, rwOsGetMemoryInterface, (void));
 int zgeInitializeSubsystems(const char *argument);
 int ngifInitialize(void);
 int ngifRunFrame(float dt);
@@ -56,7 +47,6 @@ ORIG_FN(0x00492fe0, int, zrwcamEnd, (void));
 ORIG_FN(0x00493060, void *, zrwcamHandle, (void *camera));
 ORIG_FN(0x00497620, int, zrwtxrFlush, (void));
 ORIG_FN(0x004de8a0, int, rwCameraClear, (void *camera, const void *color, int flags));
-ORIG_FN(0x004ded90, void, rwErrorGet, (void *error));
 ORIG_FN(0x004dea80, void *, rwCameraGetFrame, (void *camera));
 ORIG_FN(0x004d2b00, uint8_t *, rwFrameGetMatrix, (void *frame));
 ORIG_FN(0x004dcfd0, int, rwRasterShowRaster, (void *raster, void *window, int flags));
@@ -68,21 +58,7 @@ ORIG_FN(0x004cc2c0, void, rwLightEnd, (void *light));
 ORIG_FN(0x004a5c98, void *, rwfopen, (const char *path, const char *mode));
 ORIG_FN(0x004a5cab, int, rwfclose, (void *file));
 ORIG_FN(0x004a5a46, void, rwExit, (int code));
-ORIG_FN(0x004cf870, int, rwEngineGetNumSubSystems, (void));
-ORIG_FN(0x004cf8b0, int, rwEngineGetSubSystemInfo, (void *info, int index));
-ORIG_FN(0x004cf940, int, rwEngineGetCurrentSubSystem, (void));
-ORIG_FN(0x004cf980, int, rwEngineSetSubSystem, (int index));
-ORIG_FN(0x004cf9f0, uint32_t, rwEngineGetNumVideoModes, (void));
-ORIG_FN(0x004cfa60, int, rwEngineGetVideoModeInfo, (void *info, uint32_t index));
-ORIG_FN(0x004cfb40, int, rwEngineSetVideoMode, (uint32_t index));
-ORIG_FN(0x004cfad0, int, rwEngineGetCurrentVideoMode, (void));
 
-/* Result of RwErrorGet. */
-typedef struct RwError {
-    uint32_t plugin;
-    uint32_t code;
-} RwError;
-static const uint32_t kRwNoError = 0x80000000u;
 /* RwVideoMode: size, depth and flags (bit 0: full screen). */
 typedef struct RwVideoMode {
     uint32_t width;
@@ -388,7 +364,7 @@ int zrwGetParameter(int id, void *out, const void *extra)
         if (extra == NULL) {
             zdebugFail("Invalid camera specified.", kZglFile, 0x13e, 0);
         }
-        *f = rwRenderStateGetFloat();
+        *f = RwIm2DGetNearScreenZ();
         return 1;
     case 7:
     case 8:
@@ -479,13 +455,13 @@ int zrwSelectDefaultDevice(void)
 {
     RwVideoMode mode;
 
-    if (rwEngineSetSubSystem(gZglSubSystem) == 0) {
+    if (RwEngineSetSubSystem(gZglSubSystem) == 0) {
         return 0;
     }
-    if (rwEngineSetVideoMode(gZglVideoMode) == 0) {
+    if (RwEngineSetVideoMode(gZglVideoMode) == 0) {
         return 0;
     }
-    rwEngineGetVideoModeInfo(&mode, gZglVideoMode);
+    RwEngineGetVideoModeInfo(&mode, gZglVideoMode);
     if ((mode.flags & 1) != 0) {
         enterFullscreen(&mode);
     }
@@ -504,7 +480,7 @@ int zrwSelectDevice(void)
     void *const parent = gZrwWindow;
     RwVideoMode mode;
 
-    gZglSubSystemCount = rwEngineGetNumSubSystems();
+    gZglSubSystemCount = RwEngineGetNumSubSystems();
     if (gZglSubSystemCount == 0) {
         return 0;
     }
@@ -512,14 +488,14 @@ int zrwSelectDevice(void)
         gZglSubSystemCount = kMaxSubSystems;
     }
     for (int i = 0; i < gZglSubSystemCount; i++) {
-        rwEngineGetSubSystemInfo(&gZglSubSystemNames + i * kSubSystemNameBytes, i);
+        RwEngineGetSubSystemInfo(&gZglSubSystemNames + i * kSubSystemNameBytes, i);
     }
-    gZglSubSystem = rwEngineGetCurrentSubSystem();
+    gZglSubSystem = RwEngineGetCurrentSubSystem();
     if (gZglWantW2 != 0 && gZglWantH2 != 0 && gZglWantDepth != 0) {
-        const uint32_t count = rwEngineGetNumVideoModes();
+        const uint32_t count = RwEngineGetNumVideoModes();
 
         for (uint32_t i = 0; i < count; i++) {
-            rwEngineGetVideoModeInfo(&mode, i);
+            RwEngineGetVideoModeInfo(&mode, i);
             if ((int)mode.depth == gZglWantDepth) {
                 mode.width = (uint32_t)gZglWantW2;
                 if (gZglWantW2 != 0 && (int)mode.height == gZglWantH2 && (mode.flags & 1) != 0) {
@@ -530,8 +506,8 @@ int zrwSelectDevice(void)
     } else if (gDialogBox(instance, 0x68, parent, BMX_FNPTR(void *, 0x0048a330, zrwDialogProc), 0) == 0) {
         return 0;
     }
-    if (rwEngineSetSubSystem(gZglSubSystem) != 0 && rwEngineSetVideoMode(gZglVideoMode) != 0) {
-        rwEngineGetVideoModeInfo(&mode, gZglVideoMode);
+    if (RwEngineSetSubSystem(gZglSubSystem) != 0 && RwEngineSetVideoMode(gZglVideoMode) != 0) {
+        RwEngineGetVideoModeInfo(&mode, gZglVideoMode);
         if ((mode.flags & 1) != 0) {
             enterFullscreen(&mode);
         }
@@ -546,24 +522,24 @@ int zrwAttachPlugins(void *window)
     if (gZrwSkipDevice == 0) {
         gZrwEngineInit = (uint32_t)zrwReturnZero();
     }
-    rwEngineInit(gZrwEngineInit, 0);
-    if (rpWorldPluginAttach() == 0) {
+    RwEngineInit((const RwMemoryFunctions *)(uintptr_t)gZrwEngineInit, 0);
+    if (RpWorldPluginAttach() == 0) {
         zrwApplicationError("RpWorldPluginAttach failed");
         return 0;
     }
-    if (rpAnimPluginAttach() == 0) {
+    if (RpAnimPluginAttach() == 0) {
         zrwApplicationError("RpAnimPluginAttach failed");
         return 0;
     }
-    if (rpBonePluginAttach() == 0) {
+    if (RpBonePluginAttach() == 0) {
         zrwApplicationError("RpBonePluginAttach failed");
         return 0;
     }
-    if (rpLodAtomicPluginAttach() == 0) {
+    if (RpLODAtomicPluginAttach() == 0) {
         zrwApplicationError("RpLODAtomicPluginAttach failed");
         return 0;
     }
-    if (rpPvsPluginAttach() == 0) {
+    if (RpPVSPluginAttach() == 0) {
         zrwApplicationError("RpPVSPluginAttach failed");
         return 0;
     }
@@ -576,7 +552,7 @@ int zrwAttachPlugins(void *window)
         return 0;
     }
     gZrwEngineOpen = (uint32_t)(uintptr_t)window;
-    rwEngineOpen(&gZrwEngineOpen);
+    RwEngineOpen(&gZrwEngineOpen);
     if (gZrwSkipDevice == 0) {
         if (zrwSelectDevice() == 0) {
             return 0;
@@ -584,7 +560,7 @@ int zrwAttachPlugins(void *window)
     } else if (zrwSelectDefaultDevice() == 0) {
         return 0;
     }
-    return rwEngineStart() != 0;
+    return RwEngineStart() != 0;
 }
 
 /*
@@ -601,10 +577,10 @@ int zrwInitApp(const char *commandLine)
     zmemFill((void *)&gZrwRaster, 0, 0x88);
     zmemFill(&gZrwInitialized, 0, 0xa8);
     gZrwInitialized = 1;
-    gRwMalloc = (ZMemAllocFn)(uintptr_t)rwOsGetMemoryInterface()[0];
-    gRwFree = (ZMemFreeFn)(uintptr_t)rwOsGetMemoryInterface()[1];
-    gRwRealloc = (ZMemReallocFn)(uintptr_t)rwOsGetMemoryInterface()[2];
-    gZglMemoryFuncs = rwOsGetMemoryInterface()[3];
+    gRwMalloc = (ZMemAllocFn)(uintptr_t)RwOsGetMemoryInterface()->rwmalloc;
+    gRwFree = (ZMemFreeFn)(uintptr_t)RwOsGetMemoryInterface()->rwfree;
+    gRwRealloc = (ZMemReallocFn)(uintptr_t)RwOsGetMemoryInterface()->rwrealloc;
+    gZglMemoryFuncs = (uint32_t)(uintptr_t)RwOsGetMemoryInterface()->rwcalloc;
     gZglAllocHookNop = BMX_FNPTR(ZglNopFn, 0x0048af80, zrwNop);
     if (commandLine != NULL) {
         while (*commandLine != '\0') {
@@ -717,7 +693,7 @@ int zrwDrawFrame(void)
         if ((((const uint8_t *)camera)[8] & 4) == 0) {
             continue;
         }
-        rwErrorGet(&error);
+        RwErrorGet(&error);
         if (zrwcamBegin(camera) == 0) {
             continue;
         }
@@ -741,8 +717,8 @@ int zrwDrawFrame(void)
         if (zrwcamEnd() == 0) {
             return 0;
         }
-        rwErrorGet(&error);
-        if (error.code != kRwNoError) {
+        RwErrorGet(&error);
+        if (error.errorCode != rwERRNONE) {
             zdebugFail("There is a pending RenderWare error. Rendering has been aborted.", kZglFile, 0x45f,
                        0);
             return 0;
@@ -832,24 +808,24 @@ void zrwResetRenderState(void)
 
     gZrwRenderExtra = 0;
     gZrwRenderFlags = 0x6502;
-    rwRenderStateSet(1, 0);
+    RwRenderStateSet(1, 0);
     level = (int)((gZrwRenderFlags >> 4 & 2) + 1);
-    rwRenderStateSet(2, level);
-    rwRenderStateSet(0x12, level);
-    rwRenderStateSet(0x13, level);
-    rwRenderStateSet(3, 1);
-    rwRenderStateSet(4, 1);
-    rwRenderStateSet(5, 2);
-    rwRenderStateSet(6, 1);
-    rwRenderStateSet(7, 2);
-    rwRenderStateSet(10, (int)(~gZrwRenderFlags >> 3 & 1));
-    rwRenderStateSet(0xb, -1);
-    rwRenderStateSet(0xc, 0);
-    rwRenderStateSet(0xd, -1);
-    rwRenderStateSet(0xe, 1);
-    rwRenderStateSet(0x11, 1);
-    rwRenderStateSet(8, (int)(gZrwRenderFlags >> 8 & 0xf));
-    rwRenderStateSet(9, (int)(gZrwRenderFlags >> 12 & 0xf));
+    RwRenderStateSet(2, level);
+    RwRenderStateSet(0x12, level);
+    RwRenderStateSet(0x13, level);
+    RwRenderStateSet(3, 1);
+    RwRenderStateSet(4, 1);
+    RwRenderStateSet(5, 2);
+    RwRenderStateSet(6, 1);
+    RwRenderStateSet(7, 2);
+    RwRenderStateSet(10, (int)(~gZrwRenderFlags >> 3 & 1));
+    RwRenderStateSet(0xb, -1);
+    RwRenderStateSet(0xc, 0);
+    RwRenderStateSet(0xd, -1);
+    RwRenderStateSet(0xe, 1);
+    RwRenderStateSet(0x11, 1);
+    RwRenderStateSet(8, (int)(gZrwRenderFlags >> 8 & 0xf));
+    RwRenderStateSet(9, (int)(gZrwRenderFlags >> 12 & 0xf));
 }
 
 /* Applies only the render states whose flag bits differ from the current ones. */
@@ -862,18 +838,18 @@ int zrwSetRenderState(uint32_t flags, int extra)
         if ((diff & 1) != 0) {
             const int off = (flags & 1) == 0;
 
-            rwRenderStateSet(4, off);
-            rwRenderStateSet(6, off);
+            RwRenderStateSet(4, off);
+            RwRenderStateSet(6, off);
         }
         if ((diff & 4) != 0) {
-            rwRenderStateSet(7, (flags & 4) != 0 ? 1 : 2);
+            RwRenderStateSet(7, (flags & 4) != 0 ? 1 : 2);
         }
         if ((diff & 0x20) != 0) {
             const int level = (int)((flags >> 4 & 2) + 1);
 
-            rwRenderStateSet(2, level);
-            rwRenderStateSet(0x12, level);
-            rwRenderStateSet(0x13, level);
+            RwRenderStateSet(2, level);
+            RwRenderStateSet(0x12, level);
+            RwRenderStateSet(0x13, level);
         }
         if ((diff & 0xff02) != 0) {
             if ((flags & 2) == 0) {
@@ -881,17 +857,17 @@ int zrwSetRenderState(uint32_t flags, int extra)
                 diff = gZrwRenderFlags ^ flags;
             }
             if ((diff >> 8 & 0xff) != 0) {
-                rwRenderStateSet(8, (int)(flags >> 8 & 0xf));
-                rwRenderStateSet(9, (int)(flags >> 12 & 0xf));
+                RwRenderStateSet(8, (int)(flags >> 8 & 0xf));
+                RwRenderStateSet(9, (int)(flags >> 12 & 0xf));
             }
         }
         if ((diff & 8) != 0) {
-            rwRenderStateSet(10, (flags & 8) == 0);
+            RwRenderStateSet(10, (flags & 8) == 0);
         }
         gZrwRenderFlags = flags;
     }
     if (extra != gZrwRenderExtra) {
-        rwRenderStateSet(1, extra);
+        RwRenderStateSet(1, extra);
         gZrwRenderExtra = extra;
     }
     return 1;
@@ -1134,12 +1110,12 @@ void zrwDialogInit(void *dialog)
         }
     }
     gSendMessage(subSystems, 0x14e, selected, 0);
-    count = (int)rwEngineGetNumVideoModes();
-    selectedMode = (uintptr_t)rwEngineGetCurrentVideoMode();
+    count = (int)RwEngineGetNumVideoModes();
+    selectedMode = (uintptr_t)RwEngineGetCurrentVideoMode();
     for (int i = 0; i < count; i++) {
         RwVideoMode mode;
 
-        rwEngineGetVideoModeInfo(&mode, (uint32_t)i);
+        RwEngineGetVideoModeInfo(&mode, (uint32_t)i);
         if ((mode.depth == 16 || mode.depth == 32) && isListedMode(mode.width, mode.height)) {
             item = addModeLabel(modes, &mode, i);
         }
@@ -1169,19 +1145,19 @@ void zrwDialogSelectDevice(void *dialog)
     if ((int)gSendMessage(subSystems, 0x150, gSendMessage(subSystems, 0x147, 0, 0), 0) == gZglSubSystem) {
         return;
     }
-    rwEngineSetSubSystem(gZglSubSystem);
+    RwEngineSetSubSystem(gZglSubSystem);
     modes = gGetDlgItem(dialog, 0x3e9);
     gSendMessage(modes, 0x14b, 0, 0);
-    count = (int)rwEngineGetNumVideoModes();
+    count = (int)RwEngineGetNumVideoModes();
     for (int i = 0; i < count; i++) {
         RwVideoMode mode;
 
-        rwEngineGetVideoModeInfo(&mode, (uint32_t)i);
+        RwEngineGetVideoModeInfo(&mode, (uint32_t)i);
         if ((mode.depth == 16 || mode.depth == 32) && isListedMode(mode.width, mode.height)) {
             addModeLabel(modes, &mode, i);
         }
     }
-    gZglVideoMode = (uint32_t)rwEngineGetCurrentVideoMode();
+    gZglVideoMode = (uint32_t)RwEngineGetCurrentVideoMode();
     gSendMessage(modes, 0x14e, gZglVideoMode, 0);
 }
 

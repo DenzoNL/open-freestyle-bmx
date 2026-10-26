@@ -108,3 +108,7 @@ With `BMX_TRAP_SKIP=40` the survey continues (all in the init path, WinMain -> A
 After that the fake return value 1 is used as a pointer by InitApp and it faults, which is expected: the
 RenderWare engine core (device, memory interface, plugin registry) is the next thing to implement. The
 CRT is not reached yet.
+
+After the first RenderWare slice (rw/core.c, rw/engine.c, rw/plugins.c: engine init/open/start, memory interface,
+plugin registry, attach routines) the first trap is the next RW group, `_rwFSOpen` (0x4e82e0, rw/stream.c), called from
+RwEngineInit.

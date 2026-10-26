@@ -2,6 +2,7 @@
 #include "zge/com/zglrw/zrwlight.h"
 
 #include "compat/crt.h"
+#include "rw/rwcore.h"
 #include "zge/com/zglrw/zrwmodel.h"
 #include "zge/zdebug.h"
 #include "zge/zmem.h"
@@ -23,7 +24,6 @@ ORIG_FN(0x004d2920, int, RwFrameDestroy, (void *frame));
 ORIG_FN(0x004d2f40, void *, RwFrameTranslate, (void *frame, const ZVec3 *translation, int combine));
 ORIG_FN(0x004d2b00, ZMatrix *, RwFrameGetMatrix, (void *frame));
 ORIG_FN(0x004d3200, void *, RwFrameSetIdentity, (void *frame));
-ORIG_FN(0x004d04d0, void *, RwMatrixUpdate, (ZMatrix * matrix));
 
 /* RpLightType of the four kinds the scene creates. */
 typedef uint32_t ZrwLightTypeTable[4];

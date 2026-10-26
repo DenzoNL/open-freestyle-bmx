@@ -1,0 +1,460 @@
+/* RenderWare 3.1 engine: init/open/start, device queries, memory interface, resource arena, small helpers. */
+#include "rw/rwcore.h"
+
+#include "compat/crt.h"
+#include "rw/rwplugins.h"
+
+/* Callees in other RenderWare groups, still original code. */
+ORIG_FN(0x004e5570, void, RwImageSetGamma, (float gamma));
+ORIG_FN(0x004e82e0, int, _rwFSOpen, (void));
+
+/* The engine plugin 0x401 data: the flag bit marking an identity matrix and the multiply routine. */
+typedef struct RwMatrixGlobals {
+    uint32_t unused;                                                                /* 0x00 */
+    uint32_t identityBit;                                                           /* 0x04 */
+    void(BMX_CDECL *multiply)(RwMatrix *out, const RwMatrix *a, const RwMatrix *b); /* 0x08 */
+    uint32_t pad0c;                                                                 /* 0x0c */
+} RwMatrixGlobals;
+
+_Static_assert(sizeof(RwMatrixGlobals) == 0x10, "RwMatrixGlobals layout");
+
+static RwMatrixGlobals *rwMatrixGlobals(void)
+{
+    return (RwMatrixGlobals *)((uint8_t *)RwEngineInstance + rwMatrixOffset);
+}
+
+static RwResourcesGlobals *rwResources(void)
+{
+    return (RwResourcesGlobals *)((uint8_t *)RwEngineInstance + rwResourcesOffset);
+}
+
+/* Reports a failed device system request through the error slot. */
+static void rwDeviceError(int32_t request)
+{
+    RwError error;
+    error.pluginID = 1;
+    error.errorCode = _rwerror(rwERR_DEVICE, request);
+    RwErrorSet(&error);
+}
+
+/* ---- device queries --------------------------------------------------------------------------------- */
+
+/* Number of rendering sub systems (graphics adapters); 1 if the device does not say. */
+BMX_ADDR(0x004cf870)
+int32_t RwEngineGetNumSubSystems(void)
+{
+    int32_t count = 1;
+    if (!RwEngineInstance->dOpenDevice.fpSystem(rwDEVICESYSTEMGETNUMSUBSYSTEMS, &count, NULL, 0)) {
+        count = 1;
+    }
+    return count;
+}
+
+/* Name of a sub system; without a device answer, "Only rendering sub system" for index 0. */
+BMX_ADDR(0x004cf8b0)
+void *RwEngineGetSubSystemInfo(void *info, int32_t subSystem)
+{
+    if (!RwEngineInstance->dOpenDevice.fpSystem(rwDEVICESYSTEMGETSUBSYSTEMINFO, info, NULL, subSystem)) {
+        if (subSystem != 0) {
+            rwDeviceError(rwDEVICESYSTEMGETSUBSYSTEMINFO);
+            return NULL;
+        }
+        RwEngineInstance->stringFuncs.rwstrcpy(info, "Only rendering sub system");
+    }
+    return info;
+}
+
+BMX_ADDR(0x004cf940)
+int32_t RwEngineGetCurrentSubSystem(void)
+{
+    int32_t current;
+    if (!RwEngineInstance->dOpenDevice.fpSystem(rwDEVICESYSTEMGETCURRENTSUBSYSTEM, &current, NULL, 0)) {
+        current = 0;
+    }
+    return current;
+}
+
+BMX_ADDR(0x004cf980)
+int RwEngineSetSubSystem(int32_t subSystem)
+{
+    if (!RwEngineInstance->dOpenDevice.fpSystem(rwDEVICESYSTEMSETSUBSYSTEM, NULL, NULL, subSystem) &&
+        subSystem != 0) {
+        rwDeviceError(rwDEVICESYSTEMSETSUBSYSTEM);
+        return 0;
+    }
+    return 1;
+}
+
+BMX_ADDR(0x004cf9f0)
+int32_t RwEngineGetNumVideoModes(void)
+{
+    int32_t count;
+    if (!RwEngineInstance->dOpenDevice.fpSystem(rwDEVICESYSTEMGETNUMMODES, &count, NULL, 0)) {
+        rwDeviceError(rwDEVICESYSTEMGETNUMMODES);
+        return -1;
+    }
+    return count;
+}
+
+BMX_ADDR(0x004cfa60)
+void *RwEngineGetVideoModeInfo(void *info, int32_t modeIndex)
+{
+    if (!RwEngineInstance->dOpenDevice.fpSystem(rwDEVICESYSTEMGETMODEINFO, info, NULL, modeIndex)) {
+        rwDeviceError(rwDEVICESYSTEMGETMODEINFO);
+        return NULL;
+    }
+    return info;
+}
+
+BMX_ADDR(0x004cfad0)
+int32_t RwEngineGetCurrentVideoMode(void)
+{
+    int32_t mode;
+    if (!RwEngineInstance->dOpenDevice.fpSystem(rwDEVICESYSTEMGETMODE, &mode, NULL, 0)) {
+        rwDeviceError(rwDEVICESYSTEMGETMODE);
+        return -1;
+    }
+    return mode;
+}
+
+BMX_ADDR(0x004cfb40)
+int RwEngineSetVideoMode(int32_t modeIndex)
+{
+    if (!RwEngineInstance->dOpenDevice.fpSystem(rwDEVICESYSTEMUSEMODE, NULL, NULL, modeIndex)) {
+        rwDeviceError(rwDEVICESYSTEMUSEMODE);
+        return 0;
+    }
+    return 1;
+}
+
+/* ---- engine life cycle ------------------------------------------------------------------------------ */
+
+/*
+ * Starts the device, initialises the engine object's plugin data and applies the device's gamma. Stops
+ * the device again when a plugin constructor fails.
+ */
+BMX_ADDR(0x004cfd50)
+int RwEngineStart(void)
+{
+    if (!RwEngineInstance->dOpenDevice.fpSystem(rwDEVICESYSTEMSTART, NULL, NULL, 0)) {
+        rwDeviceError(rwDEVICESYSTEMSTART);
+        return 0;
+    }
+    if (_rwPluginRegistryInitObject(&rwEngineRegistry, RwEngineInstance) != NULL) {
+        RwImageSetGamma(RwEngineInstance->dOpenDevice.gammaCorrection);
+        RwEngineInstance->dOpenDevice.fpSystem(rwDEVICESYSTEMFINALIZESTART, NULL, NULL, 0);
+        RwEngineInstance->engineStatus = rwENGINESTATUSSTARTED;
+        return 1;
+    }
+    if (!RwEngineInstance->dOpenDevice.fpSystem(rwDEVICESYSTEMSTOP, NULL, NULL, 0)) {
+        rwDeviceError(rwDEVICESYSTEMSTOP);
+    }
+    return 0;
+}
+
+/*
+ * Register-argument function (EAX = device, EDX = open parameters). Allocates the engine instance (the
+ * size grew with every engine plugin), copies the static defaults into it, registers the device and opens
+ * it. A failed registration or standards query is reported but not fatal; a failed open restores the
+ * static instance and frees the new one.
+ */
+BMX_ADDR(0x004cfe60)
+__attribute__((regparm(2))) int EngineOpen(const RwDevice *device, void *openParams)
+{
+    RwGlobals *instance = RwEngineInstance->memoryFuncs.rwmalloc((size_t)rwEngineRegistry.sizeOfStruct);
+    RwEngineInstance = instance;
+    if (instance == NULL) {
+        RwError error;
+        error.pluginID = 1;
+        error.errorCode = _rwerror(rwERR_NOMEM, rwEngineRegistry.sizeOfStruct);
+        RwErrorSet(&error);
+        return 0;
+    }
+    *instance = RwDefaultGlobals;
+    if (!device->fpSystem(rwDEVICESYSTEMREGISTER, &RwEngineInstance->dOpenDevice,
+                          &RwEngineInstance->memoryFuncs, 0)) {
+        rwDeviceError(rwDEVICESYSTEMREGISTER);
+    }
+    if (!device->fpSystem(rwDEVICESYSTEMOPEN, NULL, openParams, 0)) {
+        rwDeviceError(rwDEVICESYSTEMOPEN);
+        RwEngineInstance = &RwDefaultGlobals;
+        RwDefaultGlobals = *instance;
+        RwEngineInstance->memoryFuncs.rwfree(instance);
+        return 0;
+    }
+    if (!device->fpSystem(rwDEVICESYSTEMSTANDARDS, RwEngineInstance->stdFunc, NULL,
+                          rwSTANDARDNUMOFSTANDARD)) {
+        rwDeviceError(rwDEVICESYSTEMSTANDARDS);
+    }
+    rwEngineInstanceCount++;
+    return 1;
+}
+
+/* The D3D7 driver's device table. */
+BMX_ADDR(0x004ee140)
+RwDevice *_rwDeviceGetHandle(void)
+{
+    return &rwD3D7Device;
+}
+
+/* Opens the engine on the device; openParams is the driver's (the window handle for D3D7). */
+BMX_ADDR(0x004d0020)
+int RwEngineOpen(void *openParams)
+{
+    if (RwEngineInstance == NULL) {
+        RwEngineInstance = &RwDefaultGlobals;
+    }
+    RwDevice *device = _rwDeviceGetHandle();
+    if (device == NULL) {
+        return 0;
+    }
+    const int opened = EngineOpen(device, openParams);
+    if (opened != 0) {
+        RwEngineInstance->engineStatus = rwENGINESTATUSOPENED;
+    }
+    return opened;
+}
+
+BMX_ADDR(0x004d0120)
+int32_t *RwEngineGetMetrics(void)
+{
+    return RwEngineInstance->metrics;
+}
+
+BMX_ADDR(0x004d0130)
+int32_t _rwGetNumEngineInstances(void)
+{
+    return rwEngineInstanceCount;
+}
+
+/* Counterpart of _rwFSOpen; does nothing. */
+BMX_ADDR(0x004e8380)
+void _rwFSClose(void) {}
+
+/* The first entry of the table at 0x69bee0 is the attach routine of the core plugin it belongs to. */
+BMX_ADDR(0x004eb110)
+void **rwCoreExtGetFuncs(void)
+{
+    return RW_CB(void **, 0x0069bee0);
+}
+
+BMX_ADDR(0x004e86f0)
+int rwCoreExtPluginAttach(void)
+{
+    return ((int(BMX_CDECL *)(void))rwCoreExtGetFuncs()[0])();
+}
+
+/*
+ * Initialises RenderWare before anything else: memory interface (the CRT's unless the caller passes its
+ * own), string functions, file system, plugin registry and the core plugins. initFlags bit 0 selects the
+ * plain free list entry points.
+ */
+BMX_ADDR(0x004d01f0)
+int RwEngineInit(const RwMemoryFunctions *memoryFunctions, uint32_t initFlags)
+{
+    RwEngineInstance = &RwDefaultGlobals;
+    if ((initFlags & 1) == 0) {
+        RwEngineInstance->freeListAlloc = RW_CB(RwFreeListAllocFunc, 0x004dbc30);
+        RwEngineInstance->freeListFree = RW_CB(RwFreeListFreeFunc, 0x004dbd90);
+    } else {
+        RwEngineInstance->freeListAlloc = RW_CB(RwFreeListAllocFunc, 0x004cf800);
+        RwEngineInstance->freeListFree = RW_CB(RwFreeListFreeFunc, 0x004cf820);
+    }
+    int result = _rwStringOpen();
+    if (result != 0) {
+        result = _rwMemoryOpen(memoryFunctions);
+        if (result != 0) {
+            result = _rwFSOpen();
+            if (result != 0) {
+                result = _rwPluginRegistryOpen();
+                if (result != 0) {
+                    result = CorePluginAttach();
+                    if (result != 0) {
+                        RwEngineInstance->engineStatus = rwENGINESTATUSINITED;
+                        return result;
+                    }
+                    _rwPluginRegistryClose();
+                }
+                _rwFSClose();
+            }
+            _rwMemoryClose();
+        }
+        _rwStringClose();
+    }
+    return result;
+}
+
+/* ---- memory interface ------------------------------------------------------------------------------- */
+
+/* calloc of the default memory interface: the exe's malloc plus a zero fill. */
+void *rwDefaultCalloc(size_t count, size_t size)
+{
+    const size_t bytes = count * size;
+    uint8_t *block = malloc(bytes);
+    if (block != NULL) {
+        for (size_t i = 0; i < bytes; i++) {
+            block[i] = 0;
+        }
+    }
+    return block;
+}
+
+/*
+ * Resets the free list chain and fills the engine's memory interface: from the caller's, or the exe's
+ * malloc/free/realloc and a calloc built on malloc. Always 1.
+ */
+BMX_ADDR(0x004db9e0)
+int _rwMemoryOpen(const RwMemoryFunctions *memoryFunctions)
+{
+    rwFreeListHead.next = &rwFreeListHead;
+    rwFreeListHead.prev = &rwFreeListHead;
+    RwMemoryFunctions *memory = &RwEngineInstance->memoryFuncs;
+    if (memoryFunctions == NULL) {
+        memory->rwmalloc = (RwMemMallocFunc)malloc;
+        memory->rwfree = (RwMemFreeFunc)free;
+        memory->rwrealloc = RW_CB(RwMemReallocFunc, 0x0051d67e);
+        memory->rwcalloc = BMX_FNPTR(RwMemCallocFunc, 0x004db9a0, rwDefaultCalloc);
+    } else {
+        memory->rwmalloc = memoryFunctions->rwmalloc;
+        memory->rwfree = memoryFunctions->rwfree;
+        memory->rwrealloc = memoryFunctions->rwrealloc;
+        memory->rwcalloc = memoryFunctions->rwcalloc;
+    }
+    return 1;
+}
+
+BMX_ADDR(0x004dba70)
+void _rwMemoryClose(void) {}
+
+BMX_ADDR(0x004dba80)
+const RwMemoryFunctions *RwOsGetMemoryInterface(void)
+{
+    return &RwEngineInstance->memoryFuncs;
+}
+
+/* ---- resource arena --------------------------------------------------------------------------------- */
+
+/* Unlinks a resource entry, calls its destroy notification and gives the memory back; always 1. */
+BMX_ADDR(0x004dc380)
+int RwResourcesFreeResEntry(RwResEntry *entry)
+{
+    if (entry->destroyNotify != NULL) {
+        entry->destroyNotify(entry);
+    }
+    entry->link.prev->next = entry->link.next;
+    entry->link.next->prev = entry->link.prev;
+    *entry->ownerRef = NULL;
+    rwResources()->currentSize -= entry->size;
+    RwEngineInstance->memoryFuncs.rwfree(entry);
+    return 1;
+}
+
+/* Moves the older entry list onto the newer one, swaps the two lists and resets the reuse counter. */
+BMX_ADDR(0x004dc3f0)
+void _rwResourcesPurge(void)
+{
+    RwLLLink *first = rwResources()->usedEntries;
+    RwLLLink *second = rwResources()->freeEntries;
+    RwLLLink *firstNext = first->next;
+    if (firstNext != first) {
+        if (second == second->next) {
+            second->next = firstNext;
+            firstNext->prev = second;
+            second->prev = first->prev;
+            first->prev->next = second;
+        } else {
+            RwLLLink *secondLast = second->prev;
+            secondLast->next = firstNext;
+            firstNext->prev = secondLast;
+            first->prev->next = second;
+            second->prev = first->prev;
+        }
+        first->next = first;
+        first->prev = first;
+    }
+    rwResources()->freeEntries = first;
+    rwResources()->usedEntries = second;
+    rwResources()->reusageSize = 0;
+}
+
+/*
+ * Sets the arena limit and frees entries, newest first from the first list, then the second, until the
+ * arena fits. Returns 0 when both lists run empty before it does.
+ */
+BMX_ADDR(0x004dc6e0)
+int RwResourcesSetArenaSize(int32_t size)
+{
+    rwResources()->maxSize = size;
+    while (rwResources()->maxSize < rwResources()->currentSize) {
+        RwLLLink *link = rwResources()->usedEntries->prev;
+        if (link == rwResources()->usedEntries) {
+            link = rwResources()->freeEntries->prev;
+            if (link == rwResources()->freeEntries) {
+                return 0;
+            }
+        }
+        RwResourcesFreeResEntry((RwResEntry *)link);
+    }
+    return 1;
+}
+
+/* ---- render state and matrix helpers ---------------------------------------------------------------- */
+
+/* The near z of the 2D immediate mode, as the device reports it (the value is returned on the x87 stack). */
+BMX_ADDR(0x004db800)
+float RwIm2DGetNearScreenZ(void)
+{
+    return RwEngineInstance->dOpenDevice.zBufferNear;
+}
+
+/* Sets a render state through the device; needs a current camera, else reports and returns 0. */
+BMX_ADDR(0x004db820)
+int RwRenderStateSet(int32_t state, int32_t value)
+{
+    if (RwEngineInstance->curCamera == NULL) {
+        RwError error;
+        error.pluginID = 1;
+        error.errorCode = _rwerror(rwERR_NOCAMERA);
+        RwErrorSet(&error);
+        return 0;
+    }
+    return RwEngineInstance->dOpenDevice.fpRenderStateSet(state, value);
+}
+
+BMX_ADDR(0x004db920)
+int RwIm2DRenderPrimitive(int32_t primType, void *vertices, int32_t numVertices)
+{
+    return RwEngineInstance->dOpenDevice.fpIm2DRenderPrimitive(primType, vertices, numVertices);
+}
+
+/* Marks a matrix as changed: bumps its version byte and drops the type and identity flags. */
+BMX_ADDR(0x004d04d0)
+RwMatrix *RwMatrixUpdate(RwMatrix *matrix)
+{
+    ((uint8_t *)&matrix->pad1)[0]++;
+    matrix->flags &= 0xfffdfffc;
+    return matrix;
+}
+
+/*
+ * out = a * b through the engine's multiply routine. An identity operand (flag bit) short-cuts to a copy
+ * of the other one. The type flags survive only when both operands have a type.
+ */
+BMX_ADDR(0x004d04f0)
+RwMatrix *RwMatrixMultiply(RwMatrix *out, const RwMatrix *a, const RwMatrix *b)
+{
+    const uint32_t identity = rwMatrixGlobals()->identityBit & 0x20000;
+    if ((a->flags & identity) != 0) {
+        *out = *b;
+    } else if ((b->flags & identity) != 0) {
+        *out = *a;
+    } else {
+        rwMatrixGlobals()->multiply(out, a, b);
+        out->flags &= 0xfffdffff;
+        if ((a->flags & 3) == 0 || (b->flags & 3) == 0) {
+            out->flags &= 0xfffffffc;
+        }
+    }
+    ((uint8_t *)&out->pad1)[0]++;
+    return out;
+}

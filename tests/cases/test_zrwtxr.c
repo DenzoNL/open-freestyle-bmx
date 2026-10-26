@@ -1194,7 +1194,7 @@ DT_CASES(zrwtxr_cases) = {
     {"BMPImageRead", 0x004979e0, BMPImageRead, 1, DT_RET_INT, setup_image_read, 300, 0},
     {"PNGImageRead", 0x00497a30, PNGImageRead, 1, DT_RET_INT, setup_image_read, 300, 0},
     {"DDSImageRead", 0x00497a80, DDSImageRead, 0, DT_RET_INT, setup_dds_read, 20, 0},
-    {"rwMatConstructor", 0x00497a90, rwMatConstructor, 1, DT_RET_VOID, setup_plugin, 200, 0},
+    {"rwMatConstructor", 0x00497a90, rwMatConstructor, 1, DT_RET_INT, setup_plugin, 200, 0},
     {"rwMatDestructor", 0x00497ab0, rwMatDestructor, 1, DT_RET_INT, setup_plugin, 20, 0},
     {"zrwMatGetUserData", 0x00497ae0, zrwMatGetUserData, 1, DT_RET_INT, setup_plugin, 200, 0},
     {"LoadTexture", 0x00497b00, LoadTexture, 4, DT_RET_INT, setup_load_texture, 3000, 0},
