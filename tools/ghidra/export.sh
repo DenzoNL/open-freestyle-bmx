@@ -10,7 +10,8 @@ mkdir -p "$work/ghidra"
 headless=$(command -v ghidra-analyzeHeadless || command -v analyzeHeadless)
 post=(-postScript SeedILT.java -postScript SeedPtrs.java -postScript SeedPtrs.java)
 if [[ -n $labels ]]; then post+=(-postScript ApplyLabels.java "$labels"); fi
-post+=(-postScript ExportBundles.java "${BUNDLES_OUT:-$work/bundles}" 401000 4a4a80)
+# BUNDLES_FROM/TO: export another range (e.g. the RenderWare library 4a4a80..54b000 into work/bundles-rw).
+post+=(-postScript ExportBundles.java "${BUNDLES_OUT:-$work/bundles}" "${BUNDLES_FROM:-401000}" "${BUNDLES_TO:-4a4a80}")
 "$headless" "$work/ghidra" "${GHIDRA_PROJECT:-ngbmx}" -import "$exe" -overwrite -scriptPath "$root/tools/ghidra" "${post[@]}" \
     >"$work/ghidra/export.log" 2>&1
 grep -E '> (Seed|Apply|Export)' "$work/ghidra/export.log"
