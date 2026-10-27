@@ -17,6 +17,9 @@ void bmxLogOpen(void);
  */
 int bmxLoadImage(const char *exePath);
 
+/* Write a jump from every reachable original CRT entry point to our C runtime layer (src/native/crt.c). */
+void bmxCrtInstall(void);
+
 /* Install the vectored exception handler that reports int3 traps. */
 void bmxTrapInstall(void);
 

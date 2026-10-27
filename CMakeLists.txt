@@ -49,7 +49,7 @@ if(BMX_NATIVE32)
     list(APPEND BMX_CRT_STARTFILES ${crtPath})
   endforeach()
   add_executable(bmxnative $<TARGET_OBJECTS:bmx_range> ${BMX_CRT_STARTFILES} $<TARGET_OBJECTS:bmx_game>
-    ${BMX_NATIVE_SOURCES} ${CMAKE_BINARY_DIR}/hooks_table.c)
+    ${BMX_NATIVE_SOURCES} src/native/crtasm.S ${CMAKE_BINARY_DIR}/hooks_table.c)
   target_link_options(bmxnative PRIVATE -nostartfiles)
   target_include_directories(bmxnative PRIVATE src)
   target_compile_definitions(bmxnative PRIVATE _WIN32_WINNT=0x0A00 BMX_SOURCE_DIR="${CMAKE_SOURCE_DIR}" BMX_WORK_DIR="${BMX_WORK_DIR}")

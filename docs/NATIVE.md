@@ -127,3 +127,46 @@ After the second slice (rw/stream.c, rw/im.c: file system table, streams, Im3D) 
 the CRT `malloc` (0x4a50d2, the engine's default memory interface), reached from `RwFreeListCreate` (plugin registry
 open in RwEngineInit). That and the stdio entries `_rwFSOpen` installs (`rwfopen` 0x4a5c98 and friends) are CRT
 functions that need equivalents in our C library, like the other `skip` rows of data/functions-rw.csv.
+
+## C runtime layer (src/native/crt.c, crtasm.S)
+
+The original links MSVC6's CRT statically, so its code is int3 here. After the hook jumps, `bmxCrtInstall` (called
+at the end of `bmxLoadImage`) writes a `jmp` from each CRT entry the game or RenderWare can reach to an
+implementation; the table in `crt.c` has the original address, replacement and name (54 entries). The set comes from
+the CRT functions that ported code calls (callers in `work/bundles*`), the `ORIG_FN`/`RW_CB` addresses in `src`, and
+the stdio/string tables `_rwFSOpen`/`_rwStringOpen` fill. `data/functions-rw.csv` is incomplete here (it lacks
+sprintf 0x51dd9c, rwfread 0x51db3d, strtok...), `work/labels.raw` has them.
+
+- Compiler helpers, in assembly with the original conventions (`crtasm.S`): `_ftol` (ST0 in, EDX:EAX out),
+  `_CIsqrt`, `_chkstk` (EAX = bytes; `compat/crt.c`'s `__chkstk` jumps to it), `__allmul`/`__aulldiv`/`__aullrem`
+  (stack args, `ret 16`), `__allshl` (EDX:EAX, CL), `_setjmp3`/`_longjmp` (MSVC `jmp_buf` layout, without the SEH
+  chain). Checked against C arithmetic for edge values.
+- Host: malloc/free/realloc (`malloc(0)` gives a block, `realloc(p, 0)` frees and returns NULL like MSVC6),
+  stdio (`rwfopen`...`rwfseek`/`rwftell`, fflush; the game only passes the `FILE *` back, no FILE internals are read,
+  `rwfputs` returns 0/-1), strtoul, strtok, sscanf (`vsscanf`), pow, ceil, `_finite`, strstr/strchr/strcpy...
+- Wrapped for MSVC behaviour: strcmp/strncmp/`_strcmpi` return -1/0/1; `atoi` wraps instead of saturating; qsort is
+  MSVC6's own algorithm (pivot to the front, cutoff 8, same stack discipline; not stable, so the order of equal
+  elements matches the original); the printf family (vsprintf, sprintf, printf, fprintf) has its own formatter:
+  floats use 17 significant digits then round half up (`%.0f` of 0.5 is `1`, `%.2f` of 0.125 is `0.13`), zero padding
+  past the 17th digit, three-digit exponents (`e+010`), `1.#INF00`/`1.#QNAN0`/`-1.#IND00`, `%p` as 8 uppercase hex
+  digits, `%g` stripping like MSVC. RenderWare's own helpers the engine tables point at (rwstricmp, rwstrupr, rwstrlwr,
+  rwstrchr, rwstrrchr at 0x4ee1d0..0x4ee2d0, rwfexist 0x4e8290) are included since they are plain C.
+- rand/srand: the CRT has none (no label, no caller); the game uses its own `zmathRand` (0x481f80).
+- Not covered (not reachable yet): the CRT startup/exit path (0x4a51f9 WinMainCRTStartup, doexit, `_ioinit`, locale),
+  the FILE-based internals (`_output`, `_flsbuf`, `_read`/`_write`), `time`/`ctime` (0x51df10, 0x51dfec), `raise`,
+  the float-exception hooks `pcprofile.c` installs into the original's printf tables (`crtFpInit` calls
+  0x4a6415/0x4a63c5; they are unneeded with our own formatter but will trap if `crtFpInit` runs).
+  `pow` is the host's, so results can differ from the x87 original in the last ulp (texture gamma tables).
+
+New first trap after the CRT layer (2026-10-28): `_rwFreeListAllocReal` (0x4dbc30, RenderWare free lists), called
+from `_rwPluginRegistryAddPlugin` (0x4e88d0). `malloc` and the stdio table are no longer traps. A
+`BMX_TRAP_SKIP` survey shows no further CRT trap before the fake return value faults.
+
+### Open points from the CRT layer (2026-10-28)
+
+- RW functions reached only through function pointers (engine tables, plugin/default callbacks) are
+  missing from data/functions-rw.csv, whose closure follows direct calls only; the first one is
+  `_rwFreeListAllocReal` (0x4dbc30, via the engine's freeListAlloc slot). tools/rwmap.py should also
+  collect the code addresses stored by RW_CB/table initialisers in the ported RW code.
+- `pow` and other libm calls come from the host: they can differ from the original's x87 results in the
+  last bit (texture gamma tables). Replace with x87-faithful versions before comparing screenshots.

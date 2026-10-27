@@ -189,6 +189,7 @@ int bmxLoadImage(const char *exePath)
         writeJump(a, bmxHooks[i].impl);
     }
     bmxLog("hooks: %u jumps\n", (unsigned)bmxHookCount);
+    bmxCrtInstall();
     FlushInstructionCache(GetCurrentProcess(), NULL, 0);
     free(file);
     return 0;
