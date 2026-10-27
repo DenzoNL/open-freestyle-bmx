@@ -78,7 +78,8 @@ ORIG_FN(0x004de5d0, uint32_t, rwCameraGetHeight, (void *camera));
  */
 ORIG_FN(0x00492eb0, uint8_t *, zrwGetCurrentCamera, (void));
 ORIG_FN(0x00493060, void *, zrwCameraGetRwCamera, (const uint8_t *camera));
-ORIG_FN(0x00496620, void, zrwWorldPvsCallback, (void));
+/* The world's PVS progress callback (ported in zrwworld.c); only its address is used here. */
+ORIG_FN(0x00496620, int, zrwWorldPvsCallback, (int stage, float progress));
 ORIG_FN(0x004cd510, void, rwWorldPvsDefaultCallback, (void));
 ORIG_FN(0x00489ba0, void, zrwmatTextureLoadBegin, (void));
 ORIG_FN(0x00489be0, void, zrwmatTextureLoaded, (ZrwTexture * texture));

@@ -111,6 +111,14 @@ Without it, `DT_NEEDS_ASSETS` cases are skipped. The community labels used for n
 - Ghidra shows some functions as `void` that leave a value in EAX (init functions ending in `MOV EAX,1`)
   that callers test. Void ports pass their tests but break the real game (first in-game run: "no devices
   connected", zfile.c:240). Run `python3 -I tools/void_eax_audit.py .` after porting; it must report none.
+- Argument counts that are wrong in port and stub alike pass the tests (rwSceneFind takes 1, rwSceneRelease 2).
+  `py -I tools/argcount_audit.py .` checks ORIG_FN / port signatures against the original callee and the caller's
+  ADD ESP; triage by hand (`-v` lists harmless unread extra arguments).
+- A data pointer can start out at the ported function that calls through it (zrwTimeGetTime via 0x561480: endless
+  recursion in-game). `py -I tools/selfref_audit.py .` reads the exe's initial values; must report no cycles.
+- (int16_t) and AND 0xffff widen differently (zprimLoadGroup: ids >= 0x8000). `py -I tools/extend_audit.py .`
+  compares MOVSX/MOVZX/AND before pushes and on parameters with the port's casts and types; no A/B findings
+  (`extend_audit: ok - why` above a BMX_ADDR marks a hand-checked function).
 - Ghidra pseudo-C regroups FP sums and drops pushed arguments. FP and argument lists come from the
   disassembly.
 - The x87 model: `double` = register, `float` = stored. LLVM's x87 backend doesn't round floats, so the hook

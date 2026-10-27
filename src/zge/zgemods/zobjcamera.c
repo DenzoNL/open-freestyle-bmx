@@ -56,12 +56,14 @@ int zmathInitialize(void)
     return 1;
 }
 
+/* extend_audit: ok - the original ANDs the angle with 0xffff, tableIndex() masks it too */
 BMX_ADDR(0x00480e40)
 double zmathSin(ZAngle a)
 {
     return gZmathTables.sin[tableIndex((uint32_t)a)];
 }
 
+/* extend_audit: ok - same: tableIndex() masks the angle */
 BMX_ADDR(0x00480eb0)
 double zmathCos(ZAngle a)
 {
@@ -95,6 +97,7 @@ ZAngle zmathAcos(float c)
     return (ZAngle)(0x3fff - gZmathTables.asin[-clampedIndex(c)]);
 }
 
+/* extend_audit: ok - same: tableIndex() masks the angle */
 BMX_ADDR(0x00480f30)
 double zmathTan(ZAngle a)
 {
@@ -236,6 +239,7 @@ double zvec3Length(const ZVec3 *v)
     return __builtin_sqrt(((double)v->x * v->x + (double)v->y * v->y) + (double)v->z * v->z);
 }
 
+/* extend_audit: ok - same: tableIndex() masks the angle */
 BMX_ADDR(0x00481340)
 void zvec3RotateX(ZVec3 *out, const ZVec3 *in, ZAngle angle)
 {
@@ -244,6 +248,7 @@ void zvec3RotateX(ZVec3 *out, const ZVec3 *in, ZAngle angle)
     bmxX87Rotate(&out->y, &out->z, in->y, in->z, &gZmathTables.cos[i], &gZmathTables.sin[i]);
 }
 
+/* extend_audit: ok - same: tableIndex() masks the angle */
 BMX_ADDR(0x00481390)
 void zvec3RotateY(ZVec3 *out, const ZVec3 *in, ZAngle angle)
 {
@@ -252,6 +257,7 @@ void zvec3RotateY(ZVec3 *out, const ZVec3 *in, ZAngle angle)
     bmxX87Rotate(&out->x, &out->z, in->x, in->z, &gZmathTables.cos[i], &gZmathTables.sin[i]);
 }
 
+/* extend_audit: ok - same: tableIndex() masks the angle */
 BMX_ADDR(0x004813e0)
 void zvec3RotateZ(ZVec3 *out, const ZVec3 *in, ZAngle angle)
 {
