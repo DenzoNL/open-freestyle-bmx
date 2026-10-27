@@ -177,15 +177,15 @@ ZrwColTriangle *zrwcolRecordHit(void *arg, const ZrwColSector *sector, ZrwColTri
         return triangle;
     }
     {
-        const void *matrix = rwFrameGetLTM(object->frame);
+        const void *matrix = RwFrameGetLTM(object->frame);
         float moved[3];
         float normal[3];
 
         for (int i = 0; i < 3; i++) {
-            rwV3dTransformPoints(moved, triangle->vertex[i], 1, matrix);
+            RwV3dTransformPoints((RwV3d *)moved, (const RwV3d *)triangle->vertex[i], 1, matrix);
             gameCorner(hit->vertex[i], moved[0], moved[1], moved[2]);
         }
-        rwV3dTransformVectors(normal, triangle, 1, matrix);
+        RwV3dTransformVectors((RwV3d *)normal, (const RwV3d *)triangle, 1, matrix);
         hit->normal[1] = -normal[1];
         hit->normal[2] = -normal[2];
         hit->normal[0] = normal[0];
@@ -252,15 +252,15 @@ int zrwcolQueryLine(float *from, float *to, uint32_t flags, const int *excluded,
     }
     if (gZrwCol.bestUser != 0) {
         const ZrwColObject *object = (const ZrwColObject *)(uintptr_t)gZrwCol.bestUser;
-        const void *matrix = rwFrameGetLTM(object->frame);
+        const void *matrix = RwFrameGetLTM(object->frame);
         float moved[3];
         void *model;
 
         for (int i = 0; i < 3; i++) {
-            rwV3dTransformPoints(moved, best->vertex[i], 1, matrix);
+            RwV3dTransformPoints((RwV3d *)moved, (const RwV3d *)best->vertex[i], 1, matrix);
             gameCorner(out->hit.vertex[i], moved[0], moved[1], moved[2]);
         }
-        rwV3dTransformVectors(moved, best, 1, matrix);
+        RwV3dTransformVectors((RwV3d *)moved, (const RwV3d *)best, 1, matrix);
         out->hit.normal[1] = -moved[1];
         out->hit.normal[2] = -moved[2];
         out->hit.normal[0] = moved[0];

@@ -5,16 +5,9 @@
 #include "rw/rwplugins.h"
 
 #include "compat/crt.h"
+#include "rw/rwmath.h"
 
-/* Callees in other RenderWare groups (math, clump), still original code. */
-ORIG_FN(0x004d1340, RwMatrix *, RwMatrixInvert, (RwMatrix * out, const RwMatrix *in));
-ORIG_FN(0x004d2eb0, RwFrame *, RwFrameForAllChildren,
-        (RwFrame * frame, RwObjectCallBack callback, void *data));
-ORIG_FN(0x004d3a90, void *, RwV3dTransformPoints,
-        (ZVec3 * out, const ZVec3 *in, int32_t count, const RwMatrix *matrix));
-ORIG_FN(0x004d3ae0, void *, RwV3dTransformVectors,
-        (ZVec3 * out, const ZVec3 *in, int32_t count, const RwMatrix *matrix));
-ORIG_FN(0x004e9760, RwBBox *, RwBBoxCalculate, (RwBBox * bbox, const ZVec3 *points, int32_t count));
+/* Callees in other RenderWare groups (clump), still original code. */
 ORIG_FN(0x004b43e0, RpMorphTarget *, RpGeometryGetMorphTarget, (void *geometry, int32_t index));
 ORIG_FN(0x004b4550, int32_t, RpGeometryGetNumVertices, (const void *geometry));
 ORIG_FN(0x004b45d0, ZVec3 *, RpMorphTargetGetVertices, (const RpMorphTarget *morphTarget));

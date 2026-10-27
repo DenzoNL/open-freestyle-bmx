@@ -27,6 +27,21 @@ static inline double bmxX87CosScaled(int32_t n, double k)
     return r;
 }
 
+/* FSIN / FCOS of a value held in a register (a double). */
+static inline double bmxX87Fsin(double a)
+{
+    double r;
+    __asm__("fldl %1\n\tfsin\n\tfstpl %0" : "=m"(r) : "m"(a) : "st");
+    return r;
+}
+
+static inline double bmxX87Fcos(double a)
+{
+    double r;
+    __asm__("fldl %1\n\tfcos\n\tfstpl %0" : "=m"(r) : "m"(a) : "st");
+    return r;
+}
+
 /* asin(n * step) * scale as the CRT computes it for |n * step| < 1: x / sqrt((1 + x) * (1 - x)) via FPATAN.
  */
 static inline double bmxX87AsinScaled(int32_t n, double step, float scale)
@@ -93,6 +108,14 @@ static inline float bmxX87SinScaled(int32_t n, float k)
 static inline double bmxX87CosScaled(int32_t n, double k)
 {
     return cos((double)n * k);
+}
+static inline double bmxX87Fsin(double a)
+{
+    return sin(a);
+}
+static inline double bmxX87Fcos(double a)
+{
+    return cos(a);
 }
 static inline double bmxX87AsinScaled(int32_t n, double step, float scale)
 {

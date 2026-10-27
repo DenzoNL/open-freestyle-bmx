@@ -4,7 +4,9 @@
 #include <stddef.h>
 
 #include "compat/crt.h"
+#include "rw/rwcamera.h"
 #include "rw/rwcore.h"
+#include "rw/rwmath.h"
 #include "rw/rwplugins.h"
 #include "rw/rwstream.h"
 #include "zge/com/zglrw/zrwcol.h"
@@ -37,11 +39,6 @@ typedef float ZrwLodTable[4];
 typedef void *(BMX_CDECL *RwFrameCallback)(void *frame, void *data);
 typedef void *(BMX_CDECL *RpAtomicCallback)(void *atomic, void *data);
 
-ORIG_FN(0x004d2b00, ZMatrix *, RwFrameGetMatrix, (void *frame));
-ORIG_FN(0x004d2eb0, void *, RwFrameForAllChildren, (void *frame, RwFrameCallback callback, void *data));
-ORIG_FN(0x004d2f00, int, RwFrameCount, (void *frame));
-ORIG_FN(0x004d3200, void *, RwFrameSetIdentity, (void *frame));
-ORIG_FN(0x004b1990, void *, RpClumpForAllAtomics, (void *clump, RpAtomicCallback callback, void *data));
 ORIG_FN(0x004b1440, int, RpClumpGetNumAtomics, (void *clump));
 ORIG_FN(0x004b1ee0, void *, RpClumpClone, (void *clump));
 ORIG_FN(0x004b21e0, int, RpClumpDestroy, (void *clump));

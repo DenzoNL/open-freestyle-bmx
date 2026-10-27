@@ -4,7 +4,9 @@
 #include <stddef.h>
 
 #include "compat/crt.h"
+#include "rw/rwcamera.h"
 #include "rw/rwcore.h"
+#include "rw/rwmath.h"
 #include "rw/rwplugins.h"
 #include "zge/com/zglrw/zrwmodelrender.h"
 #include "zge/zdebug.h"
@@ -16,22 +18,11 @@ static const char kZrwModelFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwModel.c";
 
 /* RenderWare library calls (statically linked in the exe, not ported). */
 typedef void *(BMX_CDECL *RpAtomicCallback)(void *atomic, void *data);
-ORIG_FN(0x004b1990, void *, RpClumpForAllAtomics, (void *clump, RpAtomicCallback callback, void *data));
 ORIG_FN(0x004b6140, uint32_t, RpGeometryGetFlags, (void *geometry));
 ORIG_FN(0x004b61b0, void *, RpGeometrySetFlags, (void *geometry, uint32_t flags));
 ORIG_FN(0x004b8870, void *, RpClumpGetWorld, (void *clump));
 ORIG_FN(0x004b86a0, void *, RpWorldAddClump, (void *world, void *clump));
 ORIG_FN(0x004b8770, void *, RpWorldRemoveClump, (void *world, void *clump));
-ORIG_FN(0x004d2b00, ZMatrix *, RwFrameGetMatrix, (void *frame));
-ORIG_FN(0x004d2b10, ZMatrix *, RwFrameGetLTM, (void *frame));
-ORIG_FN(0x004d2a80, void *, RwFrameUpdateObjects, (void *frame));
-ORIG_FN(0x004d3ae0, void *, RwV3dTransformVectors,
-        (ZVec3 * out, const ZVec3 *in, int count, const ZMatrix *matrix));
-ORIG_FN(0x004d3a90, void *, RwV3dTransformPoints,
-        (ZVec3 * out, const ZVec3 *in, int count, const ZMatrix *matrix));
-ORIG_FN(0x004d1400, void *, RwMatrixScale, (ZMatrix * matrix, const ZVec3 *scale, int combine));
-ORIG_FN(0x004d1fe0, ZMatrix *, RwMatrixCreate, (void));
-ORIG_FN(0x004d1fb0, int, RwMatrixDestroy, (ZMatrix * matrix));
 ORIG_FN(0x004b4ce0, int, RpGeometryGetNumMaterials, (void *geometry));
 ORIG_FN(0x004b47a0, void *, RpGeometryGetMaterial, (void *geometry, int index));
 ORIG_FN(0x004b9310, void *, RpMaterialSetColor, (void *material, const void *color));

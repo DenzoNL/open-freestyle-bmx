@@ -1,9 +1,7 @@
 /* RenderWare 3.1 core: free lists, error slot, object/frame linkage, plugin registry, string table. */
 #include "rw/rwcore.h"
+#include "rw/rwmath.h"
 #include "rw/rwstream.h"
-
-/* Callees in other RenderWare groups, still original code. */
-ORIG_FN(0x004d2a80, void *, RwFrameUpdateObjects, (RwFrame * frame));
 
 /* ---- free lists ------------------------------------------------------------------------------------- */
 

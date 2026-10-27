@@ -4,7 +4,9 @@
 #include <stddef.h>
 
 #include "compat/crt.h"
+#include "rw/rwcamera.h"
 #include "rw/rwcore.h"
+#include "rw/rwmath.h"
 #include "rw/rwplugins.h"
 #include "zge/pc/pcinput.h"
 #include "zge/zdebug.h"
@@ -46,9 +48,6 @@ ORIG_FN(0x00492f00, int, zrwcamBegin, (void *camera));
 ORIG_FN(0x00492fe0, int, zrwcamEnd, (void));
 ORIG_FN(0x00493060, void *, zrwcamHandle, (void *camera));
 ORIG_FN(0x00497620, int, zrwtxrFlush, (void));
-ORIG_FN(0x004de8a0, int, rwCameraClear, (void *camera, const void *color, int flags));
-ORIG_FN(0x004dea80, void *, rwCameraGetFrame, (void *camera));
-ORIG_FN(0x004d2b00, uint8_t *, rwFrameGetMatrix, (void *frame));
 ORIG_FN(0x004dcfd0, int, rwRasterShowRaster, (void *raster, void *window, int flags));
 ORIG_FN(0x004cc270, void, rwLightBegin, (void *light));
 ORIG_FN(0x004cc510, void, rwLightSetMatrix, (void *light, const void *matrix));
@@ -682,7 +681,7 @@ int zrwDrawFrame(void)
     if (gZrwClearOn != 0) {
         for (camera = zrwcamFirst(); camera != NULL; camera = zrwcamNext(camera)) {
             if ((((const uint8_t *)camera)[8] & 4) != 0) {
-                rwCameraClear(zrwcamHandle(camera), &gZrwClearColor, 3);
+                RwCameraClear(zrwcamHandle(camera), &gZrwClearColor, 3);
             }
         }
     }
@@ -699,7 +698,7 @@ int zrwDrawFrame(void)
         }
         if (gZrwDebugLightOn != 0) {
             rwLightBegin(gZrwDebugLight);
-            rwLightSetMatrix(gZrwDebugLight, rwFrameGetMatrix(rwCameraGetFrame(zrwcamHandle(camera))) + 0x30);
+            rwLightSetMatrix(gZrwDebugLight, RwFrameGetMatrix(RwCameraGetFrame(zrwcamHandle(camera))) + 0x30);
         }
         runListAt(gZrwUpdateLists[1].head);
         if (zrwtxrFlush() == 0) {

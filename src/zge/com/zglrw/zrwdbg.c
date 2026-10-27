@@ -5,7 +5,9 @@
 #include <stddef.h>
 
 #include "compat/crt.h"
+#include "rw/rwcamera.h"
 #include "rw/rwcore.h"
+#include "rw/rwmath.h"
 #include "zge/com/zglrw/zrwzgl.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zobjcamera.h"
@@ -15,10 +17,6 @@
 static const char kZrwDbgFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwDbg.c";
 
 /* RenderWare library calls (statically linked in the exe, not ported). */
-ORIG_FN(0x004cbef0, void, RtCharsetPrint, (void *charset, const char *text, int x, int y));
-ORIG_FN(0x004cbfb0, void *, RtCharsetCreate, (const uint32_t *foreground, const uint32_t *background));
-ORIG_FN(0x004cb3f0, void, RtCharsetGetDesc, (void *charset, int32_t *desc));
-ORIG_FN(0x004cbf60, void, RtCharsetDestroy, (void *charset));
 
 /* Hooks into the engine (function pointers in the exe's data). */
 typedef void(BMX_CDECL *ZrwDbgFrameStartFn)(void);
@@ -653,12 +651,12 @@ int zrwDbgInitialize(void)
 
     gZrwDbgInitialized = 1;
     zrwListInit(&gZrwDbgCallbacks);
-    gZrwDbgCharset = RtCharsetCreate(&gZrwClearColor2, &gZrwClearColor);
+    gZrwDbgCharset = RtCharsetCreate((const RwRGBA *)&gZrwClearColor2, (const RwRGBA *)&gZrwClearColor);
     if (gZrwDbgCharset == NULL) {
         zdebugFail("Cannot create raster chraset.", kZrwDbgFile, 0x33b, 0);
         return 0;
     }
-    RtCharsetGetDesc(gZrwDbgCharset, desc);
+    RtCharsetGetDesc(gZrwDbgCharset, (RtCharsetDesc *)desc);
     gZrwDbgCharWidth = desc[0];
     gZrwDbgCharHeight = desc[1];
     gZrwDbgUpdateNode = gZrwDbgRegister(4, BMX_FNPTR(ZrwUpdateFn, 0x0047f660, DebugUpdateFunction), NULL, 1);

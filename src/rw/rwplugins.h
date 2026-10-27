@@ -38,14 +38,18 @@ typedef struct RpAtomic {
     uint8_t pad14[8];        /* 0x14 */
     void *geometry;          /* 0x1c */
     RwSphere boundingSphere; /* 0x20 */
+    uint8_t pad30[0x14];     /* 0x30 */
+    RwLLLink inClumpLink;    /* 0x44 link in the clump's atomic list */
 } RpAtomic;
 
 _Static_assert(offsetof(RpAtomic, geometry) == 0x1c, "RpAtomic layout");
 _Static_assert(offsetof(RpAtomic, boundingSphere) == 0x20, "RpAtomic layout");
+_Static_assert(offsetof(RpAtomic, inClumpLink) == 0x44, "RpAtomic layout");
 
 /* Partial RpClump: parent is its frame. */
 typedef struct RpClump {
     RwObject object;
+    RwLLLink atomicList; /* 0x08 */
 } RpClump;
 
 /* A bone as the skin code uses it: the matrix applied to its vertices and a flag word (bit 1: active). */

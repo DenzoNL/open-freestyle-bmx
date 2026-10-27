@@ -4,7 +4,9 @@
 #include <stddef.h>
 
 #include "compat/crt.h"
+#include "rw/rwcamera.h"
 #include "rw/rwcore.h"
+#include "rw/rwmath.h"
 #include "rw/rwplugins.h"
 #include "rw/rwstream.h"
 #include "zge/zdebug.h"
@@ -70,8 +72,6 @@ ORIG_FN(0x004cc0f0, void, rwWorldSetPvsCallback, (void *world, void *callback));
 ORIG_FN(0x004ce960, int, rwWorldPvsCreate,
         (void *world, uint32_t a, uint32_t b, uint32_t c, uint32_t d, void *callback, uint32_t e));
 ORIG_FN(0x004c3ae0, int, rwWorldPvsRead, (void *world, void *stream));
-ORIG_FN(0x004de5a0, uint32_t, rwCameraGetWidth, (void *camera));
-ORIG_FN(0x004de5d0, uint32_t, rwCameraGetHeight, (void *camera));
 
 /* Other modules: the camera (pcinput.c), the world callbacks, the RAM disk file hook (zprofile.c), materials.
  */
@@ -202,8 +202,8 @@ int zrwWorldSetupPvs(void)
         return 0;
     }
     rwCamera = zrwCameraGetRwCamera(camera);
-    width = rwCameraGetWidth(rwCamera);
-    height = rwCameraGetHeight(rwCamera);
+    width = (uint32_t)(uintptr_t)RwCameraGetRaster(rwCamera);   /* the raster, not a width */
+    height = (uint32_t)(uintptr_t)RwCameraGetZRaster(rwCamera); /* the Z raster */
     extra = *(uint32_t *)(camera + 0xb0);
     gZrwWorldPvsState = rwWorldGetPvsState(gZrwWorld);
     rwWorldSetPvsCallback(gZrwWorld, (void *)(uintptr_t)zrwWorldPvsCallback);

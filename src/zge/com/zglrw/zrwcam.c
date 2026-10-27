@@ -2,7 +2,9 @@
 #include "zge/com/zglrw/zrwcam.h"
 
 #include "compat/crt.h"
+#include "rw/rwcamera.h"
 #include "rw/rwcore.h"
+#include "rw/rwmath.h"
 #include "rw/rwplugins.h"
 #include "zge/com/zglrw/zrwmodelcreate.h"
 #include "zge/zdebug.h"
@@ -134,29 +136,8 @@ int zrwCameraSetResolution(int width, int height)
 /* ---- cameras ------------------------------------------------------------------------------------ */
 
 /* RenderWare library calls (statically linked in the exe). */
-ORIG_FN(0x004deae0, void *, RwCameraCreate, (void));
-ORIG_FN(0x004dea90, void, RwCameraDestroy, (void *camera));
-ORIG_FN(0x004d2870, void *, RwFrameCreate, (void));
-ORIG_FN(0x004d2920, void, RwFrameDestroy, (void *frame));
-ORIG_FN(0x004dea60, void, RwCameraSetFrame, (void *camera, void *frame));
-ORIG_FN(0x004dea80, void *, RwCameraGetFrame, (void *camera));
-ORIG_FN(0x004d3200, void, RwFrameSetIdentity, (void *frame));
-ORIG_FN(0x004d2b00, float *, RwFrameGetMatrix, (void *frame));
-ORIG_FN(0x004de920, void, RwCameraSetProjection, (void *camera, int projection));
 ORIG_FN(0x004dcc80, void, RwRasterSubRaster, (void *raster, void *parent, const int32_t *rect));
 ORIG_FN(0x004dcd70, void *, RwRasterGetParent, (void *raster));
-ORIG_FN(0x004de580, void, RwCameraSetRaster, (void *camera, void *raster));
-ORIG_FN(0x004de5b0, void, RwCameraSetZRaster, (void *camera, void *raster));
-ORIG_FN(0x004de5a0, int16_t *, RwCameraGetRaster, (void *camera));
-ORIG_FN(0x004de5d0, void *, RwCameraGetZRaster, (void *camera));
-ORIG_FN(0x004de9b0, void, RwCameraSetViewWindow, (void *camera, const float *window));
-ORIG_FN(0x004dea10, const float *, RwCameraGetViewWindow, (void *camera));
-ORIG_FN(0x004de540, void, RwCameraSetViewOffset, (void *camera, const float *offset));
-ORIG_FN(0x004de5e0, void, RwCameraSetNearClipPlane, (void *camera, float distance));
-ORIG_FN(0x004de620, void, RwCameraSetFarClipPlane, (void *camera, float distance));
-ORIG_FN(0x004de660, void, RwCameraSetFogDistance, (void *camera, float distance));
-ORIG_FN(0x004de790, int, RwCameraBeginUpdate, (void *camera));
-ORIG_FN(0x004de7f0, void, RwCameraEndUpdate, (void *camera));
 ORIG_FN(0x004dcd80, int, RwRasterPushContext, (void *raster));
 ORIG_FN(0x004dce20, void, RwRasterPopContext, (void));
 /* Scene hooks around a camera's update (the engine's lighting and sorting state). */
@@ -184,7 +165,7 @@ static void applyFov(void *rw, ZAngle fov)
 
     window[0] = (float)half;
     window[1] = (float)(half * 0.75f);
-    RwCameraSetViewWindow(rw, window);
+    RwCameraSetViewWindow(rw, (const RwV2d *)window);
 }
 
 /* Frees the RwCamera with its frame and rasters and the record. */
@@ -196,7 +177,7 @@ static void releaseCamera(ZrwCamera *camera)
     if (RwCameraGetFrame(camera->rwCamera) != NULL) {
         RwFrameDestroy(RwCameraGetFrame(camera->rwCamera));
     }
-    raster = RwCameraGetRaster(camera->rwCamera);
+    raster = (int16_t *)RwCameraGetRaster(camera->rwCamera);
     if (raster != NULL) {
         RwRasterDestroy(raster);
     }
@@ -259,7 +240,7 @@ ZrwCamera *zrwCameraCreate(uint32_t flags, void *owner)
         RwRasterSubRaster(depth, zRaster, rect);
         RwCameraSetRaster(camera->rwCamera, colour);
         RwCameraSetZRaster(camera->rwCamera, depth);
-        check = RwCameraGetRaster(rw);
+        check = (int16_t *)RwCameraGetRaster(rw);
         if (check != NULL && RwRasterGetParent(RwCameraGetRaster(rw)) != NULL &&
             RwCameraGetZRaster(rw) != NULL && RwRasterGetParent(RwCameraGetZRaster(rw)) != NULL) {
             void *rw2;
@@ -340,7 +321,7 @@ void zrwCameraSetView(ZrwCamera *camera, const ZMatrix *view, const ZVec3 *eye)
     zmatrixCopyRotation(&camera->view, view);
     camera->view.pos = *eye;
     frame = RwCameraGetFrame(rw);
-    m = RwFrameGetMatrix(frame);
+    m = (float *)RwFrameGetMatrix(frame);
     RwFrameSetIdentity(frame);
     m[0] = -v[0];
     m[1] = -v[4];
@@ -370,7 +351,7 @@ BMX_ADDR(0x00492c20)
 int zrwCameraProject(const ZrwCamera *camera, const ZVec3 *point, float *out)
 {
     if (point->z > camera->nearClip && point->z < camera->farClip) {
-        const float *window = RwCameraGetViewWindow(camera->rwCamera);
+        const float *window = (const float *)RwCameraGetViewWindow(camera->rwCamera);
         const double inv = 1.0f / (double)point->z;
 
         out[0] = (float)((double)camera->width * inv * point->x);
@@ -398,7 +379,7 @@ void zrwCameraSetRect(ZrwCamera *camera, const float *rect)
     ints[1] = bmxFtol(rect[1]);
     ints[2] = bmxFtol(rect[2]);
     ints[3] = bmxFtol(rect[3]);
-    raster = RwCameraGetRaster(rw);
+    raster = (int16_t *)RwCameraGetRaster(rw);
     if (raster != NULL) {
         RwRasterSubRaster(raster, RwRasterGetParent(raster), ints);
     }
@@ -409,7 +390,7 @@ void zrwCameraSetRect(ZrwCamera *camera, const float *rect)
     if (camera->fov != 0) {
         applyFov(camera->rwCamera, (ZAngle)camera->fov);
     }
-    raster = RwCameraGetRaster(rw);
+    raster = (int16_t *)RwCameraGetRaster(rw);
     camera->offsetX = (float)raster[14] /* +0x1c */;
     camera->offsetY = (float)raster[15] /* +0x1e */;
 }
@@ -568,5 +549,5 @@ void zrwCameraSetViewOffset(ZrwCamera *camera, float x, float y)
 {
     const float offset[2] = {x, y};
 
-    RwCameraSetViewOffset(camera->rwCamera, offset);
+    RwCameraSetViewOffset(camera->rwCamera, (const RwV2d *)offset);
 }

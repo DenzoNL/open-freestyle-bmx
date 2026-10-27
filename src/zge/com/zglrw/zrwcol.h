@@ -10,6 +10,8 @@
 #include <stdint.h>
 
 #include "compat/orig.h"
+#include "rw/rwcamera.h"
+#include "rw/rwmath.h"
 
 /* A triangle of the world as RenderWare reports it (0x28 bytes): plane normal, material index, vertex
  * pointers. */
@@ -154,9 +156,6 @@ int zrwcolQueryLine(float *from, float *to, uint32_t flags, const int *excluded,
 uint8_t *zrwcolHitColor(ZrwColLineHit *hit);
 
 /* RenderWare: matrices and points of frames, materials, and the intersection enumerators. */
-ORIG_FN(0x004d2b10, void *, rwFrameGetLTM, (void *frame));
-ORIG_FN(0x004d3a90, void, rwV3dTransformPoints, (float *out, const void *in, int count, const void *matrix));
-ORIG_FN(0x004d3ae0, void, rwV3dTransformVectors, (float *out, const void *in, int count, const void *matrix));
 ORIG_FN(0x004b46b0, uint8_t *, rwModelGetMaterialTable, (void *model));
 ORIG_FN(0x004b47a0, void *, rwModelGetMaterial, (void *model, uint32_t index));
 ORIG_FN(0x004b93d0, void *, rwMaterialGetData, (void *material));

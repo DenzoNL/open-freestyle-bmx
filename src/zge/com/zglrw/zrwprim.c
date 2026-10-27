@@ -2,8 +2,10 @@
 #include "zge/com/zglrw/zrwprim.h"
 
 #include "compat/crt.h"
+#include "rw/rwcamera.h"
 #include "rw/rwcore.h"
 #include "rw/rwim.h"
+#include "rw/rwmath.h"
 #include "zge/com/zglrw/zrwcam.h"
 #include "zge/com/zglrw/zrwmat.h"
 #include "zge/com/zglrw/zrwzgl.h"
@@ -15,9 +17,6 @@
 static const char kPrimFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwPrim.c";
 
 /* RenderWare (statically linked, not ported): immediate mode and camera queries. */
-ORIG_FN(0x004de610, float, RwCameraGetNearClipPlane, (void *camera));
-ORIG_FN(0x004d3ae0, void *, RwV3dTransformVectors,
-        (ZVec3 * out, const ZVec3 *in, int count, const ZMatrix *m));
 
 /* The renderer's render state hook (0x561490): state bits and the raster to use. */
 typedef void(BMX_CDECL *ZrwPrimStateHookFn)(uint32_t state, void *raster);

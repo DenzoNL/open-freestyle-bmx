@@ -45,12 +45,17 @@
 #define ORIG_FN_STDCALL(addr, ret, name, params)                                                             \
     static ret(BMX_STDCALL *const name) params = (ret(BMX_STDCALL *) params)(addr)
 #define ORIG_VAR(addr, type, name) (*(type *)(uintptr_t)(addr))
+/* Original function taking its first n arguments in EAX, EDX, ECX (the rest on the stack, cdecl). */
+#define ORIG_FN_REGPARM(n, addr, ret, name, params)                                                          \
+    static ret(__attribute__((regparm(n))) *const name) params =                                             \
+        (ret(__attribute__((regparm(n))) *) params)(addr)
 #else
 #define BMX_CDECL
 #define BMX_STDCALL
-#define ORIG_FN(addr, ret, name, params)         ret name params
-#define ORIG_FN_STDCALL(addr, ret, name, params) ret name params
-#define ORIG_VAR(addr, type, name)               name
+#define ORIG_FN(addr, ret, name, params)            ret name params
+#define ORIG_FN_STDCALL(addr, ret, name, params)    ret name params
+#define ORIG_VAR(addr, type, name)                  name
+#define ORIG_FN_REGPARM(n, addr, ret, name, params) __attribute__((regparm(n))) ret name params
 #endif
 // NOLINTEND(bugprone-macro-parentheses)
 

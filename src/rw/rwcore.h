@@ -175,7 +175,7 @@ typedef struct RwGlobals {
     uint8_t pad0c[4];                          /* 0x0c */
     RwDevice dOpenDevice;                      /* 0x10 */
     uint32_t stdFunc[rwSTANDARDNUMOFSTANDARD]; /* 0x48 */
-    uint8_t padB8[8];                          /* 0xb8 */
+    RwLLLink dirtyFrameList;                   /* 0xb8 frame hierarchies waiting for a sync */
     RwFileFunctions fileFuncs;                 /* 0xc0 */
     RwStringFunctions stringFuncs;             /* 0xe8 */
     RwMemoryFunctions memoryFuncs;             /* 0x128 */
@@ -248,12 +248,29 @@ typedef struct RwObject {
     void *parent;
 } RwObject;
 
-/* The part of RwFrame the core needs: the list of objects attached to it (0x14). */
+/*
+ * RwFrame: a node of the frame hierarchy. object.parent is the parent frame; privateFlags bits 0 and 1 (3)
+ * mean "in the engine's dirty list", bits 2 and 3 (0xc) mark a changed frame / subtree.
+ */
 typedef struct RwFrame {
     RwObject object;
-    uint8_t pad08[0xc];
-    RwLLLink objectList; /* 0x14 */
+    uint8_t version;       /* 0x08 bumped whenever the frame changes */
+    uint8_t pad09[3];      /* 0x09 */
+    RwLLLink dirtyLink;    /* 0x0c in RwGlobals.dirtyFrameList (only while privateFlags & 3) */
+    RwLLLink objectList;   /* 0x14 objects attached to the frame */
+    RwMatrix modelling;    /* 0x1c relative to the parent */
+    RwMatrix ltm;          /* 0x5c local transformation matrix (world space) */
+    struct RwFrame *child; /* 0x9c first child */
+    struct RwFrame *next;  /* 0xa0 next sibling */
+    struct RwFrame *root;  /* 0xa4 root of the hierarchy */
 } RwFrame;
+
+enum {
+    rwFRAMEPRIVATEHIERARCHYSYNCLTM = 0x01,
+    rwFRAMEPRIVATEHIERARCHYSYNCOBJ = 0x02,
+    rwFRAMEPRIVATESUBTREESYNCLTM = 0x04,
+    rwFRAMEPRIVATESUBTREESYNCOBJ = 0x08,
+};
 
 typedef struct RwObjectHasFrame {
     RwObject object; /* parent is the frame */
@@ -262,6 +279,10 @@ typedef struct RwObjectHasFrame {
 } RwObjectHasFrame;
 
 _Static_assert(offsetof(RwFrame, objectList) == 0x14, "RwFrame layout");
+_Static_assert(offsetof(RwFrame, ltm) == 0x5c, "RwFrame layout");
+_Static_assert(offsetof(RwFrame, root) == 0xa4, "RwFrame layout");
+_Static_assert(sizeof(RwFrame) == 0xa8, "RwFrame layout");
+_Static_assert(offsetof(RwGlobals, dirtyFrameList) == 0xb8, "RwGlobals layout");
 _Static_assert(sizeof(RwObjectHasFrame) == 0x14, "RwObjectHasFrame layout");
 
 /* Callback of the for-all helpers: gets the object and the caller's data, returns NULL to stop. */

@@ -45,6 +45,16 @@ declarations of functions that are ported under another name, and WinMain. The C
 to equivalents in our C library, checked against MSVC6 behaviour where it differs (strcmp returns
 -1/0/1; printf formatting of floats).
 
+## Later: drop the dependency on the user's NgBMX.exe
+
+Step 1 copies the original's initialised data (515 globals: tables, strings, settings) from the user's
+own NgBMX.exe at startup, so bmxnative.exe must sit next to the original and cannot replace it yet.
+Before a release, every ORIG_VAR with initial data gets a native definition (generated from the
+original's formula where possible, else read from the game's asset files) and the remaining ORIG_FN
+targets are ours. Then the exe needs only the user's asset files and can be dropped into the game
+folder as NgBMX.exe (save files stay compatible: same formats). Other platforms have no exe to
+replace: they point at a copy of the game's assets folder.
+
 ## Done for step 1
 
 `bmxnative.exe` starts from the game folder, loads the data, and runs the init sequence until the first

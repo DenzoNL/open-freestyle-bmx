@@ -4,8 +4,10 @@
 #include <stddef.h>
 
 #include "compat/crt.h"
+#include "rw/rwcamera.h"
 #include "rw/rwcore.h"
 #include "rw/rwim.h"
+#include "rw/rwmath.h"
 #include "rw/rwplugins.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zobjcamera.h"
@@ -17,20 +19,8 @@ static const char kZrwModelRenderFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwMod
 /* RenderWare library calls (statically linked in the exe, not ported). */
 typedef void *(BMX_CDECL *RwFrameCallback)(void *frame, void *data);
 typedef void *(BMX_CDECL *RpAtomicCallback)(void *atomic, void *data);
-ORIG_FN(0x004d2b10, ZMatrix *, RwFrameGetLTM, (void *frame));
-ORIG_FN(0x004d2b00, ZMatrix *, RwFrameGetMatrix, (void *frame));
-ORIG_FN(0x004d2a80, void *, RwFrameUpdateObjects, (void *frame));
-ORIG_FN(0x004d2eb0, void *, RwFrameForAllChildren, (void *frame, RwFrameCallback callback, void *data));
-ORIG_FN(0x004dea80, void *, RwCameraGetFrame, (void *camera));
-ORIG_FN(0x004de5a0, void *, RwCameraGetRaster, (void *camera));
-ORIG_FN(0x004de650, float, RwCameraGetFarClipPlane, (void *camera));
-ORIG_FN(0x004de620, void *, RwCameraSetFarClipPlane, (void *camera, float distance));
-ORIG_FN(0x004de610, float, RwCameraGetNearClipPlane, (void *camera));
 ORIG_FN(0x004dcc30, int, RwRasterGetWidth, (void *raster));
 ORIG_FN(0x004dcc40, int, RwRasterGetHeight, (void *raster));
-ORIG_FN(0x004d15a0, void *, RwMatrixTranslate, (ZMatrix * matrix, const ZVec3 *translation, int combine));
-ORIG_FN(0x004d1040, void *, RwMatrixRotate, (ZMatrix * matrix, const ZVec3 *axis, float angle, int combine));
-ORIG_FN(0x004b1990, void *, RpClumpForAllAtomics, (void *clump, RpAtomicCallback callback, void *data));
 ORIG_FN(0x004b1940, void *, RpClumpRender, (void *clump));
 ORIG_FN(0x004b4550, int, RpGeometryGetNumVertices, (void *geometry));
 ORIG_FN(0x004b43e0, void *, RpGeometryGetMorphTarget, (void *geometry, int index));

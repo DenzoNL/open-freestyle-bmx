@@ -2,7 +2,9 @@
 #include "zge/com/zglrw/zrwworld.h"
 
 #include "compat/crt.h"
+#include "rw/rwcamera.h"
 #include "rw/rwcore.h"
+#include "rw/rwmath.h"
 #include "rw/rwstream.h"
 #include "zge/com/zglrw/zrwmat.h"
 #include "zge/com/zglrw/zrwtxr.h"
@@ -39,14 +41,12 @@ ORIG_FN(0x004c2060, int, RpWorldSectorGetNumPolygons, (void *sector));
 ORIG_FN(0x004c2050, int, RpWorldSectorGetNumVertices, (void *sector));
 ORIG_FN(0x004b4720, int, RpGeometryGetNumTriangles, (void *geometry));
 ORIG_FN(0x004b4550, int, RpGeometryGetNumVertices, (void *geometry));
-ORIG_FN(0x004b1990, void *, RpClumpForAllAtomics, (void *clump, ZrwForAllFn callback, void *arg));
 ORIG_FN(0x004ba050, const float *, RpWorldGetOrigin, (void *world));
 ORIG_FN(0x004b9fe0, const float *, RpWorldGetBBox, (void *world));
 ORIG_FN(0x004ba9c0, int, RpWorldDestroy, (void *world));
 ORIG_FN(0x004bb080, void *, RpWorldCreate, (const float *bbox));
 ORIG_FN(0x004cc640, int, rwWorldIsPvsReady, (void *world));
 ORIG_FN(0x004cc320, void, rwWorldPvsUnload, (void *world));
-ORIG_FN(0x004de8a0, int, RwCameraClear, (void *camera, const void *color, int flags));
 ORIG_FN(0x004c3e60, void *, RpWorldStreamRead, (void *stream));
 ORIG_FN(0x00492eb0, uint8_t *, zrwGetCurrentCamera, (void));
 ORIG_FN(0x00492f00, int, zrwcamBegin, (void *camera));
