@@ -9,6 +9,7 @@
 #include "rw/rwmath.h"
 #include "rw/rwplugins.h"
 #include "rw/rwstream.h"
+#include "rw/rwtexture.h"
 #include "zge/zdebug.h"
 #include "zge/zfile.h"
 #include "zge/zgemods/zobjcamera.h"
@@ -21,43 +22,6 @@
 static const char kZrwTxrFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwTxr.c";
 
 /* RenderWare library calls (statically linked in the exe, not ported). */
-ORIG_FN(0x004dfcb0, void *, RwTextureRead, (const char *name, const char *maskName));
-ORIG_FN(0x004e6d90, void *, RtBMPImageRead, (const char *name));
-ORIG_FN(0x005068a0, void *, RtPNGImageRead, (const char *name));
-ORIG_FN(0x004e3a60, int, RwImageGetWidth, (void *image));
-ORIG_FN(0x004e3a70, int, RwImageGetHeight, (void *image));
-ORIG_FN(0x004e3a80, int, RwImageGetDepth, (void *image));
-ORIG_FN(0x004e3a90, uint8_t *, RwImageGetPixels, (void *image));
-ORIG_FN(0x004e3aa0, uint8_t *, RwImageGetPalette, (void *image));
-ORIG_FN(0x004e3960, int, RwImageDestroy, (void *image));
-ORIG_FN(0x004dcb10, void *, RwRasterCreate, (int width, int height, int depth, int flags));
-ORIG_FN(0x004e7f70, void *, RwRasterSetFromImage, (void *raster, void *image));
-ORIG_FN(0x004dcc30, int, RwRasterGetWidth, (void *raster));
-ORIG_FN(0x004dcc40, int, RwRasterGetHeight, (void *raster));
-ORIG_FN(0x004dcc50, int, RwRasterGetStride, (void *raster));
-ORIG_FN(0x004dcc60, int, RwRasterGetDepth, (void *raster));
-ORIG_FN(0x004dcc70, uint32_t, RwRasterGetFormat, (void *raster));
-ORIG_FN(0x004dd160, uint8_t *, RwRasterLockPalette, (void *raster, int mode));
-ORIG_FN(0x004dd1d0, void *, RwRasterUnlockPalette, (void *raster));
-ORIG_FN(0x004e5330, void, zrwPixelToRGBA, (uint8_t *rgba, uint32_t pixel, uint32_t format));
-ORIG_FN(0x004df650, void *, RwTextureGetRaster, (void *texture));
-ORIG_FN(0x004df5f0, void *, RwTextureSetRaster, (void *texture, void *raster));
-ORIG_FN(0x004df910, void *, RwTextureCreate, (void *raster));
-ORIG_FN(0x004df760, int, RwTextureDestroy, (void *texture));
-ORIG_FN(0x004df990, const char *, RwTextureGetName, (void *texture));
-ORIG_FN(0x004df9b0, void *, RwTextureSetName, (void *texture, const char *name));
-ORIG_FN(0x004dff70, void *, RwTextureSetFilterMode, (void *texture, int mode));
-ORIG_FN(0x004dffa0, void *, RwTextureSetAddressing, (void *texture, int mode));
-ORIG_FN(0x004dfb20, void *, RwTexDictionaryAddTexture, (void *dictionary, void *texture));
-ORIG_FN(0x004df670, void *, RwTexDictionaryCreate, (void));
-ORIG_FN(0x004df810, int, RwTexDictionaryDestroy, (void *dictionary));
-ORIG_FN(0x004dfc80, void *, RwTexDictionarySetCurrent, (void *dictionary));
-ORIG_FN(0x004e4a30, int, RwImageRegisterImageFormat, (const char *extension, void *read, void *write));
-ORIG_FN(0x004df580, int, RwTextureSetMipmapping, (int enable));
-ORIG_FN(0x004df980, void *, RwTextureAddRef, (void *texture));
-ORIG_FN(0x004df550, void *, RwTextureSetFindCallBack, (void *callback));
-ORIG_FN(0x004df540, void *, RwTextureGetReadCallBack, (void));
-ORIG_FN(0x004df520, int, RwTextureSetReadCallBack, (void *callback));
 /* The image writers registered next to the readers, and worlds (RpWorld) with their PVS. */
 ORIG_FN(0x004e7eb0, int, rwBmpImageWrite, (void));
 ORIG_FN(0x004cc640, int, rwWorldIsPvsReady, (void *world));
@@ -837,7 +801,7 @@ uint8_t *zrwTextureReadPalette(const ZrwTexture *texture)
         default:
             break;
         }
-        zrwPixelToRGBA(rgba, value, format);
+        RwRGBAFromPixel(rgba, value, format);
         gZrwTxr.palette[i * 4] = rgba[0];
         gZrwTxr.palette[i * 4 + 1] = rgba[1];
         next16++;

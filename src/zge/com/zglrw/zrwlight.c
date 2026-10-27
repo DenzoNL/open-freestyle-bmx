@@ -4,6 +4,7 @@
 #include "compat/crt.h"
 #include "rw/rwcamera.h"
 #include "rw/rwcore.h"
+#include "rw/rwlight.h"
 #include "rw/rwmath.h"
 #include "zge/com/zglrw/zrwmodel.h"
 #include "zge/zdebug.h"
@@ -11,16 +12,8 @@
 
 static const char kZrwLightFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwLight.c";
 
-ORIG_FN(0x004c2400, void *, RpLightCreate, (uint32_t type));
-ORIG_FN(0x004c2530, void, RpLightSetRadius, (void *light, float radius));
-ORIG_FN(0x004c25e0, void, RpLightSetConeAngle, (void *light, float angle));
-ORIG_FN(0x004c2570, void, RpLightSetColor, (void *light, const float *color));
-ORIG_FN(0x004c2bb0, void, RpLightSetFrame, (void *light, void *frame));
-ORIG_FN(0x004c2be0, void *, RpLightGetFrame, (void *light));
-ORIG_FN(0x004c2c00, void, RpLightSetFlags, (void *light, uint32_t flags));
 ORIG_FN(0x004b8af0, void *, RpWorldAddLight, (void *world, void *light));
 ORIG_FN(0x004b8b80, void *, RpWorldRemoveLight, (void *world, void *light));
-ORIG_FN(0x004c24c0, int, RpLightDestroy, (void *light));
 
 /* RpLightType of the four kinds the scene creates. */
 typedef uint32_t ZrwLightTypeTable[4];

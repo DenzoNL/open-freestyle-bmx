@@ -4,9 +4,7 @@
 #include "compat/crt.h"
 #include "rw/rwplugins.h"
 #include "rw/rwstream.h"
-
-/* Callees in other RenderWare groups, still original code. */
-ORIG_FN(0x004e5570, void, RwImageSetGamma, (float gamma));
+#include "rw/rwtexture.h"
 
 /* The engine plugin 0x401 data: the flag bit marking an identity matrix and the multiply routine. */
 typedef struct RwMatrixGlobals {

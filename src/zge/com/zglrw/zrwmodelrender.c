@@ -9,6 +9,7 @@
 #include "rw/rwim.h"
 #include "rw/rwmath.h"
 #include "rw/rwplugins.h"
+#include "rw/rwtexture.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zobjcamera.h"
 #include "zge/zmem.h"
@@ -19,8 +20,6 @@ static const char kZrwModelRenderFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwMod
 /* RenderWare library calls (statically linked in the exe, not ported). */
 typedef void *(BMX_CDECL *RwFrameCallback)(void *frame, void *data);
 typedef void *(BMX_CDECL *RpAtomicCallback)(void *atomic, void *data);
-ORIG_FN(0x004dcc30, int, RwRasterGetWidth, (void *raster));
-ORIG_FN(0x004dcc40, int, RwRasterGetHeight, (void *raster));
 ORIG_FN(0x004b1940, void *, RpClumpRender, (void *clump));
 ORIG_FN(0x004b4550, int, RpGeometryGetNumVertices, (void *geometry));
 ORIG_FN(0x004b43e0, void *, RpGeometryGetMorphTarget, (void *geometry, int index));
@@ -30,7 +29,6 @@ ORIG_FN(0x004b44e0, const uint32_t *, RpGeometryGetTexCoords, (void *geometry));
 ORIG_FN(0x004b4720, int, RpGeometryGetNumTriangles, (void *geometry));
 ORIG_FN(0x004b47a0, void *, RpGeometryGetMaterial, (void *geometry, int index));
 ORIG_FN(0x004b93d0, void *, RpMaterialGetTexture, (void *material));
-ORIG_FN(0x004df650, void *, RwTextureGetRaster, (void *texture));
 
 /* Hooks into the renderer (function pointers in the exe's data). */
 typedef void(BMX_CDECL *ZrwRenderStateHookFn)(uint32_t flags, const void *raster);

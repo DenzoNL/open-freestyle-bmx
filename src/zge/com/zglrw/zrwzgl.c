@@ -8,6 +8,7 @@
 #include "rw/rwcore.h"
 #include "rw/rwmath.h"
 #include "rw/rwplugins.h"
+#include "rw/rwtexture.h"
 #include "zge/pc/pcinput.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zramdisk.h"
@@ -48,7 +49,6 @@ ORIG_FN(0x00492f00, int, zrwcamBegin, (void *camera));
 ORIG_FN(0x00492fe0, int, zrwcamEnd, (void));
 ORIG_FN(0x00493060, void *, zrwcamHandle, (void *camera));
 ORIG_FN(0x00497620, int, zrwtxrFlush, (void));
-ORIG_FN(0x004dcfd0, int, rwRasterShowRaster, (void *raster, void *window, int flags));
 ORIG_FN(0x004cc270, void, rwLightBegin, (void *light));
 ORIG_FN(0x004cc510, void, rwLightSetMatrix, (void *light, const void *matrix));
 ORIG_FN(0x004cc670, void, rwLightSetParams, (void *light, const void *a, const void *b));
@@ -725,14 +725,14 @@ int zrwDrawFrame(void)
         }
     }
     runListAt(gZrwUpdateLists[3].head);
-    rwRasterShowRaster(gZrwRaster, gZrwWindow, 1);
+    RwRasterShowRaster(gZrwRaster, gZrwWindow, 1);
     return 1;
 }
 
 BMX_ADDR(0x0048b950)
 void zrwShowRaster(int vsync)
 {
-    rwRasterShowRaster(gZrwRaster, gZrwWindow, vsync != 0);
+    RwRasterShowRaster(gZrwRaster, gZrwWindow, vsync != 0);
 }
 
 BMX_ADDR(0x0048b990)

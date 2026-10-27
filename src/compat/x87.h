@@ -55,6 +55,14 @@ static inline double bmxX87AsinScaled(int32_t n, double step, float scale)
     return r;
 }
 
+/* (float)tan(a): FLD, FPTAN, drop the 1.0 it pushes, FSTP to float (the light cone angle). */
+static inline float bmxX87TanFloat(float a)
+{
+    float r;
+    __asm__("flds %1\n\tfptan\n\tfstp %%st(0)\n\tfstps %0" : "=m"(r) : "m"(a) : "st", "st(1)");
+    return r;
+}
+
 /* The CRT's asin(+-1): +-pi/2 loaded as an 80 bit constant, times scale. */
 static inline double bmxX87HalfPiScaled(int negative, float scale)
 {
@@ -120,6 +128,10 @@ static inline double bmxX87Fcos(double a)
 static inline double bmxX87AsinScaled(int32_t n, double step, float scale)
 {
     return asin((double)n * step) * scale;
+}
+static inline float bmxX87TanFloat(float a)
+{
+    return (float)tan((double)a);
 }
 static inline double bmxX87HalfPiScaled(int negative, float scale)
 {
