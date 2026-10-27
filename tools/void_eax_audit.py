@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 repo = Path(sys.argv[1])
-ANNOT = re.compile(r"^BMX_ADDR\((0x[0-9a-fA-F]+)\)\s*\n((?:static\s+)?[\w\s\*]+?)\b(\w+)\s*\(", re.M)
+ANNOT = re.compile(r"^BMX_ADDR\((0x[0-9a-fA-F]+)\)\s*\n(?:static\s+)?(?:__attribute__\(\(.*?\)\)\s*)*((?:static\s+)?[\w\s\*]+?)\b(\w+)\s*\(", re.M)
 INSN = re.compile(r"^([0-9a-f]{8})\s+(.*)$")
 EAX_READ = re.compile(r"\b(EAX|AX|AL|AH)\b")
 EAX_WRITE_DEST = re.compile(r"^(MOV|MOVZX|MOVSX|LEA|POP|XOR|SUB|SETNZ|SETZ|SET\w+|CDQ)\s+(EAX|AX|AL)\b")

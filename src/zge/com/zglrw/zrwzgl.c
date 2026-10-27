@@ -698,7 +698,8 @@ int zrwDrawFrame(void)
         }
         if (gZrwDebugLightOn != 0) {
             rwLightBegin(gZrwDebugLight);
-            rwLightSetMatrix(gZrwDebugLight, RwFrameGetMatrix(RwCameraGetFrame(zrwcamHandle(camera))) + 0x30);
+            /* The matrix position (+0x30 bytes); `+ 0x30` broke once RwFrameGetMatrix returned RwMatrix *. */
+            rwLightSetMatrix(gZrwDebugLight, &RwFrameGetMatrix(RwCameraGetFrame(zrwcamHandle(camera)))->pos);
         }
         runListAt(gZrwUpdateLists[1].head);
         if (zrwtxrFlush() == 0) {

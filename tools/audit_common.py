@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 
 INSN = re.compile(r"^([0-9a-f]{8})\s+(.*)$")
-ANNOT = re.compile(r"^BMX_ADDR\((0x[0-9a-fA-F]+)\)\s*\n((?:static\s+)?[\w\s\*]+?)\b(\w+)\s*\(", re.M)
+ANNOT = re.compile(r"^BMX_ADDR\((0x[0-9a-fA-F]+)\)\s*\n(?:static\s+)?(?:__attribute__\(\(.*?\)\)\s*)*((?:static\s+)?[\w\s\*]+?)\b(\w+)\s*\(", re.M)
 
 
 def strip_c(text):
