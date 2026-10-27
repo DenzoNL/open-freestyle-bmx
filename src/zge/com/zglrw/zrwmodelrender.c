@@ -5,6 +5,7 @@
 
 #include "compat/crt.h"
 #include "rw/rwcore.h"
+#include "rw/rwim.h"
 #include "rw/rwplugins.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zobjcamera.h"
@@ -40,10 +41,6 @@ ORIG_FN(0x004b4720, int, RpGeometryGetNumTriangles, (void *geometry));
 ORIG_FN(0x004b47a0, void *, RpGeometryGetMaterial, (void *geometry, int index));
 ORIG_FN(0x004b93d0, void *, RpMaterialGetTexture, (void *material));
 ORIG_FN(0x004df650, void *, RwTextureGetRaster, (void *texture));
-ORIG_FN(0x004df0b0, int, RwIm3DTransform, (void *vertices, int count, const ZMatrix *matrix, int flags));
-ORIG_FN(0x004df090, int, RwIm3DEnd, (void));
-ORIG_FN(0x004df020, int, RwIm3DRenderIndexedPrimitive, (int primitive, const uint16_t *indices, int count));
-ORIG_FN(0x004defc0, int, RwIm3DRenderLine, (int from, int to));
 
 /* Hooks into the renderer (function pointers in the exe's data). */
 typedef void(BMX_CDECL *ZrwRenderStateHookFn)(uint32_t flags, const void *raster);

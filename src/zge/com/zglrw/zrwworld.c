@@ -3,6 +3,7 @@
 
 #include "compat/crt.h"
 #include "rw/rwcore.h"
+#include "rw/rwstream.h"
 #include "zge/com/zglrw/zrwmat.h"
 #include "zge/com/zglrw/zrwtxr.h"
 #include "zge/zdebug.h"
@@ -46,11 +47,7 @@ ORIG_FN(0x004bb080, void *, RpWorldCreate, (const float *bbox));
 ORIG_FN(0x004cc640, int, rwWorldIsPvsReady, (void *world));
 ORIG_FN(0x004cc320, void, rwWorldPvsUnload, (void *world));
 ORIG_FN(0x004de8a0, int, RwCameraClear, (void *camera, const void *color, int flags));
-ORIG_FN(0x004e23e0, void *, RwStreamOpen, (int type, int access, const void *data));
-ORIG_FN(0x004e2ec0, int, RwStreamFindChunk,
-        (void *stream, uint32_t type, uint32_t *length, uint32_t *version));
 ORIG_FN(0x004c3e60, void *, RpWorldStreamRead, (void *stream));
-ORIG_FN(0x004e2660, int, RwStreamClose, (void *stream, void *data));
 ORIG_FN(0x00492eb0, uint8_t *, zrwGetCurrentCamera, (void));
 ORIG_FN(0x00492f00, int, zrwcamBegin, (void *camera));
 ORIG_FN(0x00492fe0, int, zrwcamEnd, (void));

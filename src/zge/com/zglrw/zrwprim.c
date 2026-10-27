@@ -3,6 +3,7 @@
 
 #include "compat/crt.h"
 #include "rw/rwcore.h"
+#include "rw/rwim.h"
 #include "zge/com/zglrw/zrwcam.h"
 #include "zge/com/zglrw/zrwmat.h"
 #include "zge/com/zglrw/zrwzgl.h"
@@ -15,9 +16,6 @@ static const char kPrimFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwPrim.c";
 
 /* RenderWare (statically linked, not ported): immediate mode and camera queries. */
 ORIG_FN(0x004de610, float, RwCameraGetNearClipPlane, (void *camera));
-ORIG_FN(0x004df0b0, int, RwIm3DTransform, (void *vertices, int count, const ZMatrix *matrix, int flags));
-ORIG_FN(0x004def70, int, RwIm3DRenderPrimitive, (int type));
-ORIG_FN(0x004df090, int, RwIm3DEnd, (void));
 ORIG_FN(0x004d3ae0, void *, RwV3dTransformVectors,
         (ZVec3 * out, const ZVec3 *in, int count, const ZMatrix *m));
 

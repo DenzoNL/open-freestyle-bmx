@@ -1,15 +1,9 @@
 /* RenderWare 3.1 core: free lists, error slot, object/frame linkage, plugin registry, string table. */
 #include "rw/rwcore.h"
+#include "rw/rwstream.h"
 
 /* Callees in other RenderWare groups, still original code. */
 ORIG_FN(0x004d2a80, void *, RwFrameUpdateObjects, (RwFrame * frame));
-ORIG_FN(0x004e2c50, void *, RwStreamSkip, (void *stream, uint32_t count));
-ORIG_FN(0x004e2e20, int, _rwStreamReadChunkHeader,
-        (void *stream, uint32_t *type, uint32_t *length, uint32_t *version));
-ORIG_FN(0x004e2ec0, int, RwStreamFindChunk,
-        (void *stream, uint32_t type, uint32_t *length, uint32_t *version));
-ORIG_FN(0x004e2fd0, int, _rwStreamWriteVersionedChunkHeader,
-        (void *stream, uint32_t type, int32_t size, uint32_t version));
 
 /* ---- free lists ------------------------------------------------------------------------------------- */
 

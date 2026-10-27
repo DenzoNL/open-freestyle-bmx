@@ -42,6 +42,9 @@ enum {
     rwERR_NOMEM = (int32_t)0x80000002,
     rwERR_INVALIDSIZE = (int32_t)0x80000006, /* "Invalid data block size specified" */
     rwERR_NOTOPEN = (int32_t)0x80000007,
+    rwERR_FILEOPEN = (int32_t)0x80000003, /* "Cannot open file" (argument: the name) */
+    rwERR_READ = (int32_t)0x80000004,
+    rwERR_WRITE = (int32_t)0x80000005,
     rwERR_ALREADYOPEN = (int32_t)0x80000008, /* plugins can only be registered before RwEngineOpen */
     rwERR_BADVERSION = (int32_t)0x80000018,
     rwERRNONE = (int32_t)0x80000000, /* the code of an empty error slot */
@@ -76,24 +79,29 @@ enum {
 
 typedef int(BMX_CDECL *RwSystemFunc)(int32_t request, void *out, void *inOut, int32_t in);
 typedef int(BMX_CDECL *RwRenderStateSetFunc)(int32_t state, int32_t value);
+typedef int(BMX_CDECL *RwRenderStateGetFunc)(int32_t state, void *value);
 typedef int(BMX_CDECL *RwIm2DRenderPrimitiveFunc)(int32_t primType, void *vertices, int32_t numVertices);
+typedef int(BMX_CDECL *RwIm3DRenderLineFunc)(int32_t from, int32_t to);
+typedef int(BMX_CDECL *RwIm3DRenderPrimitiveFunc)(int32_t primType);
+typedef int(BMX_CDECL *RwIm3DRenderIndexedPrimitiveFunc)(int32_t primType, const uint16_t *indices,
+                                                         int32_t numIndices);
 
 /* The device driver's function table (the D3D7 driver's lives in .data at 0x566fe4). */
 typedef struct RwDevice {
-    float gammaCorrection;                           /* 0x00 */
-    RwSystemFunc fpSystem;                           /* 0x04 */
-    float zBufferNear;                               /* 0x08 */
-    float zBufferFar;                                /* 0x0c */
-    RwRenderStateSetFunc fpRenderStateSet;           /* 0x10 */
-    void *fpRenderStateGet;                          /* 0x14 */
-    void *fpIm2DRenderLine;                          /* 0x18 */
-    void *fpIm2DRenderTriangle;                      /* 0x1c */
-    RwIm2DRenderPrimitiveFunc fpIm2DRenderPrimitive; /* 0x20 */
-    void *fpIm2DRenderIndexedPrimitive;              /* 0x24 */
-    void *fpIm3DRenderLine;                          /* 0x28 */
-    void *fpIm3DRenderTriangle;                      /* 0x2c */
-    void *fpIm3DRenderPrimitive;                     /* 0x30 */
-    void *fpIm3DRenderIndexedPrimitive;              /* 0x34 */
+    float gammaCorrection;                                         /* 0x00 */
+    RwSystemFunc fpSystem;                                         /* 0x04 */
+    float zBufferNear;                                             /* 0x08 */
+    float zBufferFar;                                              /* 0x0c */
+    RwRenderStateSetFunc fpRenderStateSet;                         /* 0x10 */
+    RwRenderStateGetFunc fpRenderStateGet;                         /* 0x14 */
+    void *fpIm2DRenderLine;                                        /* 0x18 */
+    void *fpIm2DRenderTriangle;                                    /* 0x1c */
+    RwIm2DRenderPrimitiveFunc fpIm2DRenderPrimitive;               /* 0x20 */
+    void *fpIm2DRenderIndexedPrimitive;                            /* 0x24 */
+    RwIm3DRenderLineFunc fpIm3DRenderLine;                         /* 0x28 */
+    void *fpIm3DRenderTriangle;                                    /* 0x2c */
+    RwIm3DRenderPrimitiveFunc fpIm3DRenderPrimitive;               /* 0x30 */
+    RwIm3DRenderIndexedPrimitiveFunc fpIm3DRenderIndexedPrimitive; /* 0x34 */
 } RwDevice;
 
 _Static_assert(sizeof(RwDevice) == 0x38, "RwDevice layout");
@@ -136,6 +144,25 @@ typedef struct RwStringFunctions {
 } RwStringFunctions;
 
 /*
+ * The file system interface (RwOSGetFileInterface): the C stdio subset RenderWare streams use, filled in by
+ * _rwFSOpen with the CRT's functions. The game replaces entries while a texture is read from memory.
+ */
+typedef struct RwFileFunctions {
+    int(BMX_CDECL *rwfexist)(const char *name);                                          /* 0x00 */
+    void *(BMX_CDECL *rwfopen)(const char *name, const char *mode);                      /* 0x04 */
+    int(BMX_CDECL *rwfclose)(void *file);                                                /* 0x08 */
+    size_t(BMX_CDECL *rwfread)(void *buf, size_t size, size_t count, void *file);        /* 0x0c */
+    size_t(BMX_CDECL *rwfwrite)(const void *buf, size_t size, size_t count, void *file); /* 0x10 */
+    char *(BMX_CDECL *rwfgets)(char *buf, int32_t size, void *file);                     /* 0x14 */
+    int(BMX_CDECL *rwfputs)(const char *str, void *file);                                /* 0x18 */
+    int(BMX_CDECL *rwfeof)(void *file);                                                  /* 0x1c */
+    int(BMX_CDECL *rwfseek)(void *file, int32_t offset, int32_t origin);                 /* 0x20 */
+    int(BMX_CDECL *rwfflush)(void *file);                                                /* 0x24 */
+} RwFileFunctions;
+
+_Static_assert(sizeof(RwFileFunctions) == 0x28, "RwFileFunctions layout");
+
+/*
  * The engine instance. RwEngineInstance points at it; RwDefaultGlobals is the static one used until
  * RwEngineOpen allocates the real one. Plugins registered on the engine registry keep their data after
  * sizeof(RwGlobals): the error slot, the resource arena, the matrix globals.
@@ -148,7 +175,8 @@ typedef struct RwGlobals {
     uint8_t pad0c[4];                          /* 0x0c */
     RwDevice dOpenDevice;                      /* 0x10 */
     uint32_t stdFunc[rwSTANDARDNUMOFSTANDARD]; /* 0x48 */
-    uint8_t padB8[0x30];                       /* 0xb8 */
+    uint8_t padB8[8];                          /* 0xb8 */
+    RwFileFunctions fileFuncs;                 /* 0xc0 */
     RwStringFunctions stringFuncs;             /* 0xe8 */
     RwMemoryFunctions memoryFuncs;             /* 0x128 */
     RwFreeListAllocFunc freeListAlloc;         /* 0x138 */
@@ -160,6 +188,7 @@ typedef struct RwGlobals {
 _Static_assert(sizeof(RwGlobals) == 0x148, "RwGlobals layout");
 _Static_assert(offsetof(RwGlobals, dOpenDevice) == 0x10, "RwGlobals layout");
 _Static_assert(offsetof(RwGlobals, stdFunc) == 0x48, "RwGlobals layout");
+_Static_assert(offsetof(RwGlobals, fileFuncs) == 0xc0, "RwGlobals layout");
 _Static_assert(offsetof(RwGlobals, stringFuncs) == 0xe8, "RwGlobals layout");
 _Static_assert(offsetof(RwGlobals, memoryFuncs) == 0x128, "RwGlobals layout");
 _Static_assert(offsetof(RwGlobals, freeListAlloc) == 0x138, "RwGlobals layout");
@@ -174,6 +203,8 @@ _Static_assert(offsetof(RwGlobals, engineStatus) == 0x144, "RwGlobals layout");
 #define rwResourcesOffset ORIG_VAR(0x00676cf0, int32_t, rwResourcesOffset)
 #define rwMatrixOffset    ORIG_VAR(0x00676970, int32_t, rwMatrixOffset)
 #define rwFastSqrtOffset  ORIG_VAR(0x00676990, int32_t, rwFastSqrtOffset)
+/* The stream plugin's data: the free list the RwStream objects come from (rw/stream.c). */
+#define rwStreamOffset ORIG_VAR(0x00676d50, int32_t, rwStreamOffset)
 
 /* A block of free list entries: the next block's address, then the entries. */
 typedef struct RwFreeListBlock {
@@ -376,6 +407,7 @@ RwMatrix *RwMatrixMultiply(RwMatrix *out, const RwMatrix *a, const RwMatrix *b);
 
 float RwIm2DGetNearScreenZ(void);
 int RwRenderStateSet(int32_t state, int32_t value);
+int RwRenderStateGet(int32_t state, void *value);
 int RwIm2DRenderPrimitive(int32_t primType, void *vertices, int32_t numVertices);
 
 /* Pointer to the D3D7 driver's device table, and the two vtable-style module attach calls. */

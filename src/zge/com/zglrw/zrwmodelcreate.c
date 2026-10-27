@@ -6,6 +6,7 @@
 #include "compat/crt.h"
 #include "rw/rwcore.h"
 #include "rw/rwplugins.h"
+#include "rw/rwstream.h"
 #include "zge/com/zglrw/zrwcol.h"
 #include "zge/com/zglrw/zrwmat.h"
 #include "zge/com/zglrw/zrwmodelrender.h"
@@ -54,10 +55,6 @@ ORIG_FN(0x004b47a0, void *, RpGeometryGetMaterial, (void *geometry, int index));
 ORIG_FN(0x004b6140, uint32_t, RpGeometryGetFlags, (void *geometry));
 ORIG_FN(0x004b93d0, void *, RpMaterialGetTexture, (void *material));
 ORIG_FN(0x004e4420, void, RwImageSetPath, (const char *path));
-ORIG_FN(0x004e23e0, void *, RwStreamOpen, (int type, int access, const void *data));
-ORIG_FN(0x004e2ec0, int, RwStreamFindChunk,
-        (void *stream, uint32_t type, uint32_t *length, uint32_t *version));
-ORIG_FN(0x004e2660, int, RwStreamClose, (void *stream, void *data));
 ORIG_FN(0x004b86a0, void *, RpWorldAddClump, (void *world, void *clump));
 ORIG_FN(0x004b8770, void *, RpWorldRemoveClump, (void *world, void *clump));
 ORIG_FN(0x004b8870, void *, RpClumpGetWorld, (void *clump));
@@ -65,12 +62,6 @@ ORIG_FN(0x004b8870, void *, RpClumpGetWorld, (void *clump));
 /* The RenderWare memory interface: allocation at +0, free at +4. */
 typedef void *(BMX_CDECL *RwAllocFn)(uint32_t size);
 typedef void(BMX_CDECL *RwFreeFn)(void *block);
-
-/* Memory descriptor of a stream: the data and its size. */
-typedef struct RwMemory {
-    void *start;
-    uint32_t length;
-} RwMemory;
 
 /* Reference count of a model definition (+4). */
 #define defRefs(def) (*(uint32_t *)((uint8_t *)(def) + 4))

@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 #include "compat/orig.h"
+#include "rw/rwstream.h"
 #include "zge/com/zglrw/zrwramdisk.h"
 #include "zge/zfile.h"
 
@@ -85,9 +86,6 @@ void RegisterCallBacksForFileSystem(void);
 void ImageBufferSizeType(const void *address, uint32_t size, const char *extension);
 /* Restores RenderWare's own file interface. */
 void zrwFileRamDiskClear(void);
-
-/* RenderWare's file interface table. */
-ORIG_FN(0x004e8280, void **, RwOSGetFileInterface, (void));
 
 int zprofileInitialize(void);
 /*

@@ -71,7 +71,7 @@ uint32_t zrwfseek(ZfileHandle **file, uint32_t a, uint32_t b)
 BMX_ADDR(0x004a3500)
 void RegisterCallBacksForFileSystem(void)
 {
-    void **rw = RwOSGetFileInterface();
+    void **rw = (void **)(uintptr_t)RwOSGetFileInterface();
 
     zmemCopy(&gZrwSavedFileInterface, (const void *)rw, sizeof(ZrwFileInterface));
     rw[0] = BMX_FNPTR(void *, 0x004a3200, zrwRamDiskMatches);

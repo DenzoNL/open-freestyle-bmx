@@ -6,6 +6,7 @@
 #include "compat/crt.h"
 #include "rw/rwcore.h"
 #include "rw/rwplugins.h"
+#include "rw/rwstream.h"
 #include "zge/zdebug.h"
 #include "zge/zfile.h"
 #include "zge/zgemods/zobjcamera.h"
@@ -69,8 +70,6 @@ ORIG_FN(0x004cc0f0, void, rwWorldSetPvsCallback, (void *world, void *callback));
 ORIG_FN(0x004ce960, int, rwWorldPvsCreate,
         (void *world, uint32_t a, uint32_t b, uint32_t c, uint32_t d, void *callback, uint32_t e));
 ORIG_FN(0x004c3ae0, int, rwWorldPvsRead, (void *world, void *stream));
-ORIG_FN(0x004e23e0, void *, RwStreamOpen, (int type, int access, void *data));
-ORIG_FN(0x004e2660, int, RwStreamClose, (void *stream, void *data));
 ORIG_FN(0x004de5a0, uint32_t, rwCameraGetWidth, (void *camera));
 ORIG_FN(0x004de5d0, uint32_t, rwCameraGetHeight, (void *camera));
 
