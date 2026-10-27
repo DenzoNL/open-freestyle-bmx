@@ -1,20 +1,27 @@
 /*
- * RenderWare 3.1 world (rw/world.c): the BSP of plane sectors and the world sectors at its leaves, as far as
- * the collision code and the game read them.
+ * RenderWare 3.1 world (rw/world.c): the world with its BSP of plane sectors and world sectors, the clumps,
+ * lights and cameras attached to it, materials, and the PVS plugin.
+ *
+ * The world keeps three kinds of links to the objects around it: the ties between atomics and sectors
+ * (RpTie), between lights and sectors (RpLightTie) and the camera's list of sectors in its view. The object
+ * a plugin extends stores its link at the offset the plugin registered (rpWorldClumpOffset and friends).
  */
 #ifndef RW_RWWORLD_H
 #define RW_RWWORLD_H
 
+#include "rw/rwcamera.h"
+#include "rw/rwlight.h"
 #include "rw/rwmath.h"
+#include "rw/rwtexture.h"
 
-/* A node of the world BSP: type < 0 is a world sector (leaf), otherwise a plane sector. */
+/* A node of the world BSP: type < 0 is a world sector (-1 owns its data, -2 is a stub), otherwise a plane. */
 typedef struct RpSector {
     int32_t type; /* 0x00 plane sectors: byte offset of the split axis in an RwV3d (0, 4, 8) */
 } RpSector;
 
 /*
  * Plane sector. The children overlap: everything below leftValue is in the left subtree, everything above
- * rightValue in the right one. The collision walks compare these values with coordinates as integers (the bit
+ * rightValue in the right one. The walks compare these values with coordinates as integers (the bit
  * patterns), which orders non-negative floats correctly.
  */
 typedef struct RpPlaneSector {
@@ -33,42 +40,276 @@ typedef struct RpPolygon {
 } RpPolygon;
 
 /*
- * World sector (partial). colSectorRoot is the polygon split tree of the collision code: nodes of three bytes
- * (flags/count, split vertex, first polygon), node n has the children 2n and 2n + 1, node 1 is the root.
+ * World sector (a BSP leaf). colSectorRoot is the polygon split tree of the collision code: nodes of three
+ * bytes (flags/count, split vertex, first polygon), node n has the children 2n and 2n + 1, node 1 is the
+ * root. The three lists hold the ties of the atomics with and without collision and of the lights.
  */
 typedef struct RpWorldSector {
-    int32_t type;                      /* 0x00 negative */
-    int16_t matListWindowBase;         /* 0x04 */
-    uint16_t numVertices;              /* 0x06 */
-    uint16_t numPolygons;              /* 0x08 */
-    uint8_t pad0a[2];                  /* 0x0a */
-    RpPolygon *polygons;               /* 0x0c */
-    RwV3d *vertices;                   /* 0x10 */
-    uint8_t pad14[0x10];               /* 0x14 */
-    RwLLLink collAtomicsInWorldSector; /* 0x24 RpTie links of the atomics touching the sector */
-    uint8_t pad2c[0x28];               /* 0x2c */
-    const uint8_t *colSectorRoot;      /* 0x54 NULL: no polygons to test */
+    int32_t type;                        /* 0x00 negative */
+    int16_t matListWindowBase;           /* 0x04 */
+    uint16_t numVertices;                /* 0x06 */
+    uint16_t numPolygons;                /* 0x08 */
+    uint8_t pad0a[2];                    /* 0x0a */
+    RpPolygon *polygons;                 /* 0x0c */
+    RwV3d *vertices;                     /* 0x10 */
+    void *normals;                       /* 0x14 */
+    void *preLitLum;                     /* 0x18 */
+    void *texCoords;                     /* 0x1c */
+    RwResEntry *repEntry;                /* 0x20 cached render data */
+    RwLLLink collAtomicsInWorldSector;   /* 0x24 RpTie links of the atomics touching the sector */
+    RwLLLink noCollAtomicsInWorldSector; /* 0x2c */
+    RwLLLink lightsInWorldSector;        /* 0x34 RpLightTie links */
+    uint8_t pad3c[0x18];                 /* 0x3c */
+    const uint8_t *colSectorRoot;        /* 0x54 NULL: no polygons to test */
+    void *pvsData;                       /* 0x58 the PVS plugin's data of the sector */
 } RpWorldSector;
 
 _Static_assert(offsetof(RpWorldSector, polygons) == 0x0c, "RpWorldSector layout");
+_Static_assert(offsetof(RpWorldSector, repEntry) == 0x20, "RpWorldSector layout");
 _Static_assert(offsetof(RpWorldSector, collAtomicsInWorldSector) == 0x24, "RpWorldSector layout");
+_Static_assert(offsetof(RpWorldSector, lightsInWorldSector) == 0x34, "RpWorldSector layout");
 _Static_assert(offsetof(RpWorldSector, colSectorRoot) == 0x54, "RpWorldSector layout");
-
-/* World (partial): the root of the BSP. */
-typedef struct RpWorld {
-    uint8_t pad00[0x18];
-    RpSector *rootSector; /* 0x18 */
-} RpWorld;
+_Static_assert(offsetof(RpWorldSector, pvsData) == 0x58, "RpWorldSector layout");
 
 /* Links an atomic and a world sector it touches (in both of their lists). */
 typedef struct RpTie {
-    RwLLLink lAtomicInWorldSector; /* 0x00 in RpWorldSector.collAtomicsInWorldSector */
+    RwLLLink lAtomicInWorldSector; /* 0x00 in RpWorldSector.collAtomicsInWorldSector or the other list */
     RpAtomic *apAtom;              /* 0x08 */
-    RwLLLink lWorldSectorInAtomic; /* 0x0c in RpAtomic.llWorldSectorsInAtomic */
+    RwLLLink lWorldSectorInAtomic; /* 0x0c in the atomic's list of sectors */
     RpWorldSector *worldSector;    /* 0x14 */
 } RpTie;
 
+/* The same for a light: in the sector's light list and in the light's list of sectors (RpLight.sectors). */
+typedef struct RpLightTie {
+    RwLLLink lightInWorldSector; /* 0x00 */
+    RpLight *light;              /* 0x08 */
+    RwLLLink worldSectorInLight; /* 0x0c */
+    RpWorldSector *worldSector;  /* 0x14 */
+} RpLightTie;
+
 _Static_assert(sizeof(RpTie) == 0x18, "RpTie layout");
+_Static_assert(sizeof(RpLightTie) == 0x18, "RpLightTie layout");
+
+typedef struct RpMaterial {
+    RwTexture *texture; /* 0x00 */
+    RwRGBA color;       /* 0x04 */
+    uint8_t pad08[2];   /* 0x08 */
+    uint8_t stamp;      /* 0x0a bumped by every setter (1 for the colour, 2 for the texture) */
+} RpMaterial;
+
+_Static_assert(offsetof(RpMaterial, stamp) == 0x0a, "RpMaterial layout");
+
+typedef struct RpMaterialList {
+    RpMaterial **materials; /* 0x00 */
+    int32_t numMaterials;   /* 0x04 */
+    int32_t space;          /* 0x08 */
+} RpMaterialList;
+
+/* Render callback of a world: draws one world sector. */
+typedef void *(BMX_CDECL *RpWorldSectorCallBackRender)(RpWorldSector *sector);
+
+typedef struct RpWorld {
+    RwObject object;               /* 0x00 privateFlags bit 0: the sectors belong to someone else */
+    uint32_t flags;                /* 0x08 */
+    RpMaterialList matList;        /* 0x0c */
+    RpSector *rootSector;          /* 0x18 */
+    int32_t numClumpsInWorld;      /* 0x1c */
+    RwLLLink *currentClumpLink;    /* 0x20 the next clump a for-all walk would visit */
+    RwLLLink clumpList;            /* 0x24 clumps, linked at RpClump + 0x14 */
+    RwLLLink lightList;            /* 0x2c local lights (point, spot), linked at RpLight.inWorld */
+    RwLLLink directionalLightList; /* 0x34 ambient and directional lights */
+    RwV3d worldOrigin;             /* 0x3c */
+    RwBBox boundingBox;            /* 0x48 */
+    uint8_t pad60[0xc];            /* 0x60 */
+    RpWorldSectorCallBackRender renderCallBack; /* 0x6c */
+    uint8_t stamp;                              /* 0x70 incremented when the world is destroyed */
+} RpWorld;
+
+_Static_assert(offsetof(RpWorld, matList) == 0x0c, "RpWorld layout");
+_Static_assert(offsetof(RpWorld, rootSector) == 0x18, "RpWorld layout");
+_Static_assert(offsetof(RpWorld, clumpList) == 0x24, "RpWorld layout");
+_Static_assert(offsetof(RpWorld, directionalLightList) == 0x34, "RpWorld layout");
+_Static_assert(offsetof(RpWorld, boundingBox) == 0x48, "RpWorld layout");
+_Static_assert(offsetof(RpWorld, renderCallBack) == 0x6c, "RpWorld layout");
+_Static_assert(offsetof(RpWorld, stamp) == 0x70, "RpWorld layout");
+
+/* The world plugin's data of a camera (at RwCamera + rpWorldCameraOffset): the sectors in view and the world.
+ */
+typedef struct RpWorldCameraData {
+    RpWorldSector **sectors; /* 0x00 */
+    int32_t capacity;        /* 0x04 */
+    int32_t numSectors;      /* 0x08 */
+    RpWorld *world;          /* 0x0c */
+} RpWorldCameraData;
+
+_Static_assert(sizeof(RpWorldCameraData) == 0x10, "RpWorldCameraData layout");
+
+/* The tie plugin's data in the engine instance (at rpTieOffset): free lists of the two kinds of ties. */
+typedef struct RpTieGlobals {
+    RwFreeList *tieFreeList;      /* 0x00 */
+    RwFreeList *lightTieFreeList; /* 0x04 */
+} RpTieGlobals;
+
+/* An entry of the engine's list of worlds, with the world it stands for. */
+typedef struct RpWorldListEntry {
+    RpWorld *world; /* 0x00 */
+    int32_t pad04;  /* 0x04 */
+    RwLLLink link;  /* 0x08 in RpWorldGlobals.worlds */
+} RpWorldListEntry;
+
+/* The world module's data in the engine instance (at rpWorldGlobalsOffset). */
+typedef struct RpWorldGlobals {
+    int32_t pad00;             /* 0x00 */
+    RwFreeList *entryFreeList; /* 0x04 free list of RpWorldListEntry */
+    RwLLLink worlds;           /* 0x08 */
+} RpWorldGlobals;
+
+#define rpTieOffset          ORIG_VAR(0x00676730, int32_t, rpTieOffset)
+#define rpWorldGlobalsOffset ORIG_VAR(0x00676760, int32_t, rpWorldGlobalsOffset)
+
+/* ---- intersections (the walks of the BSP) ----------------------------------------------------------- */
+
+typedef struct RwLine {
+    RwV3d start;
+    RwV3d end;
+} RwLine;
+
+typedef enum RpIntersectType {
+    rpINTERSECTNONE = 0,
+    rpINTERSECTLINE = 1,
+    rpINTERSECTPOINT = 2,
+    rpINTERSECTSPHERE = 3,
+    rpINTERSECTBOX = 4,
+    rpINTERSECTATOMIC = 5, /* the walk goes over the sectors the atomic is tied to */
+} RpIntersectType;
+
+/* The volume of a query and its type (0x1c bytes). The BSP walks read a point as int bit patterns. */
+typedef struct RpIntersection {
+    union {
+        RwLine line;
+        RwV3d point;
+        int32_t pointBits[3];
+        RwSphere sphere;
+        RwBBox box;
+        RpAtomic *object;
+    } t;          /* 0x00 */
+    int32_t type; /* 0x18 RpIntersectType */
+} RpIntersection;
+
+_Static_assert(sizeof(RpIntersection) == 0x1c, "RpIntersection layout");
+_Static_assert(offsetof(RpIntersection, type) == 0x18, "RpIntersection layout");
+
+typedef void *(BMX_CDECL *RpIntersectionCallBackWorldSector)(RpIntersection *intersection,
+                                                             RpWorldSector *sector, void *data);
+
+/* ---- the PVS plugin --------------------------------------------------------------------------------- */
+
+/* Progress callback of the PVS generation: stage code and progress (the stages 0x14 and 0x16 bracket it). */
+typedef void(BMX_CDECL *RpPVSProgressCallBack)(int32_t stage, float progress);
+
+/*
+ * The PVS plugin's data of a world (at RpWorld + rpPVSWorldOffset). The generation fills numSectors ..
+ * rowBuffer from the world; hooked is set while the PVS render callback replaces the world's own.
+ */
+typedef struct RpPVSWorldData {
+    int32_t numSectors;  /* 0x00 */
+    int32_t rowBytes;    /* 0x04 bytes of a row of visibility bits */
+    int32_t rowStride;   /* 0x08 a row padded to 4 bytes, plus 3 */
+    int32_t granularity; /* 0x0c */
+    int32_t numCells;    /* 0x10 1 << granularity */
+    uint8_t *visibility; /* 0x14 numSectors rows of rowStride bytes; NULL: no PVS */
+    uint8_t pad18[8];    /* 0x18 */
+    uint8_t *rowBuffer;  /* 0x20 */
+    RpWorldSectorCallBackRender savedRenderCallBack; /* 0x24 */
+    int32_t hooked;                                  /* 0x28 */
+    uint8_t pad2c[8];                                /* 0x2c */
+    RpPVSProgressCallBack progressCallBack;          /* 0x34 */
+    int32_t pad38;                                   /* 0x38 */
+    uint8_t *cursor;                                 /* 0x3c */
+    uint8_t pad40[4];                                /* 0x40 */
+    int32_t numEntries;                              /* 0x44 */
+    void *entries;                                   /* 0x48 numEntries * 0x24 bytes */
+    void *entryIndices;                              /* 0x4c numEntries * 6 bytes */
+    uint32_t statsA;                                 /* 0x50 */
+    uint32_t statsB;                                 /* 0x54 */
+} RpPVSWorldData;
+
+_Static_assert(offsetof(RpPVSWorldData, visibility) == 0x14, "RpPVSWorldData layout");
+_Static_assert(offsetof(RpPVSWorldData, rowBuffer) == 0x20, "RpPVSWorldData layout");
+_Static_assert(offsetof(RpPVSWorldData, progressCallBack) == 0x34, "RpPVSWorldData layout");
+_Static_assert(offsetof(RpPVSWorldData, numEntries) == 0x44, "RpPVSWorldData layout");
+_Static_assert(offsetof(RpPVSWorldData, statsA) == 0x50, "RpPVSWorldData layout");
+
+/* State of a PVS generation in progress: the world, and the camera and image it renders with. */
+#define rpPVSWorld  ORIG_VAR(0x00676810, RpWorld *, rpPVSWorld)
+#define rpPVSCamera ORIG_VAR(0x00676814, RwCamera *, rpPVSCamera)
+#define rpPVSImage  ORIG_VAR(0x00676818, RwImage *, rpPVSImage)
+
+/* ---- cameras ---------------------------------------------------------------------------------------- */
+
+RpWorld *RpWorldAddCamera(RpWorld *world, RwCamera *camera);
+RpWorld *RpWorldRemoveCamera(RpWorld *world, RwCamera *camera);
+RpWorld *RwCameraGetWorld(const RwCamera *camera);
+RwCamera *RpCameraForAllSectorsInFrustum(RwCamera *camera, RwObjectCallBack callback, void *data);
+int rpWorldCameraDataDestroy(RpWorldCameraData *data);
+
+/* ---- clumps, lights ---------------------------------------------------------------------------------- */
+
+RpWorld *RpWorldAddClump(RpWorld *world, RpClump *clump);
+RpWorld *RpWorldRemoveClump(RpWorld *world, RpClump *clump);
+RpWorld *RpClumpGetWorld(const RpClump *clump);
+RpWorld *RpWorldAddLight(RpWorld *world, RpLight *light);
+RpWorld *RpWorldRemoveLight(RpWorld *world, RpLight *light);
+int _rpTieDestroy(RpTie *tie);
+int _rpLightTieDestroy(RpLightTie *tie);
+
+/* ---- materials -------------------------------------------------------------------------------------- */
+
+RpMaterial *RpMaterialSetColor(RpMaterial *material, const RwRGBA *color);
+RpMaterial *RpMaterialSetTexture(RpMaterial *material, RwTexture *texture);
+RwTexture *RpMaterialGetTexture(const RpMaterial *material);
+
+/* ---- the world -------------------------------------------------------------------------------------- */
+
+const RwBBox *RpWorldGetBBox(const RpWorld *world);
+const RwV3d *RpWorldGetOrigin(const RpWorld *world);
+int32_t RpWorldGetNumMaterials(const RpWorld *world);
+RpMaterial *RpWorldGetMaterial(const RpWorld *world, int32_t index);
+int32_t RpWorldGetNumClumps(const RpWorld *world);
+RpWorldSectorCallBackRender RpWorldGetRenderCallBack(const RpWorld *world);
+RpWorld *RpWorldRender(RpWorld *world);
+RpWorld *RpWorldForAllClumps(RpWorld *world, RwObjectCallBack callback, void *data);
+RpWorld *RpWorldForAllLights(RpWorld *world, RwObjectCallBack callback, void *data);
+RpWorld *RpWorldForAllWorldSectors(RpWorld *world, RwObjectCallBack callback, void *data);
+
+/*
+ * EAX = world. Destroys the world. RpWorldDestroy is the original's four byte stub at 0x4ba9c0 that loads the
+ * argument into EAX and falls into this body; hooking both would overlap, so only the body is ported.
+ */
+ORIG_FN(0x004ba9c0, int, RpWorldDestroy, (RpWorld * world));
+__attribute__((regparm(1))) int rpWorldDestroyBody(RpWorld *world);
+/* EAX = sector: frees what a sector tree owns / only releases its ties and plugin data. */
+__attribute__((regparm(1))) void rpSectorTreeDestroy(RpSector *sector);
+__attribute__((regparm(1))) void rpSectorTreeDeinit(RpSector *sector);
+
+/* Calls the callback for every sector the intersection touches (line and ray walks are still original). */
+RpWorld *_rpWorldForAllSectorsIntersecting(RpWorld *world, RpIntersection *intersection,
+                                           RpIntersectionCallBackWorldSector callback, void *data);
+
+/* ---- PVS -------------------------------------------------------------------------------------------- */
+
+RpWorld *RpPVSSetProgressCallBack(RpWorld *world, RpPVSProgressCallBack callback);
+RpWorld *RpPVSHook(RpWorld *world);
+RpWorld *RpPVSUnhook(RpWorld *world);
+RpWorld *RpPVSUnload(RpWorld *world);
+RpWorld *RpPVSSetViewPosition(RpWorld *world, const RwV3d *position);
+int32_t RpPVSQuery(const RpWorld *world);
+RpWorld *RpPVSStatisticsGet(RpWorld *world, uint32_t *statsA, uint32_t *statsB);
+RpWorld *RpPVSCreate(RpWorld *world, RwRaster *raster, RwRaster *zRaster, float farClip, int32_t granularity,
+                     void *callback, void *callbackData);
+int32_t rpPVSCountSectors(RpWorld *world);
+/* EAX = world: tears down the camera, rasters and image of a PVS generation. */
+__attribute__((regparm(1))) void rpPVSCameraDestroy(RpWorld *world);
 
 /* Vertex and polygon counts of a world sector (zero-extended 16-bit fields). */
 int32_t RpWorldSectorGetNumVertices(const RpWorldSector *sector);

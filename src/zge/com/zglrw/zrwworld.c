@@ -29,21 +29,9 @@ void zrwShowRaster(int vsync);
 void zrwDbgPrintDirect(const char *text, int x, int y);
 
 typedef void *(BMX_CDECL *ZrwForAllFn)(void *item, void *arg);
-ORIG_FN(0x004bba60, void *, RpWorldForAllLights, (void *world, ZrwForAllFn callback, void *arg));
-ORIG_FN(0x004bbb80, void *, RpWorldForAllWorldSectors, (void *world, ZrwForAllFn callback, void *arg));
-ORIG_FN(0x004bb7d0, void *, RpWorldForAllClumps, (void *world, ZrwForAllFn callback, void *arg));
-ORIG_FN(0x004ba0c0, int, RpWorldGetNumMaterials, (void *world));
-ORIG_FN(0x004ba140, void *, RpWorldGetMaterial, (void *world, int index));
-ORIG_FN(0x004ba1f0, int, RpWorldGetNumClumps, (void *world));
-ORIG_FN(0x004b93d0, void *, RpMaterialGetTexture, (void *material));
 ORIG_FN(0x004b4720, int, RpGeometryGetNumTriangles, (void *geometry));
 ORIG_FN(0x004b4550, int, RpGeometryGetNumVertices, (void *geometry));
-ORIG_FN(0x004ba050, const float *, RpWorldGetOrigin, (void *world));
-ORIG_FN(0x004b9fe0, const float *, RpWorldGetBBox, (void *world));
-ORIG_FN(0x004ba9c0, int, RpWorldDestroy, (void *world));
 ORIG_FN(0x004bb080, void *, RpWorldCreate, (const float *bbox));
-ORIG_FN(0x004cc640, int, rwWorldIsPvsReady, (void *world));
-ORIG_FN(0x004cc320, void, rwWorldPvsUnload, (void *world));
 ORIG_FN(0x004c3e60, void *, RpWorldStreamRead, (void *stream));
 ORIG_FN(0x00492eb0, uint8_t *, zrwGetCurrentCamera, (void));
 ORIG_FN(0x00492f00, int, zrwcamBegin, (void *camera));
@@ -318,7 +306,7 @@ int zrwWorldPvsCallback(int stage, float progress)
 /* Centre, scaled centre and bounds of a new world; hands the bounds to the renderer. */
 static void setWorldBounds(void *world)
 {
-    const float *origin = RpWorldGetOrigin(world);
+    const float *origin = (const float *)RpWorldGetOrigin(world);
     const float *extent;
     float bounds[8];
 
@@ -328,7 +316,7 @@ static void setWorldBounds(void *world)
     gZrwWorldCenter.z = origin[2];
     gZrwWorldCenterScaled.y = (float)((double)gZrwWorldCenter.y * gZrwInvScale);
     gZrwWorldCenterScaled.z = (float)((double)gZrwWorldCenter.z * gZrwInvScale);
-    extent = RpWorldGetBBox(gZrwWorld);
+    extent = (const float *)RpWorldGetBBox(gZrwWorld);
     bounds[0] = (float)(((double)extent[3] - gZrwWorldCenter.x) * gZrwInvScale);
     bounds[1] = (float)-(((double)extent[1] - gZrwWorldCenter.y) * gZrwInvScale);
     bounds[2] = (float)-(((double)extent[2] - gZrwWorldCenter.z) * gZrwInvScale);
@@ -372,7 +360,7 @@ int zrwworldReadStream(void *image, const char *name)
             }
             gZrwWorld = world;
             setWorldBounds(world);
-            if (rwWorldIsPvsReady(gZrwWorld) != 0) {
+            if (RpPVSQuery(gZrwWorld) != 0) {
                 gZrwPvsLoaded = 1;
                 gZrwPvsEnabled = 1;
             }
@@ -415,8 +403,8 @@ int zrwWorldShutdown(void)
         if (gZrwWorldActive != 0) {
             void *world;
 
-            if (rwWorldIsPvsReady(gZrwWorld) != 0) {
-                rwWorldPvsUnload(gZrwWorld);
+            if (RpPVSQuery(gZrwWorld) != 0) {
+                RpPVSUnload(gZrwWorld);
                 gZrwPvsLoaded = 0;
                 gZrwPvsEnabled = 0;
             }

@@ -7,6 +7,7 @@
 #include "rw/rwmath.h"
 #include "rw/rwplugins.h"
 #include "rw/rwtexture.h"
+#include "rw/rwworld.h"
 #include "zge/com/zglrw/zrwmodelcreate.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zobjcamera.h"
@@ -135,10 +136,7 @@ int zrwCameraSetResolution(int width, int height)
 
 /* RenderWare library calls (statically linked in the exe). */
 /* Scene hooks around a camera's update (the engine's lighting and sorting state). */
-ORIG_FN(0x004b81f0, void, rwSceneBegin, (void *state, void *camera));
-ORIG_FN(0x004b82a0, void *, rwSceneFind, (void *camera));
 /* Two arguments: the original reuses its second push of the camera (rwSceneFind takes one). */
-ORIG_FN(0x004b8240, void, rwSceneRelease, (void *scene, void *camera));
 void zrwResetRenderState(void);
 
 #define gZrwCurrentCamera ORIG_VAR(0x00674020, ZrwCamera *, gZrwCurrentCamera)
@@ -444,7 +442,7 @@ int zrwCameraBegin(ZrwCamera *camera)
     void *rw = camera->rwCamera;
 
     gZrwCurrentCamera = camera;
-    rwSceneBegin(gZrwSceneState, rw);
+    RpWorldAddCamera(gZrwSceneState, rw);
     RpLODAtomicSetCamera(gZrwActiveRw);
     gZrwActiveRw = camera->rwCamera;
     if (RwCameraBeginUpdate(gZrwActiveRw) != 0 && RwRasterPushContext(RwCameraGetRaster(rw)) != 0) {
@@ -477,7 +475,7 @@ int zrwCameraEnd(void)
     gZrwInUpdate = 0;
     RwRasterPopContext();
     RwCameraEndUpdate(gZrwActiveRw);
-    rwSceneRelease(rwSceneFind(gZrwActiveRw), gZrwActiveRw);
+    RpWorldRemoveCamera(RwCameraGetWorld(gZrwActiveRw), gZrwActiveRw);
     gZrwActiveRw = NULL;
     gZrwCurrentCamera = NULL;
     return 1;

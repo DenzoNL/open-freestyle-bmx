@@ -10,6 +10,7 @@
 #include "rw/rwplugins.h"
 #include "rw/rwstream.h"
 #include "rw/rwtexture.h"
+#include "rw/rwworld.h"
 #include "zge/com/zglrw/zrwcol.h"
 #include "zge/com/zglrw/zrwmat.h"
 #include "zge/com/zglrw/zrwmodelrender.h"
@@ -51,10 +52,6 @@ ORIG_FN(0x004b4550, int, RpGeometryGetNumVertices, (void *geometry));
 ORIG_FN(0x004b4ce0, int, RpGeometryGetNumMaterials, (void *geometry));
 ORIG_FN(0x004b47a0, void *, RpGeometryGetMaterial, (void *geometry, int index));
 ORIG_FN(0x004b6140, uint32_t, RpGeometryGetFlags, (void *geometry));
-ORIG_FN(0x004b93d0, void *, RpMaterialGetTexture, (void *material));
-ORIG_FN(0x004b86a0, void *, RpWorldAddClump, (void *world, void *clump));
-ORIG_FN(0x004b8770, void *, RpWorldRemoveClump, (void *world, void *clump));
-ORIG_FN(0x004b8870, void *, RpClumpGetWorld, (void *clump));
 
 /* The RenderWare memory interface: allocation at +0, free at +4. */
 typedef void *(BMX_CDECL *RwAllocFn)(uint32_t size);

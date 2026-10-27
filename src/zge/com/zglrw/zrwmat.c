@@ -2,6 +2,7 @@
 #include "zge/com/zglrw/zrwmat.h"
 
 #include "compat/crt.h"
+#include "rw/rwworld.h"
 #include "zge/com/zglrw/zrwmodel.h"
 #include "zge/com/zglrw/zrwtxr.h"
 #include "zge/zdebug.h"
@@ -10,9 +11,6 @@
 #include "zge/zobj.h"
 
 static const char kZrwMatFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwMat.c";
-
-ORIG_FN(0x004b9380, void *, RpMaterialSetTexture, (void *material, void *texture));
-ORIG_FN(0x004b9310, void *, RpMaterialSetColor, (void *material, const void *color));
 
 /* The renderer's model table (pointers in the exe's data, targets in zrwmodel.c / zrwmodelcreate.c). */
 typedef void *(BMX_CDECL *ZrwMatCallFn)(void *a);

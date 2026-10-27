@@ -10,6 +10,7 @@
 #include "rw/rwmath.h"
 #include "rw/rwplugins.h"
 #include "rw/rwtexture.h"
+#include "rw/rwworld.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zobjcamera.h"
 #include "zge/zmem.h"
@@ -28,7 +29,6 @@ ORIG_FN(0x004b46b0, const int16_t *, RpGeometryGetTriangles, (void *geometry));
 ORIG_FN(0x004b44e0, const uint32_t *, RpGeometryGetTexCoords, (void *geometry));
 ORIG_FN(0x004b4720, int, RpGeometryGetNumTriangles, (void *geometry));
 ORIG_FN(0x004b47a0, void *, RpGeometryGetMaterial, (void *geometry, int index));
-ORIG_FN(0x004b93d0, void *, RpMaterialGetTexture, (void *material));
 
 /* Hooks into the renderer (function pointers in the exe's data). */
 typedef void(BMX_CDECL *ZrwRenderStateHookFn)(uint32_t flags, const void *raster);

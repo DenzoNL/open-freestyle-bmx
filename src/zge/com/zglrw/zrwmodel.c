@@ -8,6 +8,7 @@
 #include "rw/rwcore.h"
 #include "rw/rwmath.h"
 #include "rw/rwplugins.h"
+#include "rw/rwworld.h"
 #include "zge/com/zglrw/zrwmodelrender.h"
 #include "zge/zdebug.h"
 #include "zge/ziff.h"
@@ -20,12 +21,8 @@ static const char kZrwModelFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwModel.c";
 typedef void *(BMX_CDECL *RpAtomicCallback)(void *atomic, void *data);
 ORIG_FN(0x004b6140, uint32_t, RpGeometryGetFlags, (void *geometry));
 ORIG_FN(0x004b61b0, void *, RpGeometrySetFlags, (void *geometry, uint32_t flags));
-ORIG_FN(0x004b8870, void *, RpClumpGetWorld, (void *clump));
-ORIG_FN(0x004b86a0, void *, RpWorldAddClump, (void *world, void *clump));
-ORIG_FN(0x004b8770, void *, RpWorldRemoveClump, (void *world, void *clump));
 ORIG_FN(0x004b4ce0, int, RpGeometryGetNumMaterials, (void *geometry));
 ORIG_FN(0x004b47a0, void *, RpGeometryGetMaterial, (void *geometry, int index));
-ORIG_FN(0x004b9310, void *, RpMaterialSetColor, (void *material, const void *color));
 
 /* Other renderer modules (zrwmodelcreate.c, zrwmodelrender.c, zrwzgl.c, zobjlight.c, ...). */
 int zrwModelCreateInitialize(void);

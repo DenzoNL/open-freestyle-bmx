@@ -9,6 +9,7 @@
 #include "rw/rwmath.h"
 #include "rw/rwplugins.h"
 #include "rw/rwtexture.h"
+#include "rw/rwworld.h"
 #include "zge/pc/pcinput.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zramdisk.h"
@@ -49,10 +50,6 @@ ORIG_FN(0x00492f00, int, zrwcamBegin, (void *camera));
 ORIG_FN(0x00492fe0, int, zrwcamEnd, (void));
 ORIG_FN(0x00493060, void *, zrwcamHandle, (void *camera));
 ORIG_FN(0x00497620, int, zrwtxrFlush, (void));
-ORIG_FN(0x004cc270, void, rwLightBegin, (void *light));
-ORIG_FN(0x004cc510, void, rwLightSetMatrix, (void *light, const void *matrix));
-ORIG_FN(0x004cc670, void, rwLightSetParams, (void *light, const void *a, const void *b));
-ORIG_FN(0x004cc2c0, void, rwLightEnd, (void *light));
 
 ORIG_FN(0x004a5c98, void *, rwfopen, (const char *path, const char *mode));
 ORIG_FN(0x004a5cab, int, rwfclose, (void *file));
@@ -697,17 +694,18 @@ int zrwDrawFrame(void)
             continue;
         }
         if (gZrwDebugLightOn != 0) {
-            rwLightBegin(gZrwDebugLight);
+            RpPVSHook(gZrwDebugLight);
             /* The matrix position (+0x30 bytes); `+ 0x30` broke once RwFrameGetMatrix returned RwMatrix *. */
-            rwLightSetMatrix(gZrwDebugLight, &RwFrameGetMatrix(RwCameraGetFrame(zrwcamHandle(camera)))->pos);
+            RpPVSSetViewPosition(gZrwDebugLight,
+                                 &RwFrameGetMatrix(RwCameraGetFrame(zrwcamHandle(camera)))->pos);
         }
         runListAt(gZrwUpdateLists[1].head);
         if (zrwtxrFlush() == 0) {
             return 0;
         }
         if (gZrwDebugLightOn != 0) {
-            rwLightSetParams(gZrwDebugLight, &gZrwLightParamA, &gZrwLightParamB);
-            rwLightEnd(gZrwDebugLight);
+            RpPVSStatisticsGet(gZrwDebugLight, &gZrwLightParamA, &gZrwLightParamB);
+            RpPVSUnhook(gZrwDebugLight);
         }
         zrwResetRenderState();
         runListAt(gZrwUpdateLists[2].head);

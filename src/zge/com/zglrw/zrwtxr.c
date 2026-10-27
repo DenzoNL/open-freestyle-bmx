@@ -10,6 +10,7 @@
 #include "rw/rwplugins.h"
 #include "rw/rwstream.h"
 #include "rw/rwtexture.h"
+#include "rw/rwworld.h"
 #include "zge/zdebug.h"
 #include "zge/zfile.h"
 #include "zge/zgemods/zobjcamera.h"
@@ -24,17 +25,7 @@ static const char kZrwTxrFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwTxr.c";
 /* RenderWare library calls (statically linked in the exe, not ported). */
 /* The image writers registered next to the readers, and worlds (RpWorld) with their PVS. */
 ORIG_FN(0x004e7eb0, int, rwBmpImageWrite, (void));
-ORIG_FN(0x004cc640, int, rwWorldIsPvsReady, (void *world));
-ORIG_FN(0x004cc320, void, rwWorldPvsUnload, (void *world));
-ORIG_FN(0x004ba9c0, int, RpWorldDestroy, (void *world));
 ORIG_FN(0x004bb080, void *, RpWorldCreate, (const float *bbox));
-ORIG_FN(0x004ba050, const float *, RpWorldGetOrigin, (void *world));
-ORIG_FN(0x004b9fe0, const float *, RpWorldGetBBox, (void *world));
-ORIG_FN(0x004ba460, void, rwWorldRender, (void *world));
-ORIG_FN(0x004cef40, uint32_t, rwWorldGetPvsState, (void *world));
-ORIG_FN(0x004cc0f0, void, rwWorldSetPvsCallback, (void *world, void *callback));
-ORIG_FN(0x004ce960, int, rwWorldPvsCreate,
-        (void *world, uint32_t a, uint32_t b, uint32_t c, uint32_t d, void *callback, uint32_t e));
 ORIG_FN(0x004c3ae0, int, rwWorldPvsRead, (void *world, void *stream));
 
 /* Other modules: the camera (pcinput.c), the world callbacks, the RAM disk file hook (zprofile.c), materials.
@@ -83,8 +74,8 @@ int zrwWorldReset(void)
     if (gZrwWorldActive == 0) {
         return 1;
     }
-    if (rwWorldIsPvsReady(gZrwWorld) != 0) {
-        rwWorldPvsUnload(gZrwWorld);
+    if (RpPVSQuery(gZrwWorld) != 0) {
+        RpPVSUnload(gZrwWorld);
         gZrwPvsLoaded = 0;
         gZrwPvsEnabled = 0;
     }
@@ -97,14 +88,14 @@ int zrwWorldReset(void)
         return 0;
     }
     gZrwWorld = world;
-    origin = RpWorldGetOrigin(world);
+    origin = (const float *)RpWorldGetOrigin(world);
     gZrwWorldCenter.x = origin[0];
     gZrwWorldCenter.y = origin[1];
     gZrwWorldCenterScaled.x = (float)((double)gZrwInvScale * gZrwWorldCenter.x);
     gZrwWorldCenter.z = origin[2];
     gZrwWorldCenterScaled.y = (float)((double)gZrwWorldCenter.y * gZrwInvScale);
     gZrwWorldCenterScaled.z = (float)((double)gZrwWorldCenter.z * gZrwInvScale);
-    extent = RpWorldGetBBox(gZrwWorld);
+    extent = (const float *)RpWorldGetBBox(gZrwWorld);
     bounds[0] = (float)(((double)extent[3] - gZrwWorldCenter.x) * gZrwInvScale);
     bounds[1] = (float)-(((double)extent[1] - gZrwWorldCenter.y) * gZrwInvScale);
     bounds[2] = (float)-(((double)extent[2] - gZrwWorldCenter.z) * gZrwInvScale);
@@ -151,7 +142,7 @@ void *zrwWorldGetMaterial(int index)
 BMX_ADDR(0x00497480)
 int zrwWorldHasPvs(void)
 {
-    return rwWorldIsPvsReady(gZrwWorld) != 0;
+    return RpPVSQuery(gZrwWorld) != 0;
 }
 
 /* Rebuilds the world's PVS for the size of the current camera. Returns 0 without a camera. */
@@ -160,24 +151,27 @@ int zrwWorldSetupPvs(void)
 {
     uint8_t *camera = zrwGetCurrentCamera();
     void *rwCamera;
-    uint32_t width, height, extra;
+    RwRaster *raster;
+    RwRaster *zRaster;
+    float farClip;
 
     if (camera == NULL) {
         return 0;
     }
     rwCamera = zrwCameraGetRwCamera(camera);
-    width = (uint32_t)(uintptr_t)RwCameraGetRaster(rwCamera);   /* the raster, not a width */
-    height = (uint32_t)(uintptr_t)RwCameraGetZRaster(rwCamera); /* the Z raster */
-    extra = *(uint32_t *)(camera + 0xb0);
-    gZrwWorldPvsState = rwWorldGetPvsState(gZrwWorld);
-    rwWorldSetPvsCallback(gZrwWorld, (void *)(uintptr_t)zrwWorldPvsCallback);
-    if (rwWorldIsPvsReady(gZrwWorld) != 0) {
-        rwWorldPvsUnload(gZrwWorld);
+    /* The original fetches both rasters first, before the PVS calls. */
+    raster = RwCameraGetRaster(rwCamera);
+    zRaster = RwCameraGetZRaster(rwCamera);
+    __builtin_memcpy(&farClip, camera + 0xb0, sizeof farClip);
+    gZrwWorldPvsState = rpPVSCountSectors(gZrwWorld);
+    RpPVSSetProgressCallBack(gZrwWorld, (RpPVSProgressCallBack)(uintptr_t)zrwWorldPvsCallback);
+    if (RpPVSQuery(gZrwWorld) != 0) {
+        RpPVSUnload(gZrwWorld);
         gZrwPvsLoaded = 0;
         gZrwPvsEnabled = 0;
     }
-    if (rwWorldPvsCreate(gZrwWorld, width, height, extra, 0, (void *)(uintptr_t)rwWorldPvsDefaultCallback,
-                         0) != 0) {
+    if (RpPVSCreate(gZrwWorld, raster, zRaster, farClip, 0, (void *)(uintptr_t)rwWorldPvsDefaultCallback,
+                    NULL) != NULL) {
         gZrwPvsLoaded = 1;
         gZrwPvsEnabled = 1;
     }
@@ -224,7 +218,7 @@ BMX_ADDR(0x00497620)
 int zrwWorldRender(void)
 {
     if (gZrwWorld != NULL) {
-        rwWorldRender(gZrwWorld);
+        RpWorldRender(gZrwWorld);
     }
     return 1;
 }

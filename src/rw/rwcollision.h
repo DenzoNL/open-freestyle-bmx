@@ -12,33 +12,7 @@
 
 #include "rw/rwworld.h"
 
-typedef struct RwLine {
-    RwV3d start;
-    RwV3d end;
-} RwLine;
-
-typedef enum RpIntersectType {
-    rpINTERSECTNONE = 0,
-    rpINTERSECTLINE = 1,
-    rpINTERSECTPOINT = 2,
-    rpINTERSECTSPHERE = 3,
-    rpINTERSECTBOX = 4,
-    rpINTERSECTATOMIC = 5,
-} RpIntersectType;
-
-/* The volume of a query and its type (0x1c bytes). */
-typedef struct RpIntersection {
-    union {
-        RwLine line;
-        RwV3d point;
-        RwSphere sphere;
-        RwBBox box;
-        RpAtomic *object;
-    } t;
-    int32_t type; /* 0x18 RpIntersectType */
-} RpIntersection;
-
-_Static_assert(sizeof(RpIntersection) == 0x1c, "RpIntersection layout");
+/* RwLine, RpIntersectType and RpIntersection live in rwworld.h (the BSP walks use them too). */
 
 /* A triangle hit, as the callbacks see it: unit normal, first corner, triangle index, corner pointers. */
 typedef struct RpCollisionTriangle {

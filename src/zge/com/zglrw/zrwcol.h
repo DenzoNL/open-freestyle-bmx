@@ -13,6 +13,7 @@
 #include "rw/rwcamera.h"
 #include "rw/rwcollision.h"
 #include "rw/rwmath.h"
+#include "rw/rwworld.h"
 
 /* A triangle of the world as RenderWare reports it (0x28 bytes): plane normal, material index, vertex
  * pointers. */
@@ -160,7 +161,5 @@ uint8_t *zrwcolHitColor(ZrwColLineHit *hit);
  * rw/rwcollision.h). */
 ORIG_FN(0x004b46b0, uint8_t *, rwModelGetMaterialTable, (void *model));
 ORIG_FN(0x004b47a0, void *, rwModelGetMaterial, (void *model, uint32_t index));
-ORIG_FN(0x004b93d0, void *, rwMaterialGetData, (void *material));
-ORIG_FN(0x004ba140, void *, rwWorldGetMaterial, (void *world, uint32_t index));
 
 #endif

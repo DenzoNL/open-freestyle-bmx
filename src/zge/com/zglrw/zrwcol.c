@@ -141,7 +141,7 @@ static void gameCorner(float *out, float x, float y, float z)
 /* Material user data of the material behind a handle of the world or of a model. */
 static uint32_t materialData(void *material)
 {
-    void *data = rwMaterialGetData(material);
+    void *data = RpMaterialGetTexture(material);
 
     return (data == NULL) ? 0 : zrwMatGetUserData(data);
 }
@@ -175,7 +175,7 @@ ZrwColTriangle *zrwcolRecordHit(void *arg, const ZrwColSector *sector, ZrwColTri
         }
         hit->distance = distance;
         hit->objectData = 0;
-        hit->materialData = materialData(rwWorldGetMaterial(
+        hit->materialData = materialData(RpWorldGetMaterial(
             gZrwWorld,
             (uint16_t)((uint16_t)sector->map[(uint32_t)triangle->index * 4] + (uint16_t)sector->base)));
         return triangle;
@@ -286,7 +286,7 @@ int zrwcolQueryLine(float *from, float *to, uint32_t flags, const int *excluded,
             gameCorner(out->hit.vertex[i], p[0], p[1], p[2]);
         }
         out->hit.objectData = 0;
-        out->hit.materialData = materialData(rwWorldGetMaterial(
+        out->hit.materialData = materialData(RpWorldGetMaterial(
             gZrwWorld,
             (uint16_t)((uint16_t)sector->map[(uint32_t)best->index * 4] + (uint16_t)sector->base)));
     } else {

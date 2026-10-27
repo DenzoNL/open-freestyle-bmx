@@ -6,14 +6,12 @@
 #include "rw/rwcore.h"
 #include "rw/rwlight.h"
 #include "rw/rwmath.h"
+#include "rw/rwworld.h"
 #include "zge/com/zglrw/zrwmodel.h"
 #include "zge/zdebug.h"
 #include "zge/zmem.h"
 
 static const char kZrwLightFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwLight.c";
-
-ORIG_FN(0x004b8af0, void *, RpWorldAddLight, (void *world, void *light));
-ORIG_FN(0x004b8b80, void *, RpWorldRemoveLight, (void *world, void *light));
 
 /* RpLightType of the four kinds the scene creates. */
 typedef uint32_t ZrwLightTypeTable[4];
