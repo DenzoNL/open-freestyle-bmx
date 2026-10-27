@@ -50,12 +50,21 @@ typedef struct RwFrameList {
 RwMatrix *RwMatrixCreate(void);
 int RwMatrixDestroy(RwMatrix *matrix);
 RwMatrix *RwMatrixRotate(RwMatrix *matrix, const RwV3d *axis, float angle, RwOpCombineType combine);
+/* Rotation from a unit axis, sine and 1 - cosine: EAX = matrix, EDX = axis, ECX = combine, ST0 = 1 - cos and
+ * the float sine as the fourth stack word (asm entry; NULL for a bad combine type). */
+RwMatrix *RwMatrixRotateOneMinusCosineSine(uint32_t unused0, uint32_t unused1, uint32_t unused2, float sine);
 RwMatrix *RwMatrixScale(RwMatrix *matrix, const RwV3d *scale, RwOpCombineType combine);
 RwMatrix *RwMatrixTranslate(RwMatrix *matrix, const RwV3d *translation, RwOpCombineType combine);
 RwMatrix *RwMatrixInvert(RwMatrix *out, const RwMatrix *in);
 
 /* Reciprocal square root of a float (given as its bits) from the engine's table; 0 for 0. */
 double _rwFastInvSqrt(int32_t floatBits);
+/* Square root of a float (given as its bits) from the engine's table; 0 for 0. */
+double _rwFastSqrt(int32_t floatBits);
+/* Normalise in into out (they may be the same): the fast one returns 1 / length, RwV3dNormalize the length
+ * (and reports an error for a zero vector). */
+double _rwV3dNormalize(RwV3d *out, const RwV3d *in);
+double RwV3dNormalize(RwV3d *out, const RwV3d *in);
 RwV3d *RwV3dTransformPoints(RwV3d *out, const RwV3d *in, int32_t count, const RwMatrix *matrix);
 RwV3d *RwV3dTransformVectors(RwV3d *out, const RwV3d *in, int32_t count, const RwMatrix *matrix);
 
@@ -69,6 +78,8 @@ int RwFrameDestroyHierarchy(RwFrame *frame);
 RwFrame *RwFrameUpdateObjects(RwFrame *frame);
 RwMatrix *RwFrameGetMatrix(RwFrame *frame);
 RwMatrix *RwFrameGetLTM(RwFrame *frame);
+/* Whether the frame's hierarchy waits for a sync. */
+int RwFrameDirty(const RwFrame *frame);
 RwFrame *RwFrameForAllChildren(RwFrame *frame, RwObjectCallBack callback, void *data);
 int32_t RwFrameCount(RwFrame *frame);
 RwFrame *RwFrameTranslate(RwFrame *frame, const RwV3d *translation, RwOpCombineType combine);

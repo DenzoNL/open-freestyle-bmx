@@ -251,3 +251,70 @@ RwCamera *RwCameraCreate(void)
     _rwPluginRegistryInitObject(&rwCameraRegistry, camera);
     return camera;
 }
+
+/* ---- the PVS camera ---------------------------------------------------------------------------------- */
+
+/* Rasters, images and the world, still original code (rw/texture.c, rw/world.c). */
+ORIG_FN(0x004dcb10, RwRaster *, RwRasterCreate,
+        (int32_t width, int32_t height, int32_t depth, int32_t flags));
+ORIG_FN(0x004dcc80, RwRaster *, RwRasterSubRaster,
+        (RwRaster * raster, RwRaster *parent, const int32_t *rect));
+ORIG_FN(0x004e38e0, void *, RwImageCreate, (int32_t width, int32_t height, int32_t depth));
+ORIG_FN(0x004e3ab0, void *, RwImageAllocatePixels, (void *image));
+ORIG_FN(0x004b81f0, void *, RpWorldAddCamera, (void *world, RwCamera *camera));
+
+/* The camera the PVS builder renders the world with, and its 128 x 128 x 32 image (0x676814, 0x676818). */
+#define rwPvsCamera ORIG_VAR(0x00676814, RwCamera *, rwPvsCamera)
+#define rwPvsImage  ORIG_VAR(0x00676818, void *, rwPvsImage)
+
+/*
+ * Creates the PVS camera: a frame, a 128 x 128 camera raster and z raster (sub rasters of the given ones when
+ * there are any), near plane 0.25, the given far plane, a 1 x 1 view window, added to the world; and the
+ * image it is read back into.
+ */
+__attribute__((used, noinline)) static void rwPvsCameraCreateImpl(void *world, RwRaster *raster,
+                                                                  RwRaster *zRaster, double farClip)
+{
+    const int32_t rect[4] = {0, 0, 128, 128};
+    rwPvsCamera = RwCameraCreate();
+    RwCameraSetFrame(rwPvsCamera, RwFrameCreate());
+    RwRaster *created;
+    if (raster == NULL) {
+        created = RwRasterCreate(128, 128, 0, 2);
+    } else {
+        created = RwRasterCreate(0, 0, 0, 2);
+        RwRasterSubRaster(created, raster, rect);
+    }
+    RwCameraSetRaster(rwPvsCamera, created);
+    if (zRaster == NULL) {
+        created = RwRasterCreate(128, 128, 0, 1);
+    } else {
+        created = RwRasterCreate(0, 0, 0, 1);
+        RwRasterSubRaster(created, zRaster, rect);
+    }
+    RwCameraSetZRaster(rwPvsCamera, created);
+    RwCameraSetFarClipPlane(rwPvsCamera, (float)farClip);
+    RwCameraSetNearClipPlane(rwPvsCamera, 0.25f);
+    const RwV2d window = {1.0f, 1.0f};
+    RwCameraSetViewWindow(rwPvsCamera, &window);
+    RpWorldAddCamera(world, rwPvsCamera);
+    rwPvsImage = RwImageCreate(128, 128, 32);
+    RwImageAllocatePixels(rwPvsImage);
+}
+
+/*
+ * The original's entry (labelled RwCameraClone): EAX = world, EDX = parent camera raster, ECX = parent z
+ * raster, ST0 = far clip plane (popped).
+ */
+BMX_ADDR(0x004ce6d0)
+__attribute__((naked)) void rwPvsCameraCreate(void)
+{
+    __asm__ volatile("subl $8, %esp\n\t"
+                     "fstpl (%esp)\n\t"
+                     "pushl %ecx\n\t"
+                     "pushl %edx\n\t"
+                     "pushl %eax\n\t"
+                     "call _rwPvsCameraCreateImpl\n\t"
+                     "addl $20, %esp\n\t"
+                     "ret");
+}

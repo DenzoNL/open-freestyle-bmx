@@ -74,6 +74,9 @@ RwCamera *RwCameraSetFogDistance(RwCamera *camera, float fogDistance);
 RwCamera *RwCameraSetProjection(RwCamera *camera, int32_t projection);
 RwCamera *RwCameraSetViewWindow(RwCamera *camera, const RwV2d *viewWindow);
 const RwV2d *RwCameraGetViewWindow(const RwCamera *camera);
+/* Creates the PVS camera and image (asm entry: EAX = world, EDX / ECX = parent camera / z raster or NULL, ST0
+ * = far clip plane). */
+void rwPvsCameraCreate(void);
 RwCamera *RwCameraBeginUpdate(RwCamera *camera);
 RwCamera *RwCameraEndUpdate(RwCamera *camera);
 RwCamera *RwCameraGetCurrentCamera(void);
@@ -101,6 +104,10 @@ typedef struct RtCharsetDesc {
 } RtCharsetDesc;
 
 RtCharset *RtCharsetCreate(const RwRGBA *foreground, const RwRGBA *background);
+/* RtCharsetPrint's worker: EAX = charset, EDX = text, ECX = x, y is the fourth stack word. */
+__attribute__((regparm(3))) int rtCharsetPrintText(RtCharset *charset, const char *text, int32_t x,
+                                                   int32_t unused0, int32_t unused1, int32_t unused2,
+                                                   int32_t y);
 int RtCharsetDestroy(RtCharset *charset);
 RtCharset *RtCharsetGetDesc(RtCharset *charset, RtCharsetDesc *desc);
 /* EAX = charset, EDX = foreground, ECX = background. */

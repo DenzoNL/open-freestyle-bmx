@@ -202,11 +202,86 @@ RwMatrix *RwMatrixInvert(RwMatrix *out, const RwMatrix *in)
 }
 
 /*
- * The FPU work of RwMatrixRotate: the axis scaled by the table based 1 / length (floats, as the original
- * stores them), sin(angle) as a float and 1 - cos(angle) as a double (sin and cos are the x87 instructions).
- * They go into the slots of the original's stack frame, where RwMatrixRotate's asm stub finds them.
+ * The rotation by the unit axis with the sine and 1 - cosine of the angle, combined with the matrix (replace,
+ * rotation first or last; the product goes through the module's multiply routine unless the matrix is the
+ * identity). The matrix keeps its own flags minus the identity bit and its version byte goes up (twice when
+ * combined). The original leaves the padding words of its rotation matrix uninitialised; they are 0 here.
  */
-__attribute__((used, noinline)) static void rotatePrepare(const RwV3d *axis, float angle, uint8_t *frame)
+__attribute__((used, noinline)) static RwMatrix *
+rwMatrixRotateImpl(RwMatrix *matrix, const RwV3d *axis, int32_t combine, double oneMinusCosine, float sine)
+{
+    const double c = oneMinusCosine;
+    const double xyc = rwMul(axis->x, axis->y) * c;
+    const double xzc = rwMul(axis->x, axis->z) * c;
+    const double yzc = rwMul(axis->z, axis->y) * c;
+    const double sx = rwMul(sine, axis->x), sy = rwMul(sine, axis->y), sz = rwMul(sine, axis->z);
+    RwMatrix rotation;
+    memset(&rotation, 0, sizeof rotation);
+    rotation.right.x = (float)(1.0 - (1.0 - rwMul(axis->x, axis->x)) * c);
+    rotation.right.y = (float)(sz + xyc);
+    rotation.right.z = (float)(xzc - sy);
+    rotation.flags = 3;
+    rotation.up.x = (float)(xyc - sz);
+    rotation.up.y = (float)(1.0 - (1.0 - rwMul(axis->y, axis->y)) * c);
+    rotation.up.z = (float)(yzc + sx);
+    rotation.at.x = (float)(sy + xzc);
+    rotation.at.y = (float)(yzc - sx);
+    rotation.at.z = (float)(1.0 - c * (1.0 - rwMul(axis->z, axis->z)));
+    RwMatrix result;
+    memset(&result, 0, sizeof result);
+    if (combine == rwCOMBINEREPLACE) {
+        result = rotation;
+    } else if (combine == rwCOMBINEPRECONCAT || combine == rwCOMBINEPOSTCONCAT) {
+        const uint32_t identity = rwMatrixModule()->flagMask & rwMATRIXINTERNALIDENTITY;
+        if ((matrix->flags & identity) != 0) {
+            result = rotation;
+        } else {
+            typedef void(BMX_CDECL * MultiplyFunc)(RwMatrix * out, const RwMatrix *a, const RwMatrix *b);
+            const MultiplyFunc multiply = (MultiplyFunc)rwMatrixModule()->multiply;
+            if (combine == rwCOMBINEPRECONCAT) {
+                multiply(&result, &rotation, matrix);
+            } else {
+                multiply(&result, matrix, &rotation);
+            }
+        }
+        ((uint8_t *)&result.pad1)[0]++;
+    } else {
+        RwError error;
+        error.pluginID = 1;
+        error.errorCode = _rwerror(rwERR_INVALIDSIZE, "Invalid combination type");
+        RwErrorSet(&error);
+        return NULL;
+    }
+    const uint32_t flags = matrix->flags & ~(uint32_t)rwMATRIXINTERNALIDENTITY;
+    *matrix = result;
+    matrix->flags = flags;
+    ((uint8_t *)&matrix->pad1)[0]++;
+    return matrix;
+}
+
+/* The original's entry: EAX = matrix, EDX = unit axis, ECX = combine, ST0 = 1 - cos (popped), the float sine
+ * as the fourth stack word. */
+BMX_ADDR(0x004d0a00)
+__attribute__((naked)) RwMatrix *RwMatrixRotateOneMinusCosineSine(uint32_t unused0, uint32_t unused1,
+                                                                  uint32_t unused2, float sine)
+{
+    __asm__ volatile("pushl 0x10(%esp)\n\t"
+                     "subl $8, %esp\n\t"
+                     "fstpl (%esp)\n\t"
+                     "pushl %ecx\n\t"
+                     "pushl %edx\n\t"
+                     "pushl %eax\n\t"
+                     "call _rwMatrixRotateImpl\n\t"
+                     "addl $24, %esp\n\t"
+                     "ret");
+}
+
+/*
+ * Rotates the matrix by angle degrees around axis: the axis scaled by the table based 1 / length (floats, as
+ * the original stores them), sin(angle) as a float and 1 - cos(angle) as a double (the x87 FSIN / FCOS).
+ */
+BMX_ADDR(0x004d1040)
+RwMatrix *RwMatrixRotate(RwMatrix *matrix, const RwV3d *axis, float angle, RwOpCombineType combine)
 {
     const double radians = rwMul(0x1.1df46ap-6f, angle);
     const float lengthSquared =
@@ -214,52 +289,14 @@ __attribute__((used, noinline)) static void rotatePrepare(const RwV3d *axis, flo
     uint32_t bits;
     memcpy(&bits, &lengthSquared, sizeof bits);
     const double scale = _rwFastInvSqrt((int32_t)bits);
-    float *unit = (float *)(frame + 0x18);
-    unit[0] = (float)((double)axis->x * scale);
-    unit[1] = (float)((double)axis->y * scale);
-    unit[2] = (float)((double)axis->z * scale);
-    const double sine = bmxX87Fsin(radians);
+    RwV3d unit;
+    unit.x = (float)((double)axis->x * scale);
+    unit.y = (float)((double)axis->y * scale);
+    unit.z = (float)((double)axis->z * scale);
+    const float sine = (float)bmxX87Fsin(radians);
     const double cosine = bmxX87Fcos(radians);
-    *(float *)(frame + 0xc) = (float)sine;
-    *(double *)(frame + 0x28) = (double)1.0f - cosine;
-}
-
-/*
- * Rotates the matrix by angle degrees around axis. The work is done by RwMatrixRotateOneMinusCosineSine
- * (0x4d0a00, not ported yet): EAX = matrix, EDX = the normalised axis, ECX = combine, ST0 = 1 - cos(angle)
- * and the float sin(angle) as the fourth word of its stack arguments; it leaves the x87 stack empty. That
- * routine copies three words of its own, uninitialised stack frame into the matrix padding (and hands them to
- * the multiply routine); they are cleared here so the padding does not depend on stale stack contents.
- * This function keeps the original's frame (EBX saved, 0x40 bytes of locals) so the callee runs at the same
- * stack depth. TODO: plain C once 0x4d0a00 is ported.
- */
-BMX_ADDR(0x004d1040)
-__attribute__((naked)) RwMatrix *RwMatrixRotate(RwMatrix *matrix, const RwV3d *axis, float angle,
-                                                RwOpCombineType combine)
-{
-    __asm__ volatile("pushl %ebx\n\t"
-                     "subl $0x40, %esp\n\t"
-                     "movl 0x48(%esp), %ebx\n\t"
-                     "pushl %esp\n\t"
-                     "pushl 0x54(%esp)\n\t"
-                     "pushl 0x54(%esp)\n\t"
-                     "call _rotatePrepare\n\t"
-                     "addl $12, %esp\n\t"
-                     "fldl 0x28(%esp)\n\t"
-                     "movl 0x54(%esp), %ecx\n\t"
-                     "movl %ebx, %eax\n\t"
-                     "leal 0x18(%esp), %edx\n\t"
-                     "movl $0, -0x94(%esp)\n\t"
-                     "movl $0, -0x84(%esp)\n\t"
-                     "movl $0, -0x74(%esp)\n\t"
-                     "movl %esi, 0x3c(%esp)\n\t"
-                     "movl $0x004d0a00, %esi\n\t"
-                     "call *%esi\n\t"
-                     "movl 0x3c(%esp), %esi\n\t"
-                     "addl $0x40, %esp\n\t"
-                     "movl %ebx, %eax\n\t"
-                     "popl %ebx\n\t"
-                     "ret");
+    rwMatrixRotateImpl(matrix, &unit, combine, (double)1.0f - cosine, sine);
+    return matrix;
 }
 
 /*
@@ -278,6 +315,67 @@ double _rwFastInvSqrt(int32_t floatBits)
     float result;
     memcpy(&result, &bits, sizeof result);
     return result;
+}
+
+/* sqrt(x) for a float given as its bits, from the engine's square root table; 0 for 0. */
+BMX_ADDR(0x004d3880)
+double _rwFastSqrt(int32_t floatBits)
+{
+    uint32_t bits = (uint32_t)floatBits;
+    if (bits != 0) {
+        const uint32_t *table = rwV3dModule()->sqrtTable;
+        bits += 0x800;
+        bits = table[(bits & 0xffffff) >> 12] + ((bits & 0x7f800000) >> 1);
+    }
+    float result;
+    memcpy(&result, &bits, sizeof result);
+    return result;
+}
+
+/* Squared length of a vector as the original sums it: (z*z + y*y) + x*x. */
+static double rwV3dLengthSquared(const RwV3d *v)
+{
+    return (rwMul(v->z, v->z) + rwMul(v->y, v->y)) + rwMul(v->x, v->x);
+}
+
+static int32_t rwFloatBits(float f)
+{
+    int32_t bits;
+    memcpy(&bits, &f, sizeof bits);
+    return bits;
+}
+
+/* out = in scaled by the float s, x first (out may be in). */
+static void rwV3dScale(RwV3d *out, const RwV3d *in, float s)
+{
+    out->x = (float)rwMul(in->x, s);
+    out->y = (float)rwMul(s, in->y);
+    out->z = (float)rwMul(s, in->z);
+}
+
+/* Normalises by the table based 1 / length (no error for a zero vector, which stays zero); returns it. */
+BMX_ADDR(0x004d3650)
+double _rwV3dNormalize(RwV3d *out, const RwV3d *in)
+{
+    const float scale = (float)_rwFastInvSqrt(rwFloatBits((float)rwV3dLengthSquared(in)));
+    rwV3dScale(out, in, scale);
+    return scale;
+}
+
+/* Normalises a vector and returns its length (both from the tables); a zero vector reports an error. */
+BMX_ADDR(0x004d36e0)
+double RwV3dNormalize(RwV3d *out, const RwV3d *in)
+{
+    const int32_t bits = rwFloatBits((float)rwV3dLengthSquared(in));
+    const double length = (float)_rwFastSqrt(bits);
+    rwV3dScale(out, in, (float)_rwFastInvSqrt(bits));
+    if (length == 0.0 || __builtin_isnan(length)) {
+        RwError error;
+        error.pluginID = 1;
+        error.errorCode = _rwerror(0x10);
+        RwErrorSet(&error);
+    }
+    return length;
 }
 
 /* Transforms points and vectors through the engine's function table (the transform routines are the
@@ -528,6 +626,13 @@ RwFrame *RwFrameForAllChildren(RwFrame *frame, RwObjectCallBack callback, void *
 }
 
 /* Number of frames in the subtree, the frame itself included. */
+/* Whether the frame's hierarchy waits for a sync (its root is queued). */
+BMX_ADDR(0x004d2840)
+int RwFrameDirty(const RwFrame *frame)
+{
+    return (frame->root->object.privateFlags & 3) != 0;
+}
+
 BMX_ADDR(0x004d2f00)
 int32_t RwFrameCount(RwFrame *frame)
 {

@@ -11,6 +11,7 @@
 
 #include "compat/orig.h"
 #include "rw/rwcamera.h"
+#include "rw/rwcollision.h"
 #include "rw/rwmath.h"
 
 /* A triangle of the world as RenderWare reports it (0x28 bytes): plane normal, material index, vertex
@@ -155,15 +156,11 @@ int zrwcolQueryLine(float *from, float *to, uint32_t flags, const int *excluded,
  */
 uint8_t *zrwcolHitColor(ZrwColLineHit *hit);
 
-/* RenderWare: matrices and points of frames, materials, and the intersection enumerators. */
+/* RenderWare: matrices and points of frames, materials (the intersection enumerators are in
+ * rw/rwcollision.h). */
 ORIG_FN(0x004b46b0, uint8_t *, rwModelGetMaterialTable, (void *model));
 ORIG_FN(0x004b47a0, void *, rwModelGetMaterial, (void *model, uint32_t index));
 ORIG_FN(0x004b93d0, void *, rwMaterialGetData, (void *material));
 ORIG_FN(0x004ba140, void *, rwWorldGetMaterial, (void *world, uint32_t index));
-ORIG_FN(0x004c1b10, void, rwWorldIntersectTriangles,
-        (void *world, const ZrwColIntersection *intersection, void *callback, void *arg));
-ORIG_FN(0x004c1c10, void, rwWorldIntersectObjects,
-        (void *world, const ZrwColIntersection *intersection, void *callback, const void *arg));
-ORIG_FN(0x004c1f30, void, rwObjectIntersectTriangles, (void *object, void *arg, void *callback, void *user));
 
 #endif

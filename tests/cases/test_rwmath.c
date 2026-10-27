@@ -105,6 +105,60 @@ static void setup_matrix_rotate(DtCtx *c)
     clear_stack();
 }
 
+/* RwMatrixRotateOneMinusCosineSine: EAX = matrix, EDX = axis, ECX = combine, ST0 = 1 - cos, the sine as the
+ * fourth stack word. */
+static RwMatrix *rotate_omcs_call(uint32_t target, RwMatrix *m, const RwV3d *axis, int32_t combine,
+                                  const double *omc, const float *sine)
+{
+    uint32_t eax = (uint32_t)(uintptr_t)m, edx = (uint32_t)(uintptr_t)axis, ecx = (uint32_t)combine;
+    const uint32_t sineBits = *(const uint32_t *)sine;
+    __asm__ volatile("subl $16, %%esp\n\t"
+                     "movl %5, 12(%%esp)\n\t"
+                     "fldl (%3)\n\t"
+                     "call *%4\n\t"
+                     "addl $16, %%esp"
+                     : "+a"(eax), "+d"(edx), "+c"(ecx)
+                     : "r"(omc), "r"(target), "r"(sineBits)
+                     : "memory", "cc", "st");
+    return (RwMatrix *)(uintptr_t)eax;
+}
+
+static RwMatrix *rotate_omcs_orig(RwMatrix *m, const RwV3d *axis, int32_t combine, const double *omc,
+                                  const float *sine)
+{
+    return rotate_omcs_call(0x004d0a00, m, axis, combine, omc, sine);
+}
+
+static RwMatrix *rotate_omcs_impl(RwMatrix *m, const RwV3d *axis, int32_t combine, const double *omc,
+                                  const float *sine)
+{
+    return rotate_omcs_call((uint32_t)(uintptr_t)RwMatrixRotateOneMinusCosineSine, m, axis, combine, omc,
+                            sine);
+}
+
+static void setup_rotate_omcs(DtCtx *c)
+{
+    dt_seed(c);
+    mathEnv();
+    RwMatrix *m = dt_alloc(sizeof *m);
+    mathFillMatrix(m);
+    RwV3d *axis = dt_alloc(sizeof *axis);
+    axis->x = dt_float_edgy(-1.0f, 1.0f);
+    axis->y = dt_float_edgy(-1.0f, 1.0f);
+    axis->z = dt_float_edgy(-1.0f, 1.0f);
+    double *omc = dt_alloc(8);
+    *omc = dt_u32() % 6 == 0 ? 0.0 : (double)dt_float(0.0f, 2.0f) * 1.0000001;
+    float *sine = dt_alloc(4);
+    *sine = dt_float_edgy(-1.0f, 1.0f);
+    DT_ARG_PTR(c, 0, m);
+    DT_ARG_PTR(c, 1, axis);
+    DT_ARG_INT(c, 2, dt_range(0, dt_u32() % 8 == 0 ? 5 : 2));
+    DT_ARG_PTR(c, 3, omc);
+    DT_ARG_PTR(c, 4, sine);
+    rwtEnd();
+    clear_stack();
+}
+
 static void setup_matrix_scale(DtCtx *c)
 {
     matrix_op_setup(c, 2, 0);
@@ -368,6 +422,8 @@ static void setup_frame_list_deinit(DtCtx *c)
 
 DT_CASES(rwmath_cases) = {
     {"RpClumpForAllAtomics", 0x004b1990, RpClumpForAllAtomics, 3, DT_RET_INT, setup_clump_atomics, 200, 0},
+    {"RwMatrixRotateOneMinusCosineSine", (uint32_t)(uintptr_t)rotate_omcs_orig, rotate_omcs_impl, 5,
+     DT_RET_INT, setup_rotate_omcs, 1500, 0},
     {"RwMatrixRotate", 0x004d1040, RwMatrixRotate, 4, DT_RET_INT, setup_matrix_rotate, 1500, 0},
     {"RwMatrixInvert", 0x004d1340, RwMatrixInvert, 2, DT_RET_INT, setup_matrix_invert, 400, 0},
     {"RwMatrixScale", 0x004d1400, RwMatrixScale, 3, DT_RET_INT, setup_matrix_scale, 600, 0},

@@ -349,7 +349,180 @@ static void setup_charset_print(DtCtx *c)
     rwtEnd();
 }
 
+/* ---- charset text ------------------------------------------------------------------------------------ */
+
+static int32_t BMX_CDECL stub_strlen(const char *s)
+{
+    int32_t n = 0;
+    while (s[n] != 0) {
+        n++;
+    }
+    rwtLog(0x4a4f20);
+    rwtLog((uint32_t)n);
+    return n;
+}
+
+/* The rasters of these tests hold their width and height in the first two words. */
+static int32_t BMX_CDECL stub_raster_width(const RwRaster *raster)
+{
+    rwtLog(0x4dcc30);
+    rwtLogPtr(raster);
+    return ((const int32_t *)raster)[0];
+}
+
+static int32_t BMX_CDECL stub_raster_height(const RwRaster *raster)
+{
+    rwtLog(0x4dcc40);
+    rwtLogPtr(raster);
+    return ((const int32_t *)raster)[1];
+}
+
+static int BMX_CDECL stub_state_set(int32_t state, int32_t value)
+{
+    rwtLog(0x4db820);
+    rwtLog((uint32_t)state);
+    rwtLog(dt_canon((uint32_t)value));
+    return 1;
+}
+
+static int BMX_CDECL stub_state_get(int32_t state, void *value)
+{
+    rwtLog(0x4db870);
+    rwtLog((uint32_t)state);
+    rwtLogPtr(value);
+    *(int32_t *)value = (int32_t)(dt_u32() & 0xff);
+    return 1;
+}
+
+static int BMX_CDECL stub_text_primitive(int32_t primType, void *vertices, int32_t numVertices, void *indices,
+                                         int32_t numIndices)
+{
+    rwtLog(0x4de101);
+    rwtLog((uint32_t)primType);
+    rwtLogPtr(vertices);
+    rwtLog((uint32_t)numVertices);
+    rwtLogWords(vertices, numVertices * 8);
+    rwtLogPtr(indices);
+    rwtLog((uint32_t)numIndices);
+    for (int32_t i = 0; i < numIndices; i++) {
+        rwtLog(((const uint16_t *)indices)[i]);
+    }
+    return 1;
+}
+
+static RwRaster *text_raster(int32_t width, int32_t height)
+{
+    int32_t *raster = dt_alloc(0x40);
+    raster[0] = width;
+    raster[1] = height;
+    return (RwRaster *)raster;
+}
+
+static int text_orig(RtCharset *charset, const char *text, int32_t x, int32_t y)
+{
+    return ((int(__attribute__((regparm(3))) *)(RtCharset *, const char *, int32_t, int32_t, int32_t, int32_t,
+                                                int32_t))(uintptr_t)0x004cb860)(charset, text, x, 0, 0, 0, y);
+}
+
+static int text_impl(RtCharset *charset, const char *text, int32_t x, int32_t y)
+{
+    return rtCharsetPrintText(charset, text, x, 0, 0, 0, y);
+}
+
+static void setup_print_text(DtCtx *c)
+{
+    camera_env(c);
+    RwGlobals *g = RwEngineInstance;
+    g->stringFuncs.rwstrlen = (void *)stub_strlen;
+    g->dOpenDevice.fpRenderStateSet = stub_state_set;
+    g->dOpenDevice.fpRenderStateGet = stub_state_get;
+    g->dOpenDevice.fpIm2DRenderIndexedPrimitive = (void *)stub_text_primitive;
+    dt_stub(0x004dcc30, NULL, (void *)stub_raster_width);
+    dt_stub(0x004dcc40, NULL, (void *)stub_raster_height);
+    RwCamera *camera = make_camera(0);
+    camera->frameBuffer = dt_u32() % 10 == 0 ? NULL : text_raster(dt_range(1, 200), dt_range(1, 120));
+    g->curCamera = dt_u32() % 10 == 0 ? NULL : camera;
+    gRwtMallocFailAt = dt_u32() % 8 == 0 ? dt_range(1, 2) : 0;
+    const int length = dt_u32() % 10 == 0 ? 0 : dt_range(1, 12);
+    char *text = dt_alloc((uint32_t)length + 4);
+    for (int i = 0; i < length; i++) {
+        text[i] = (char)dt_range(0x20, 0x7a);
+    }
+    text[length] = 0;
+    DT_ARG_PTR(c, 0, text_raster(dt_u32() % 2 == 0 ? 128 : dt_range(16, 256), dt_range(16, 256)));
+    DT_ARG_PTR(c, 1, text);
+    DT_ARG_INT(c, 2, dt_range(-40, 220));
+    DT_ARG_INT(c, 3, dt_range(-30, 140));
+    rwtEnd();
+}
+
+/* ---- the PVS camera ---------------------------------------------------------------------------------- */
+
+static RwRaster *BMX_CDECL stub_sub_raster(RwRaster *raster, RwRaster *parent, const int32_t *rect)
+{
+    rwtLog(0x4dcc80);
+    rwtLogPtr(raster);
+    rwtLogPtr(parent);
+    rwtLogPtr(rect);
+    rwtLogWords(rect, 4);
+    return raster;
+}
+
+static void *BMX_CDECL stub_world_add_camera(void *world, RwCamera *camera)
+{
+    rwtLog(0x4b81f0);
+    rwtLogPtr(world);
+    rwtLogPtr(camera);
+    rwtLogFloatBits(camera->farPlane);
+    rwtLogFloatBits(camera->nearPlane);
+    return world;
+}
+
+/* EAX = world, EDX / ECX = parent rasters, the far clip plane in ST0. */
+static void pvs_camera_call(uint32_t target, void *world, RwRaster *raster, RwRaster *zRaster,
+                            const float *farClip)
+{
+    uint32_t eax = (uint32_t)(uintptr_t)world, edx = (uint32_t)(uintptr_t)raster;
+    uint32_t ecx = (uint32_t)(uintptr_t)zRaster;
+    __asm__ volatile("flds (%3)\n\tcall *%4"
+                     : "+a"(eax), "+d"(edx), "+c"(ecx)
+                     : "r"(farClip), "r"(target)
+                     : "memory", "cc", "st");
+}
+
+static void pvs_camera_orig(void *world, RwRaster *raster, RwRaster *zRaster, const float *farClip)
+{
+    pvs_camera_call(0x004ce6d0, world, raster, zRaster, farClip);
+}
+
+static void pvs_camera_impl(void *world, RwRaster *raster, RwRaster *zRaster, const float *farClip)
+{
+    pvs_camera_call((uint32_t)(uintptr_t)rwPvsCameraCreate, world, raster, zRaster, farClip);
+}
+
+static void setup_pvs_camera(DtCtx *c)
+{
+    charset_env(c);
+    RwPluginRegistry *r = rwtRegistry(dt_range(0, 2), 0x140);
+    __builtin_memcpy(&rwCameraRegistry, r, sizeof *r);
+    mathFrameRegistry();
+    gCharFailAt = 0;
+    dt_stub(0x004dcc80, NULL, (void *)stub_sub_raster);
+    dt_stub(0x004b81f0, NULL, (void *)stub_world_add_camera);
+    float *farClip = dt_alloc(4);
+    *farClip = dt_u32() % 6 == 0 ? mathFloat() : dt_float(1.0f, 5000.0f);
+    DT_ARG_PTR(c, 0, dt_alloc(0x20));
+    DT_ARG_PTR(c, 1, dt_u32() % 2 == 0 ? NULL : dt_alloc(0x40));
+    DT_ARG_PTR(c, 2, dt_u32() % 2 == 0 ? NULL : dt_alloc(0x40));
+    DT_ARG_PTR(c, 3, farClip);
+    rwtEnd();
+}
+
 DT_CASES(rwcamera_cases) = {
+    {"rtCharsetPrintText", (uint32_t)(uintptr_t)text_orig, text_impl, 4, DT_RET_INT, setup_print_text, 800,
+     0},
+    {"rwPvsCameraCreate", (uint32_t)(uintptr_t)pvs_camera_orig, pvs_camera_impl, 4, DT_RET_VOID,
+     setup_pvs_camera, 200, 0},
     {"RwIm2DGetFarScreenZ", 0x004db810, RwIm2DGetFarScreenZ, 0, DT_RET_FLOAT, setup_far_screen_z, 30, 0},
     {"RwIm2DRenderIndexedPrimitive", 0x004db950, RwIm2DRenderIndexedPrimitive, 5, DT_RET_INT, setup_indexed,
      30, 0},

@@ -32,19 +32,62 @@ typedef struct RpMorphTarget {
 _Static_assert(offsetof(RpMorphTarget, boundingSphere) == 4, "RpMorphTarget layout");
 _Static_assert(offsetof(RpMorphTarget, normals) == 0x18, "RpMorphTarget layout");
 
-/* Partial RpAtomic: its frame link (RwObjectHasFrame), geometry and bounding sphere. */
+/* A triangle of a geometry: three vertex indices and the material. */
+typedef struct RpTriangle {
+    uint16_t vertIndex[3];
+    int16_t matIndex;
+} RpTriangle;
+
+/* Partial RpGeometry: the triangles and the morph targets (each with its own vertices). */
+typedef struct RpGeometry {
+    uint8_t pad00[0x1c];
+    int32_t numTriangles;       /* 0x1c */
+    int32_t numVertices;        /* 0x20 */
+    int32_t numMorphTargets;    /* 0x24 */
+    RpTriangle *triangles;      /* 0x28 */
+    uint8_t pad2c[0x18];        /* 0x2c */
+    RpMorphTarget *morphTarget; /* 0x44 */
+} RpGeometry;
+
+_Static_assert(offsetof(RpGeometry, triangles) == 0x28, "RpGeometry layout");
+_Static_assert(offsetof(RpGeometry, morphTarget) == 0x44, "RpGeometry layout");
+
+/* Morph interpolation state of an atomic: from start to end morph target, position / time of the way. */
+typedef struct RpInterpolator {
+    uint32_t flags;           /* 0x00 bit 1: the bounding sphere is out of date */
+    int16_t startMorphTarget; /* 0x04 */
+    int16_t endMorphTarget;   /* 0x06 */
+    float time;               /* 0x08 */
+    float recipTime;          /* 0x0c */
+    float position;           /* 0x10 */
+} RpInterpolator;
+
+/*
+ * Partial RpAtomic: its frame link (RwObjectHasFrame), geometry, bounding spheres, morph interpolator, the
+ * tag the collision code uses to visit an atomic once per query and its ties to the world sectors.
+ * object.privateFlags bit 0 says the world bounding sphere must be recomputed.
+ */
 typedef struct RpAtomic {
-    RwObjectHasFrame object; /* 0x00 */
-    uint8_t pad14[8];        /* 0x14 */
-    void *geometry;          /* 0x1c */
-    RwSphere boundingSphere; /* 0x20 */
-    uint8_t pad30[0x14];     /* 0x30 */
-    RwLLLink inClumpLink;    /* 0x44 link in the clump's atomic list */
+    RwObjectHasFrame object;         /* 0x00 */
+    uint8_t pad14[8];                /* 0x14 */
+    void *geometry;                  /* 0x1c */
+    RwSphere boundingSphere;         /* 0x20 in the frame's space */
+    RwSphere worldBoundingSphere;    /* 0x30 */
+    uint8_t pad40[4];                /* 0x40 */
+    RwLLLink inClumpLink;            /* 0x44 link in the clump's atomic list */
+    uint8_t pad4c[4];                /* 0x4c */
+    RpInterpolator interpolator;     /* 0x50 */
+    uint8_t pad64[2];                /* 0x64 */
+    uint16_t collisionTag;           /* 0x66 RwGlobals.lightFrame of the last query that visited it */
+    RwLLLink llWorldSectorsInAtomic; /* 0x68 RpTie links of the sectors it touches */
 } RpAtomic;
 
 _Static_assert(offsetof(RpAtomic, geometry) == 0x1c, "RpAtomic layout");
 _Static_assert(offsetof(RpAtomic, boundingSphere) == 0x20, "RpAtomic layout");
 _Static_assert(offsetof(RpAtomic, inClumpLink) == 0x44, "RpAtomic layout");
+_Static_assert(offsetof(RpAtomic, interpolator) == 0x50, "RpAtomic layout");
+_Static_assert(offsetof(RpAtomic, collisionTag) == 0x66, "RpAtomic layout");
+_Static_assert(offsetof(RpAtomic, llWorldSectorsInAtomic) == 0x68, "RpAtomic layout");
 
 /* Partial RpClump: parent is its frame. */
 typedef struct RpClump {

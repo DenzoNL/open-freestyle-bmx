@@ -8,6 +8,7 @@
 #include "rw/rwmath.h"
 #include "rw/rwstream.h"
 #include "rw/rwtexture.h"
+#include "rw/rwworld.h"
 #include "zge/com/zglrw/zrwmat.h"
 #include "zge/com/zglrw/zrwtxr.h"
 #include "zge/zdebug.h"
@@ -35,8 +36,6 @@ ORIG_FN(0x004ba0c0, int, RpWorldGetNumMaterials, (void *world));
 ORIG_FN(0x004ba140, void *, RpWorldGetMaterial, (void *world, int index));
 ORIG_FN(0x004ba1f0, int, RpWorldGetNumClumps, (void *world));
 ORIG_FN(0x004b93d0, void *, RpMaterialGetTexture, (void *material));
-ORIG_FN(0x004c2060, int, RpWorldSectorGetNumPolygons, (void *sector));
-ORIG_FN(0x004c2050, int, RpWorldSectorGetNumVertices, (void *sector));
 ORIG_FN(0x004b4720, int, RpGeometryGetNumTriangles, (void *geometry));
 ORIG_FN(0x004b4550, int, RpGeometryGetNumVertices, (void *geometry));
 ORIG_FN(0x004ba050, const float *, RpWorldGetOrigin, (void *world));

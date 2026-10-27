@@ -108,7 +108,9 @@ ZrwColPoly *zrwcolFilterNearest(void *arg, void *unused, ZrwColPoly *poly, void 
     (void)unused;
     (void)unused2;
     if (objectWanted(poly, excluded)) {
-        rwObjectIntersectTriangles(poly, arg, BMX_FNPTR(void *, 0x00494310, zrwcolKeepNearest), poly);
+        rwObjectIntersectTriangles(
+            (RpAtomic *)poly, arg,
+            BMX_FNPTR(RpIntersectionCallBackGeometryTriangle, 0x00494310, zrwcolKeepNearest), poly);
     }
     return poly;
 }
@@ -119,7 +121,9 @@ ZrwColPoly *zrwcolFilterRecord(void *arg, void *unused, ZrwColPoly *poly, void *
     (void)unused;
     (void)unused2;
     if (objectWanted(poly, excluded)) {
-        rwObjectIntersectTriangles(poly, arg, BMX_FNPTR(void *, 0x004947c0, zrwcolRecordObjectHit), poly);
+        rwObjectIntersectTriangles(
+            (RpAtomic *)poly, arg,
+            BMX_FNPTR(RpIntersectionCallBackGeometryTriangle, 0x004947c0, zrwcolRecordObjectHit), poly);
     }
     return poly;
 }
@@ -240,12 +244,14 @@ int zrwcolQueryLine(float *from, float *to, uint32_t flags, const int *excluded,
     gZrwCol.found = 0;
     gZrwCol.flags = flags;
     if ((flags & 1) != 0) {
-        rwWorldIntersectTriangles(gZrwWorld, (const ZrwColIntersection *)&line,
-                                  BMX_FNPTR(void *, 0x00494240, zrwcolKeepNearestSub), NULL);
+        rwWorldIntersectTriangles(
+            gZrwWorld, (RpIntersection *)&line,
+            BMX_FNPTR(RpIntersectionCallBackWorldTriangle, 0x00494240, zrwcolKeepNearestSub), NULL);
     }
     if ((flags & 6) != 0) {
-        rwWorldIntersectObjects(gZrwWorld, (const ZrwColIntersection *)&line,
-                                BMX_FNPTR(void *, 0x004942a0, zrwcolFilterNearest), excluded);
+        rwWorldIntersectObjects(gZrwWorld, (RpIntersection *)&line,
+                                BMX_FNPTR(RpIntersectionCallBackAtomic, 0x004942a0, zrwcolFilterNearest),
+                                (void *)excluded);
     }
     if (gZrwCol.found == 0) {
         return 0;
@@ -440,11 +446,14 @@ int zrwcolQuerySphere(const float *center, float radius, uint32_t flags, const i
     volume.z = (float)(gZrwWorldCenter.z - (double)center[2] * gZrwScale);
     volume.radius = (float)((double)gZrwScale * radius);
     if ((flags & 1) != 0) {
-        rwWorldIntersectTriangles(gZrwWorld, &volume, BMX_FNPTR(void *, 0x00494490, zrwcolRecordHit), NULL);
+        rwWorldIntersectTriangles(gZrwWorld, (RpIntersection *)&volume,
+                                  BMX_FNPTR(RpIntersectionCallBackWorldTriangle, 0x00494490, zrwcolRecordHit),
+                                  NULL);
     }
     if ((flags & 6) != 0) {
-        rwWorldIntersectObjects(gZrwWorld, &volume, BMX_FNPTR(void *, 0x00494750, zrwcolFilterRecord),
-                                excluded);
+        rwWorldIntersectObjects(gZrwWorld, (RpIntersection *)&volume,
+                                BMX_FNPTR(RpIntersectionCallBackAtomic, 0x00494750, zrwcolFilterRecord),
+                                (void *)excluded);
     }
     if (gZrwCol.found != 0) {
         out[0] = (uint32_t)(uintptr_t)gZrwCol.hits;

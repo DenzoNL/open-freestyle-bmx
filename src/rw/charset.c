@@ -22,13 +22,8 @@ ORIG_FN(0x004e3aa0, RwRGBA *, RwImageGetPalette, (const RwImage *image));
 ORIG_FN(0x004e7f70, RwRaster *, RwRasterSetFromImage, (RwRaster * raster, RwImage *image));
 /* The CRT's ceil (status skip). */
 ORIG_FN(0x004a552a, double, crtCeil, (double x));
-/*
- * RtCharsetPrint's worker (0x4cb860, not ported): EAX = charset, EDX = text, ECX = x, and the fourth word
- * of its stack arguments is y (it reads nothing else from the stack).
- */
-ORIG_FN_REGPARM(3, 0x004cb860, int, rtCharsetPrintText,
-                (RtCharset * charset, const char *text, int32_t x, int32_t unused0, int32_t unused1,
-                 int32_t unused2, int32_t y));
+ORIG_FN(0x004dcc30, int32_t, RwRasterGetWidth, (const RwRaster *raster));
+ORIG_FN(0x004dcc40, int32_t, RwRasterGetHeight, (const RwRaster *raster));
 
 typedef uint8_t RtCharsetGlyphs[91 * 14];
 /* One byte per glyph row, the low bit is the leftmost pixel. */
@@ -180,7 +175,147 @@ RtCharset *RtCharsetCreate(const RwRGBA *foreground, const RwRGBA *background)
     return charset;
 }
 
-/* Draws text at (x, y) into the current camera's raster (the work is done by the unported worker). */
+/* A 2D immediate mode vertex as the charset fills it. */
+typedef struct RtCharsetVertex {
+    float x, y, z, rhw;
+    uint32_t color;
+    uint32_t pad14;
+    float u, v;
+} RtCharsetVertex;
+
+_Static_assert(sizeof(RtCharsetVertex) == 0x20, "RtCharsetVertex layout");
+
+static void charsetCorner(RtCharsetVertex *vertex, int32_t x, int32_t y, int32_t u, int32_t v,
+                          double invWidth, double invHeight)
+{
+    vertex->x = (float)((double)x + 0.5);
+    vertex->y = (float)((double)y + 0.5);
+    vertex->u = (float)((double)u * invWidth);
+    vertex->v = (float)((double)v * invHeight);
+}
+
+/*
+ * RtCharsetPrint's worker: one textured quad per character (8 x 14 pixels from (x, y)), clipped to the
+ * current camera's raster, drawn as one indexed triangle list with texture filtering and the raster render
+ * states set and restored. EAX = charset, EDX = text, ECX = x, y is the fourth stack word. Always 0.
+ */
+BMX_ADDR(0x004cb860)
+__attribute__((regparm(3))) int rtCharsetPrintText(RtCharset *charset, const char *text, int32_t x,
+                                                   int32_t unused0, int32_t unused1, int32_t unused2,
+                                                   int32_t y)
+{
+    (void)unused0;
+    (void)unused1;
+    (void)unused2;
+    typedef int32_t(BMX_CDECL * StrlenFunc)(const char *s);
+    const int32_t length = ((StrlenFunc)RwEngineInstance->stringFuncs.rwstrlen)(text);
+    if (length == 0) {
+        return 0;
+    }
+    RwCamera *camera = RwCameraGetCurrentCamera();
+    if (camera == NULL) {
+        return 0;
+    }
+    const RwRaster *target = RwCameraGetRaster(camera);
+    if (target == NULL) {
+        return 0;
+    }
+    const int32_t screenHeight = RwRasterGetHeight(target);
+    const int32_t screenWidth = RwRasterGetWidth(target);
+    const int32_t fontHeight = RwRasterGetHeight(charset);
+    const int32_t fontWidth = RwRasterGetWidth(charset);
+    const double invHeight = (double)1.0f / fontHeight;
+    const double invWidth = (double)1.0f / fontWidth;
+    RtCharsetVertex *vertices = RwEngineInstance->memoryFuncs.rwmalloc((size_t)(length << 7));
+    uint16_t *indices = RwEngineInstance->memoryFuncs.rwmalloc((size_t)(length * 12));
+    if (vertices == NULL || indices == NULL) {
+        if (vertices != NULL) {
+            RwEngineInstance->memoryFuncs.rwfree(vertices);
+        }
+        if (indices != NULL) {
+            RwEngineInstance->memoryFuncs.rwfree(indices);
+        }
+        RwError error;
+        error.pluginID = 0x180;
+        error.errorCode = _rwerror(rwERR_NOMEM, (length << 7) + length * 12);
+        RwErrorSet(&error);
+        return 0;
+    }
+    RtCharsetDesc desc;
+    charsetLayout(&desc);
+    const int32_t perRow = desc.glyphsPerRow;
+    int32_t savedFilter;
+    int32_t savedAddress;
+    RwRenderStateGet(4, &savedFilter);
+    RwRenderStateGet(6, &savedAddress);
+    RwRenderStateSet(4, 0);
+    RwRenderStateSet(6, 0);
+    RwRenderStateSet(7, 1);
+    RwRenderStateSet(1, (int32_t)(uintptr_t)charset);
+    RwRenderStateSet(8, 5);
+    RwRenderStateSet(9, 6);
+    for (int32_t i = 0; i < length * 4; i++) {
+        vertices[i].rhw = 1.0f;
+        vertices[i].z = 1.0f;
+        vertices[i].color = 0xffffffffu;
+    }
+    uint32_t quads = 0;
+    for (int32_t i = 0; i < length; i++) {
+        int32_t left = x + i * 8;
+        int32_t right = left + 8;
+        int32_t top = y;
+        int32_t bottom = y + 14;
+        if (top >= screenHeight || bottom <= 0 || left >= screenWidth || right <= 0) {
+            continue;
+        }
+        const int32_t glyph = text[i] - 0x20;
+        const int32_t row = glyph / perRow;
+        int32_t u0 = (glyph - perRow * row) * 8;
+        int32_t u1 = u0 + 8;
+        int32_t v0 = row * 14;
+        int32_t v1 = v0 + 14;
+        if (top < 0) {
+            v0 -= top;
+            top = 0;
+        }
+        if (bottom > screenHeight - 1) {
+            bottom = screenHeight - 1;
+            v1 = bottom - top + v0;
+        }
+        if (left < 0) {
+            u0 -= left;
+            left = 0;
+        }
+        if (right > screenWidth - 1) {
+            right = screenWidth - 1;
+            u1 = right - left + u0;
+        }
+        RtCharsetVertex *quad = &vertices[quads * 4];
+        charsetCorner(&quad[0], left, top, u0, v0, invWidth, invHeight);
+        charsetCorner(&quad[1], left, bottom, u0, v1, invWidth, invHeight);
+        charsetCorner(&quad[2], right, bottom, u1, v1, invWidth, invHeight);
+        charsetCorner(&quad[3], right, top, u1, v0, invWidth, invHeight);
+        uint16_t *triangles = &indices[quads * 6];
+        const uint16_t first = (uint16_t)(quads * 4);
+        triangles[0] = first;
+        triangles[1] = (uint16_t)(first + 1);
+        triangles[2] = (uint16_t)(first + 2);
+        triangles[3] = first;
+        triangles[4] = (uint16_t)(first + 2);
+        triangles[5] = (uint16_t)(first + 3);
+        quads++;
+    }
+    if (quads != 0) {
+        RwIm2DRenderIndexedPrimitive(3, vertices, (int32_t)(quads * 4), indices, (int32_t)(quads * 6));
+    }
+    RwRenderStateSet(4, savedFilter);
+    RwRenderStateSet(6, savedAddress);
+    RwEngineInstance->memoryFuncs.rwfree(indices);
+    RwEngineInstance->memoryFuncs.rwfree(vertices);
+    return 0;
+}
+
+/* Draws text at (x, y) into the current camera's raster. */
 BMX_ADDR(0x004cbef0)
 int RtCharsetPrint(RtCharset *charset, const char *text, int32_t x, int32_t y)
 {
