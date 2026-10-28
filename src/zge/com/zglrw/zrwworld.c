@@ -3,6 +3,7 @@
 
 #include "compat/crt.h"
 #include "rw/rwcamera.h"
+#include "rw/rwclump.h"
 #include "rw/rwcore.h"
 #include "rw/rwlight.h"
 #include "rw/rwmath.h"
@@ -29,10 +30,7 @@ void zrwShowRaster(int vsync);
 void zrwDbgPrintDirect(const char *text, int x, int y);
 
 typedef void *(BMX_CDECL *ZrwForAllFn)(void *item, void *arg);
-ORIG_FN(0x004b4720, int, RpGeometryGetNumTriangles, (void *geometry));
-ORIG_FN(0x004b4550, int, RpGeometryGetNumVertices, (void *geometry));
 ORIG_FN(0x004bb080, void *, RpWorldCreate, (const float *bbox));
-ORIG_FN(0x004c3e60, void *, RpWorldStreamRead, (void *stream));
 ORIG_FN(0x00492eb0, uint8_t *, zrwGetCurrentCamera, (void));
 ORIG_FN(0x00492f00, int, zrwcamBegin, (void *camera));
 ORIG_FN(0x00492fe0, int, zrwcamEnd, (void));

@@ -370,12 +370,12 @@ static RpWorldSector *mkLeaf(int32_t type)
     RpWorldSector *s = dt_alloc(kSectorBytes);
     s->type = type;
     s->repEntry = dt_u32() % 2 == 0 ? NULL : (RwResEntry *)dt_alloc(0x18);
-    void **blocks[] = {(void **)&s->vertices, &s->normals,           &s->preLitLum,
-                       &s->texCoords,         (void **)&s->polygons, (void **)&s->colSectorRoot};
+    void **blocks[] = {(void **)&s->vertices,  (void **)&s->normals,  (void **)&s->preLitLum,
+                       (void **)&s->texCoords, (void **)&s->polygons, (void **)&s->colSectorRoot};
     for (int i = 0; i < 6; i++) {
         *blocks[i] = dt_u32() % 3 == 0 ? NULL : dt_alloc(8);
     }
-    s->pvsData = dt_u32() % 2 == 0 ? NULL : dt_alloc(8);
+    s->mesh = dt_u32() % 2 == 0 ? NULL : dt_alloc(8);
     listInit(&s->collAtomicsInWorldSector);
     listInit(&s->noCollAtomicsInWorldSector);
     listInit(&s->lightsInWorldSector);

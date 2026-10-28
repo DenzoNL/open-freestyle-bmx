@@ -7,11 +7,7 @@
  */
 #include "rw/rwworld.h"
 
-/* Callees in other RenderWare groups, still original code. */
-ORIG_FN(0x004baf20, RpWorld *, RpWorldSetRenderCallBack,
-        (RpWorld * world, RpWorldSectorCallBackRender callback));
-ORIG_FN(0x004c4870, int, rpPVSSectorDataDestroy, (void *data));
-ORIG_FN(0x004c5640, int, _rpMaterialListDeinitialize, (RpMaterialList * list));
+#include "rw/rwclump.h"
 
 /*
  * The line and ray walks of the BSP (the same intersection structure is passed twice: in EDX and again on
@@ -560,10 +556,10 @@ __attribute__((regparm(1))) void rpSectorTreeDestroy(RpSector *sector)
         sectorLeafDeinit(leaf);
         sectorFreeBlock((void *)&leaf->vertices);
         sectorFreeBlock((void *)&leaf->normals);
-        sectorFreeBlock((void *)&leaf->texCoords);
+        sectorFreeBlock((void *)&leaf->preLitLum);
         sectorFreeBlock((void *)&leaf->polygons);
         sectorFreeBlock((void *)&leaf->colSectorRoot);
-        sectorFreeBlock((void *)&leaf->preLitLum);
+        sectorFreeBlock((void *)&leaf->texCoords);
     } else if (sector->type != -2) {
         RpPlaneSector *plane = (RpPlaneSector *)sector;
         rpSectorTreeDestroy(plane->leftSubTree);
@@ -576,7 +572,7 @@ __attribute__((regparm(1))) void rpSectorTreeDestroy(RpSector *sector)
 
 /*
  * Destroys the world (RpWorldDestroy at 0x4ba9c0 loads its argument into EAX and falls into this): leaves the
- * engine's list of worlds, drops the PVS data of every sector, the material list and the sectors (unless
+ * engine's list of worlds, drops the mesh header of every sector, the material list and the sectors (unless
  * private flag 1 says they belong to someone else; then only their ties and plugin data go), then the world.
  * The original is only entered by its caller at 0x4bb080 and by that stub, so only this entry is hooked.
  */
@@ -608,9 +604,9 @@ __attribute__((regparm(1))) int rpWorldDestroyBody(RpWorld *world)
     do {
         if (node->type < 0) {
             RpWorldSector *leaf = (RpWorldSector *)node;
-            if (leaf->pvsData != NULL) {
-                rpPVSSectorDataDestroy(leaf->pvsData);
-                leaf->pvsData = NULL;
+            if (leaf->mesh != NULL) {
+                _rpMeshHeaderDestroy(leaf->mesh);
+                leaf->mesh = NULL;
             }
             node = stack[top--];
         } else {

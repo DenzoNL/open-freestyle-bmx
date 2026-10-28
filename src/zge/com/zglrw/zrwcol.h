@@ -11,6 +11,7 @@
 
 #include "compat/orig.h"
 #include "rw/rwcamera.h"
+#include "rw/rwclump.h"
 #include "rw/rwcollision.h"
 #include "rw/rwmath.h"
 #include "rw/rwworld.h"
@@ -156,10 +157,5 @@ int zrwcolQueryLine(float *from, float *to, uint32_t flags, const int *excluded,
  * the hit was not on the world. Sorts the hit's corners by z in place.
  */
 uint8_t *zrwcolHitColor(ZrwColLineHit *hit);
-
-/* RenderWare: matrices and points of frames, materials (the intersection enumerators are in
- * rw/rwcollision.h). */
-ORIG_FN(0x004b46b0, uint8_t *, rwModelGetMaterialTable, (void *model));
-ORIG_FN(0x004b47a0, void *, rwModelGetMaterial, (void *model, uint32_t index));
 
 #endif

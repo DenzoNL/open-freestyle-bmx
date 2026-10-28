@@ -39,6 +39,21 @@ typedef struct RpPolygon {
     uint8_t vertIndex[3];
 } RpPolygon;
 
+/* A texture coordinate pair (sets of them are stored back to back per vertex). */
+typedef struct RwTexCoords {
+    float u;
+    float v;
+} RwTexCoords;
+
+/* Ambient, specular and diffuse reflection factors of a world, geometry or material. */
+typedef struct RwSurfaceProperties {
+    float ambient;
+    float specular;
+    float diffuse;
+} RwSurfaceProperties;
+
+struct RpMeshHeader; /* rw/rwclump.h */
+
 /*
  * World sector (a BSP leaf). colSectorRoot is the polygon split tree of the collision code: nodes of three
  * bytes (flags/count, split vertex, first polygon), node n has the children 2n and 2n + 1, node 1 is the
@@ -46,30 +61,34 @@ typedef struct RpPolygon {
  */
 typedef struct RpWorldSector {
     int32_t type;                        /* 0x00 negative */
-    int16_t matListWindowBase;           /* 0x04 */
+    uint16_t matListWindowBase;          /* 0x04 first world material the polygons index */
     uint16_t numVertices;                /* 0x06 */
     uint16_t numPolygons;                /* 0x08 */
-    uint8_t pad0a[2];                    /* 0x0a */
+    uint8_t stamp;                       /* 0x0a */
+    uint8_t pad0b;                       /* 0x0b */
     RpPolygon *polygons;                 /* 0x0c */
     RwV3d *vertices;                     /* 0x10 */
-    void *normals;                       /* 0x14 */
-    void *preLitLum;                     /* 0x18 */
-    void *texCoords;                     /* 0x1c */
+    uint32_t *normals;                   /* 0x14 packed, four bytes each */
+    RwTexCoords *texCoords;              /* 0x18 */
+    uint32_t *preLitLum;                 /* 0x1c */
     RwResEntry *repEntry;                /* 0x20 cached render data */
     RwLLLink collAtomicsInWorldSector;   /* 0x24 RpTie links of the atomics touching the sector */
     RwLLLink noCollAtomicsInWorldSector; /* 0x2c */
     RwLLLink lightsInWorldSector;        /* 0x34 RpLightTie links */
-    uint8_t pad3c[0x18];                 /* 0x3c */
+    RwBBox boundingBox;                  /* 0x3c */
     const uint8_t *colSectorRoot;        /* 0x54 NULL: no polygons to test */
-    void *pvsData;                       /* 0x58 the PVS plugin's data of the sector */
+    struct RpMeshHeader *mesh;           /* 0x58 render mesh built from the polygons */
 } RpWorldSector;
 
 _Static_assert(offsetof(RpWorldSector, polygons) == 0x0c, "RpWorldSector layout");
+_Static_assert(offsetof(RpWorldSector, texCoords) == 0x18, "RpWorldSector layout");
+_Static_assert(offsetof(RpWorldSector, preLitLum) == 0x1c, "RpWorldSector layout");
 _Static_assert(offsetof(RpWorldSector, repEntry) == 0x20, "RpWorldSector layout");
+_Static_assert(offsetof(RpWorldSector, boundingBox) == 0x3c, "RpWorldSector layout");
 _Static_assert(offsetof(RpWorldSector, collAtomicsInWorldSector) == 0x24, "RpWorldSector layout");
 _Static_assert(offsetof(RpWorldSector, lightsInWorldSector) == 0x34, "RpWorldSector layout");
 _Static_assert(offsetof(RpWorldSector, colSectorRoot) == 0x54, "RpWorldSector layout");
-_Static_assert(offsetof(RpWorldSector, pvsData) == 0x58, "RpWorldSector layout");
+_Static_assert(offsetof(RpWorldSector, mesh) == 0x58, "RpWorldSector layout");
 
 /* Links an atomic and a world sector it touches (in both of their lists). */
 typedef struct RpTie {
@@ -90,15 +109,21 @@ typedef struct RpLightTie {
 _Static_assert(sizeof(RpTie) == 0x18, "RpTie layout");
 _Static_assert(sizeof(RpLightTie) == 0x18, "RpLightTie layout");
 
+/* RpMaterial: texture, colour, reference count, a change stamp and the surface properties. */
 typedef struct RpMaterial {
-    RwTexture *texture; /* 0x00 */
-    RwRGBA color;       /* 0x04 */
-    uint8_t pad08[2];   /* 0x08 */
-    uint8_t stamp;      /* 0x0a bumped by every setter (1 for the colour, 2 for the texture) */
+    RwTexture *texture;               /* 0x00 */
+    RwRGBA color;                     /* 0x04 */
+    uint16_t refCount;                /* 0x08 */
+    uint8_t stamp;                    /* 0x0a bumped by every setter (1 for the colour, 2 for the texture) */
+    uint8_t pad0b;                    /* 0x0b */
+    RwSurfaceProperties surfaceProps; /* 0x0c */
 } RpMaterial;
 
+_Static_assert(offsetof(RpMaterial, refCount) == 0x08, "RpMaterial layout");
 _Static_assert(offsetof(RpMaterial, stamp) == 0x0a, "RpMaterial layout");
+_Static_assert(sizeof(RpMaterial) == 0x18, "RpMaterial layout");
 
+/* The materials of a geometry or world: a growable array (space 5 at a time). */
 typedef struct RpMaterialList {
     RpMaterial **materials; /* 0x00 */
     int32_t numMaterials;   /* 0x04 */
@@ -109,18 +134,18 @@ typedef struct RpMaterialList {
 typedef void *(BMX_CDECL *RpWorldSectorCallBackRender)(RpWorldSector *sector);
 
 typedef struct RpWorld {
-    RwObject object;               /* 0x00 privateFlags bit 0: the sectors belong to someone else */
-    uint32_t flags;                /* 0x08 */
-    RpMaterialList matList;        /* 0x0c */
-    RpSector *rootSector;          /* 0x18 */
-    int32_t numClumpsInWorld;      /* 0x1c */
-    RwLLLink *currentClumpLink;    /* 0x20 the next clump a for-all walk would visit */
-    RwLLLink clumpList;            /* 0x24 clumps, linked at RpClump + 0x14 */
-    RwLLLink lightList;            /* 0x2c local lights (point, spot), linked at RpLight.inWorld */
-    RwLLLink directionalLightList; /* 0x34 ambient and directional lights */
-    RwV3d worldOrigin;             /* 0x3c */
-    RwBBox boundingBox;            /* 0x48 */
-    uint8_t pad60[0xc];            /* 0x60 */
+    RwObject object;                  /* 0x00 privateFlags bit 0: the sectors belong to someone else */
+    uint32_t flags;                   /* 0x08 set by RpWorldSetKind (the stream reader sets 2) */
+    RpMaterialList matList;           /* 0x0c */
+    RpSector *rootSector;             /* 0x18 */
+    int32_t numClumpsInWorld;         /* 0x1c */
+    RwLLLink *currentClumpLink;       /* 0x20 the next clump a for-all walk would visit */
+    RwLLLink clumpList;               /* 0x24 clumps, linked at RpClump + 0x14 */
+    RwLLLink lightList;               /* 0x2c local lights (point, spot), linked at RpLight.inWorld */
+    RwLLLink directionalLightList;    /* 0x34 ambient and directional lights */
+    RwV3d worldOrigin;                /* 0x3c */
+    RwBBox boundingBox;               /* 0x48 */
+    RwSurfaceProperties surfaceProps; /* 0x60 */
     RpWorldSectorCallBackRender renderCallBack; /* 0x6c */
     uint8_t stamp;                              /* 0x70 incremented when the world is destroyed */
 } RpWorld;
@@ -129,7 +154,9 @@ _Static_assert(offsetof(RpWorld, matList) == 0x0c, "RpWorld layout");
 _Static_assert(offsetof(RpWorld, rootSector) == 0x18, "RpWorld layout");
 _Static_assert(offsetof(RpWorld, clumpList) == 0x24, "RpWorld layout");
 _Static_assert(offsetof(RpWorld, directionalLightList) == 0x34, "RpWorld layout");
+_Static_assert(offsetof(RpWorld, worldOrigin) == 0x3c, "RpWorld layout");
 _Static_assert(offsetof(RpWorld, boundingBox) == 0x48, "RpWorld layout");
+_Static_assert(offsetof(RpWorld, surfaceProps) == 0x60, "RpWorld layout");
 _Static_assert(offsetof(RpWorld, renderCallBack) == 0x6c, "RpWorld layout");
 _Static_assert(offsetof(RpWorld, stamp) == 0x70, "RpWorld layout");
 
@@ -153,7 +180,7 @@ typedef struct RpTieGlobals {
 /* An entry of the engine's list of worlds, with the world it stands for. */
 typedef struct RpWorldListEntry {
     RpWorld *world; /* 0x00 */
-    int32_t pad04;  /* 0x04 */
+    uint32_t size;  /* 0x04 bytes of the world's block (rpWorldRegister) */
     RwLLLink link;  /* 0x08 in RpWorldGlobals.worlds */
 } RpWorldListEntry;
 

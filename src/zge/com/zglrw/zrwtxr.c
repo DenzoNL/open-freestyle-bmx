@@ -5,6 +5,7 @@
 
 #include "compat/crt.h"
 #include "rw/rwcamera.h"
+#include "rw/rwclump.h"
 #include "rw/rwcore.h"
 #include "rw/rwmath.h"
 #include "rw/rwplugins.h"
@@ -26,7 +27,6 @@ static const char kZrwTxrFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwTxr.c";
 /* The image writers registered next to the readers, and worlds (RpWorld) with their PVS. */
 ORIG_FN(0x004e7eb0, int, rwBmpImageWrite, (void));
 ORIG_FN(0x004bb080, void *, RpWorldCreate, (const float *bbox));
-ORIG_FN(0x004c3ae0, int, rwWorldPvsRead, (void *world, void *stream));
 
 /* Other modules: the camera (pcinput.c), the world callbacks, the RAM disk file hook (zprofile.c), materials.
  */
@@ -209,7 +209,7 @@ int zrwWorldLoadPvs(void)
     if (stream == NULL) {
         return 0;
     }
-    ok = rwWorldPvsRead(gZrwWorld, stream);
+    ok = RpWorldStreamWrite(gZrwWorld, stream) != NULL;
     RwStreamClose(stream, NULL);
     return ok != 0;
 }

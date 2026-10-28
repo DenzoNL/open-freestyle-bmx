@@ -105,6 +105,12 @@ closure, and two callbacks the game passes by address (`rwBmpImageWrite` 0x4e7eb
 `rwWorldPvsDefaultCallback` 0x4cd510) are not Ghidra functions, so they have no bundle or CSV row yet
 (create the functions in Ghidra and re-export to add them).
 
+## Known issues
+
+- `rpBspStreamRead` (0x4c36a0): the port diverges from the original for BSP trees with nested plane
+  sectors (real levels have them). It is disabled (`#if 0` in `src/rw/clump.c`, no `BMX_ADDR`), and
+  `RpWorldStreamRead` calls the original through the `ORIG_FN_REGPARM` in `src/rw/rwclump.h`.
+
 ## Next
 
 1. Port engine core + memory + plugins (the first traps in `bmxnative.exe`), oracle-tested like the game.

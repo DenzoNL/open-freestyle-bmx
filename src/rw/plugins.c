@@ -5,14 +5,10 @@
 #include "rw/rwplugins.h"
 
 #include "compat/crt.h"
+#include "rw/rwclump.h"
 #include "rw/rwmath.h"
 
 /* Callees in other RenderWare groups (clump), still original code. */
-ORIG_FN(0x004b43e0, RpMorphTarget *, RpGeometryGetMorphTarget, (void *geometry, int32_t index));
-ORIG_FN(0x004b4550, int32_t, RpGeometryGetNumVertices, (const void *geometry));
-ORIG_FN(0x004b45d0, ZVec3 *, RpMorphTargetGetVertices, (const RpMorphTarget *morphTarget));
-ORIG_FN(0x004b4f20, void *, RpGeometryLock, (void *geometry, int32_t lockMode));
-ORIG_FN(0x004b4fd0, void *, RpGeometryUnlock, (void *geometry));
 
 /* The error record the RpWorld module (plugin id 2) reports. */
 static void rpReportError(int32_t code)

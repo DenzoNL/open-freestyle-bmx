@@ -1,13 +1,9 @@
 /* Direct access to a model's geometry (see zrwmodelgeom.h). */
 #include "zge/com/zglrw/zrwmodelgeom.h"
 
+#include "rw/rwclump.h"
 #include "zge/zdebug.h"
 #include "zge/zstring.h"
-
-ORIG_FN(0x004b43e0, void *, RpGeometryGetMorphTarget, (void *geometry, int index));
-ORIG_FN(0x004b4f20, int, RpGeometryLock, (void *geometry, int lockMode));
-ORIG_FN(0x004b45d0, float *, RpMorphTargetGetVertices, (void *morphTarget));
-ORIG_FN(0x004b4fd0, int, RpGeometryUnlock, (void *geometry));
 
 static const char kZrwModelGeomFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwModelGeom.c";
 
@@ -44,7 +40,7 @@ int zrwModelLockGeometry(ZrwModel *model, uint8_t flags)
                        kZrwModelGeomFile, 0xba, 0);
             return 0;
         }
-        model->def->vertices = RpMorphTargetGetVertices(target);
+        model->def->vertices = (float *)RpMorphTargetGetVertices(target);
         model->flags |= 4;
     }
     return 1;

@@ -95,7 +95,20 @@ void rwFrameSyncHierarchyLTM(RwFrame *root);
 RwFrameList *_rwFrameListStreamRead(void *stream, RwFrameList *frameList);
 RwFrameList *_rwFrameListDeinitialize(RwFrameList *frameList);
 
-/* TODO(rw/clump.c): belongs to the clump module. */
+/* In rw/clump.c: bounding boxes, matrix error measures (returned on the x87 stack), frame clones. */
+void rwBBoxInitialize(RwBBox *bbox, const ZVec3 *point);
+RwBBox *rwBBoxAddPoint(RwBBox *bbox, const ZVec3 *point);
+double rwMatrixDeterminant(const RwMatrix *matrix);
+double rwMatrixNormalError(const RwMatrix *matrix);
+double rwMatrixOrthogonalError(const RwMatrix *matrix);
+/* Destroys a frame and, recursively, everything below it (EAX = frame). */
+__attribute__((regparm(1))) void rwFrameDestroyRecursive(RwFrame *frame);
+__attribute__((regparm(2))) RwFrame *rwFrameCloneRecursive(RwFrame *frame, RwFrame *root);
+RwFrame *RwFrameCloneHierarchy(RwFrame *frame);
+void rwFrameResetRoot(RwFrame *frame);
+RwFrame *RwFrameAddChild(RwFrame *parent, RwFrame *child);
+
+/* In rw/clump.c (also declared in rwclump.h). */
 RpClump *RpClumpForAllAtomics(RpClump *clump, RwObjectCallBack callback, void *data);
 
 #endif

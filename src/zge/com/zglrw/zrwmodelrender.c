@@ -5,6 +5,7 @@
 
 #include "compat/crt.h"
 #include "rw/rwcamera.h"
+#include "rw/rwclump.h"
 #include "rw/rwcore.h"
 #include "rw/rwim.h"
 #include "rw/rwmath.h"
@@ -21,14 +22,6 @@ static const char kZrwModelRenderFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwMod
 /* RenderWare library calls (statically linked in the exe, not ported). */
 typedef void *(BMX_CDECL *RwFrameCallback)(void *frame, void *data);
 typedef void *(BMX_CDECL *RpAtomicCallback)(void *atomic, void *data);
-ORIG_FN(0x004b1940, void *, RpClumpRender, (void *clump));
-ORIG_FN(0x004b4550, int, RpGeometryGetNumVertices, (void *geometry));
-ORIG_FN(0x004b43e0, void *, RpGeometryGetMorphTarget, (void *geometry, int index));
-ORIG_FN(0x004b45d0, const float *, RpMorphTargetGetVertices, (void *morphTarget));
-ORIG_FN(0x004b46b0, const int16_t *, RpGeometryGetTriangles, (void *geometry));
-ORIG_FN(0x004b44e0, const uint32_t *, RpGeometryGetTexCoords, (void *geometry));
-ORIG_FN(0x004b4720, int, RpGeometryGetNumTriangles, (void *geometry));
-ORIG_FN(0x004b47a0, void *, RpGeometryGetMaterial, (void *geometry, int index));
 
 /* Hooks into the renderer (function pointers in the exe's data). */
 typedef void(BMX_CDECL *ZrwRenderStateHookFn)(uint32_t flags, const void *raster);
@@ -523,9 +516,9 @@ void *zrwModelRenderAtomic(void *atomic)
     ZMatrix *const frame = RwFrameGetLTM(*(void **)((uint8_t *)atomic + 4));
     void *const geometry = *(void **)((uint8_t *)atomic + 0x1c);
     const int vertexCount = RpGeometryGetNumVertices(geometry);
-    const float *vertices = RpMorphTargetGetVertices(RpGeometryGetMorphTarget(geometry, 0));
-    const int16_t *triangle = RpGeometryGetTriangles(geometry);
-    const uint32_t *texCoords = RpGeometryGetTexCoords(geometry);
+    const float *vertices = (const float *)RpMorphTargetGetVertices(RpGeometryGetMorphTarget(geometry, 0));
+    const int16_t *triangle = (const int16_t *)RpGeometryGetTriangles(geometry);
+    const uint32_t *texCoords = (const uint32_t *)RpGeometryGetTexCoords(geometry);
     const int triangleCount = RpGeometryGetNumTriangles(geometry);
     void *const raster = RwCameraGetRaster(gZrwCamera);
     float farPlane;

@@ -196,10 +196,10 @@ ZrwColTriangle *zrwcolRecordHit(void *arg, const ZrwColSector *sector, ZrwColTri
         hit->objectData = zrwMdlGetUserData(object);
         {
             void *model = object->model;
-            const uint8_t *table = rwModelGetMaterialTable(model);
+            const uint8_t *table = (const uint8_t *)RpGeometryGetTriangles(model);
 
             hit->materialData = materialData(
-                rwModelGetMaterial(model, *(const uint16_t *)(table + (uint32_t)triangle->index * 8 + 6)));
+                RpGeometryGetMaterial(model, *(const uint16_t *)(table + (uint32_t)triangle->index * 8 + 6)));
         }
     }
     return triangle;
@@ -272,8 +272,9 @@ int zrwcolQueryLine(float *from, float *to, uint32_t flags, const int *excluded,
         out->hit.normal[0] = moved[0];
         out->hit.objectData = zrwMdlGetUserData(object);
         model = object->model;
-        out->hit.materialData = materialData(rwModelGetMaterial(
-            model, *(const uint16_t *)(rwModelGetMaterialTable(model) + (uint32_t)best->index * 8 + 6)));
+        out->hit.materialData = materialData(
+            RpGeometryGetMaterial(model, *(const uint16_t *)((const uint8_t *)RpGeometryGetTriangles(model) +
+                                                             (uint32_t)best->index * 8 + 6)));
     } else if (gZrwCol.bestSub != 0) {
         const ZrwColSector *sector = (const ZrwColSector *)(uintptr_t)gZrwCol.bestSub;
 

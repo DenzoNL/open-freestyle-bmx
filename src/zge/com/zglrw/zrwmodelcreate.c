@@ -5,6 +5,7 @@
 
 #include "compat/crt.h"
 #include "rw/rwcamera.h"
+#include "rw/rwclump.h"
 #include "rw/rwcore.h"
 #include "rw/rwmath.h"
 #include "rw/rwplugins.h"
@@ -41,17 +42,8 @@ typedef float ZrwLodTable[4];
 typedef void *(BMX_CDECL *RwFrameCallback)(void *frame, void *data);
 typedef void *(BMX_CDECL *RpAtomicCallback)(void *atomic, void *data);
 
-ORIG_FN(0x004b1440, int, RpClumpGetNumAtomics, (void *clump));
-ORIG_FN(0x004b1ee0, void *, RpClumpClone, (void *clump));
-ORIG_FN(0x004b21e0, int, RpClumpDestroy, (void *clump));
-ORIG_FN(0x004b2790, void *, RpClumpStreamRead, (void *stream));
-ORIG_FN(0x004b4720, int, RpGeometryGetNumTriangles, (void *geometry));
 /* The same function called with a stray second argument (see zrwAtomicCountGeometry). */
 ORIG_FN(0x004b4720, int, RpGeometryGetNumTrianglesWithArg, (void *geometry, int vertices));
-ORIG_FN(0x004b4550, int, RpGeometryGetNumVertices, (void *geometry));
-ORIG_FN(0x004b4ce0, int, RpGeometryGetNumMaterials, (void *geometry));
-ORIG_FN(0x004b47a0, void *, RpGeometryGetMaterial, (void *geometry, int index));
-ORIG_FN(0x004b6140, uint32_t, RpGeometryGetFlags, (void *geometry));
 
 /* The RenderWare memory interface: allocation at +0, free at +4. */
 typedef void *(BMX_CDECL *RwAllocFn)(uint32_t size);

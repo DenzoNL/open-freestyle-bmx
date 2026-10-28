@@ -10,7 +10,7 @@
 #ifndef RW_RWCOLLISION_H
 #define RW_RWCOLLISION_H
 
-#include "rw/rwworld.h"
+#include "rw/rwclump.h"
 
 /* RwLine, RpIntersectType and RpIntersection live in rwworld.h (the BSP walks use them too). */
 

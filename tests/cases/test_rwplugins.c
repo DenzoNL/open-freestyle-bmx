@@ -447,7 +447,7 @@ static void skin_world(DtCtx *c, int update)
     gSkin.atomic->object.object.parent = dt_alloc(0xa0);
     dt_fill(gSkin.atomic->object.object.parent, 0xa0);
     gSkin.geometry = dt_alloc(0x100);
-    gSkin.atomic->geometry = gSkin.geometry;
+    gSkin.atomic->geometry = (RpGeometry *)gSkin.geometry;
     gSkin.numVertices = dt_range(0, 12);
     gSkin.verts = dt_u32() % 8 == 0 ? NULL : dt_alloc(12u * 16u);
     gSkin.normals = dt_u32() % 3 == 0 ? NULL : dt_alloc(12u * 16u);

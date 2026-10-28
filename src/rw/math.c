@@ -9,14 +9,6 @@ ORIG_FN(0x004e2dc0, void *, RwMemNative32, (void *mem, int32_t size));
 ORIG_FN(0x004e2e00, void *, RwMemFloat32ToReal, (void *mem, int32_t size));
 ORIG_FN(0x004e2ec0, int, RwStreamFindChunk,
         (void *stream, uint32_t type, uint32_t *length, uint32_t *version));
-/* Error measures of a matrix (they return on the x87 stack): the rows' length, their skew, the determinant.
- */
-ORIG_FN(0x004d2190, double, rwMatrixNormalError, (const RwMatrix *matrix));
-ORIG_FN(0x004d2210, double, rwMatrixOrthogonalError, (const RwMatrix *matrix));
-ORIG_FN(0x004d0470, double, rwMatrixDeterminant, (const RwMatrix *matrix));
-ORIG_FN(0x004d2b50, RwFrame *, RwFrameAddChild, (RwFrame * parent, RwFrame *child));
-/* Destroys a frame and, recursively, everything below it (EAX = frame). */
-ORIG_FN_REGPARM(1, 0x004d2530, void, rwFrameDestroyRecursive, (RwFrame * frame));
 
 enum {
     rwERR_NOPARENT = 0x11,
@@ -803,21 +795,4 @@ RwFrameList *_rwFrameListDeinitialize(RwFrameList *frameList)
         RwEngineInstance->memoryFuncs.rwfree((void *)frameList->frames);
     }
     return frameList;
-}
-
-/* ---- clump (misassigned: belongs to rw/clump.c) ------------------------------------------------------- */
-
-/* Calls callback for every atomic of the clump until it returns NULL (the next link is read first). */
-BMX_ADDR(0x004b1990)
-RpClump *RpClumpForAllAtomics(RpClump *clump, RwObjectCallBack callback, void *data)
-{
-    RwLLLink *link = clump->atomicList.next;
-    while (link != &clump->atomicList) {
-        RpAtomic *atomic = (RpAtomic *)((uint8_t *)link - offsetof(RpAtomic, inClumpLink));
-        link = link->next;
-        if (callback(atomic, data) == NULL) {
-            break;
-        }
-    }
-    return clump;
 }
