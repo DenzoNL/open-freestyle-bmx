@@ -25,7 +25,7 @@ static const char kZrwTxrFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwTxr.c";
 
 /* RenderWare library calls (statically linked in the exe, not ported). */
 /* The image writers registered next to the readers, and worlds (RpWorld) with their PVS. */
-ORIG_FN(0x004e7eb0, int, rwBmpImageWrite, (void));
+ORIG_FN(0x004e7eb0, int, rwBmpImageWrite, (void *image, void *name));
 ORIG_FN(0x004bb080, void *, RpWorldCreate, (const float *bbox));
 
 /* Other modules: the camera (pcinput.c), the world callbacks, the RAM disk file hook (zprofile.c), materials.
@@ -34,7 +34,7 @@ ORIG_FN(0x00492eb0, uint8_t *, zrwGetCurrentCamera, (void));
 ORIG_FN(0x00493060, void *, zrwCameraGetRwCamera, (const uint8_t *camera));
 /* The world's PVS progress callback (ported in zrwworld.c); only its address is used here. */
 ORIG_FN(0x00496620, int, zrwWorldPvsCallback, (int stage, float progress));
-ORIG_FN(0x004cd510, void, rwWorldPvsDefaultCallback, (void));
+ORIG_FN(0x004cd510, int, rwWorldPvsDefaultCallback, (int stage, float progress));
 ORIG_FN(0x00489ba0, void, zrwmatTextureLoadBegin, (void));
 ORIG_FN(0x00489be0, void, zrwmatTextureLoaded, (ZrwTexture * texture));
 

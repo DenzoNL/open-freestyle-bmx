@@ -16,9 +16,9 @@
 
 /* The per-object data of the clump/atomic module (engine plugin data): the two free lists. */
 typedef struct RpClumpGlobals {
-    uint32_t pad0;
-    RwFreeList *atomicFreeList; /* 0x04 */
-    RwFreeList *clumpFreeList;  /* 0x08 */
+    struct RwIm3DPipeline *pipeline; /* 0x00 the render pipeline of atomics */
+    RwFreeList *atomicFreeList;      /* 0x04 */
+    RwFreeList *clumpFreeList;       /* 0x08 */
 } RpClumpGlobals;
 
 #define rpClumpModuleOffset ORIG_VAR(0x00676710, int32_t, rpClumpModuleOffset)
@@ -109,6 +109,23 @@ RpAtomic *rwClumpCloneAtomic(RpAtomic *atomic, RwClumpCloneData *data);
 RpClump *RpClumpClone(RpClump *source);
 RpAtomic *rwClumpDestroyAtomic(RpAtomic *atomic, void *data);
 int RpClumpDestroy(RpClump *clump);
+int rpWorldExtAttachNothing(void);
+__attribute__((regparm(1))) int rpRasterFormatHasAlpha(uint32_t format);
+int rpMeshCompareMaterials(const RpMesh *const *a, const RpMesh *const *b);
+int rpWorldPipelineInit(struct RwIm3DPipeline *pipeline);
+int rpAtomicPipelineInit(struct RwIm3DPipeline *pipeline);
+RpAtomic *RpAtomicSetGeometry(RpAtomic *atomic, RpGeometry *geometry, uint32_t flags);
+__attribute__((regparm(1))) void rpAtomicUpdateBoundingSphere(RpAtomic *atomic);
+RpAtomic *rpAtomicSyncCallback(RpAtomic *atomic);
+RpAtomic *rpAtomicRenderCallback(RpAtomic *atomic);
+void rpAtomicFreeListDestroyCB(void *atomic, void *data);
+void *rpClumpDefaultCallback(void *clump);
+void *_rpClumpClose(void *engine);
+void *_rpGeometryOpen(void *engine, int32_t offset);
+void rpGeometryFreeListDestroyCB(void *geometry, void *data);
+void *_rpGeometryClose(void *engine);
+void *_rpMeshOpen(void *engine, int32_t offset);
+void *_rpMeshClose(void *engine);
 __attribute__((regparm(2))) void RpClumpAddAtomic(RpClump *clump, RpAtomic *atomic);
 RpClump *RpClumpStreamRead(RwStream *stream);
 __attribute__((regparm(2))) RpAtomic *RpAtomicStreamRead(RwStream *stream, RwFrameList *frameList);

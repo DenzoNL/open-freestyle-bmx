@@ -95,6 +95,22 @@ void rwFrameSyncHierarchyLTM(RwFrame *root);
 RwFrameList *_rwFrameListStreamRead(void *stream, RwFrameList *frameList);
 RwFrameList *_rwFrameListDeinitialize(RwFrameList *frameList);
 
+/* Module open/close routines (rw/math.c) and the engine's default transforms. */
+void *_rwFrameOpen(void *engine, int32_t offset);
+void *_rwFrameClose(void *engine);
+void rwMatrixMultiplyDefault(RwMatrix *out, const RwMatrix *a, const RwMatrix *b);
+RwV3d *rwV3dTransformPointsDefault(RwV3d *out, const RwV3d *in, int32_t count, const RwMatrix *matrix);
+RwV3d *rwV3dTransformVectorsDefault(RwV3d *out, const RwV3d *in, int32_t count, const RwMatrix *matrix);
+/* Installs the point and vector transforms (EAX, EDX; NULL = the defaults). */
+__attribute__((regparm(2))) int rwV3dSetTransformFuncs(RwV3dTransformFunc points, RwV3dTransformFunc vectors);
+void rwV3dFreeSqrtTable(void);
+void rwV3dFreeInvSqrtTable(void);
+void *rwVectorOpen(void *engine, int32_t offset);
+void *rwVectorClose(void *engine);
+/* Stores a frame hierarchy into an array (EAX = cursor, EDX = frame) and builds the frame list of a clump. */
+__attribute__((regparm(2))) int rwFrameListFill(RwFrame ***cursor, RwFrame *frame);
+RwFrameList *_rwFrameListInitialize(RwFrameList *frameList, RwFrame *root);
+
 /* In rw/clump.c: bounding boxes, matrix error measures (returned on the x87 stack), frame clones. */
 void rwBBoxInitialize(RwBBox *bbox, const ZVec3 *point);
 RwBBox *rwBBoxAddPoint(RwBBox *bbox, const ZVec3 *point);

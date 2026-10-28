@@ -318,3 +318,19 @@ __attribute__((naked)) void rwPvsCameraCreate(void)
                      "addl $20, %esp\n\t"
                      "ret");
 }
+
+#define rwCameraModuleCount ORIG_VAR(0x00676d14, int32_t, rwCameraModuleCount)
+
+/* Camera module: the free list of cameras (the registry's size, entries 4 aligned). NULL when it fails. */
+BMX_ADDR(0x004dd430)
+void *_rwCameraOpen(void *engine, int32_t offset)
+{
+    rwCameraOffset = offset;
+    *(RwFreeList **)((uint8_t *)RwEngineInstance + offset) =
+        RwFreeListCreate(rwCameraRegistry.sizeOfStruct, 4, 4);
+    if (rwCameraFreeList() == NULL) {
+        return NULL;
+    }
+    rwCameraModuleCount++;
+    return engine;
+}

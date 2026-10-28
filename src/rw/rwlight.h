@@ -12,7 +12,7 @@ enum { rpLIGHTLIGHTATOMICS = 1, rpLIGHTLIGHTWORLD = 2 };
 /* An RpLight (a lamp of the world); `stamp` is incremented by every setter. */
 typedef struct RpLight {
     RwObjectHasFrame object; /* 0x00 type 3, subType = light type, parent = frame, sync at 0x10 */
-    uint8_t pad14[4];        /* 0x14 */
+    void *worldExtCallback;  /* 0x14 the lighting routine of its type (rpWorldExtLightSelectCallback) */
     float radius;            /* 0x18 */
     float color[4];          /* 0x1c red, green, blue, alpha */
     float coneAngle;         /* 0x2c tan of the angle */
@@ -30,6 +30,24 @@ _Static_assert(offsetof(RpLight, stamp) == 0x42, "RpLight layout");
 /* The light plugin's data in the engine instance: the free list of lights. */
 #define rpLightOffset ORIG_VAR(0x006767a0, int32_t, rpLightOffset)
 
+/* What the for-all-lights walk hands each light: the visitor's context, callback and data (rpLightVisitOnce).
+ */
+typedef void(BMX_CDECL *RpLightVisitFn)(void *context, RpLight *light, void *block, void *tail, void *extra);
+
+typedef struct RpLightVisit {
+    void *context;           /* 0x00 */
+    RpLightVisitFn callback; /* 0x04 */
+    void *extra;             /* 0x08 */
+    uint8_t block[0x40];     /* 0x0c passed by address */
+    void *tail;              /* 0x4c */
+} RpLightVisit;
+
+_Static_assert(sizeof(RpLightVisit) == 0x50, "RpLightVisit layout");
+
+void rpWorldExtLightSelectCallback(RpLight *light);
+RpLight *rpLightVisitOnce(RpLight *light, RpLightVisit *visit);
+void *_rpLightOpen(void *engine, int32_t offset);
+void *_rpLightClose(void *engine);
 void rpWorldExtLightInit(RpLight *light);
 RpLight *RpLightCreate(uint32_t type);
 int RpLightDestroy(RpLight *light);

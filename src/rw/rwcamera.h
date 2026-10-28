@@ -57,6 +57,7 @@ _Static_assert(offsetof(RwCamera, version) == 0x96, "RwCamera layout");
 
 #define rwCameraOffset ORIG_VAR(0x00676d10, int32_t, rwCameraOffset)
 
+void *_rwCameraOpen(void *engine, int32_t offset);
 RwCamera *RwCameraCreate(void);
 int RwCameraDestroy(RwCamera *camera);
 RwCamera *RwCameraSetFrame(RwCamera *camera, RwFrame *frame);

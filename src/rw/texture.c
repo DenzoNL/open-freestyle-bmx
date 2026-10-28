@@ -1366,3 +1366,195 @@ RwImage *RtPNGImageRead(const char *name)
     RwStreamClose(stream, NULL);
     return image;
 }
+
+/* ---- modules: rasters, textures, images ------------------------------------------------------------- */
+
+#define rwRasterModuleCount  ORIG_VAR(0x00676d04, int32_t, rwRasterModuleCount)
+#define rwTextureModuleCount ORIG_VAR(0x00676d44, int32_t, rwTextureModuleCount)
+#define rwImageModuleCount   ORIG_VAR(0x00676d64, int32_t, rwImageModuleCount)
+
+/* The texture module's default read and find callbacks: still original code. */
+#define TEXTURE_DEFAULT_READ_CALLBACK 0x004e1410
+#define TEXTURE_DEFAULT_FIND_CALLBACK 0x004e1140
+
+/*
+ * Raster module: the context stack starts with an embedded root raster (all zero, "don't allocate"), and
+ * the
+ * raster free list is created. NULL when that fails.
+ */
+BMX_ADDR(0x004dc9e0)
+void *_rwRasterOpen(void *engine, int32_t offset)
+{
+    rwRasterOffset = offset;
+    RwRasterGlobals *globals = rasterGlobals();
+    RwRaster *root = (RwRaster *)globals->pad2c;
+    for (size_t i = 0; i < sizeof globals->pad2c; i++) {
+        globals->pad2c[i] = 0;
+    }
+    root->flags = 0x80;
+    globals->depth = 0;
+    globals->stack[0] = root;
+    rasterGlobals()->freeList = RwFreeListCreate(rwRasterRegistry.sizeOfStruct, 10, 0);
+    if (rasterGlobals()->freeList == NULL) {
+        return NULL;
+    }
+    rwRasterModuleCount++;
+    return engine;
+}
+
+BMX_ADDR(0x004dcac0)
+void *_rwRasterClose(void *engine)
+{
+    if (rasterGlobals()->freeList != NULL) {
+        RwFreeListDestroy(rasterGlobals()->freeList);
+        rasterGlobals()->freeList = NULL;
+    }
+    rwRasterModuleCount--;
+    return engine;
+}
+
+/*
+ * Texture module: free lists of textures and dictionaries, the list of all dictionaries and the first
+ *
+ * dictionary, which becomes the current one. NULL (nothing left allocated) when anything fails.
+ */
+BMX_ADDR(0x004df120)
+void *_rwTextureOpen(void *engine, int32_t offset)
+{
+    rwTextureOffset = offset;
+    textureGlobals()->textureFreeList = RwFreeListCreate(rwTextureRegistry.sizeOfStruct, 7, 0);
+    if (textureGlobals()->textureFreeList == NULL) {
+        return NULL;
+    }
+    textureGlobals()->dictFreeList = RwFreeListCreate(rwTexDictionaryRegistry.sizeOfStruct, 3, 0);
+    if (textureGlobals()->dictFreeList == NULL) {
+        RwFreeListDestroy(textureGlobals()->textureFreeList);
+        textureGlobals()->textureFreeList = NULL;
+        return NULL;
+    }
+    textureGlobals()->dictList.next = &textureGlobals()->dictList;
+    rwTextureModuleCount++;
+    textureGlobals()->dictList.prev = &textureGlobals()->dictList;
+    RwTexDictionary *dict = RwEngineInstance->freeListAlloc(textureGlobals()->dictFreeList);
+    if (dict != NULL) {
+        dict->object.type = 6;
+        dict->object.parent = NULL;
+        dict->object.subType = 0;
+        dict->object.flags = 0;
+        dict->object.privateFlags = 0;
+        RwTextureGlobals *globals = textureGlobals();
+        dict->lInInstance.next = globals->dictList.next;
+        dict->lInInstance.prev = &globals->dictList;
+        globals->dictList.next->prev = &dict->lInInstance;
+        globals->dictList.next = &dict->lInInstance;
+        dict->texturesInDict.prev = &dict->texturesInDict;
+        dict->texturesInDict.next = &dict->texturesInDict;
+        _rwPluginRegistryInitObject(&rwTexDictionaryRegistry, dict);
+    }
+    textureGlobals()->currentDict = dict;
+    if (textureGlobals()->currentDict == NULL) {
+        RwFreeListDestroy(textureGlobals()->dictFreeList);
+        textureGlobals()->dictFreeList = NULL;
+        RwFreeListDestroy(textureGlobals()->textureFreeList);
+        textureGlobals()->textureFreeList = NULL;
+        return NULL;
+    }
+    textureGlobals()->findCallBack = NULL;
+    textureGlobals()->mipmapping = 0;
+    textureGlobals()->readCallBack = RW_CB(RwTextureCallBackRead, TEXTURE_DEFAULT_READ_CALLBACK);
+    textureGlobals()->defaultFind = RW_CB(void *, TEXTURE_DEFAULT_FIND_CALLBACK);
+    textureGlobals()->field20 = NULL;
+    textureGlobals()->field24 = 0;
+    return engine;
+}
+
+/* Destroys every dictionary with its textures, then both free lists. */
+BMX_ADDR(0x004df380)
+void *_rwTextureClose(void *engine)
+{
+    if (textureGlobals()->field20 != NULL) {
+        RwEngineInstance->memoryFuncs.rwfree(textureGlobals()->field20);
+        textureGlobals()->field20 = NULL;
+        textureGlobals()->field24 = 0;
+    }
+    if (textureGlobals()->textureFreeList != NULL && textureGlobals()->dictFreeList != NULL) {
+        RwLLLink *head = &textureGlobals()->dictList;
+        RwLLLink *link = head->next;
+        while (link != head) {
+            RwTexDictionary *dict =
+                (RwTexDictionary *)((uint8_t *)link - offsetof(RwTexDictionary, lInInstance));
+            RwLLLink *next = link->next;
+            if (textureGlobals()->currentDict == dict) {
+                textureGlobals()->currentDict = NULL;
+            }
+            RwLLLink *textures = &dict->texturesInDict;
+            for (RwLLLink *t = textures->next; t != textures;) {
+                RwTexture *texture = (RwTexture *)((uint8_t *)t - offsetof(RwTexture, lInDictionary));
+                t = t->next;
+                if (RwTextureDestroyAll(texture) == NULL) {
+                    break;
+                }
+            }
+            _rwPluginRegistryDeInitObject(&rwTexDictionaryRegistry, dict);
+            link->prev->next = link->next;
+            link->next->prev = link->prev;
+            RwEngineInstance->freeListFree(textureGlobals()->dictFreeList, dict);
+            link = next;
+        }
+    }
+    if (textureGlobals()->textureFreeList != NULL) {
+        RwFreeListDestroy(textureGlobals()->textureFreeList);
+        textureGlobals()->textureFreeList = NULL;
+    }
+    if (textureGlobals()->dictFreeList != NULL) {
+        RwFreeListDestroy(textureGlobals()->dictFreeList);
+        textureGlobals()->dictFreeList = NULL;
+    }
+    rwTextureModuleCount--;
+    return engine;
+}
+
+/*
+ * Image module: free lists of images and of file formats, a 256 byte search path buffer, and the gamma
+ *
+ * tables for gamma 1.0 (RwImageSetGamma's loop with a single pow per entry). NULL when anything fails.
+ */
+BMX_ADDR(0x004e33d0)
+void *_rwImageOpen(void *engine, int32_t offset)
+{
+    rwImageOffset = offset;
+    imageGlobals()->imageFreeList = RwFreeListCreate(rwImageRegistry.sizeOfStruct, 0x14, 0);
+    if (imageGlobals()->imageFreeList == NULL) {
+        return NULL;
+    }
+    imageGlobals()->formatFreeList = RwFreeListCreate(0x34, 3, 0);
+    if (imageGlobals()->formatFreeList == NULL) {
+        RwFreeListDestroy(imageGlobals()->imageFreeList);
+        imageGlobals()->imageFreeList = NULL;
+        return NULL;
+    }
+    imageGlobals()->pathSize = 0x100;
+    imageGlobals()->path = RwEngineInstance->memoryFuncs.rwmalloc((size_t)imageGlobals()->pathSize);
+    if (imageGlobals()->path == NULL) {
+        RwFreeListDestroy(imageGlobals()->formatFreeList);
+        imageGlobals()->formatFreeList = NULL;
+        RwFreeListDestroy(imageGlobals()->imageFreeList);
+        imageGlobals()->imageFreeList = NULL;
+        return NULL;
+    }
+    imageGlobals()->path[0] = 0;
+    rwImageModuleCount++;
+    imageGlobals()->gamma = 1.0F;
+    imageGlobals()->gammaUp[0] = 0;
+    imageGlobals()->gammaDown[0] = 0;
+    for (int i = 1; i < 0x100; i++) {
+        const double p = crtPow((double)i * (double)0x1.010102p-8F, 1.0);
+        imageGlobals()->gammaUp[i] = truncateToByte(p * 255.0 + 0.5);
+        imageGlobals()->gammaDown[i] = truncateToByte(p * 255.0 + 0.5);
+    }
+    imageGlobals()->formats = NULL;
+    for (int i = 0; i < 8; i++) {
+        imageGlobals()->pad210[i] = 0;
+    }
+    return engine;
+}

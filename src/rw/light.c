@@ -147,3 +147,78 @@ uint32_t RpLightGetFlags(const RpLight *light)
 {
     return light->object.object.flags;
 }
+
+/* ---- module and the for-all-lights callback --------------------------------------------------------- */
+
+#define rpLightModuleCount ORIG_VAR(0x006767a4, int32_t, rpLightModuleCount)
+
+/* Light module: the free list of lights (the registry's size). NULL when it cannot be created. */
+BMX_ADDR(0x004c2310)
+void *_rpLightOpen(void *engine, int32_t offset)
+{
+    rpLightOffset = offset;
+    *(RwFreeList **)((uint8_t *)RwEngineInstance + offset) =
+        RwFreeListCreate(rpLightRegistry.sizeOfStruct, 0x14, 0);
+    if (*(RwFreeList **)((uint8_t *)RwEngineInstance + rpLightOffset) == NULL) {
+        return NULL;
+    }
+    rpLightModuleCount++;
+    return engine;
+}
+
+/* Destroys the lights still alive (the free list callback at 0x4c2370 is still original code) and the list.
+ */
+BMX_ADDR(0x004c2380)
+void *_rpLightClose(void *engine)
+{
+    RwFreeListForAllUsed(*(RwFreeList **)((uint8_t *)RwEngineInstance + rpLightOffset),
+                         RW_CB(RwFreeListCallBack, 0x004c2370), NULL);
+    RwFreeListDestroy(*(RwFreeList **)((uint8_t *)RwEngineInstance + rpLightOffset));
+    rpLightModuleCount--;
+    *(RwFreeList **)((uint8_t *)RwEngineInstance + rpLightOffset) = NULL;
+    return engine;
+}
+
+/*
+ * Visits a light once per light frame: when the light is enabled (flag bit 0) the callback of `visit` is
+ * called with the visitor's context, the light, a copy of the visitor's matrix block and two more values;
+ * the light is then stamped with the current frame (a halfword in the engine instance at 0x0c).
+ */
+BMX_ADDR(0x004b1800)
+RpLight *rpLightVisitOnce(RpLight *light, RpLightVisit *visit)
+{
+    const uint16_t frame = *(uint16_t *)((uint8_t *)RwEngineInstance + 0x0c);
+    if (light->lightFrame != frame) {
+        if ((light->object.object.flags & 1) != 0) {
+            visit->callback(visit->context, light, visit->block, visit->tail, visit->extra);
+        }
+        light->lightFrame = frame;
+    }
+    return light;
+}
+
+/* Gives a light the lighting routine of its type (field at 0x14; point, directional, spot...). */
+BMX_ADDR(0x004caa60)
+void rpWorldExtLightSelectCallback(RpLight *light)
+{
+    void **callback = &light->worldExtCallback;
+    switch (RpLightGetType(light)) {
+    case 2:
+        *callback = RW_CB(void *, 0x004c9b20);
+        break;
+    case 1:
+        *callback = RW_CB(void *, 0x004c9c20);
+        break;
+    case 0x80:
+        *callback = RW_CB(void *, 0x004c9e20);
+        break;
+    case 0x81:
+        *callback = RW_CB(void *, 0x004ca130);
+        break;
+    case 0x82:
+        *callback = RW_CB(void *, 0x004ca5b0);
+        break;
+    default:
+        break;
+    }
+}

@@ -30,12 +30,18 @@ typedef struct RwIm3DPipeline {
 _Static_assert(sizeof(RwIm3DPipeline) == 0x1c, "RwIm3DPipeline layout");
 
 /* The Im3D plugin's data in the engine instance: the device's begin/end entries and the pipeline stack. */
+typedef int(BMX_CDECL *RwIm3DBeginFunc)(RwIm3DPipeline *pipeline);
+typedef int(BMX_CDECL *RwIm3DEndFunc)(void);
+typedef void *(BMX_CDECL *RwIm3DInstanceFunc)(RwIm3DTransformInfo *info);
+typedef void(BMX_CDECL *RwIm3DStageFunc)(void *work);
+typedef void(BMX_CDECL *RwIm3DStage4Func)(void *work, void *data);
+
 typedef struct RwIm3DGlobals {
-    uint32_t pad00;                                  /* 0x00 */
-    int(BMX_CDECL *begin)(RwIm3DPipeline *pipeline); /* 0x04 */
-    int(BMX_CDECL *end)(void);                       /* 0x08 */
-    int32_t depth;                                   /* 0x0c number of pipelines on the stack */
-    RwIm3DPipeline *stack[1];                        /* 0x10 grows with depth */
+    RwFreeList *pipelineFreeList; /* 0x00 free list of RwIm3DPipeline */
+    RwIm3DBeginFunc begin;        /* 0x04 */
+    RwIm3DEndFunc end;            /* 0x08 */
+    int32_t depth;                /* 0x0c number of pipelines on the stack */
+    RwIm3DPipeline *stack[1];     /* 0x10 grows with depth */
 } RwIm3DGlobals;
 
 _Static_assert(offsetof(RwIm3DGlobals, stack) == 0x10, "RwIm3DGlobals layout");
@@ -58,5 +64,22 @@ void *RwIm3DTransform(void *vertices, int32_t numVertices, const RwMatrix *ltm, 
 RwIm3DPipeline *rwIm3DPipelinePush(RwIm3DPipeline *pipeline);
 RwIm3DTransformInfo *rwIm3DPipelineRun(RwIm3DTransformInfo *info);
 RwIm3DPipeline *rwIm3DPipelinePop(void);
+
+/* Module open/close routines of the engine registry, the default pipeline stages and the pipeline calls. */
+void rwIm3DSetEntries(RwIm3DBeginFunc begin, RwIm3DEndFunc end);
+int rwIm3DDefaultBegin(RwIm3DPipeline *pipeline);
+int rwIm3DDefaultEnd(void);
+void *_rwRenderPipelineOpen(void *engine, int32_t offset);
+void *_rwRenderPipelineClose(void *engine);
+void *rwPipelineDefaultInstance(RwIm3DTransformInfo *info);
+void rwPipelineDefaultStage4(void *work, void *data);
+void rwPipelineDefaultStageData(void);
+void rwPipelineDefaultStage(void *work);
+RwIm3DPipeline *_rpWorldPipelineOpen(void);
+int rwIm3DPipelineRelease(RwIm3DPipeline *pipeline);
+int rwCoreExtCallSlot3(void *pipeline);
+void rwCoreExtCallSlot1(void *pipeline);
+void *_rwIm3DOpen(void *engine, int32_t offset);
+void *_rwIm3DClose(void *engine);
 
 #endif

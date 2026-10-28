@@ -10,6 +10,7 @@
 #include "rw/rwclump.h"
 
 #include "compat/crt.h"
+#include "rw/rwim.h"
 
 /* Callbacks that are still original code. */
 #define RP_ATOMIC_SYNC_CALLBACK   0x004b1490
@@ -2888,4 +2889,283 @@ RpWorld *RpWorldStreamRead(RwStream *stream)
         return NULL;
     }
     return world;
+}
+
+/* ---- module open/close and the callbacks the registries keep ---------------------------------------- */
+
+#define rpClumpModuleCount ORIG_VAR(0x00676714, int32_t, rpClumpModuleCount)
+#define rpMeshModuleCount  ORIG_VAR(0x006966ec, int32_t, rpMeshModuleCount)
+
+/* Free list callback of the clump module's atomic list: destroys the atomic. */
+BMX_ADDR(0x004b1070)
+void rpAtomicFreeListDestroyCB(void *atomic, void *data)
+{
+    RpAtomicDestroy(atomic);
+}
+
+/* The default callback of RpClumpForAllAtomics-style walks: returns its argument. */
+BMX_ADDR(0x004b20f0)
+void *rpClumpDefaultCallback(void *clump)
+{
+    return clump;
+}
+
+/*
+ * Clump module close: releases the clump pipeline, destroys the clumps and atomics still alive (the clump
+ * callback at 0x4b1060 is still original code) and both free lists.
+ */
+BMX_ADDR(0x004b1080)
+void *_rpClumpClose(void *engine)
+{
+    rwIm3DPipelineRelease(clumpGlobals()->pipeline);
+    clumpGlobals()->pipeline = NULL;
+    RwFreeListForAllUsed(clumpGlobals()->clumpFreeList, RW_CB(RwFreeListCallBack, 0x004b1060), NULL);
+    RwFreeListForAllUsed(clumpGlobals()->atomicFreeList,
+                         BMX_FNPTR(RwFreeListCallBack, 0x004b1070, rpAtomicFreeListDestroyCB), NULL);
+    RwFreeListDestroy(clumpGlobals()->atomicFreeList);
+    RwFreeListDestroy(clumpGlobals()->clumpFreeList);
+    clumpGlobals()->atomicFreeList = NULL;
+    clumpGlobals()->clumpFreeList = NULL;
+    rpClumpModuleCount--;
+    return engine;
+}
+
+/*
+ * Brings the atomic's bounding sphere up to date: the sphere of the start morph target, or the blend of the
+ * start and end morph targets by the interpolator's position (kept in an x87 register) when they differ and
+ * both exist; the first morph target if an index is out of range. The vector parts go through float stores
+ * before they are scaled. Clears the interpolator's dirty bit and marks the atomic's world sphere stale.
+ */
+BMX_ADDR(0x004b1154)
+__attribute__((regparm(1))) void rpAtomicUpdateBoundingSphere(RpAtomic *atomic)
+{
+    RpGeometry *geometry = atomic->geometry;
+    if (geometry == NULL) {
+        return;
+    }
+    const int32_t start = atomic->interpolator.startMorphTarget;
+    const int32_t end = atomic->interpolator.endMorphTarget;
+    const int32_t count = geometry->numMorphTargets;
+    const RpMorphTarget *targets = geometry->morphTarget;
+    if (start != end && start < count && end < count) {
+        const RpMorphTarget *from = &targets[start];
+        const RpMorphTarget *to = &targets[end];
+        const double t = (double)atomic->interpolator.position * (double)atomic->interpolator.recipTime;
+        atomic->boundingSphere.radius =
+            (float)(from->boundingSphere.radius +
+                    (double)(to->boundingSphere.radius - (double)from->boundingSphere.radius) * t);
+        const float x = (float)((double)to->boundingSphere.center.x - (double)from->boundingSphere.center.x);
+        const float y = (float)((double)to->boundingSphere.center.y - (double)from->boundingSphere.center.y);
+        const float z = (float)((double)to->boundingSphere.center.z - (double)from->boundingSphere.center.z);
+        const float xs = (float)((double)x * t);
+        const float ys = (float)((double)y * t);
+        const float zs = (float)(t * (double)z);
+        atomic->boundingSphere.center.x = (float)((double)xs + (double)from->boundingSphere.center.x);
+        atomic->boundingSphere.center.y = (float)((double)ys + (double)from->boundingSphere.center.y);
+        atomic->boundingSphere.center.z = (float)((double)zs + (double)from->boundingSphere.center.z);
+    } else if (start < count && end < count) {
+        atomic->boundingSphere = targets[start].boundingSphere;
+    } else {
+        atomic->boundingSphere = targets[0].boundingSphere;
+    }
+    atomic->interpolator.flags &= 0xfffffffd;
+    atomic->object.object.privateFlags |= 1;
+}
+
+/* The atomic's sync callback: refreshes the bounding sphere if the interpolator asks for it. */
+BMX_ADDR(0x004b1490)
+RpAtomic *rpAtomicSyncCallback(RpAtomic *atomic)
+{
+    if ((atomic->interpolator.flags & 2) != 0) {
+        rpAtomicUpdateBoundingSphere(atomic);
+    }
+    atomic->object.object.privateFlags |= 1;
+    return atomic;
+}
+
+/*
+ * Sets the atomic's geometry (adds a reference to the new one, drops the old one). Unless bit 0 of flags is
+ * set the bounding sphere is that of the first morph target and the frame is told that an object changed.
+ */
+BMX_ADDR(0x004b1ad0)
+RpAtomic *RpAtomicSetGeometry(RpAtomic *atomic, RpGeometry *geometry, uint32_t flags)
+{
+    RpGeometry *old = atomic->geometry;
+    if (geometry != old) {
+        if (geometry != NULL) {
+            RpGeometryAddRef(geometry);
+            old = atomic->geometry;
+        }
+        if (old != NULL) {
+            RpGeometryDestroy(old);
+        }
+        atomic->geometry = geometry;
+        if ((flags & 1) == 0) {
+            if (geometry != NULL) {
+                atomic->boundingSphere = geometry->morphTarget[0].boundingSphere;
+            }
+            if (atomic->object.object.parent != NULL) {
+                RwFrameUpdateObjects(atomic->object.object.parent);
+            }
+        }
+        atomic->stamp++;
+    }
+    return atomic;
+}
+
+/* The atomic's default render callback: runs it through the clump pipeline. NULL if that cannot be pushed. */
+BMX_ADDR(0x004b3350)
+RpAtomic *rpAtomicRenderCallback(RpAtomic *atomic)
+{
+    if (rwIm3DPipelinePush(clumpGlobals()->pipeline) == NULL) {
+        return NULL;
+    }
+    RpAtomic *result = (RpAtomic *)rwIm3DPipelineRun((RwIm3DTransformInfo *)atomic);
+    rwIm3DPipelinePop();
+    return result;
+}
+
+/* Geometry module: the free list of geometries. NULL when it cannot be created. */
+BMX_ADDR(0x004b3390)
+void *_rpGeometryOpen(void *engine, int32_t offset)
+{
+    rpGeometryOffset = offset;
+    *(RwFreeList **)((uint8_t *)RwEngineInstance + offset) =
+        RwFreeListCreate(rpGeometryRegistry.sizeOfStruct, 0x14, 0);
+    if (geometryFreeList() == NULL) {
+        return NULL;
+    }
+    rpGeometryModuleCount++;
+    return engine;
+}
+
+/* Free list callback of the geometry list: drops a reference. */
+BMX_ADDR(0x004b33f0)
+void rpGeometryFreeListDestroyCB(void *geometry, void *data)
+{
+    RpGeometryDestroy(geometry);
+}
+
+BMX_ADDR(0x004b3400)
+void *_rpGeometryClose(void *engine)
+{
+    RwFreeListForAllUsed(geometryFreeList(),
+                         BMX_FNPTR(RwFreeListCallBack, 0x004b33f0, rpGeometryFreeListDestroyCB), NULL);
+    RwFreeListDestroy(geometryFreeList());
+    rpGeometryModuleCount--;
+    *(RwFreeList **)((uint8_t *)RwEngineInstance + rpGeometryOffset) = NULL;
+    return engine;
+}
+
+/* Mesh module: a one-halfword marker in the engine instance (1) and a counter. */
+BMX_ADDR(0x004c4710)
+void *_rpMeshOpen(void *engine, int32_t offset)
+{
+    rpMeshOffset = offset;
+    *(uint16_t *)((uint8_t *)RwEngineInstance + offset) = 1;
+    rpMeshModuleCount++;
+    return engine;
+}
+
+BMX_ADDR(0x004c4740)
+void *_rpMeshClose(void *engine)
+{
+    rpMeshModuleCount--;
+    return engine;
+}
+
+/* ---- world extension: the table at 0x69b520 and the material sort ----------------------------------- */
+
+/* Entry 0 of the world extension's table: its attach routine, nothing to register. */
+BMX_ADDR(0x004c5ab0)
+int rpWorldExtAttachNothing(void)
+{
+    return 1;
+}
+
+/* True for the raster formats with an alpha channel (1555, 4444, 8888: format bits 0x100, 0x300, 0x500). */
+BMX_ADDR(0x004c5ad0)
+__attribute__((regparm(1))) int rpRasterFormatHasAlpha(uint32_t format)
+{
+    return format == 0x100 || format == 0x300 || format == 0x500;
+}
+
+/* Sort key of a mesh: 2 if its material is translucent (alpha format texture or colour alpha not 255). */
+static uint32_t rpMaterialSortBits(const RpMaterial *material, uint32_t bits)
+{
+    if (material != NULL) {
+        if (material->texture != NULL) {
+            if (rpRasterFormatHasAlpha(RwRasterGetFormat(RwTextureGetRaster(material->texture)) & 0xf00)) {
+                bits |= 2;
+            }
+        }
+        if (material->color.alpha != 0xff) {
+            bits |= 2;
+        }
+    }
+    return bits;
+}
+
+/*
+ * qsort comparator of two RpMesh pointers: orders by material, opaque ones before translucent ones (the
+ *
+ * order bit 2 gives), and by the material's address within the same class. 0 for the same material.
+ */
+BMX_ADDR(0x004c5af0)
+int rpMeshCompareMaterials(const RpMesh *const *a, const RpMesh *const *b)
+{
+    const RpMaterial *first = (*a)->material;
+    const RpMaterial *second = (*b)->material;
+    if (first == second) {
+        return 0;
+    }
+    uint32_t firstBits = (uintptr_t)second < (uintptr_t)first;
+    uint32_t secondBits = (uintptr_t)first <= (uintptr_t)second;
+    firstBits = rpMaterialSortBits(first, firstBits);
+    secondBits = rpMaterialSortBits(second, secondBits);
+    return (int)(firstBits - secondBits);
+}
+
+#define rpPipelineTypes  ((uint8_t *)(uintptr_t)0x006767f0)
+#define rpPipelineSizes  ((uint8_t *)(uintptr_t)0x006767f8)
+#define rpPipelineSizesB ((uint8_t *)(uintptr_t)0x00676800)
+#define rpPipelineTypesB ((uint8_t *)(uintptr_t)0x00676808)
+
+/* Stages of the world's render pipeline and the vertex layouts of its five mesh types (still original code).
+ */
+BMX_ADDR(0x004c9270)
+int rpWorldPipelineInit(RwIm3DPipeline *pipeline)
+{
+    if (pipeline == NULL) {
+        return 0;
+    }
+    pipeline->instance = RW_CB(RwIm3DInstanceFunc, 0x004c8e30);
+    pipeline->stage2 = RW_CB(RwIm3DStageFunc, 0x004c9800);
+    pipeline->stageData = RW_CB(void *, 0x004c9790);
+    pipeline->stage5 = RW_CB(RwIm3DStageFunc, 0x004c9880);
+    pipeline->stage6 = RW_CB(RwIm3DStageFunc, 0x004cac00);
+    for (uint32_t i = 0; i <= 4; i++) {
+        rpPipelineTypes[i] = (i & 4) != 0 ? 2 : 0;
+        rpPipelineSizes[i] = (i & 4) != 0 ? 0x24 : 0x1c;
+    }
+    return 1;
+}
+
+/* The same for the pipeline of atomics (another instance stage, the tables at 0x676800 / 0x676808). */
+BMX_ADDR(0x004c9730)
+int rpAtomicPipelineInit(RwIm3DPipeline *pipeline)
+{
+    if (pipeline == NULL) {
+        return 0;
+    }
+    pipeline->instance = RW_CB(RwIm3DInstanceFunc, 0x004c92d0);
+    pipeline->stage2 = RW_CB(RwIm3DStageFunc, 0x004c9800);
+    pipeline->stageData = RW_CB(void *, 0x004c9790);
+    pipeline->stage5 = RW_CB(RwIm3DStageFunc, 0x004c9880);
+    pipeline->stage6 = RW_CB(RwIm3DStageFunc, 0x004cac00);
+    for (uint32_t i = 0; i <= 4; i++) {
+        rpPipelineTypesB[i] = (i & 4) != 0 ? 2 : 0;
+        rpPipelineSizesB[i] = (i & 4) != 0 ? 0x24 : 0x1c;
+    }
+    return 1;
 }

@@ -114,9 +114,13 @@ typedef struct RwTextureGlobals {
     RwTextureCallBackRead readCallBack; /* 0x14 */
     RwTextureCallBackFind findCallBack; /* 0x18 */
     int32_t mipmapping;                 /* 0x1c */
+    void *field20;                      /* 0x20 block freed on close (never set here) */
+    uint16_t field24;                   /* 0x24 */
+    uint8_t pad26[2];                   /* 0x26 */
+    void *defaultFind; /* 0x28 the default find callback (0x4e1140), never called through here */
 } RwTextureGlobals;
 
-_Static_assert(sizeof(RwTextureGlobals) == 0x20, "RwTextureGlobals layout");
+_Static_assert(sizeof(RwTextureGlobals) == 0x2c, "RwTextureGlobals layout");
 
 enum { rwIMAGEOWNSPIXELS = 1, rwIMAGEGAMMACORRECTED = 2 };
 
@@ -205,6 +209,13 @@ RwRaster *RwTextureGetRaster(const RwTexture *texture);
 RwTexDictionary *RwTexDictionaryCreate(void);
 RwTexture *RwTextureDestroyAll(RwTexture *texture);
 int RwTextureDestroy(RwTexture *texture);
+
+/* Module open/close routines the engine registry calls (plugin data at the given offset; NULL = failed). */
+void *_rwRasterOpen(void *engine, int32_t offset);
+void *_rwRasterClose(void *engine);
+void *_rwTextureOpen(void *engine, int32_t offset);
+void *_rwTextureClose(void *engine);
+void *_rwImageOpen(void *engine, int32_t offset);
 int RwTexDictionaryDestroy(RwTexDictionary *dictionary);
 RwTexture *RwTextureCreate(RwRaster *raster);
 RwTexture *RwTextureAddRef(RwTexture *texture);

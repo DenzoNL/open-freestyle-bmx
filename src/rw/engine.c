@@ -8,10 +8,10 @@
 
 /* The engine plugin 0x401 data: the flag bit marking an identity matrix and the multiply routine. */
 typedef struct RwMatrixGlobals {
-    uint32_t unused;                                                                /* 0x00 */
-    uint32_t identityBit;                                                           /* 0x04 */
-    void(BMX_CDECL *multiply)(RwMatrix *out, const RwMatrix *a, const RwMatrix *b); /* 0x08 */
-    uint32_t pad0c;                                                                 /* 0x0c */
+    RwFreeList *freeList;          /* 0x00 */
+    uint32_t identityBit;          /* 0x04 */
+    RwMatrixMultiplyFunc multiply; /* 0x08 */
+    uint32_t pad0c;                /* 0x0c */
 } RwMatrixGlobals;
 
 _Static_assert(sizeof(RwMatrixGlobals) == 0x10, "RwMatrixGlobals layout");
@@ -285,6 +285,7 @@ int RwEngineInit(const RwMemoryFunctions *memoryFunctions, uint32_t initFlags)
 /* ---- memory interface ------------------------------------------------------------------------------- */
 
 /* calloc of the default memory interface: the exe's malloc plus a zero fill. */
+BMX_ADDR(0x004db9a0)
 void *rwDefaultCalloc(size_t count, size_t size)
 {
     const size_t bytes = count * size;
@@ -455,4 +456,175 @@ RwMatrix *RwMatrixMultiply(RwMatrix *out, const RwMatrix *a, const RwMatrix *b)
     }
     ((uint8_t *)&out->pad1)[0]++;
     return out;
+}
+
+/* ---- free list entry points ------------------------------------------------------------------------- */
+
+/* The plain free list allocator (initFlags bit 0 of RwEngineInit): every entry comes from the memory
+ * interface. */
+BMX_ADDR(0x004cf800)
+void *rwFreeListAllocPlain(RwFreeList *freeList)
+{
+    return RwEngineInstance->memoryFuncs.rwmalloc((size_t)freeList->entrySize);
+}
+
+/* Counterpart of rwFreeListAllocPlain; returns the free list. */
+BMX_ADDR(0x004cf820)
+RwFreeList *rwFreeListFreePlain(RwFreeList *freeList, void *entry)
+{
+    RwEngineInstance->memoryFuncs.rwfree(entry);
+    return freeList;
+}
+
+/* The engine's default free list release: pushes the entry onto the free stack. */
+BMX_ADDR(0x004dbd90)
+void _rwFreeListFreeReal(RwFreeList *freeList, void *entry)
+{
+    void **top = freeList->freeTop + 1;
+    freeList->freeTop = top;
+    *top = entry;
+}
+
+/* ---- modules of the engine registry (opened by RwEngineOpen, in plugin order) ----------------------------
+ */
+
+#define rwErrorModuleCount     ORIG_VAR(0x00676d24, int32_t, rwErrorModuleCount)
+#define rwMatrixModuleCount    ORIG_VAR(0x00676974, int32_t, rwMatrixModuleCount)
+#define rwColorModuleCount     ORIG_VAR(0x00676da4, int32_t, rwColorModuleCount)
+#define rwResourcesModuleCount ORIG_VAR(0x00676cf4, int32_t, rwResourcesModuleCount)
+
+/* Error module: an empty error slot (plugin id 0, the "no error" code). Returns the engine. */
+BMX_ADDR(0x004dee30)
+void *_rwErrorOpen(void *engine, int32_t offset)
+{
+    rwErrorOffset = offset;
+    RwError *slot = (RwError *)((uint8_t *)RwEngineInstance + offset);
+    slot->pluginID = 0;
+    rwErrorModuleCount++;
+    slot->errorCode = rwERRNONE;
+    return engine;
+}
+
+/* Colour module: nothing to set up. */
+BMX_ADDR(0x004eb2a0)
+void *_rwColorOpen(void *engine)
+{
+    rwColorModuleCount++;
+    return engine;
+}
+
+BMX_ADDR(0x004eb2b0)
+void *_rwColorClose(void *engine)
+{
+    rwColorModuleCount--;
+    return engine;
+}
+
+/* Matrix module: the free list of matrices, the identity flag mask and the default product. NULL on no
+ * memory. */
+BMX_ADDR(0x004d2080)
+void *_rwMatrixOpen(void *engine, int32_t offset)
+{
+    rwMatrixOffset = offset;
+    RwMatrixGlobals *globals = (RwMatrixGlobals *)((uint8_t *)RwEngineInstance + offset);
+    globals->freeList = RwFreeListCreate(0x40, 5, 4);
+    if (globals->freeList == NULL) {
+        return NULL;
+    }
+    globals->identityBit = 0x20000;
+    rwMatrixModuleCount++;
+    globals->multiply = BMX_FNPTR(RwMatrixMultiplyFunc, 0x004d02c0, rwMatrixMultiplyDefault);
+    return engine;
+}
+
+/* Resource arena: empty lists, no entries, 8 MB limit. */
+BMX_ADDR(0x004dc990)
+void ResourcesInit(RwResourcesGlobals *resources)
+{
+    resources->reusageSize = 0;
+    resources->currentSize = 0;
+    resources->entriesA.next = &resources->entriesA;
+    resources->entriesA.prev = &resources->entriesA;
+    resources->entriesB.next = &resources->entriesB;
+    resources->entriesB.prev = &resources->entriesB;
+    resources->maxSize = 0x800000;
+    resources->freeEntries = &resources->entriesA;
+    resources->usedEntries = &resources->entriesB;
+}
+
+BMX_ADDR(0x004dc210)
+void *_rwResourcesOpen(void *engine, int32_t offset)
+{
+    rwResourcesOffset = offset;
+    ResourcesInit((RwResourcesGlobals *)((uint8_t *)RwEngineInstance + offset));
+    rwResourcesModuleCount++;
+    return engine;
+}
+
+/* Frees every entry of both lists (calling the destroy notifications) and resets the arena lists. */
+BMX_ADDR(0x004dc250)
+void *_rwResourcesClose(void *engine)
+{
+    RwResourcesGlobals *r = rwResources();
+    r->entriesA.prev->next = r->entriesB.next;
+    RwLLLink *end = &r->entriesB;
+    RwResEntry *entry = (RwResEntry *)r->entriesA.next;
+    while ((RwLLLink *)entry != end) {
+        RwResEntry *next = (RwResEntry *)entry->link.next;
+        if (entry->destroyNotify != NULL) {
+            entry->destroyNotify(entry);
+        }
+        entry->link.prev->next = entry->link.next;
+        entry->link.next->prev = entry->link.prev;
+        *entry->ownerRef = NULL;
+        rwResources()->currentSize -= entry->size;
+        RwEngineInstance->memoryFuncs.rwfree(entry);
+        entry = next;
+    }
+    r->entriesA.next = &r->entriesA;
+    r->entriesA.prev = &r->entriesA;
+    r->entriesB.next = &r->entriesB;
+    r->entriesB.prev = &r->entriesB;
+    r->reusageSize = 0;
+    rwResourcesModuleCount--;
+    return engine;
+}
+
+/* ---- device system requests ------------------------------------------------------------------------- */
+
+/*
+ * Sends a request to the device's system function. Requests a device does not know are answered here
+ * (sub system count 1, "Only rendering sub system" as the sub system name, no sub system switching); any
+ * other unanswered request is reported as an error. Returns 1 when it was handled.
+ */
+BMX_ADDR(0x004cf3b0)
+int _rwDeviceSystemRequest(RwDevice *device, int32_t request, void *out, void *inOut, int32_t in)
+{
+    if (device->fpSystem(request, out, inOut, in) != 0 || request == rwDEVICESYSTEMFINALIZESTART ||
+        request == 0x12) {
+        return 1;
+    }
+    if (request == rwDEVICESYSTEMGETNUMSUBSYSTEMS) {
+        *(int32_t *)out = 1;
+        return 1;
+    }
+    if (request == rwDEVICESYSTEMGETSUBSYSTEMINFO) {
+        if (in == 0) {
+            RwEngineInstance->stringFuncs.rwstrcpy((char *)out, RW_CB(const char *, 0x0069b740));
+            return 1;
+        }
+    } else {
+        if (request == rwDEVICESYSTEMGETCURRENTSUBSYSTEM) {
+            *(int32_t *)out = 0;
+            return 1;
+        }
+        if (request == rwDEVICESYSTEMSETSUBSYSTEM && in == 0) {
+            return 1;
+        }
+    }
+    RwError error;
+    error.pluginID = 1;
+    error.errorCode = _rwerror(rwERR_DEVICE, request);
+    RwErrorSet(&error);
+    return 0;
 }

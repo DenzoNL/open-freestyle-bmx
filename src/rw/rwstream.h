@@ -80,6 +80,7 @@ RwStream *RwStreamWriteInt32(RwStream *stream, const void *ints, uint32_t size);
 RwStream *RwStreamReadReal(RwStream *stream, void *reals, uint32_t size);
 RwStream *RwStreamReadInt32(RwStream *stream, void *ints, uint32_t size);
 
+void *_rwStreamModuleOpen(void *engine, int32_t offset);
 const RwFileFunctions *RwOSGetFileInterface(void);
 int _rwFSOpen(void);
 

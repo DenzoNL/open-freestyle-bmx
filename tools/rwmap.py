@@ -5,10 +5,26 @@ Needs work/bundles-rw (or $BMX_WORK/bundles-rw; Ghidra export of 0x4a4a80..0x54b
 Same columns as functions.csv (addr,size,file,confidence,name,status).
 
 Which functions: the static call closure of the RW entry functions, i.e. every ORIG_FN declaration
-(and every BMX_ADDR annotation) in src/ with an address >= 0x4a4a80. Calls through function-pointer
-tables (the D3D driver, plugin callbacks) are invisible to it; callbacks the game passes by address
-(rwBmpImageWrite 0x4e7eb0, rwWorldPvsDefaultCallback 0x4cd510) are not Ghidra functions and have no
-bundle, so they are listed on stderr instead of in the CSV.
+(and every BMX_ADDR annotation) in src/ with an address >= 0x4a4a80, plus the closure of the INDIRECT
+targets: functions reached only through function pointers (engine/plugin tables, default callbacks,
+constructors/destructors given to the plugin registry, stream callbacks, free-list slots):
+  1. code addresses ported code stores or passes as pointers: RW_CB(type, addr) and BMX_FNPTR(type, addr, fn)
+     in src/ (a #define'd name is resolved), and the initial value of every ORIG_VAR(addr, ...) global
+     when it is the start of an RW function (function-pointer variables; read from the exe with pefile);
+  2. dwords in the exe's .rdata/.data/.data1 that equal the start of an RW function (statically
+     initialised tables, e.g. the D3D7 device table at 0x566fe4);
+  3. immediates in the RW disassembly: `PUSH 0x4xxxxx`, `MOV [mem],0x4xxxxx`, `MOV reg,0x4xxxxx` that are
+     function starts (tables filled at run time).
+A target needs a Ghidra function in work/bundles-rw; tools/ghidra/SeedPtrs.java creates them from the same
+data dwords and immediates (RW's `lea esi,[esi+0]` padding included), so re-export after changing it.
+Callbacks the game passes by address that still have no bundle are listed on stderr.
+
+Driver: the Direct3D 7 device driver is replaced by our SDL3 driver and never ported. Seeds: the function
+pointers in DRIVER_TABLES (the RwDevice, the rwD3D3Standards table and the core extension table at 0x69bee0
+with the driver's Im3D/render state hooks) and every function whose community
+label contains "D3D". Their closure (direct calls, plus the pointers the driver stores itself, e.g. the
+camera/raster plugin constructors), minus everything the non-driver roots reach, goes to file
+`lib/d3d7driver`, group rw/driver, status `skip`.
 
 Skipped functions (status `skip`, file `lib/crt`, `lib/libpng` or `lib/zlib`) are not ported, because
 the replacement uses the platform CRT or a real image decoder:
@@ -40,13 +56,21 @@ BUNDLES = WORK / "bundles-rw"
 LABELS = WORK / "labels.raw"
 OUT = ROOT / "data/functions-rw.csv"
 RW_START = 0x4A4A80
+RW_END = 0x54C159  # end of _rwcseg; bundles are exported up to 0x54b000 only
 CRT_BLOCKS = [(0x4A4A80, 0x4B0000), (0x51D000, 0x54B000)]
 PNG_RANGE = (0x506000, 0x51D000)
 ZLIB_FROM = 0x518DB0
+# The D3D driver's statically initialised tables: its RwDevice (fpSystem, render state, Im2D/Im3D) and the
+# rwD3D3Standards (id, function) pairs that D3D3System installs in RwEngineInstance->stdFunc.
+DRIVER_TABLES = [(0x566FE4, 0x38), (0x56701C, 0x94), (0x69BEE0, 0x10)]
+CB_RE = re.compile(r"\b(?:RW_CB|BMX_FNPTR)\(\s*[\w\s*]+,\s*(\w+)")
+DEFINE_RE = re.compile(r"^#define\s+(\w+)\s+\(?(0x[0-9a-fA-F]+)\)?\s*$", re.M)
+VAR_RE = re.compile(r"ORIG_VAR\(\s*(0x[0-9a-fA-F]+)")
+IMM_RE = re.compile(r"^(?:PUSH\s+|MOV\s+(?:dword ptr )?(?:\[[^\]]*\]|[A-Z]{2,3}),)0x([0-9a-fA-F]{6,8})$")
 ENTRY_RE = re.compile(r"ORIG_FN\(\s*(0x[0-9a-fA-F]+)|^BMX_ADDR\((0x[0-9a-fA-F]+)\)", re.M)
 
 # Lowest level first: used to pick the owner of an internal reached from two groups.
-LEVEL = ["engine", "stream", "math", "plugins", "texture", "light", "camera", "im", "charset", "clump",
+LEVEL = ["core", "engine", "stream", "math", "plugins", "texture", "light", "camera", "im", "charset", "clump",
          "world", "collision"]
 
 # Start address of each module range in the RW library -> group (entry functions).
@@ -96,6 +120,58 @@ def entry_group(a, name):
     return g
 
 
+def exe_image():
+    """(dword reader, [(start, size)] of the data sections) of the original exe, via pefile."""
+    import pefile
+    pe = pefile.PE(os.environ.get("BMX_EXE", str(WORK / "NgBMX.exe")))
+    base = pe.OPTIONAL_HEADER.ImageBase
+    img = pe.get_memory_mapped_image()
+    data = [(base + s.VirtualAddress, s.Misc_VirtualSize) for s in pe.sections
+            if s.Name.rstrip(b"\0") in (b".rdata", b".data", b".data1", b"_rwdseg")]
+    return (lambda a: int.from_bytes(img[a - base:a - base + 4], "little")), data
+
+
+def indirect_roots(B):
+    """Function-pointer candidates (see the docstring): {addr: kind} for every RW-range code address ported
+    code or the exe's data/RW code uses as a pointer, whether a bundle exists or not."""
+    kind = {}
+    srcs = [p.read_text() for p in sorted((ROOT / "src").rglob("*")) if p.suffix in (".c", ".h")]
+    defs = {}
+    for t in srcs:
+        defs.update({m.group(1): int(m.group(2), 16) for m in DEFINE_RE.finditer(t)})
+    dword, data = exe_image()
+
+    def add(a, k):
+        if a is not None and RW_START <= a < RW_END:
+            kind.setdefault(a, k)
+
+    for t in srcs:
+        for m in CB_RE.finditer(t):
+            v = m.group(1)
+            add(int(v, 16) if v.startswith("0x") else defs.get(v), "RW_CB")
+        for m in VAR_RE.finditer(t):
+            a = int(m.group(1), 16)
+            if any(va <= a < va + n for va, n in data):
+                add(dword(a), "ORIG_VAR")
+    for va, n in data:
+        for a in range(va, va + n - 3, 4):
+            add(dword(a), "data")
+    for b in B.values():
+        for a in immediates(b):
+            add(a, "imm")
+    return kind
+
+
+def immediates(b):
+    """Function starts stored or pushed as immediates in one bundle's disassembly."""
+    out = set()
+    for line in b["disasm"].splitlines():
+        m = IMM_RE.match(line.split(None, 1)[1]) if " " in line else None
+        if m:
+            out.add(int(m.group(1), 16))
+    return out
+
+
 def main():
     labels = {}
     for line in LABELS.read_text().splitlines():
@@ -106,10 +182,13 @@ def main():
     def callees(a):
         return [int(c.split()[0], 16) for c in B[a]["callees"] if not c.startswith("EXT:")]
 
-    ported = {}
+    ported, old, kept = {}, set(), {}
     if OUT.exists():
         with OUT.open() as fh:
-            ported = {int(r["addr"], 16): r for r in csv.DictReader(fh) if r["status"] == "ported"}
+            rows_old = list(csv.DictReader(fh))
+        ported = {int(r["addr"], 16): r for r in rows_old if r["status"] == "ported"}
+        old = {int(r["addr"], 16) for r in rows_old}
+        kept = {int(r["addr"], 16): r["file"] for r in rows_old if r["status"] == "skip"}  # skip rows stay skipped
     entries = set()
     for p in sorted((ROOT / "src").rglob("*")):
         if p.suffix in (".c", ".h"):
@@ -133,7 +212,33 @@ def main():
             st += callees(a)
         return seen
 
-    allf = closure(entries)
+    def closure_ptr(roots, stop=()):
+        """Like closure, but also follows the function pointers a function stores or pushes."""
+        seen, st = set(), list(roots)
+        while st:
+            a = st.pop()
+            if a in seen or a in stop or a not in B:
+                continue
+            seen.add(a)
+            st += callees(a) + sorted(immediates(B[a]) & B.keys())
+        return seen
+
+    # indirect targets; the driver is what only the D3D7 device table (and what it installs) reaches
+    cand = indirect_roots(B)
+    kinds = {a: k for a, k in cand.items() if a in B}
+    inside = lambda a: any(f < a < f + b["size"] for f, b in B.items())  # noqa: E731
+    for a in sorted(set(cand) - B.keys()):
+        if not inside(a) and a < 0x54B000:
+            print(f"no bundle for pointer target {a:#x} ({cand[a]}): create the function in Ghidra", file=sys.stderr)
+    dword, _ = exe_image()
+    table = {dword(t + i) for t, n in DRIVER_TABLES for i in range(0, n, 4)} & B.keys()
+    table |= {a for a in B if re.search("D3D", labels.get(a, ""), re.I)}  # community labels of the driver
+    dcl = closure_ptr(table)
+    ncl = closure_ptr(entries | {a for a in kinds if a not in dcl})
+    driver = dcl - ncl
+    direct = set(entries)
+    entries |= {a for a in kinds if a not in driver}
+    allf = closure_ptr(entries) | driver
     for a in sorted(allf):
         for c in callees(a):
             if c not in B:
@@ -143,15 +248,22 @@ def main():
     png_root = next((a for a in entries if B[a]["name"] == "RtPNGImageRead"), None)
     skip = {}
     for a in allf:
-        if in_crt(a):
+        if a in driver:
+            skip[a] = "lib/d3d7driver"
+        elif in_crt(a):
             skip[a] = "lib/crt"
     if png_root:
-        only = closure([png_root]) - closure(entries - {png_root}) - {png_root}
+        pngcl = closure_ptr([png_root])  # roots only the decoder reaches (libpng callbacks) belong to it
+        others = {a for a, k in kinds.items() if k in ("RW_CB", "ORIG_VAR") or a not in pngcl}
+        # the ported glue declares the libpng API it calls (png_*) as ORIG_FN; those are library, not RW
+        glue = {a for a in direct if a != png_root and not labels.get(a, B[a]["name"]).startswith("png_")}
+        only = pngcl - closure(glue) - closure_ptr(others, stop={png_root}) - {png_root}
         for a in only:
             name = labels.get(a, B[a]["name"])
             if PNG_RANGE[0] <= a < PNG_RANGE[1] and not re.match(r"(Rw|Rp|Rt|_rw)", name) and a not in skip:
                 zlib = not name.startswith("png_") and (a >= ZLIB_FROM or a == 0x5114B0)
                 skip[a] = "lib/zlib" if zlib else "lib/libpng"
+    skip.update((a, f) for a, f in kept.items() if a in allf and a not in driver)
     # group of every entry; internals take the groups of the entries that reach them
     egroup = {a: entry_group(a, labels.get(a, B[a]["name"])) for a in entries if a not in skip}
     reach = defaultdict(set)
@@ -189,12 +301,18 @@ def main():
                            lineterminator="\n")
         w.writeheader()
         w.writerows(rows)
-    per = defaultdict(lambda: [0, 0])
+    per = defaultdict(lambda: [0, 0, 0])
     for r in rows:
         per[r["file"]][0] += 1
         per[r["file"]][1] += int(r["size"])
-    for f, (n, b) in sorted(per.items()):
-        print(f"{f:16} {n:4} functions {b:7} bytes")
+        per[r["file"]][2] += int(r["addr"], 16) not in old
+    for f, (n, b, new) in sorted(per.items()):
+        print(f"{f:16} {n:4} functions {b:7} bytes, {new:3} new")
+    fresh = [r for r in rows if int(r["addr"], 16) not in old]
+    drv = sum(r["file"] == "lib/d3d7driver" for r in fresh)
+    port = sum(r["status"] == "orig" for r in fresh)
+    print(f"new rows {len(fresh)}: driver (skip) {drv}, to port {port} "
+          f"({sum(int(r['size']) for r in fresh if r['status'] == 'orig')} bytes), other skip {len(fresh) - drv - port}")
     print(f"{OUT.relative_to(ROOT)}: {len(rows)} functions, {len(entries)} entries")
 
 

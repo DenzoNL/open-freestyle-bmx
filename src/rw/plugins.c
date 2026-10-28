@@ -709,3 +709,30 @@ __attribute__((regparm(2))) RwMatrix *RwMatrixInvertGeneral(RwMatrix *out, const
                           (rwMul(out->at.z, in->pos.z) + rwMul(out->up.z, in->pos.y)));
     return out;
 }
+
+/* ---- animation plugin: engine module ---------------------------------------------------------------- */
+
+#define rpAnimEngineOffset ORIG_VAR(0x00678280, int32_t, rpAnimEngineOffset)
+#define rpAnimModuleCount  ORIG_VAR(0x00678284, int32_t, rpAnimModuleCount)
+
+/* Engine part of the animation plugin: the free list (8 byte entries) is shared by all engine instances. */
+BMX_ADDR(0x004fcd50)
+void *WorldObjectOpen(void *engine, int32_t offset)
+{
+    rpAnimModuleCount++;
+    rpAnimEngineOffset = offset;
+    if (rpAnimModuleCount == 1) {
+        *(RwFreeList **)((uint8_t *)RwEngineInstance + rpAnimEngineOffset) = RwFreeListCreate(8, 0x32, 0);
+    }
+    return engine;
+}
+
+BMX_ADDR(0x004fcda0)
+void *WorldObjectClose(void *engine)
+{
+    rpAnimModuleCount--;
+    if (rpAnimModuleCount == 0) {
+        RwFreeListDestroy(*(RwFreeList **)((uint8_t *)RwEngineInstance + rpAnimEngineOffset));
+    }
+    return engine;
+}

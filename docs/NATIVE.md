@@ -162,11 +162,22 @@ New first trap after the CRT layer (2026-10-28): `_rwFreeListAllocReal` (0x4dbc3
 from `_rwPluginRegistryAddPlugin` (0x4e88d0). `malloc` and the stdio table are no longer traps. A
 `BMX_TRAP_SKIP` survey shows no further CRT trap before the fake return value faults.
 
+First trap after the pointer-only RenderWare functions (2026-10-28): `0x4eac90`, entry 0 of the core extension table at
+0x69bee0 (`rwCoreExtGetFuncs()[0]`, called by `CorePluginAttach` through `rwCoreExtPluginAttach`). It belongs to the
+Direct3D driver (classified `lib/d3d7driver` in data/functions-rw.csv), so this is where the SDL3 driver has to plug
+in: it provides the attach routine and the other table entries (render state hook, Im3D entries) plus the device
+table (0x566fe4, `D3D3System` 0x4ee010, `rwD3D3Standards` 0x56701c). With `BMX_TRAP_SKIP` the next traps are
+`D3D3System` (three calls from `RwEngineOpen`), then a null device function. Everything before that now runs in
+ported code: free lists, the memory wrappers, every engine module open routine (error, vector, colour, matrix, frame,
+stream, camera, image, raster, texture, resources, Im3D, render pipeline), the world/mesh/geometry/light/sector
+modules and the animation engine module.
+
 ### Open points from the CRT layer (2026-10-28)
 
-- RW functions reached only through function pointers (engine tables, plugin/default callbacks) are
-  missing from data/functions-rw.csv, whose closure follows direct calls only; the first one is
-  `_rwFreeListAllocReal` (0x4dbc30, via the engine's freeListAlloc slot). tools/rwmap.py should also
-  collect the code addresses stored by RW_CB/table initialisers in the ported RW code.
+- (Done) RW functions reached only through function pointers are now in data/functions-rw.csv: tools/rwmap.py
+  collects the targets of RW_CB/BMX_FNPTR, function-pointer globals, data tables and immediates in RW code, and
+  separates the D3D driver (docs/RENDERWARE.md, Tooling). A function that is only passed as `BMX_FNPTR(type, addr, fn)`
+  needs `BMX_ADDR(addr)` too: without it the hook table has no jump at `addr` and the native exe traps there
+  (rwDefaultCalloc, rwPluginDefault*, rwPluginRegEntryRelease had none).
 - `pow` and other libm calls come from the host: they can differ from the original's x87 results in the
   last bit (texture gamma tables). Replace with x87-faithful versions before comparing screenshots.

@@ -955,3 +955,104 @@ int32_t RpWorldSectorGetNumPolygons(const RpWorldSector *sector)
 {
     return sector->numPolygons;
 }
+
+/* ---- module open/close and extension constructors --------------------------------------------------- */
+
+#define rpTieModuleCount          ORIG_VAR(0x00676734, int32_t, rpTieModuleCount)
+#define rpBspModuleCount          ORIG_VAR(0x00676784, int32_t, rpBspModuleCount)
+#define rpSectorModuleCount       ORIG_VAR(0x00676794, int32_t, rpSectorModuleCount)
+#define rpBinaryWorldModuleCount  ORIG_VAR(0x006767b4, int32_t, rpBinaryWorldModuleCount)
+#define rpMaterialListModuleCount ORIG_VAR(0x006767e4, int32_t, rpMaterialListModuleCount)
+
+/* Ties module (world objects in sectors): two free lists of 0x18 byte ties; the world render frame is 1. */
+BMX_ADDR(0x004b7570)
+void *_rpTieOpen(void *engine, int32_t offset)
+{
+    rpTieOffset = offset;
+    RwFreeList **lists = (RwFreeList **)((uint8_t *)RwEngineInstance + offset);
+    lists[0] = RwFreeListCreate(0x18, 100, 0);
+    if (lists[0] == NULL) {
+        return NULL;
+    }
+    ((RwFreeList **)((uint8_t *)RwEngineInstance + rpTieOffset))[1] = RwFreeListCreate(0x18, 0x14, 0);
+    if (((RwFreeList **)((uint8_t *)RwEngineInstance + rpTieOffset))[1] == NULL) {
+        RwFreeListDestroy(((RwFreeList **)((uint8_t *)RwEngineInstance + rpTieOffset))[0]);
+        ((RwFreeList **)((uint8_t *)RwEngineInstance + rpTieOffset))[0] = NULL;
+        return NULL;
+    }
+    RwEngineInstance->renderFrame = 1;
+    rpTieModuleCount++;
+    return engine;
+}
+
+/* Clump extension (the world's data in a clump): the destructor does nothing, the constructor clears it. */
+BMX_ADDR(0x004b8fe0)
+void *WorldDeInitClumpExt(void *clump)
+{
+    return clump;
+}
+
+BMX_ADDR(0x004b8ff0)
+void *WorldInitClumpExt(void *clump)
+{
+    *(uint32_t *)((uint8_t *)clump + rpWorldClumpOffset) = 0;
+    return clump;
+}
+
+/* Module open/close routines that only count: the world's BSP module, sectors, binary worlds, material lists.
+ */
+BMX_ADDR(0x004bc3a0)
+void *_rpBspOpen(void *engine)
+{
+    rpBspModuleCount++;
+    return engine;
+}
+
+BMX_ADDR(0x004bc3b0)
+void *_rpBspClose(void *engine)
+{
+    rpBspModuleCount--;
+    return engine;
+}
+
+BMX_ADDR(0x004c2020)
+void *_rpSectorOpen(void *engine)
+{
+    rpSectorModuleCount++;
+    return engine;
+}
+
+BMX_ADDR(0x004c2030)
+void *_rpSectorClose(void *engine)
+{
+    rpSectorModuleCount--;
+    return engine;
+}
+
+BMX_ADDR(0x004c2c30)
+void *_rpBinaryWorldOpen(void *engine)
+{
+    rpBinaryWorldModuleCount++;
+    return engine;
+}
+
+BMX_ADDR(0x004c2c40)
+void *_rpBinaryWorldClose(void *engine)
+{
+    rpBinaryWorldModuleCount--;
+    return engine;
+}
+
+BMX_ADDR(0x004c56b0)
+void *_rpMaterialListOpen(void *engine)
+{
+    rpMaterialListModuleCount++;
+    return engine;
+}
+
+BMX_ADDR(0x004c56c0)
+void *_rpMaterialListClose(void *engine)
+{
+    rpMaterialListModuleCount--;
+    return engine;
+}

@@ -28,7 +28,7 @@ public class SeedPtrs extends GhidraScript {
                 if (b == text && !isImmediateOperand(L, a, v)) continue;
                 byte p = getByte(t.subtract(1));
                 byte first = getByte(t);
-                if (!(p == (byte)0xCC || p == (byte)0x90 || p == (byte)0xC3)) continue;
+                if (!(p == (byte)0xCC || p == (byte)0x90 || p == (byte)0xC3 || (v >= RW_START && afterLeaPadding(t)))) continue;
                 // Padding is not a function, but `int3; ret` (a debug-break helper) is.
                 if ((first == (byte)0xCC && getByte(t.add(1)) != (byte)0xC3) || first == (byte)0x90 || first == 0) continue;
                 if (L.getInstructionContaining(t) != null && L.getInstructionAt(t) == null) continue;
@@ -41,6 +41,20 @@ public class SeedPtrs extends GhidraScript {
         }
         analyzeChanges(currentProgram);
         println("SeedPtrs candidates " + seen + " created " + created);
+    }
+
+    static final long RW_START = 0x4a4a80L;
+
+    /** RenderWare is aligned with `lea esi,[esi+0]` style padding behind a ret/jmp (8d 76 00, 8d bc 27 ...). */
+    static final java.util.regex.Pattern AFTER_PADDING = java.util.regex.Pattern.compile(
+        "(?:c3|c2[0-9a-f]{4}|e9[0-9a-f]{8}|eb[0-9a-f]{2}|cc)"
+        + "(?:90|cc|8d7600|8d742600|8db42600000000|8db600000000|8dbc2700000000|8dbf00000000|8d7f00|89f6|8bf6|8d3600|8d4000)*$");
+
+    /** True when the bytes before t are such padding behind a terminator (the previous function may not exist yet). */
+    boolean afterLeaPadding(Address t) throws Exception {
+        StringBuilder h = new StringBuilder();
+        for (int i = 32; i >= 1; i--) h.append(String.format("%02x", getByte(t.subtract(i)) & 0xff));
+        return AFTER_PADDING.matcher(h).find();
     }
 
     /** True when the dword at a is the immediate operand of a push/mov instruction (not a memory operand). */

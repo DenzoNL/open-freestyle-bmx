@@ -16,6 +16,7 @@
 #include "zge/zmath.h"
 
 typedef ZMatrix RwMatrix;
+typedef void(BMX_CDECL *RwMatrixMultiplyFunc)(RwMatrix *out, const RwMatrix *a, const RwMatrix *b);
 
 /*
  * Address of a callback that is still original code (or code of another slice): the plugin registries and
@@ -60,6 +61,7 @@ enum {
     rwDEVICESYSTEMGETNUMMODES = 5,
     rwDEVICESYSTEMGETMODEINFO = 6,
     rwDEVICESYSTEMUSEMODE = 7,
+    rwDEVICESYSTEMPIPELINE = 9, /* the Im3D pipeline asks the driver to fill in its stages */
     rwDEVICESYSTEMGETMODE = 10,
     rwDEVICESYSTEMSTANDARDS = 11,
     rwDEVICESYSTEMGETNUMSUBSYSTEMS = 13,
@@ -389,6 +391,23 @@ int RwEngineInit(const RwMemoryFunctions *memoryFunctions, uint32_t initFlags);
 int32_t *RwEngineGetMetrics(void);
 int32_t _rwGetNumEngineInstances(void);
 
+/* The engine's free list entry points (RwGlobals.freeListAlloc / freeListFree), see rw/core.c and engine.c.
+ */
+void *_rwFreeListAllocReal(RwFreeList *freeList);
+void _rwFreeListFreeReal(RwFreeList *freeList, void *entry);
+void *rwFreeListAllocPlain(RwFreeList *freeList);
+RwFreeList *rwFreeListFreePlain(RwFreeList *freeList, void *entry);
+
+/* Modules of the engine registry: open(engine, offset of its data) returns the engine, NULL when it failed.
+ */
+void *_rwErrorOpen(void *engine, int32_t offset);
+void *_rwColorOpen(void *engine);
+void *_rwColorClose(void *engine);
+void *_rwMatrixOpen(void *engine, int32_t offset);
+void *_rwResourcesOpen(void *engine, int32_t offset);
+void *_rwResourcesClose(void *engine);
+int _rwDeviceSystemRequest(RwDevice *device, int32_t request, void *out, void *inOut, int32_t in);
+
 /* The default calloc of the memory interface (0x4db9a0): malloc plus a zero fill. */
 void *rwDefaultCalloc(size_t count, size_t size);
 
@@ -419,6 +438,7 @@ _Static_assert(sizeof(RwResEntry) == 0x18, "RwResEntry layout");
 _Static_assert(sizeof(RwResourcesGlobals) == 0x24, "RwResourcesGlobals layout");
 
 int RwResourcesFreeResEntry(RwResEntry *entry);
+void ResourcesInit(RwResourcesGlobals *resources);
 void _rwResourcesPurge(void);
 int RwResourcesSetArenaSize(int32_t size);
 

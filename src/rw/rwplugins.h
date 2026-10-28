@@ -226,4 +226,8 @@ void RpSkinFindBoneFrames(RpSkinBoneBlock *blocks, RwFrame *frame);
 __attribute__((regparm(2))) RwMatrix *RwMatrixInvertOrthonormal(RwMatrix *out, const RwMatrix *in);
 __attribute__((regparm(2))) RwMatrix *RwMatrixInvertGeneral(RwMatrix *out, const RwMatrix *in);
 
+/* The animation plugin's engine module (rw/plugins.c). */
+void *WorldObjectOpen(void *engine, int32_t offset);
+void *WorldObjectClose(void *engine);
+
 #endif

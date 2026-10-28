@@ -88,6 +88,52 @@ RwFreeList *RwFreeListForAllUsed(RwFreeList *freeList, RwFreeListCallBack fn, vo
     return freeList;
 }
 
+/*
+ * The engine's default free list allocator (RwGlobals.freeListAlloc): pops the top free entry. An empty list
+ * first gets a new block of entriesPerBlock entries and a larger free stack (the old stack is empty and
+ * freed), then hands out the entry at the block's end. NULL, with the error set, when memory runs out.
+ */
+BMX_ADDR(0x004dbc30)
+void *_rwFreeListAllocReal(RwFreeList *freeList)
+{
+    if ((uintptr_t)freeList->freeTop < (uintptr_t)freeList->freeBegin) {
+        uint8_t *block = RwEngineInstance->memoryFuncs.rwmalloc((size_t)freeList->blockSize);
+        if (block == NULL) {
+            RwError error;
+            error.pluginID = 1;
+            error.errorCode = _rwerror(rwERR_NOMEM, freeList->blockSize);
+            RwErrorSet(&error);
+            return NULL;
+        }
+        const uint32_t stackSize = ((uint32_t)freeList->entriesPerBlock + (uint32_t)freeList->numBlocks) * 4;
+        void **stack = (void **)RwEngineInstance->memoryFuncs.rwmalloc(stackSize);
+        if (stack == NULL) {
+            RwError error;
+            error.pluginID = 1;
+            error.errorCode = _rwerror(rwERR_NOMEM, (int32_t)stackSize);
+            RwErrorSet(&error);
+            RwEngineInstance->memoryFuncs.rwfree(block);
+            return NULL;
+        }
+        RwEngineInstance->memoryFuncs.rwfree((void *)freeList->freeBegin);
+        freeList->freeBegin = stack;
+        freeList->numBlocks += freeList->entriesPerBlock;
+        ((RwFreeListBlock *)block)->next = freeList->blocks;
+        uintptr_t entry = ((uintptr_t)(freeList->blockSize - freeList->entrySize) + (uintptr_t)block) &
+                          ~(uintptr_t)freeList->alignmentMask;
+        freeList->blocks = (RwFreeListBlock *)block;
+        for (int32_t left = freeList->entriesPerBlock; left != 0; left--) {
+            *stack++ = (void *)entry;
+            entry -= (uintptr_t)freeList->entrySize;
+        }
+        freeList->freeTop =
+            (void **)((uintptr_t)freeList->freeBegin + (uint32_t)freeList->entriesPerBlock * 4 - 4);
+    }
+    void **top = freeList->freeTop;
+    freeList->freeTop = top - 1;
+    return *top;
+}
+
 /* ---- errors ----------------------------------------------------------------------------------------- */
 
 static RwError *rwErrorSlot(void)
@@ -158,22 +204,26 @@ void _rwObjectHasFrameReleaseFrame(RwObjectHasFrame *object)
 /* ---- plugin registry -------------------------------------------------------------------------------- */
 
 /* The defaults for a plugin without constructor, destructor or copy callback: return the object. */
+BMX_ADDR(0x004e8b60)
 void *rwPluginDefaultCopy(void *dst, const void *src, int32_t offset, int32_t size)
 {
     return dst;
 }
 
+BMX_ADDR(0x004e8b70)
 void *rwPluginDefaultDestructor(void *object, int32_t offset, int32_t size)
 {
     return object;
 }
 
+BMX_ADDR(0x004e8b80)
 void *rwPluginDefaultConstructor(void *object, int32_t offset, int32_t size)
 {
     return object;
 }
 
 /* Free list callback (0x4e8800) used when the registry closes: resets the registry, returns the entry. */
+BMX_ADDR(0x004e8800)
 void rwPluginRegEntryRelease(void *entry, void *freeList)
 {
     RwPluginRegistry *registry = ((RwPluginRegEntry *)entry)->parentRegistry;

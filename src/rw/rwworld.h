@@ -191,7 +191,20 @@ typedef struct RpWorldGlobals {
     RwLLLink worlds;           /* 0x08 */
 } RpWorldGlobals;
 
-#define rpTieOffset          ORIG_VAR(0x00676730, int32_t, rpTieOffset)
+#define rpTieOffset ORIG_VAR(0x00676730, int32_t, rpTieOffset)
+
+/* Module open/close routines and extension callbacks (rw/world.c). */
+void *_rpTieOpen(void *engine, int32_t offset);
+void *WorldDeInitClumpExt(void *clump);
+void *WorldInitClumpExt(void *clump);
+void *_rpBspOpen(void *engine);
+void *_rpBspClose(void *engine);
+void *_rpSectorOpen(void *engine);
+void *_rpSectorClose(void *engine);
+void *_rpBinaryWorldOpen(void *engine);
+void *_rpBinaryWorldClose(void *engine);
+void *_rpMaterialListOpen(void *engine);
+void *_rpMaterialListClose(void *engine);
 #define rpWorldGlobalsOffset ORIG_VAR(0x00676760, int32_t, rpWorldGlobalsOffset)
 
 /* ---- intersections (the walks of the BSP) ----------------------------------------------------------- */

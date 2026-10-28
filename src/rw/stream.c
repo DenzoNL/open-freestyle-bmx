@@ -460,3 +460,18 @@ RwStream *RwStreamReadInt32(RwStream *stream, void *ints, uint32_t size)
 {
     return RwStreamRead(stream, ints, size) == size ? stream : NULL;
 }
+
+#define rwStreamModuleCount ORIG_VAR(0x00676d54, int32_t, rwStreamModuleCount)
+
+/* Stream module: the free list of stream objects. NULL when it cannot be created. */
+BMX_ADDR(0x004e2350)
+void *_rwStreamModuleOpen(void *engine, int32_t offset)
+{
+    rwStreamOffset = offset;
+    *(RwFreeList **)((uint8_t *)RwEngineInstance + offset) = RwFreeListCreate(0x20, 10, 0);
+    if (rwStreamFreeList() == NULL) {
+        return NULL;
+    }
+    rwStreamModuleCount++;
+    return engine;
+}

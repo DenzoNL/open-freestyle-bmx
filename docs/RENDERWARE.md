@@ -78,14 +78,27 @@ world, clump, streams) is roughly 100-120 KB, about a quarter of the game code.
 ## Tooling
 
 `data/functions-rw.csv` (same columns as `functions.csv`) lists the RW functions to port: the static call
-closure of the entry functions (ORIG_FN declarations and BMX_ADDR annotations at addresses >= 0x4a4a80),
-713 functions. 409 are `orig` (about 104 KB), grouped into `src/rw/<group>.c` (engine, plugins, math,
-collision, world, clump, stream, texture, light, camera, im, charset, and `core` for internals reached
-from three or more groups: errors, plugin registry, free lists). 304 are `skip` with file `lib/crt`,
-`lib/libpng` or `lib/zlib`: the MSVC CRT and the decoder behind RtPNGImageRead, which the replacement
-takes from the platform and a real image library. The heuristics are in the docstring of `tools/rwmap.py`.
-Group assignment is a first guess (address ranges per RW module, labels, who reaches a function): move a
-function by editing its file column and keeping it when you regenerate.
+closure of the entry functions (ORIG_FN declarations and BMX_ADDR annotations at addresses >= 0x4a4a80) and the
+closure of the functions reached only through pointers (engine and plugin tables, default callbacks, constructors
+and destructors of the plugin registry, stream callbacks, free list slots). Rows are `orig` (to port, grouped
+into `src/rw/<group>.c`), `ported`, or `skip`: `lib/crt`, `lib/libpng` and `lib/zlib` (the replacement takes those from
+the platform and a real image library) and `lib/d3d7driver` (the Direct3D 7 device driver: our SDL3 driver
+replaces it, it is never ported). The heuristics are in the docstring of `tools/rwmap.py`; in short:
+
+- Pointer targets: `RW_CB`/`BMX_FNPTR` addresses in `src/`, initial values of `ORIG_VAR` globals, dwords in the
+  exe's data sections and `PUSH`/`MOV` immediates in RW code that are function starts.
+- Driver: the closure of the device table (0x566fe4), the standard functions table (0x56701c), the core extension
+  table (0x69bee0) and every function with a "D3D" community label, minus what the other roots reach. Things between
+  the driver functions that no root claims (D3D3 raster and format code around 0x4ef450..0x4f9db0, the world
+  instancing pipelines 0x4c8e30..0x4cb000) are still `orig`: check them before porting; they are probably render
+  code the SDL3 driver replaces.
+- Pointer targets need a Ghidra function: `tools/ghidra/SeedPtrs.java` creates them (RenderWare pads with
+  `lea esi,[esi+0]` style bytes behind a ret). `rwmap.py` lists pointer targets without a bundle on stderr; re-export
+  with `BUNDLES_OUT=work/bundles-rw BUNDLES_FROM=4a4a80 BUNDLES_TO=54b000 GHIDRA_PROJECT=ngbmx-rw tools/ghidra/export.sh
+  work/NgBMX.exe work/labels.raw` (the Ghidra project must not live under a path with a `.` directory such as
+  `.claude/worktrees`). Still missing: 0x4b0f20 (clump module open), 0x4a9f70 (CRT) and the `_rwcseg` block at 0x54b000.
+- Group assignment is a first guess (address ranges per RW module, labels, who reaches a function): move a function by
+  editing its file column and keeping it when you regenerate. Rows of `skip` and `ported` functions keep their file.
 
 ```sh
 export BMX_WORK=<repo>/work        # only in a git worktree: work/ is gitignored and lives in the main checkout
@@ -100,10 +113,8 @@ callees outside the slice) and also lists the `skip` library callees. Ported RW 
 with `BMX_ADDR` annotations like the game code; `progress.py` recognises them and `CMakeLists.txt` builds
 `src/rw/*.c`. Rerun `rwmap.py` after porting: ported rows keep their file and status.
 
-Known gaps: calls through function-pointer tables (device driver, plugin callbacks) are not in the
-closure, and two callbacks the game passes by address (`rwBmpImageWrite` 0x4e7eb0 and
-`rwWorldPvsDefaultCallback` 0x4cd510) are not Ghidra functions, so they have no bundle or CSV row yet
-(create the functions in Ghidra and re-export to add them).
+Known gaps: 288 `orig` rows added by the pointer pass (80 KB) are not ported; the engine init-path ones are done, the rest
+are callbacks that run when worlds, clumps and textures load (see Next).
 
 ## Known issues
 
@@ -113,4 +124,8 @@ closure, and two callbacks the game passes by address (`rwBmpImageWrite` 0x4e7eb
 
 ## Next
 
-1. Port engine core + memory + plugins (the first traps in `bmxnative.exe`), oracle-tested like the game.
+1. Port engine core + memory + plugins (the first traps in `bmxnative.exe`), oracle-tested like the game. Done up to
+   the driver boundary (docs/NATIVE.md: first trap 0x4eac90, the driver's extension attach).
+2. Plug in the SDL3 driver at the device table / standards table / extension table, then port the pointer-only
+   code that runs once a world loads: plugin stream callbacks (rw/plugins.c, the 0x4fc..0x502 animation and bone
+   plugins), the world and sector readers (rw/world.c), texture and image callbacks (0x4e0160..0x4e1b50, 0x4e3c08..0x4e7fc0).

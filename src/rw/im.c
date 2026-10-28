@@ -117,3 +117,144 @@ RwIm3DPipeline *rwIm3DPipelinePop(void)
     rwIm3DGlobals()->depth--;
     return rwIm3DGlobals()->stack[rwIm3DGlobals()->depth];
 }
+
+/* ---- modules: the Im3D pipeline stack and its default stages ---------------------------------------- */
+
+#define rwRenderPipelineModuleCount ORIG_VAR(0x00676d74, int32_t, rwRenderPipelineModuleCount)
+#define rwIm3DModuleCount           ORIG_VAR(0x00676d34, int32_t, rwIm3DModuleCount)
+
+/* The default entries of the Im3D module: nothing to begin or end, 0 for "failed". */
+BMX_ADDR(0x004e8390)
+int rwIm3DDefaultBegin(RwIm3DPipeline *pipeline)
+{
+    return 0;
+}
+
+BMX_ADDR(0x004e83a0)
+int rwIm3DDefaultEnd(void)
+{
+    return 0;
+}
+
+/* Sets the begin and end entries of the Im3D module (called by the driver). */
+BMX_ADDR(0x004e83b0)
+void rwIm3DSetEntries(int(BMX_CDECL *begin)(RwIm3DPipeline *pipeline), int(BMX_CDECL *end)(void))
+{
+    rwIm3DGlobals()->begin = begin;
+    rwIm3DGlobals()->end = end;
+}
+
+/* Im3D module: the free list of pipelines (entries of 0x1c bytes) and the default entries. NULL on no memory.
+ */
+BMX_ADDR(0x004e83e0)
+void *_rwRenderPipelineOpen(void *engine, int32_t offset)
+{
+    rwIm3DOffset = offset;
+    rwIm3DGlobals()->pipelineFreeList = RwFreeListCreate(0x1c, 5, 0);
+    if (rwIm3DGlobals()->pipelineFreeList == NULL) {
+        return NULL;
+    }
+    rwIm3DGlobals()->begin = BMX_FNPTR(RwIm3DBeginFunc, 0x004e8390, rwIm3DDefaultBegin);
+    rwIm3DGlobals()->end = BMX_FNPTR(RwIm3DEndFunc, 0x004e83a0, rwIm3DDefaultEnd);
+    rwIm3DGlobals()->depth = 0;
+    rwRenderPipelineModuleCount++;
+    return engine;
+}
+
+BMX_ADDR(0x004e8480)
+void *_rwRenderPipelineClose(void *engine)
+{
+    if (rwIm3DGlobals()->pipelineFreeList != NULL) {
+        RwFreeListDestroy(rwIm3DGlobals()->pipelineFreeList);
+        rwIm3DGlobals()->pipelineFreeList = NULL;
+    }
+    rwRenderPipelineModuleCount--;
+    return engine;
+}
+
+/* The default stages of a pipeline: the instance stage finds no work, the others do nothing. */
+BMX_ADDR(0x004e84c0)
+void *rwPipelineDefaultInstance(RwIm3DTransformInfo *info)
+{
+    return NULL;
+}
+
+BMX_ADDR(0x004e84d0)
+void rwPipelineDefaultStage4(void *work, void *data) {}
+
+BMX_ADDR(0x004e84e0)
+void rwPipelineDefaultStageData(void) {}
+
+BMX_ADDR(0x004e84f0)
+void rwPipelineDefaultStage(void *work) {}
+
+/* A new pipeline with the default stages, which the device then fills in; NULL if that fails. */
+BMX_ADDR(0x004e8500)
+RwIm3DPipeline *_rpWorldPipelineOpen(void)
+{
+    RwIm3DPipeline *pipeline = RwEngineInstance->freeListAlloc(rwIm3DGlobals()->pipelineFreeList);
+    if (pipeline == NULL) {
+        return NULL;
+    }
+    pipeline->instance = BMX_FNPTR(RwIm3DInstanceFunc, 0x004e84c0, rwPipelineDefaultInstance);
+    pipeline->stage6 = BMX_FNPTR(RwIm3DStageFunc, 0x004e84f0, rwPipelineDefaultStage);
+    pipeline->stage5 = BMX_FNPTR(RwIm3DStageFunc, 0x004e84f0, rwPipelineDefaultStage);
+    pipeline->stage2 = BMX_FNPTR(RwIm3DStageFunc, 0x004e84f0, rwPipelineDefaultStage);
+    pipeline->stage1 = BMX_FNPTR(RwIm3DStageFunc, 0x004e84f0, rwPipelineDefaultStage);
+    pipeline->stage4 = BMX_FNPTR(RwIm3DStage4Func, 0x004e84d0, rwPipelineDefaultStage4);
+    pipeline->stageData = BMX_FNPTR(void *, 0x004e84e0, rwPipelineDefaultStageData);
+    if (_rwDeviceSystemRequest(&RwEngineInstance->dOpenDevice, rwDEVICESYSTEMPIPELINE, NULL, pipeline, 0) ==
+        0) {
+        return NULL;
+    }
+    return pipeline;
+}
+
+/* Gives a pipeline back to its free list; always 1. */
+BMX_ADDR(0x004e8580)
+int rwIm3DPipelineRelease(RwIm3DPipeline *pipeline)
+{
+    RwEngineInstance->freeListFree(rwIm3DGlobals()->pipelineFreeList, pipeline);
+    return 1;
+}
+
+/* Calls entry 3 / entry 1 of the core extension's function table (0x69bee0) on a pipeline. */
+BMX_ADDR(0x004e8700)
+int rwCoreExtCallSlot3(void *pipeline)
+{
+    ((void(BMX_CDECL *)(void *))rwCoreExtGetFuncs()[3])(pipeline);
+    return 1;
+}
+
+BMX_ADDR(0x004e8720)
+void rwCoreExtCallSlot1(void *pipeline)
+{
+    ((void(BMX_CDECL *)(void *))rwCoreExtGetFuncs()[1])(pipeline);
+}
+
+/* Im3D pipeline module: the first pipeline, handed to the core extension. NULL if it cannot be made. */
+BMX_ADDR(0x004dee70)
+void *_rwIm3DOpen(void *engine, int32_t offset)
+{
+    rwIm3DPipelineOffset = offset;
+    RwIm3DPipeline **slot = (RwIm3DPipeline **)((uint8_t *)RwEngineInstance + offset);
+    *slot = _rpWorldPipelineOpen();
+    if (*slot == NULL) {
+        return NULL;
+    }
+    rwCoreExtCallSlot3(*slot);
+    rwIm3DModuleCount++;
+    return engine;
+}
+
+BMX_ADDR(0x004deec0)
+void *_rwIm3DClose(void *engine)
+{
+    RwIm3DPipeline **slot = (RwIm3DPipeline **)((uint8_t *)RwEngineInstance + rwIm3DPipelineOffset);
+    if (*slot != NULL) {
+        rwIm3DPipelineRelease(*slot);
+        *slot = NULL;
+    }
+    rwIm3DModuleCount--;
+    return engine;
+}

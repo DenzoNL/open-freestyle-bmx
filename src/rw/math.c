@@ -796,3 +796,235 @@ RwFrameList *_rwFrameListDeinitialize(RwFrameList *frameList)
     }
     return frameList;
 }
+
+/* ---- modules: frames, matrices and the square root tables ------------------------------------------- */
+
+#define rwFrameModuleCount  ORIG_VAR(0x00676984, int32_t, rwFrameModuleCount)
+#define rwVectorModuleCount ORIG_VAR(0x00676994, int32_t, rwVectorModuleCount)
+/* Numerators of the reciprocal square root tables (both 1.0 in the exe's data). */
+#define rwInvSqrtScaleOdd  ORIG_VAR(0x0069b950, double, rwInvSqrtScaleOdd)
+#define rwInvSqrtScaleEven ORIG_VAR(0x0069b958, double, rwInvSqrtScaleEven)
+
+static void rwReportNoMemory(int32_t bytes)
+{
+    RwError error;
+    error.pluginID = 1;
+    error.errorCode = _rwerror(rwERR_NOMEM, bytes);
+    RwErrorSet(&error);
+}
+
+/* Frame module: the free list of frames (the registry's size, entries 4 aligned) and an empty dirty list. */
+BMX_ADDR(0x004d2280)
+void *_rwFrameOpen(void *engine, int32_t offset)
+{
+    rwFrameOffset = offset;
+    RwFreeList *freeList = RwFreeListCreate(rwFrameRegistry.sizeOfStruct, 0x28, 4);
+    *(RwFreeList **)((uint8_t *)RwEngineInstance + offset) = freeList;
+    if (freeList == NULL) {
+        return NULL;
+    }
+    RwEngineInstance->dirtyFrameList.next = &RwEngineInstance->dirtyFrameList;
+    RwEngineInstance->dirtyFrameList.prev = &RwEngineInstance->dirtyFrameList;
+    rwFrameModuleCount++;
+    return engine;
+}
+
+BMX_ADDR(0x004d2310)
+void *_rwFrameClose(void *engine)
+{
+    if (rwFrameFreeList() != NULL) {
+        RwFreeListDestroy(rwFrameFreeList());
+        *(RwFreeList **)((uint8_t *)RwEngineInstance + rwFrameOffset) = NULL;
+    }
+    rwFrameModuleCount--;
+    return engine;
+}
+
+/* The engine's matrix product: out = a * b for matrices without perspective (rotation rows then position). */
+BMX_ADDR(0x004d02c0)
+void rwMatrixMultiplyDefault(RwMatrix *out, const RwMatrix *a, const RwMatrix *b)
+{
+    float *o = (float *)out;
+    const float *x = (const float *)a;
+    const float *y = (const float *)b;
+    for (int row = 0; row < 3; row++) {
+        for (int col = 0; col < 3; col++) {
+            o[row * 4 + col] =
+                (float)((rwMul(x[row * 4 + 2], y[8 + col]) + rwMul(y[4 + col], x[row * 4 + 1])) +
+                        rwMul(y[col], x[row * 4]));
+        }
+    }
+    for (int col = 0; col < 3; col++) {
+        o[12 + col] = (float)(((rwMul(x[14], y[8 + col]) + rwMul(y[4 + col], x[13])) + rwMul(y[col], x[12])) +
+                              y[12 + col]);
+    }
+}
+
+/* Default point transform of the engine: out[i] = in[i] * matrix (rows then position). Returns out. */
+BMX_ADDR(0x004d34d0)
+RwV3d *rwV3dTransformPointsDefault(RwV3d *out, const RwV3d *in, int32_t count, const RwMatrix *matrix)
+{
+    const RwMatrix *m = matrix;
+    for (int32_t i = 0; i < count; i++) {
+        const double x = (rwMul(m->right.x, in[i].x) + rwMul(m->up.x, in[i].y)) + rwMul(m->at.x, in[i].z);
+        const double y = (rwMul(m->right.y, in[i].x) + rwMul(m->up.y, in[i].y)) + rwMul(m->at.y, in[i].z);
+        const double z = (rwMul(m->right.z, in[i].x) + rwMul(m->up.z, in[i].y)) + rwMul(m->at.z, in[i].z);
+        out[i].x = (float)(x + m->pos.x);
+        out[i].y = (float)(y + m->pos.y);
+        out[i].z = (float)(z + m->pos.z);
+    }
+    return out;
+}
+
+/* Like rwV3dTransformPointsDefault, without the position: for directions. */
+BMX_ADDR(0x004d3570)
+RwV3d *rwV3dTransformVectorsDefault(RwV3d *out, const RwV3d *in, int32_t count, const RwMatrix *matrix)
+{
+    const RwMatrix *m = matrix;
+    for (int32_t i = 0; i < count; i++) {
+        const double x = (rwMul(m->up.x, in[i].y) + rwMul(m->right.x, in[i].x)) + rwMul(m->at.x, in[i].z);
+        const double y = (rwMul(m->right.y, in[i].x) + rwMul(m->up.y, in[i].y)) + rwMul(m->at.y, in[i].z);
+        const double z = (rwMul(m->right.z, in[i].x) + rwMul(m->up.z, in[i].y)) + rwMul(m->at.z, in[i].z);
+        out[i].x = (float)x;
+        out[i].y = (float)y;
+        out[i].z = (float)z;
+    }
+    return out;
+}
+
+/* Installs the point and vector transforms (EAX, EDX; NULL = the defaults above). Always 1. */
+BMX_ADDR(0x004d3608)
+__attribute__((regparm(2))) int rwV3dSetTransformFuncs(RwV3dTransformFunc points, RwV3dTransformFunc vectors)
+{
+    if (points == NULL) {
+        points = BMX_FNPTR(RwV3dTransformFunc, 0x004d34d0, rwV3dTransformPointsDefault);
+    }
+    rwV3dModule()->transformPoints = points;
+    if (vectors == NULL) {
+        vectors = BMX_FNPTR(RwV3dTransformFunc, 0x004d3570, rwV3dTransformVectorsDefault);
+    }
+    rwV3dModule()->transformVectors = vectors;
+    return 1;
+}
+
+BMX_ADDR(0x004d3450)
+void rwV3dFreeSqrtTable(void)
+{
+    if (rwV3dModule()->sqrtTable != NULL) {
+        RwEngineInstance->memoryFuncs.rwfree((void *)rwV3dModule()->sqrtTable);
+        rwV3dModule()->sqrtTable = NULL;
+    }
+}
+
+BMX_ADDR(0x004d3490)
+void rwV3dFreeInvSqrtTable(void)
+{
+    if (rwV3dModule()->invSqrtTable != NULL) {
+        RwEngineInstance->memoryFuncs.rwfree((void *)rwV3dModule()->invSqrtTable);
+        rwV3dModule()->invSqrtTable = NULL;
+    }
+}
+
+BMX_ADDR(0x004d3b30)
+void *rwVectorClose(void *engine)
+{
+    rwV3dFreeInvSqrtTable();
+    rwV3dFreeSqrtTable();
+    rwVectorModuleCount--;
+    return engine;
+}
+
+static float rwFloatFromBits(uint32_t bits)
+{
+    float f;
+    memcpy(&f, &bits, sizeof f);
+    return f;
+}
+
+static uint32_t rwBitsOfFloat(float f)
+{
+    uint32_t bits;
+    memcpy(&bits, &f, sizeof bits);
+    return bits;
+}
+
+/*
+ * Vector module: the default transforms and the two 8 KB... tables _rwFastSqrt and the reciprocal square
+ * root
+ * look up by the top mantissa bits of a float. Each holds 0x1000 entries: the bits of the root of the
+ * floats
+ * from 1.0 in steps of 0x1000 bits (the odd exponent half first), offset so that adding the halved
+ * exponent of
+ * the argument gives the root of the whole number. NULL with the error set when a table cannot
+ * be allocated.
+ */
+BMX_ADDR(0x004d3b50)
+void *rwVectorOpen(void *engine, int32_t offset)
+{
+    rwFastSqrtOffset = offset;
+    rwV3dSetTransformFuncs(NULL, NULL);
+    uint32_t *table = RwEngineInstance->memoryFuncs.rwmalloc(0x4000);
+    if (table == NULL) {
+        rwReportNoMemory(0x4000);
+        return NULL;
+    }
+    uint32_t x = 0x3f800000;
+    for (int i = 0; i < 0x800; i++, x += 0x1000) {
+        table[0x800 + i] = rwBitsOfFloat((float)__builtin_sqrt((double)rwFloatFromBits(x))) + 0xe0400000u;
+    }
+    for (int i = 0; i < 0x800; i++, x += 0x1000) {
+        table[i] = rwBitsOfFloat((float)__builtin_sqrt((double)rwFloatFromBits(x))) + 0xe0000000u;
+    }
+    rwV3dModule()->sqrtTable = table;
+    uint32_t *inverse = RwEngineInstance->memoryFuncs.rwmalloc(0x4000);
+    if (inverse == NULL) {
+        rwReportNoMemory(0x4000);
+        return NULL;
+    }
+    x = 0x3f800000;
+    for (int i = 0; i < 0x800; i++, x += 0x1000) {
+        inverse[0x800 + i] =
+            rwBitsOfFloat((float)(rwInvSqrtScaleOdd / __builtin_sqrt((double)rwFloatFromBits(x)))) +
+            0xe0000000u;
+    }
+    for (int i = 0; i < 0x800; i++, x += 0x1000) {
+        inverse[i] = rwBitsOfFloat((float)(rwInvSqrtScaleEven / __builtin_sqrt((double)rwFloatFromBits(x)))) +
+                     0xe0400000u;
+    }
+    rwVectorModuleCount++;
+    rwV3dModule()->invSqrtTable = inverse;
+    return engine;
+}
+
+/* ---- frame lists ------------------------------------------------------------------------------------ */
+
+/* Stores the frame and then its siblings and children, in that order, at *cursor (EAX = cursor, EDX = frame).
+ */
+BMX_ADDR(0x004e8fc0)
+__attribute__((regparm(2))) int rwFrameListFill(RwFrame ***cursor, RwFrame *frame)
+{
+    if (frame != NULL) {
+        **cursor = frame;
+        (*cursor)++;
+        rwFrameListFill(cursor, frame->next);
+        rwFrameListFill(cursor, frame->child);
+    }
+    return 1;
+}
+
+/* Fills a frame list with every frame of the hierarchy of root. NULL, with the error set, on no memory. */
+BMX_ADDR(0x004e96d0)
+RwFrameList *_rwFrameListInitialize(RwFrameList *frameList, RwFrame *root)
+{
+    const int32_t count = RwFrameCount(root);
+    RwFrame **frames = (RwFrame **)RwEngineInstance->memoryFuncs.rwmalloc((size_t)count << 2);
+    if (frames == NULL) {
+        rwReportNoMemory(count << 2);
+        return NULL;
+    }
+    RwFrame **cursor = frames;
+    rwFrameListFill(&cursor, root);
+    frameList->numFrames = count;
+    frameList->frames = frames;
+    return frameList;
+}
