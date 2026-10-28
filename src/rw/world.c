@@ -9,6 +9,7 @@
 
 #include "rw/rwclump.h"
 #include "rw/rwcollision.h"
+#include "rw/rwim.h"
 
 /*
  * The camera set-up of the PVS generation (0x4ce6d0, original code of the camera group): EAX = world, EDX =
@@ -1154,10 +1155,10 @@ RpWorld *RpPVSHook(RpWorld *world)
 
 /*
  * Puts the world's own render callback back. The original is a four byte stub that loads the argument into
- * EAX and falls into this. Its jmp overwrites the first byte of the body 0x4cc2c4, which PVSWorldDestructor
- * (0x4cc710, original) still calls directly: not hooked until that caller is ported (gen_hooks.py checks
- * this); ported callers call this function.
+ * EAX and falls into the body at 0x4cc2c4; this function is both. The hook jmp at 0x4cc2c0 covers the body's
+ * first byte, so the body has no hook of its own: its callers 0x4cc710 and 0x4cc324 are ported and call this.
  */
+BMX_ADDR(0x004cc2c0)
 RpWorld *RpPVSUnhook(RpWorld *world)
 {
     if (world != NULL) {
@@ -1170,8 +1171,9 @@ RpWorld *RpPVSUnhook(RpWorld *world)
     return world;
 }
 
-/* Frees the PVS data of the world and of its sectors. Stub at 0x4cc320 and tail ported as one, like above;
- * not hooked until 0x4cc850 (original, calls the body 0x4cc324) is ported. */
+/* Frees the PVS data of the world and of its sectors. Stub at 0x4cc320 and body at 0x4cc324 ported as one,
+ * like above; the body's only caller 0x4cc850 is ported and calls this. */
+BMX_ADDR(0x004cc320)
 RpWorld *RpPVSUnload(RpWorld *world)
 {
     if (world != NULL) {
@@ -1236,6 +1238,291 @@ RpWorld *RpPVSStatisticsGet(RpWorld *world, uint32_t *statsA, uint32_t *statsB)
     pvs->statsA = 0;
     pvs->statsB = 0;
     return world;
+}
+
+/* ---- the PVS plugin's callbacks: render, view walk, plugin constructors/destructors and streaming ---- */
+
+#define CB_PVS_LOAD RW_CB(RwObjectCallBack, 0x004cc7d0)
+
+/* The pointer a sector's PVS plugin data holds (the row of the sector: its index, then rows of cells). */
+static uint8_t **pvsSectorSlot(const RpWorldSector *sector)
+{
+    return (uint8_t **)((uint8_t *)sector + rpPVSSectorOffset);
+}
+
+/* Renders a sector when the PVS row of the sector the viewer is in has its bit set; counts polygons seen
+ * (statsA) and drawn (statsB). Without a row everything is drawn. Callback of the world's render walk. */
+BMX_ADDR(0x004cc1f0)
+void *pvsRenderSector(RpWorldSector *sector)
+{
+    const int32_t *id = (const int32_t *)*pvsSectorSlot(sector);
+    RpPVSWorldData *pvs = pvsData(rpWorldSectorGetWorld(sector));
+    if (sector->numPolygons != 0 && id != NULL && pvs->viewRow != NULL) {
+        const int32_t index = *id;
+        pvs->statsA += sector->numPolygons;
+        if (((int32_t)(int8_t)pvs->viewRow[index >> 3] & (1 << (index & 7))) == 0) {
+            return NULL;
+        }
+        pvs->statsB += sector->numPolygons;
+    }
+    return pvs->savedRenderCallBack(sector);
+}
+
+/* Clears the PVS slot of a sector (the unload walk's callback; the sector is the result to go on). */
+BMX_ADDR(0x004cc300)
+void *pvsSectorUnload(void *sector)
+{
+    *pvsSectorSlot(sector) = NULL;
+    return sector;
+}
+
+/* a - b with b opaque to the optimiser (see subtractOpaque: the sign of a NaN decides). */
+static float pvsSubtract(float a, float b)
+{
+    __asm__("" : "+x"(b));
+    return a - b;
+}
+
+/*
+ * The row of visibility bits of the cell of the sector that holds the position (EAX = sector, EDX =
+ * position): descends the sector's collision tree as many levels as the granularity says (a node's byte 0 bit
+ * 7 marks a split, bits 5..6 give the axis (x4 as a byte offset), byte 1 the split vertex; a negative
+ * distance goes to the first child), then doubles up to the cell level. A sector without polygons has only
+ * the first row.
+ */
+BMX_ADDR(0x004cc3c0)
+__attribute__((regparm(2))) const uint8_t *pvsCellRow(const RpWorldSector *sector, const float *position)
+{
+    const RwV3d *vertices = sector->vertices;
+    const RpPVSWorldData *pvs = pvsData(rpWorldSectorGetWorld((RpWorldSector *)(uintptr_t)sector));
+    const uint8_t *data = *pvsSectorSlot(sector);
+    const uint8_t *tree = sector->colSectorRoot;
+    int32_t node = 1;
+    if (sector->numPolygons == 0) {
+        return data + 4;
+    }
+    for (int32_t level = 0; level < pvs->granularity; level++) {
+        const uint8_t flags = tree[node * 3];
+        if ((flags & 0x80) == 0) {
+            while (node < pvs->numCells) {
+                node *= 2;
+            }
+            break;
+        }
+        const uint32_t axis = (uint32_t)(flags >> 3) & 0xc;
+        const uint32_t vertex = tree[node * 3 + 1];
+        const float split = *(const float *)((const uint8_t *)vertices + vertex * 12 + axis);
+        const float distance = pvsSubtract(*(const float *)((const uint8_t *)position + axis), split);
+        node = node * 2 + (floatBits(distance) < 0 ? 0 : 1);
+    }
+    return data + 4 + (node - pvs->numCells) * pvs->rowBytes;
+}
+
+/* The view position walk's callback: remembers the sector and the row of its cell; 0 stops the walk. */
+BMX_ADDR(0x004cc4e0)
+void *pvsViewSector(RpIntersection *intersection, RpWorldSector *sector, RpPVSWorldData *pvs)
+{
+    pvs->viewSector = sector;
+    pvs->viewRow = pvsCellRow(sector, &intersection->t.point.x);
+    return NULL;
+}
+
+/* The constructor of the world's PVS data: a zeroed header of 0x58 bytes (not all of it: the sizes at 0x0c
+ * and 0x10 are set when the data is read or generated). The plugin slot gets the pointer even when the
+ * allocation failed; the result is the world then, NULL otherwise. */
+BMX_ADDR(0x004cc6b0)
+void *pvsWorldConstruct(void *world)
+{
+    RpPVSWorldData *pvs = RwEngineInstance->memoryFuncs.rwmalloc(0x58);
+    void *result = NULL;
+    if (pvs != NULL) {
+        pvs->cursor = NULL;
+        pvs->entryIndices = NULL;
+        pvs->entries = NULL;
+        pvs->numEntries = 0;
+        pvs->rowBuffer = NULL;
+        pvs->progressCallBack = NULL;
+        pvs->hooked = 0;
+        pvs->savedRenderCallBack = NULL;
+        pvs->numSectors = 0;
+        pvs->rowStride = 0;
+        pvs->rowBytes = 0;
+        pvs->visibility = NULL;
+        pvs->viewRow = NULL;
+        result = world;
+    }
+    *(RpPVSWorldData **)((uint8_t *)world + rpPVSWorldOffset) = pvs;
+    return result;
+}
+
+/* The destructor: puts the render callback back, frees the data and clears the slot. */
+BMX_ADDR(0x004cc710)
+void *pvsWorldDestruct(RpWorld *world)
+{
+    RpPVSWorldData *pvs = pvsData(world);
+    RpPVSUnhook(world);
+    if (pvs != NULL) {
+        if (pvs->visibility != NULL) {
+            engineFree(pvs->visibility);
+            pvs->visibility = NULL;
+        }
+        pvs->numEntries = 0;
+        if (pvs->entries != NULL) {
+            engineFree(pvs->entries);
+        }
+        if (pvs->entryIndices != NULL) {
+            engineFree(pvs->entryIndices);
+        }
+        pvs->entryIndices = NULL;
+        pvs->entries = NULL;
+        engineFree(pvs);
+    }
+    *(RpPVSWorldData **)((uint8_t *)world + rpPVSWorldOffset) = NULL;
+    return world;
+}
+
+/* Stream size of the world's PVS chunk: its 5 header words when there are visibility rows, else none. */
+BMX_ADDR(0x004cc7b0)
+int32_t pvsWorldChunkSize(const RpWorld *world)
+{
+    return pvsData(world)->visibility != NULL ? 0x14 : 0;
+}
+
+/* The load walk's callback: moves the sector's row from its own block into the world's one (the cursor) and
+ * tracks the largest vertex count. */
+BMX_ADDR(0x004cc7d0)
+void *pvsSectorLoad(RpWorldSector *sector, RpPVSWorldData *pvs)
+{
+    const int32_t vertices = RpWorldSectorGetNumVertices(sector);
+    pvs->numEntries = vertices > pvs->numEntries ? vertices : pvs->numEntries;
+    uint8_t *target = pvs->cursor;
+    uint8_t *source = *pvsSectorSlot(sector);
+    __builtin_memcpy(target, source, (uint32_t)pvs->rowStride);
+    *pvsSectorSlot(sector) = target;
+    engineFree(source);
+    pvs->cursor = target + pvs->rowStride;
+    return sector;
+}
+
+/* Reads the PVS chunk of a world: five header words and the rows of all sectors (read before by the sector
+ * chunks), which are packed into one block. A header that does not match its sizes drops everything. */
+BMX_ADDR(0x004cc850)
+RwStream *pvsWorldChunkRead(RwStream *stream, int32_t length, RpWorld *world)
+{
+    (void)length;
+    RpPVSWorldData *pvs = pvsData(world);
+    pvs->numEntries = 0;
+    if (pvs->entries != NULL) {
+        engineFree(pvs->entries);
+    }
+    if (pvs->entryIndices != NULL) {
+        engineFree(pvs->entryIndices);
+    }
+    int32_t header[5];
+    RwStreamRead(stream, header, 0x14);
+    RwMemNative32(header, 0x14);
+    pvs->numSectors = header[0];
+    pvs->rowBytes = header[1];
+    pvs->rowStride = header[2];
+    pvs->granularity = header[3];
+    pvs->numCells = header[4];
+    pvs->visibility = RwEngineInstance->memoryFuncs.rwmalloc((uint32_t)header[2] * (uint32_t)header[0]);
+    pvs->cursor = pvs->visibility;
+    RpWorldForAllWorldSectors(world, CB_PVS_LOAD, pvs);
+    if ((((uint32_t)(pvs->numCells * pvs->rowBytes) + 0xbU) & 0xfffffffcU) != (uint32_t)header[2]) {
+        RpPVSUnload(world);
+    }
+    return stream;
+}
+
+/* Writes the five header words of the PVS chunk (little endian). */
+BMX_ADDR(0x004cc940)
+RwStream *pvsWorldChunkWrite(RwStream *stream, int32_t length, const RpWorld *world)
+{
+    (void)length;
+    const RpPVSWorldData *pvs = pvsData(world);
+    int32_t header[5] = {pvs->numSectors, pvs->rowBytes, pvs->rowStride, pvs->granularity, pvs->numCells};
+    RwMemLittleEndian32(header, 0x14);
+    RwStreamWrite(stream, header, 0x14);
+    return stream;
+}
+
+/* Constructor and destructor of the sector's PVS data: both empty the slot (the rows live in the world's
+ * block and are freed with it). */
+BMX_ADDR(0x004cc9b0)
+void *pvsSectorConstruct(void *sector)
+{
+    *pvsSectorSlot(sector) = NULL;
+    return sector;
+}
+
+BMX_ADDR(0x004cc9d0)
+void *pvsSectorDestruct(void *sector)
+{
+    *pvsSectorSlot(sector) = NULL;
+    return sector;
+}
+
+/* Stream size of a sector's PVS chunk: one row of the world's data (the world is looked up twice, as the
+ * original does, which matters for its error report). */
+BMX_ADDR(0x004cc9f0)
+int32_t pvsSectorChunkSize(RpWorldSector *sector)
+{
+    const RpPVSWorldData *pvs = pvsData(rpWorldSectorGetWorld(sector));
+    (void)rpWorldSectorGetWorld(sector);
+    return pvs->visibility != NULL ? pvs->rowStride : 0;
+}
+
+/* Reads a sector's PVS chunk: `length` bytes whose first word (the sector's index) is native-swapped. */
+BMX_ADDR(0x004cca30)
+RwStream *pvsSectorChunkRead(RwStream *stream, int32_t length, RpWorldSector *sector)
+{
+    uint8_t *rows = RwEngineInstance->memoryFuncs.rwmalloc((uint32_t)length);
+    RwStreamRead(stream, rows, (uint32_t)length);
+    RwMemNative32(rows, 4);
+    *pvsSectorSlot(sector) = rows;
+    return stream;
+}
+
+BMX_ADDR(0x004cca90)
+RwStream *pvsSectorChunkWrite(RwStream *stream, int32_t length, const RpWorldSector *sector)
+{
+    RwStreamWrite(stream, *pvsSectorSlot(sector), (uint32_t)length);
+    return stream;
+}
+
+/* The generation's prepare walk: numbers the sector, gives it a zeroed row (the index word, then one row of
+ * rowBytes per cell with a bit set for the sector's own index in every cell) and moves the cursor on. */
+BMX_ADDR(0x004ce620)
+void *pvsSectorPrepare(RpWorldSector *sector, RpPVSWorldData *pvs)
+{
+    const int32_t index = pvs->sectorCounter;
+    uint8_t *row = pvs->cursor;
+    pvs->sectorCounter = index + 1;
+    *(int32_t *)row = index;
+    const int32_t vertices = RpWorldSectorGetNumVertices(sector);
+    pvs->numEntries = vertices > pvs->numEntries ? vertices : pvs->numEntries;
+    __builtin_memset(row + 4, 0, (uint32_t)(pvs->rowBytes * pvs->numCells));
+    for (int32_t cell = 0; cell < pvs->numCells; cell++) {
+        const uint32_t id = *(uint32_t *)row;
+        row[4 + cell * pvs->rowBytes + (id >> 3)] |= (uint8_t)(1U << (id & 7));
+    }
+    pvs->cursor = row + pvs->rowStride;
+    *pvsSectorSlot(sector) = row;
+    return sector;
+}
+
+/* The counting walk's callback: adds one to the count behind data; error 0x185 and NULL without a sector or
+ * counter. */
+BMX_ADDR(0x004ceef0)
+void *pvsSectorCount(void *sector, int32_t *count)
+{
+    if (sector == NULL || count == NULL) {
+        reportError(kPvsCountPluginId, rwERR_NULLP);
+        return NULL;
+    }
+    *count += 1;
+    return sector;
 }
 
 /* Counts the world sectors (error 0x185, result -1, without a world). */
@@ -1310,7 +1597,7 @@ RpWorld *RpPVSCreate(RpWorld *world, RwRaster *raster, RwRaster *zRaster, float 
     pvs->rowStride = (int32_t)rowStride;
     pvs->visibility = RwEngineInstance->memoryFuncs.rwmalloc((size_t)((uint32_t)numSectors * rowStride));
     pvs->rowBuffer = RwEngineInstance->memoryFuncs.rwmalloc((size_t)pvs->rowBytes);
-    pvs->pad38 = 0;
+    pvs->sectorCounter = 0;
     pvs->cursor = pvs->visibility;
     RpWorldForAllWorldSectors(world, CB_PVS_PREPARE, pvs);
     if (pvs->numEntries > 0) {
@@ -1386,6 +1673,72 @@ void *_rpTieOpen(void *engine, int32_t offset)
     RwEngineInstance->renderFrame = 1;
     rpTieModuleCount++;
     return engine;
+}
+
+/* Calls entry 2 of the world extension's function table (0x69b520) on the world's render pipeline. */
+BMX_ADDR(0x004c46d0)
+int rpWorldExtCallSlot2(void *pipeline)
+{
+    return ((int(BMX_CDECL *)(void *))rpWorldExtGetFuncs()[2])(pipeline);
+}
+
+/*
+ * World module: the sector render pipeline (made by the device) and the free list of 0x10 byte world entries,
+ * the empty list of worlds, zeroed default surface properties, the extension's entry 2 on the pipeline and
+ * the light hook of the pipeline (+0x10). Counts the open. NULL (nothing left behind) if a part fails.
+ */
+BMX_ADDR(0x004bc090)
+void *WorldOpen(void *engine, int32_t offset)
+{
+    rpWorldDefaultSurfaceProps.ambient = 0.0F;
+    rpWorldDefaultSurfaceProps.diffuse = 0.0F;
+    rpWorldDefaultSurfaceProps.specular = 0.0F;
+    rpWorldGlobalsOffset = offset;
+    worldGlobals()->pipeline = _rpWorldPipelineOpen();
+    if (worldGlobals()->pipeline == NULL) {
+        return NULL;
+    }
+    worldGlobals()->entryFreeList = RwFreeListCreate(0x10, 3, 0);
+    if (worldGlobals()->entryFreeList == NULL) {
+        rwIm3DPipelineRelease(worldGlobals()->pipeline);
+        worldGlobals()->pipeline = NULL;
+        return NULL;
+    }
+    worldGlobals()->worlds.next = &worldGlobals()->worlds;
+    worldGlobals()->worlds.prev = &worldGlobals()->worlds;
+    rpWorldExtCallSlot2(worldGlobals()->pipeline);
+    *(void **)((uint8_t *)worldGlobals()->pipeline + 0x10) =
+        BMX_FNPTR(void *, 0x004bae70, rpWorldLightObject);
+    rpWorldModuleCount++;
+    return engine;
+}
+
+/* Closes the world module: frees the entry list and the pipeline. */
+BMX_ADDR(0x004bc020)
+void *WorldClose(void *engine)
+{
+    if (worldGlobals()->entryFreeList != NULL) {
+        RwFreeListDestroy(worldGlobals()->entryFreeList);
+        worldGlobals()->entryFreeList = NULL;
+    }
+    if (worldGlobals()->pipeline != NULL) {
+        rwIm3DPipelineRelease(worldGlobals()->pipeline);
+        worldGlobals()->pipeline = NULL;
+    }
+    rpWorldModuleCount--;
+    return engine;
+}
+
+/* The default render callback of a world: runs the sector through the world's render pipeline. */
+BMX_ADDR(0x004bc360)
+void *rpWorldDefaultRender(RpWorldSector *sector)
+{
+    if (rwIm3DPipelinePush(worldGlobals()->pipeline) == NULL) {
+        return NULL;
+    }
+    void *result = rwIm3DPipelineRun((RwIm3DTransformInfo *)sector);
+    rwIm3DPipelinePop();
+    return result;
 }
 
 /* Clump extension (the world's data in a clump): the destructor does nothing, the constructor clears it. */
@@ -1525,6 +1878,103 @@ BMX_ADDR(0x004c21e0)
 void *rpWorldSectorRenderCurrent(RpWorldSector *sector)
 {
     return ((RpWorld *)RwEngineInstance->curWorld)->renderCallBack(sector);
+}
+
+/* Renders the atomics tied to a sector that are in view and not yet rendered this frame (EAX = sector): the
+ * ties with collision first, then those without. An atomic is stamped with the render frame whether or not
+ * it is inside the frustum. */
+BMX_ADDR(0x004ba360)
+__attribute__((regparm(1))) void rpSectorRenderAtomics(RpWorldSector *sector)
+{
+    RwLLLink *lists[2] = {&sector->collAtomicsInWorldSector, &sector->noCollAtomicsInWorldSector};
+    for (int i = 0; i < 2; i++) {
+        for (RwLLLink *link = lists[i]->next; link != lists[i]; link = link->next) {
+            RpAtomic *atomic = ((RpTie *)link)->apAtom;
+            if ((atomic->object.object.flags & 4) != 0 &&
+                atomic->renderFrame != RwEngineInstance->renderFrame) {
+                RwSphere *sphere = RpAtomicGetWorldBoundingSphere(atomic);
+                if (RwCameraFrustumTestSphere(RwEngineInstance->curCamera, &sphere->center.x) != 0) {
+                    atomic->renderCallBack(atomic);
+                }
+                atomic->renderFrame = RwEngineInstance->renderFrame;
+            }
+        }
+    }
+}
+
+/* The default render callback of a world's sectors, for the walk of RpWorldRender (0x4ba460): the sector is
+ * rendered through the world's render callback, and when that says yes its atomics are rendered. */
+BMX_ADDR(0x004ba430)
+void *rpWorldSectorRenderWithAtomics(RpWorldSector *sector)
+{
+    if (rpWorldSectorRenderCurrent(sector) != NULL) {
+        rpSectorRenderAtomics(sector);
+    }
+    return sector;
+}
+
+/* ---- lighting a sector with the lights of the world ------------------------------------------------------
+ */
+
+/* Calls the routine on a light that is switched on (flag bit 1) with unit strength; returns the light. */
+BMX_ADDR(0x004bae30)
+RpLight *rpLightApplyToObject(RpLight *light, RpLightApplyArgs *args)
+{
+    if ((light->object.object.flags & 2) != 0) {
+        args->apply(args->object, light, 0, 1.0F, args->surfaceProps);
+    }
+    return light;
+}
+
+/* Calls the callback on every light of the current world's ambient/directional list (EAX = callback, EDX =
+ * data), until it says no; always 1. */
+BMX_ADDR(0x004b9ac8)
+__attribute__((regparm(2))) int rpWorldForAllDirectionalLights(RwObjectCallBack callback, void *data)
+{
+    RwLLLink *head = &((RpWorld *)RwEngineInstance->curWorld)->directionalLightList;
+    RwLLLink *link = head->next;
+    while (link != head) {
+        RwLLLink *next = link->next;
+        RpLight *light = (RpLight *)((uint8_t *)link - offsetof(RpLight, inWorld));
+        if (light != NULL && callback(light, data) == NULL) {
+            return 1;
+        }
+        link = next;
+    }
+    return 1;
+}
+
+/* Calls the callback on every light tied to the sector (EAX = sector, EDX = callback, ECX = data), until it
+ * says no; the sector. */
+BMX_ADDR(0x004b9b2c)
+__attribute__((regparm(3))) RpWorldSector *rpSectorForAllLights(RpWorldSector *sector,
+                                                                RwObjectCallBack callback, void *data)
+{
+    RwLLLink *head = &sector->lightsInWorldSector;
+    RwLLLink *link = head->next;
+    while (link != head) {
+        RwLLLink *next = link->next;
+        RpLight *light = ((RpLightTie *)link)->light;
+        if (light != NULL && callback(light, data) == NULL) {
+            return sector;
+        }
+        link = next;
+    }
+    return sector;
+}
+
+/* The pipeline's light hook (stored at +0x10 of the world pipeline): lights the object with the world's
+ * lights and those tied to its sector. Returns the sector, or the object when the sector is not lit. */
+BMX_ADDR(0x004bae70)
+void *rpWorldLightObject(void *object, RpLightApplyFn apply)
+{
+    RpWorldSector *sector = *(RpWorldSector **)((uint8_t *)object + 0xc);
+    if ((*((uint8_t *)sector + 2) & 0x20) == 0) {
+        return object;
+    }
+    RpLightApplyArgs args = {object, apply, &((RpWorld *)RwEngineInstance->curWorld)->surfaceProps};
+    rpWorldForAllDirectionalLights(BMX_FNPTR(RwObjectCallBack, 0x004bae30, rpLightApplyToObject), &args);
+    return rpSectorForAllLights(sector, BMX_FNPTR(RwObjectCallBack, 0x004bae30, rpLightApplyToObject), &args);
 }
 
 /* ---- atomics and the world ---------------------------------------------------------------------------- */
@@ -1762,8 +2212,7 @@ void *WorldInitAtomicExt(void *atomic)
     RpWorldAtomicData *data = atomicData(a);
     data->world = NULL;
     void *sync = a->object.sync;
-    const uint16_t frame = (uint16_t)(RwEngineInstance->renderFrame - 1);
-    __builtin_memcpy(a->pad64, &frame, sizeof frame);
+    a->renderFrame = (uint16_t)(RwEngineInstance->renderFrame - 1);
     data->sync = sync;
     a->object.sync = RW_CB(void *, 0x004b7ab0);
     return atomic;

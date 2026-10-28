@@ -505,6 +505,13 @@ void *_rwErrorOpen(void *engine, int32_t offset)
     return engine;
 }
 
+BMX_ADDR(0x004dee20)
+void *_rwErrorClose(void *engine)
+{
+    rwErrorModuleCount--;
+    return engine;
+}
+
 /* Colour module: nothing to set up. */
 BMX_ADDR(0x004eb2a0)
 void *_rwColorOpen(void *engine)

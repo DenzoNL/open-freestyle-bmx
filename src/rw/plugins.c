@@ -462,6 +462,243 @@ float RwV3dLength(const ZVec3 *vector)
     return sum.f;
 }
 
+/* ---- bone plugin: callbacks and frame data ------------------------------------------------------------ */
+
+/* The first atomic of a frame (frame object walk callback): stores it in *found and stops. */
+BMX_ADDR(0x00502b00)
+void *rpBoneFindAtomic(void *object, void *found)
+{
+    if (*(uint8_t *)object == 1) {
+        *(void **)found = object;
+        return NULL;
+    }
+    return object;
+}
+
+/* The first atomic whose geometry has bone plugin data. */
+BMX_ADDR(0x00502b50)
+void *rpBoneFindSkinAtomic(void *object, void *found)
+{
+    if (*(uint8_t *)object == 1) {
+        const RpAtomic *atomic = object;
+        if (*(void **)((uint8_t *)atomic->geometry + rpBoneGeometryOffset) != NULL) {
+            *(void **)found = object;
+            return NULL;
+        }
+    }
+    return object;
+}
+
+/* The bone data of a frame (EAX = frame); NULL without a frame. */
+BMX_ADDR(0x00502ba0)
+__attribute__((regparm(1))) RpSkinBone *rpBoneGet(RwFrame *frame)
+{
+    if (frame == NULL) {
+        return NULL;
+    }
+    return *(RpSkinBone **)((uint8_t *)frame + rpBoneFrameOffset);
+}
+
+/* Stores the bone data in a frame (EAX = frame, EDX = bone); the frame, NULL without one. */
+BMX_ADDR(0x00502b80)
+__attribute__((regparm(2))) RwFrame *rpBoneSet(RwFrame *frame, RpSkinBone *bone)
+{
+    if (frame == NULL) {
+        return NULL;
+    }
+    *(RpSkinBone **)((uint8_t *)frame + rpBoneFrameOffset) = bone;
+    return frame;
+}
+
+/* A new bone: two identity matrices (the rest pose inverse and the pose; the flag words are only or-ed, the
+ * padding words are not written), no frame, flags 5. NULL when out of memory. */
+BMX_ADDR(0x00502bc0)
+RpSkinBone *rpBoneCreate(void)
+{
+    uint32_t *p = RwEngineInstance->memoryFuncs.rwmalloc(sizeof(RpSkinBone));
+    if (p == NULL) {
+        return NULL;
+    }
+    p[4] |= 0x20003;
+    p[0x14] |= 0x20003;
+    p[0xb] = p[6] = p[1] = p[0x1b] = p[0x16] = p[0x11] = 0x3f800000;
+    p[5] = p[3] = p[2] = p[10] = p[9] = p[7] = p[0xf] = p[0xe] = p[0xd] = 0;
+    p[0x15] = p[0x13] = p[0x12] = p[0x1a] = p[0x19] = p[0x17] = p[0x1f] = p[0x1e] = p[0x1d] = 0;
+    p[0] = 0;
+    p[0x21] = 5;
+    return (RpSkinBone *)p;
+}
+
+/* Frees a bone (EAX = bone) and clears the frame's pointer to it. */
+BMX_ADDR(0x00502c60)
+__attribute__((regparm(1))) void rpBoneDestroy(RpSkinBone *bone)
+{
+    if (bone != NULL) {
+        RwFrame *frame = bone->frame;
+        RwEngineInstance->memoryFuncs.rwfree(bone);
+        if (frame != NULL) {
+            *(RpSkinBone **)((uint8_t *)frame + rpBoneFrameOffset) = NULL;
+        }
+    }
+}
+
+/* Frame walk callback: finds the frame whose user data is the key (search[1]); search[0] gets its bone. */
+BMX_ADDR(0x00502c90)
+void *rpBoneFindFrame(void *frame, void *search)
+{
+    RwFrame *f = frame;
+    void **data = (void **)search;
+    if (data != NULL && RwFrameGetUserData(f) == (uint32_t)(uintptr_t)data[1]) {
+        data[0] = rpBoneGet(f);
+        return NULL;
+    }
+    RwFrameForAllChildren(f, BMX_FNPTR(RwObjectCallBack, 0x00502c90, rpBoneFindFrame), search);
+    return frame;
+}
+
+/* Gives every frame below this one that has an animation key (user data other than -1) a bone with the
+ * inverse of its rest pose relative to the reference frame (walks all children, whether or not it did). */
+BMX_ADDR(0x00502ce0)
+void *rpBoneAttachFrames(void *frame, void *reference)
+{
+    RwFrame *f = frame;
+    if (f != NULL && reference != NULL) {
+        if (rpBoneGet(f) == NULL && RwFrameGetUserData(f) != 0xffffffffU) {
+            RpSkinBone *bone = rpBoneCreate();
+            if (bone != NULL) {
+                bone->frame = f;
+                rpBoneSet(f, bone);
+            }
+            RwMatrixInvert(&bone->invRest, RwFrameGetLTM(f));
+            RwMatrixTransform(&bone->invRest, RwFrameGetMatrix(reference), rwCOMBINEPRECONCAT);
+        }
+        RwFrameForAllChildren(f, BMX_FNPTR(RwObjectCallBack, 0x00502ce0, rpBoneAttachFrames), reference);
+    }
+    return frame;
+}
+
+/* Engine module of the plugin: remembers its offset and counts the opens. */
+BMX_ADDR(0x00505500)
+void *rpBoneEngineOpen(void *engine, int32_t offset)
+{
+    rpBoneModuleCount++;
+    rpBoneEngineOffset = offset;
+    return engine;
+}
+
+BMX_ADDR(0x00505520)
+void *rpBoneEngineClose(void *engine)
+{
+    rpBoneModuleCount--;
+    return engine;
+}
+
+/* Geometry data: a pointer to the blocks and rest pose (RpSkinGeometry), empty at first, freed with the
+ * geometry; copies share nothing (the copy callback only returns the destination). */
+BMX_ADDR(0x00505530)
+void *rpBoneGeometryInit(void *geometry)
+{
+    *(RpSkinGeometry **)((uint8_t *)geometry + rpBoneGeometryOffset) = NULL;
+    return geometry;
+}
+
+BMX_ADDR(0x00505550)
+void *rpBoneGeometryDeinit(void *geometry)
+{
+    RpSkinGeometry **slot = (RpSkinGeometry **)((uint8_t *)geometry + rpBoneGeometryOffset);
+    RpSkinGeometry *skin = *slot;
+    if (skin != NULL) {
+        if (skin->blocks != NULL) {
+            RwEngineInstance->memoryFuncs.rwfree(skin->blocks);
+            skin->blocks = NULL;
+        }
+        if (skin->origVerts != NULL) {
+            RwEngineInstance->memoryFuncs.rwfree(skin->origVerts);
+            skin->origVerts = NULL;
+        }
+        if (skin->origNormals != NULL) {
+            RwEngineInstance->memoryFuncs.rwfree(skin->origNormals);
+            skin->origNormals = NULL;
+        }
+        *(RpSkinGeometry **)((uint8_t *)geometry + rpBoneGeometryOffset) = NULL;
+        RwEngineInstance->memoryFuncs.rwfree(skin);
+    }
+    return geometry;
+}
+
+BMX_ADDR(0x005055e0)
+void *rpBoneGeometryCopy(void *destination)
+{
+    return destination;
+}
+
+/* Writes the bone blocks, each as 3 words (vertex range and key), up to and including the terminating block;
+ * NULL when a write fails. */
+BMX_ADDR(0x005055f0)
+void *rpBoneGeometryWrite(void *stream, int32_t length, const void *geometry)
+{
+    (void)length;
+    const RpSkinGeometry *skin = *(const RpSkinGeometry **)((const uint8_t *)geometry + rpBoneGeometryOffset);
+    const RpSkinBoneBlock *block = skin->blocks;
+    if (block != NULL) {
+        while (block->numVertices != 0) {
+            if (RwStreamWriteInt32(stream, block, 0xc) == NULL) {
+                return NULL;
+            }
+            block++;
+        }
+        if (RwStreamWriteInt32(stream, block, 0xc) == NULL) {
+            return NULL;
+        }
+    }
+    return stream;
+}
+
+/* Stream size of the bone blocks (with the terminating one); 0 without blocks. */
+BMX_ADDR(0x005057b0)
+int32_t rpBoneGeometrySize(const void *geometry)
+{
+    const RpSkinGeometry *skin = *(const RpSkinGeometry **)((const uint8_t *)geometry + rpBoneGeometryOffset);
+    if (skin == NULL || skin->blocks == NULL) {
+        return 0;
+    }
+    int32_t count = 0;
+    for (const RpSkinBoneBlock *block = skin->blocks; block->numVertices != 0; block++) {
+        count++;
+    }
+    return count * 12 + 12;
+}
+
+/* Frame data: the bone pointer, empty at first; a frame's bone goes with it; copying copies the bone. */
+BMX_ADDR(0x005057f0)
+void *rpBoneFrameInit(void *frame)
+{
+    *(RpSkinBone **)((uint8_t *)frame + rpBoneFrameOffset) = NULL;
+    return frame;
+}
+
+BMX_ADDR(0x00505810)
+void *rpBoneFrameDeinit(void *frame)
+{
+    RpSkinBone *bone = *(RpSkinBone **)((uint8_t *)frame + rpBoneFrameOffset);
+    if (bone != NULL) {
+        rpBoneDestroy(bone);
+    }
+    return frame;
+}
+
+BMX_ADDR(0x00505830)
+void *rpBoneFrameCopy(void *destination, const void *source)
+{
+    RpSkinBone *to = *(RpSkinBone **)((uint8_t *)destination + rpBoneFrameOffset);
+    const RpSkinBone *from = *(const RpSkinBone *const *)((const uint8_t *)source + rpBoneFrameOffset);
+    if (to != NULL && from != NULL) {
+        __builtin_memcpy(to, from, sizeof(RpSkinBone));
+        to->frame = destination;
+    }
+    return destination;
+}
+
 /* ---- skin helpers ----------------------------------------------------------------------------------- */
 
 /*
@@ -809,8 +1046,257 @@ typedef struct RpAnimNodeSearch {
     const char *name;
 } RpAnimNodeSearch;
 
-ORIG_FN(0x004fc4f0, RpAnimNode *, rpAnimNodeCreate, (void));
-ORIG_FN(0x005029e0, void *, rpAnimInterpolatorDeinit, (void *interpolator));
+/* The interpolator state of an animation node starts empty: state 0 and no instance blocks (+0x2c, +0x30). */
+BMX_ADDR(0x00502a30)
+void *rpAnimInterpolatorInit(void *interpolator)
+{
+    uint32_t *words = interpolator;
+    words[0] = 0;
+    words[0xc] = 0;
+    words[0xb] = 0;
+    return interpolator;
+}
+
+/* A new node: no frame, empty interpolator state, last in its list. NULL when out of memory. */
+BMX_ADDR(0x004fc4f0)
+RpAnimNode *rpAnimNodeCreate(void)
+{
+    RpAnimNode *node = RwEngineInstance->memoryFuncs.rwmalloc(sizeof(RpAnimNode));
+    if (node == NULL) {
+        return NULL;
+    }
+    node->frame = NULL;
+    rpAnimInterpolatorInit(&node->state);
+    node->next = NULL;
+    return node;
+}
+
+/* The anim plugin data of a frame (at rpAnimFrameOffset): the sequence lists, a word, and the user data. */
+typedef struct RpAnimFramePlugin {
+    struct RpAnimFrameData *data; /* 0x00 */
+    uint32_t reserved;            /* 0x04 */
+    uint32_t userData;            /* 0x08 -1 until set */
+} RpAnimFramePlugin;
+
+/* Frame constructor: no sequences, user data -1. */
+BMX_ADDR(0x004fbce0)
+void *rpAnimFrameInit(void *frame)
+{
+    RpAnimFramePlugin *plugin = (RpAnimFramePlugin *)((uint8_t *)frame + rpAnimFrameOffset);
+    plugin->reserved = 0;
+    plugin->data = NULL;
+    plugin->userData = 0xffffffffU;
+    return frame;
+}
+
+/* An empty frame sequence data block (0x10 bytes, all zero); NULL when out of memory. */
+BMX_ADDR(0x004fbca0)
+struct RpAnimFrameData *rpAnimFrameDataCreate(void)
+{
+    uint32_t *words = RwEngineInstance->memoryFuncs.rwmalloc(0x10);
+    if (words == NULL) {
+        return NULL;
+    }
+    words[3] = 0;
+    words[2] = 0;
+    words[1] = 0;
+    words[0] = 0;
+    return (struct RpAnimFrameData *)words;
+}
+
+/* The name and the type (1: keys of 0xc bytes, 2: keys of 0x10 bytes) of a frame sequence. */
+BMX_ADDR(0x00500044)
+__attribute__((regparm(1))) const char *rpAnimSequenceName(const void *sequence)
+{
+    return ((const RpAnimFrameSequence *)sequence)->name;
+}
+
+BMX_ADDR(0x00500049)
+uint32_t rpAnimSequenceType(const uint32_t *sequence)
+{
+    return sequence[2];
+}
+
+/* Frame-sequence chunk size: the name (with its length word and terminator), the 0x11 byte header, the
+ * keys of the type's size and 12 bytes per further entry (EAX = sequence). */
+BMX_ADDR(0x004fd710)
+__attribute__((regparm(1))) int32_t rpAnimSequenceSize(const uint32_t *sequence)
+{
+    _Static_assert(offsetof(RwGlobals, stringFuncs) + offsetof(RwStringFunctions, rwstrlen) == 0x114,
+                   "rwstrlen offset");
+    const int32_t length = ((int32_t(BMX_CDECL *)(const char *))RwEngineInstance->stringFuncs.rwstrlen)(
+        (const char *)(uintptr_t)sequence[1]);
+    const int32_t type = (int32_t)sequence[2];
+    const int32_t count = (int32_t)sequence[3];
+    int32_t size = length + 0x11;
+    if (type == 1) {
+        size = count * 12 + 0x11 + length;
+    } else if (type == 2) {
+        size = count * 16 + 0x11 + length;
+    }
+    return (int32_t)sequence[5] * 12 + size;
+}
+
+/* Stream size of a frame's animation chunk: 8 without data, else 0x14 and the sizes of all its sequences
+ * (list A, then list B). */
+BMX_ADDR(0x004fd6a0)
+int32_t rpAnimFrameChunkSize(const void *frame)
+{
+    const RpAnimFrameData *data =
+        *(const RpAnimFrameData *const *)((const uint8_t *)frame + rpAnimFrameOffset);
+    if (data == NULL) {
+        return 8;
+    }
+    int32_t size = 0x14;
+    for (const RpAnimFrameLink *link = data->listA; link != NULL; link = link->next) {
+        size += rpAnimSequenceSize((const uint32_t *)link->sequence);
+    }
+    for (const RpAnimFrameLink *link = data->listB; link != NULL; link = link->next) {
+        size += rpAnimSequenceSize((const uint32_t *)link->sequence);
+    }
+    return size;
+}
+
+/* Adds the frame's sequence to the clump by name, as a sequence without play callback; the sequence. */
+BMX_ADDR(0x004fd770)
+void *rpAnimClumpAddFrameSequence(void *sequence, void *clump)
+{
+    const char *name = rpAnimSequenceName(sequence);
+    rpAnimClumpAddSequence(clump, name, NULL, 0, 0, 0, NULL);
+    return sequence;
+}
+
+/*
+ * Adds the sequences of a frame to the clump (EAX = frame, EDX = clump): list B first, then list A (a list
+ * ends early at a link without a sequence, and a list B that does skips list A), then the same for the
+ * children. The entry at 0x4fd7b0 (a stub that loads the stack arguments and falls into this) is the
+ * walk callback.
+ */
+BMX_ADDR(0x004fd7b8)
+__attribute__((regparm(2))) void *rpAnimClumpAddFrameSequences(void *frame, void *clump)
+{
+    const RpAnimFrameData *data =
+        *(const RpAnimFrameData *const *)((const uint8_t *)frame + rpAnimFrameOffset);
+    if (data != NULL) {
+        const RpAnimFrameLink *link = data->listB;
+        int stopped = 0;
+        while (link != NULL) {
+            const RpAnimFrameLink *next = link->next;
+            if (rpAnimClumpAddFrameSequence(link->sequence, clump) == NULL) {
+                stopped = 1;
+                break;
+            }
+            link = next;
+        }
+        if (stopped == 0) {
+            link = data->listA;
+            while (link != NULL) {
+                const RpAnimFrameLink *next = link->next;
+                if (rpAnimClumpAddFrameSequence(link->sequence, clump) == NULL) {
+                    break;
+                }
+                link = next;
+            }
+        }
+    }
+    RwFrameForAllChildren(
+        frame, BMX_FNPTR(RwObjectCallBack, 0x004fd7b0, rpAnimClumpAddFrameSequencesCallback), clump);
+    return frame;
+}
+
+BMX_ADDR(0x004fd7b0)
+void *rpAnimClumpAddFrameSequencesCallback(void *frame, void *clump)
+{
+    return rpAnimClumpAddFrameSequences(frame, clump);
+}
+
+/* Clump ext: adds the sequences of all frames below the clump's root frame to it (EAX = clump). */
+BMX_ADDR(0x004fd840)
+__attribute__((regparm(1))) RpClump *rpAnimClumpAddAllSequences(RpClump *clump)
+{
+    if (clump == NULL) {
+        return NULL;
+    }
+    RwFrame *frame = clump->object.parent;
+    if (frame != NULL) {
+        rpAnimClumpAddFrameSequences(frame, clump);
+    }
+    return clump;
+}
+
+/* Reads the clump chunk: a flag word, when set the sequences of the frames are added to the clump. */
+BMX_ADDR(0x004fd870)
+void *rpAnimClumpChunkRead(void *stream, int32_t length, RpClump *clump)
+{
+    (void)length;
+    uint32_t flag;
+    if (RwStreamReadInt32(stream, &flag, 4) == NULL) {
+        return NULL;
+    }
+    if (flag != 0) {
+        rpAnimClumpAddAllSequences(clump);
+    }
+    return stream;
+}
+
+/* Writes the clump chunk: 1 when the clump has sequences, else 0. NULL when the write fails. */
+BMX_ADDR(0x004fd8c0)
+void *rpAnimClumpChunkWrite(void *stream, int32_t length, const void *clump)
+{
+    (void)length;
+    uint32_t flag = 0;
+    if ((uintptr_t)clump + (uintptr_t)rpAnimClumpOffset != 0 &&
+        *(const int32_t *)((const uint8_t *)clump + rpAnimClumpOffset) > 0) {
+        flag = 1;
+    }
+    if (RwStreamWriteInt32(stream, &flag, 4) == NULL) {
+        return NULL;
+    }
+    return stream;
+}
+
+/* Stream size of the clump chunk: 4, or -1 when there is no sequence (no chunk). */
+BMX_ADDR(0x004fd920)
+int32_t rpAnimClumpChunkSize(const void *clump)
+{
+    if ((uintptr_t)clump + (uintptr_t)rpAnimClumpOffset != 0 &&
+        *(const int32_t *)((const uint8_t *)clump + rpAnimClumpOffset) > 0) {
+        return 4;
+    }
+    return -1;
+}
+
+/* Copies a clump's animation sequences to another: those of both lists with their name, play callback and
+ * data (the three unused argument slots of the add routine hold whatever the stack had). */
+BMX_ADDR(0x004fc780)
+void *rpAnimClumpCopy(void *destination, const void *source)
+{
+    const RpAnimClumpData *data = (const RpAnimClumpData *)((const uint8_t *)source + rpAnimClumpOffset);
+    for (const RpAnimClumpSequence *s = data->sequences->next; s != NULL; s = s->next) {
+        rpAnimClumpAddSequence(destination, s->name, s->callBack, 0, 0, 0, s->data);
+    }
+    for (const RpAnimClumpSequence *s = data->others->next; s != NULL; s = s->next) {
+        rpAnimClumpAddSequence(destination, s->name, s->callBack, 0, 0, 0, s->data);
+    }
+    return destination;
+}
+
+/* Frees the two blocks an animation interpolator owns (at +0x2c and +0x30); returns the interpolator. */
+BMX_ADDR(0x005029e0)
+void *rpAnimInterpolatorDeinit(void *interpolator)
+{
+    void **blocks = (void **)((uint8_t *)interpolator + 0x2c);
+    if (blocks[0] != NULL) {
+        RwEngineInstance->memoryFuncs.rwfree(blocks[0]);
+        blocks[0] = NULL;
+    }
+    if (blocks[1] != NULL) {
+        RwEngineInstance->memoryFuncs.rwfree(blocks[1]);
+        blocks[1] = NULL;
+    }
+    return interpolator;
+}
+
 #define CB_ANIM_FIND_NODES   RW_CB(RwObjectCallBack, 0x004fc540)
 #define CB_ANIM_DEFAULT_PLAY 0x00502990
 #define rpAnimDurationStart  ORIG_VAR(0x0069c63c, float, rpAnimDurationStart)
@@ -855,7 +1341,7 @@ static RpAnimInstance *animInstance(RpAnimFrameSequence *sequence)
 
 static void animNodeFree(RpAnimNode *node)
 {
-    rpAnimInterpolatorDeinit(&node->state);
+    rpAnimInterpolatorDeinit((uint8_t *)node + offsetof(RpAnimNode, state));
     RwEngineInstance->memoryFuncs.rwfree(node);
 }
 

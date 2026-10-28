@@ -24,7 +24,8 @@ enum {
     kClumpBytes = 0x40,
     kLightWorld = 0x48,
     kLightBytes = 0x58,
-    kPvsOffset = 0x74, /* the PVS plugin's pointer in a world */
+    kPvsOffset = 0x74,       /* the PVS plugin's pointer in a world */
+    kPvsSectorOffset = 0x5c, /* ... and in a world sector */
     kWorldBytes = 0x90,
     kSectorBytes = 0x60,
 };
@@ -239,6 +240,7 @@ static RwGlobals *worldEnv(const DtCtx *c, int maybeClosed)
     rpWorldClumpOffset = kClumpWorld;
     rpWorldLightOffset = kLightWorld;
     rpPVSWorldOffset = kPvsOffset;
+    rpPVSSectorOffset = kPvsSectorOffset;
     rpWorldModuleCount = maybeClosed && dt_u32() % 6 == 0 ? 0 : 1;
     RpTieGlobals *ties = (RpTieGlobals *)((uint8_t *)g + kTieOffset);
     ties->tieFreeList = FREELIST_TIE;
@@ -1223,8 +1225,7 @@ static RpAtomic *mkAtomic(void)
     a->object.sync = (void *)(uintptr_t)(dt_u32() & ~3U);
     a->stamp = (uint8_t)dt_u32();
     a->repEntry = dt_u32() % 2 == 0 ? NULL : (RwResEntry *)dt_alloc(0x18);
-    uint16_t spare = (uint16_t)dt_u32();
-    __builtin_memcpy(a->pad64, &spare, 2);
+    a->renderFrame = (uint16_t)dt_u32();
     listInit(&a->llWorldSectorsInAtomic);
     for (int n = dt_range(0, 3); n > 0; n--) {
         RpTie *tie = dt_alloc(sizeof(RpTie));
@@ -1816,6 +1817,657 @@ static void setup_camera_sync(DtCtx *c)
     rwtEnd();
 }
 
+/* ---- the PVS plugin's callbacks, constructors and stream chunks --------------------------------------- */
+
+static RpWorld *gFixWorld; /* the world rpWorldSectorGetWorld (0x4b9d50) is stubbed to find */
+
+static RpWorld *BMX_CDECL stSectorWorld(RpWorldSector *sector)
+{
+    rwtLog(0x4b9d50);
+    rwtLogPtr(sector);
+    return gFixWorld;
+}
+
+static uint32_t gHeader[5];
+static int gHeaderSet;
+
+/* The stream read: the world chunk's header (the 5 words of the test) or bytes drawn from the DLL's state. */
+static uint32_t BMX_CDECL stPvsStreamRead(void *stream, void *buffer, uint32_t length)
+{
+    rwtLog(0x4e2800);
+    rwtLogPtr(stream);
+    rwtLog(length);
+    if (length == 0x14 && gHeaderSet) {
+        __builtin_memcpy(buffer, gHeader, 0x14);
+    } else {
+        for (uint32_t i = 0; i < length; i++) {
+            ((uint8_t *)buffer)[i] = (uint8_t)dt_u32();
+        }
+    }
+    return length;
+}
+
+static void *BMX_CDECL stPvsStreamWrite(void *stream, const void *buffer, uint32_t length)
+{
+    rwtLog(0x4e29d0);
+    rwtLogPtr(stream);
+    rwtLog(length);
+    for (uint32_t i = 0; i < length && i < 0x40; i++) {
+        rwtLog(((const uint8_t *)buffer)[i]);
+    }
+    return stream;
+}
+
+static RpWorldSector *pvsSector(void)
+{
+    RpWorldSector *s = dt_alloc(kSectorBytes);
+    s->type = -1;
+    s->numPolygons = (uint16_t)dt_range(0, 4);
+    s->numVertices = (uint16_t)dt_range(0, 9);
+    return s;
+}
+
+static void setup_pvs_sector_count(DtCtx *c)
+{
+    worldEnv(c, 0);
+    int32_t *count = dt_alloc(4);
+    *count = dt_range(-3, 9);
+    DT_ARG_PTR(c, 0, dt_u32() % 5 == 0 ? NULL : pvsSector());
+    DT_ARG_PTR(c, 1, dt_u32() % 5 == 0 ? NULL : count);
+    rwtEnd();
+}
+
+static void setup_pvs_sector_slot(DtCtx *c)
+{
+    worldEnv(c, 0);
+    RpWorldSector *s = pvsSector();
+    *(uint32_t *)((uint8_t *)s + kPvsSectorOffset) = dt_u32();
+    DT_ARG_PTR(c, 0, s);
+    rwtEnd();
+}
+
+static void setup_pvs_world_destruct(DtCtx *c)
+{
+    worldEnv(c, 0);
+    dt_stub(0x004baf20, NULL, (void *)stSetRenderCb);
+    RpWorld *w = pvsWorld(1);
+    DT_ARG_PTR(c, 0, w);
+    rwtEnd();
+}
+
+static void setup_pvs_world_construct(DtCtx *c)
+{
+    worldEnv(c, 0);
+    RpWorld *w = mkWorld();
+    gRwtMallocFailAt = dt_u32() % 4 == 0 ? 1 : 0;
+    DT_ARG_PTR(c, 0, w);
+    rwtEnd();
+}
+
+static void setup_pvs_world_size(DtCtx *c)
+{
+    worldEnv(c, 0);
+    DT_ARG_PTR(c, 0, pvsWorld(1));
+    rwtEnd();
+}
+
+static void setup_pvs_sector_size(DtCtx *c)
+{
+    worldEnv(c, 0);
+    dt_stub(0x004b9d50, NULL, (void *)stSectorWorld);
+    gFixWorld = pvsWorld(1);
+    DT_ARG_PTR(c, 0, pvsSector());
+    rwtEnd();
+}
+
+/* A PVS header the callbacks of the generation and the loader can work with. */
+static RpPVSWorldData *pvsFixture(int32_t rowBytes, int32_t numCells)
+{
+    RpPVSWorldData *pvs = dt_alloc(0x60);
+    pvs->rowBytes = rowBytes;
+    pvs->numCells = numCells;
+    pvs->rowStride = (int32_t)((((uint32_t)(rowBytes * numCells) + 0xbU) & 0xfffffffcU) - dt_range(0, 1) * 4);
+    pvs->numEntries = dt_range(-2, 12);
+    pvs->cursor = dt_alloc(0x200);
+    pvs->sectorCounter = dt_range(0, 30);
+    pvs->statsA = dt_u32();
+    pvs->statsB = dt_u32();
+    return pvs;
+}
+
+static void setup_pvs_load(DtCtx *c)
+{
+    worldEnv(c, 0);
+    RpPVSWorldData *pvs = pvsFixture(dt_range(1, 4), dt_range(1, 4));
+    RpWorldSector *s = pvsSector();
+    uint8_t *rows = dt_alloc(0x40);
+    for (int i = 0; i < 0x40; i++) {
+        rows[i] = (uint8_t)dt_u32();
+    }
+    *(uint8_t **)((uint8_t *)s + kPvsSectorOffset) = rows;
+    DT_ARG_PTR(c, 0, s);
+    DT_ARG_PTR(c, 1, pvs);
+    rwtEnd();
+}
+
+static void setup_pvs_prepare(DtCtx *c)
+{
+    worldEnv(c, 0);
+    RpPVSWorldData *pvs = pvsFixture(dt_range(1, 4), dt_range(0, 5));
+    RpWorldSector *s = pvsSector();
+    *(uint32_t *)((uint8_t *)s + kPvsSectorOffset) = dt_u32();
+    DT_ARG_PTR(c, 0, s);
+    DT_ARG_PTR(c, 1, pvs);
+    rwtEnd();
+}
+
+static void *BMX_CDECL savedRender(RpWorldSector *sector)
+{
+    rwtLog(0x5a5a);
+    rwtLogPtr(sector);
+    return (void *)(uintptr_t)dt_u32();
+}
+
+static void setup_pvs_render(DtCtx *c)
+{
+    worldEnv(c, 0);
+    dt_stub(0x004b9d50, NULL, (void *)stSectorWorld);
+    gFixWorld = pvsWorld(1);
+    RpPVSWorldData *pvs = *(RpPVSWorldData **)((uint8_t *)gFixWorld + kPvsOffset);
+    pvs->savedRenderCallBack = savedRender;
+    uint8_t *bits = dt_u32() % 4 == 0 ? NULL : dt_alloc(8);
+    for (int i = 0; bits != NULL && i < 8; i++) {
+        bits[i] = (uint8_t)dt_u32();
+    }
+    pvs->viewRow = bits;
+    RpWorldSector *s = pvsSector();
+    int32_t *id = dt_alloc(4);
+    *id = dt_range(-8, 70);
+    *(int32_t **)((uint8_t *)s + kPvsSectorOffset) = dt_u32() % 5 == 0 ? NULL : id;
+    DT_ARG_PTR(c, 0, s);
+    rwtEnd();
+}
+
+/* The cell lookup: a sector with a collision tree (nodes of 3 bytes) and a position. */
+static RpWorldSector *pvsTreeSector(RpPVSWorldData *pvs)
+{
+    RpWorldSector *s = pvsSector();
+    const int32_t levels = dt_range(0, 5);
+    pvs->granularity = dt_u32() % 7 == 0 ? dt_range(-1, 7) : levels;
+    pvs->numCells = dt_u32() % 5 == 0 ? dt_range(1, 40) : 1 << levels;
+    pvs->rowBytes = dt_range(1, 6);
+    float *vertices = dt_alloc(7 * 12);
+    for (int i = 0; i < 7 * 3; i++) {
+        vertices[i] = dt_float_edgy(-50.0F, 50.0F);
+    }
+    s->vertices = (RwV3d *)vertices;
+    uint8_t *tree = dt_alloc(3U * 130U);
+    for (int i = 0; i < 130; i++) {
+        tree[i * 3] = dt_u32() % 5 == 0 ? (uint8_t)(dt_u32() & 0x7f) : (uint8_t)(0x80 | (dt_u32() & 0x7f));
+        tree[i * 3 + 1] = (uint8_t)dt_range(0, 5);
+        tree[i * 3 + 2] = (uint8_t)dt_u32();
+    }
+    s->colSectorRoot = tree;
+    *(uint8_t **)((uint8_t *)s + kPvsSectorOffset) = dt_alloc(0x100);
+    return s;
+}
+
+static float *pvsPosition(void)
+{
+    float *pos = dt_alloc(16);
+    for (int i = 0; i < 3; i++) {
+        pos[i] = dt_float_edgy(-50.0F, 50.0F);
+    }
+    return pos;
+}
+
+static const uint8_t *cellRowOrig(RpWorldSector *s, float *pos)
+{
+    return REG2(0x004cc3c0, const uint8_t *, RpWorldSector *, float *)(s, pos);
+}
+
+static const uint8_t *cellRowImpl(RpWorldSector *s, float *pos)
+{
+    return pvsCellRow(s, pos);
+}
+
+static void setup_pvs_cell(DtCtx *c)
+{
+    worldEnv(c, 0);
+    dt_stub(0x004b9d50, NULL, (void *)stSectorWorld);
+    gFixWorld = pvsWorld(1);
+    RpPVSWorldData *pvs = *(RpPVSWorldData **)((uint8_t *)gFixWorld + kPvsOffset);
+    RpWorldSector *s = pvsTreeSector(pvs);
+    if (dt_u32() % 6 == 0) {
+        s->numPolygons = 0;
+    }
+    DT_ARG_PTR(c, 0, s);
+    DT_ARG_PTR(c, 1, pvsPosition());
+    rwtEnd();
+}
+
+static void setup_pvs_view_cb(DtCtx *c)
+{
+    worldEnv(c, 0);
+    dt_stub(0x004b9d50, NULL, (void *)stSectorWorld);
+    gFixWorld = pvsWorld(1);
+    RpPVSWorldData *pvs = *(RpPVSWorldData **)((uint8_t *)gFixWorld + kPvsOffset);
+    RpWorldSector *s = pvsTreeSector(pvs);
+    RpIntersection *isect = dt_alloc(sizeof(RpIntersection));
+    float *pos = pvsPosition();
+    __builtin_memcpy(isect, pos, 12);
+    isect->type = rpINTERSECTPOINT;
+    DT_ARG_PTR(c, 0, isect);
+    DT_ARG_PTR(c, 1, s);
+    DT_ARG_PTR(c, 2, pvs);
+    rwtEnd();
+}
+
+/* Header and rows of the world chunk: every leaf of the tree gets a row of the size the header names. */
+static void pvsRowsInLeaves(RpSector *sector, uint32_t rowStride, int *leaves)
+{
+    if (sector->type < 0) {
+        uint8_t *rows = dt_alloc(rowStride + 4);
+        for (uint32_t i = 0; i < rowStride + 4; i++) {
+            rows[i] = (uint8_t)dt_u32();
+        }
+        *(uint8_t **)((uint8_t *)sector + kPvsSectorOffset) = rows;
+        (*leaves)++;
+        return;
+    }
+    const RpPlaneSector *p = (const RpPlaneSector *)sector;
+    pvsRowsInLeaves(p->leftSubTree, rowStride, leaves);
+    pvsRowsInLeaves(p->rightSubTree, rowStride, leaves);
+}
+
+static void setup_pvs_chunk_read(DtCtx *c)
+{
+    worldEnv(c, 0);
+    stubPvsCallbacks();
+    dt_stub(0x004baf20, NULL, (void *)stSetRenderCb);
+    dt_stub(0x004e2800, NULL, (void *)stPvsStreamRead);
+    RpWorld *w = pvsWorld(1);
+    const uint32_t rowBytes = (uint32_t)dt_range(1, 4);
+    const uint32_t numCells = (uint32_t)dt_range(1, 4);
+    const uint32_t stride = ((rowBytes * numCells + 0xb) & 0xfffffffcU) + (dt_u32() % 3 == 0 ? 4U : 0U);
+    int leaves = 0;
+    pvsRowsInLeaves(w->rootSector, stride, &leaves);
+    gHeader[0] = (uint32_t)leaves + dt_u32() % 2;
+    gHeader[1] = rowBytes;
+    gHeader[2] = stride;
+    gHeader[3] = (uint32_t)dt_range(0, 3);
+    gHeader[4] = numCells;
+    gHeaderSet = 1;
+    DT_ARG_PTR(c, 0, dt_alloc(0x20));
+    DT_ARG_INT(c, 1, (uint32_t)dt_range(0, 100));
+    DT_ARG_PTR(c, 2, w);
+    rwtEnd();
+}
+
+static void setup_pvs_chunk_write(DtCtx *c)
+{
+    worldEnv(c, 0);
+    dt_stub(0x004e29d0, NULL, (void *)stPvsStreamWrite);
+    DT_ARG_PTR(c, 0, dt_alloc(0x20));
+    DT_ARG_INT(c, 1, (uint32_t)dt_range(0, 100));
+    DT_ARG_PTR(c, 2, pvsWorld(1));
+    rwtEnd();
+}
+
+static void setup_pvs_sector_read(DtCtx *c)
+{
+    worldEnv(c, 0);
+    dt_stub(0x004e2800, NULL, (void *)stPvsStreamRead);
+    gHeaderSet = 0;
+    DT_ARG_PTR(c, 0, dt_alloc(0x20));
+    DT_ARG_INT(c, 1, (uint32_t)dt_range(1, 40));
+    DT_ARG_PTR(c, 2, pvsSector());
+    rwtEnd();
+}
+
+static void setup_pvs_sector_write(DtCtx *c)
+{
+    worldEnv(c, 0);
+    dt_stub(0x004e29d0, NULL, (void *)stPvsStreamWrite);
+    RpWorldSector *s = pvsSector();
+    uint8_t *rows = dt_alloc(0x50);
+    for (int i = 0; i < 0x50; i++) {
+        rows[i] = (uint8_t)dt_u32();
+    }
+    *(uint8_t **)((uint8_t *)s + kPvsSectorOffset) = rows;
+    DT_ARG_PTR(c, 0, dt_alloc(0x20));
+    DT_ARG_INT(c, 1, (uint32_t)dt_range(0, 0x50));
+    DT_ARG_PTR(c, 2, s);
+    rwtEnd();
+}
+
+/* ---- sector rendering, lighting and the world module ----------------------------------------------------
+ */
+
+static RwSphere *BMX_CDECL stAtomicSphere(RpAtomic *atomic)
+{
+    rwtLog(0x4b1280);
+    rwtLogPtr(atomic);
+    return (RwSphere *)((uint8_t *)atomic + 0x30);
+}
+
+static int BMX_CDECL stFrustumSphere(const void *camera, const float *sphere)
+{
+    rwtLog(0x4de820);
+    rwtLogPtr(camera);
+    rwtLogPtr(sphere);
+    return (int)(dt_u32() % 2);
+}
+
+static RpAtomic *BMX_CDECL cbAtomicRender(RpAtomic *atomic)
+{
+    rwtLog(0xa7e1);
+    rwtLogPtr(atomic);
+    return atomic;
+}
+
+static void *BMX_CDECL stSectorRenderCurrent(RpWorldSector *sector)
+{
+    rwtLog(0x4c21e0);
+    rwtLogPtr(sector);
+    return (void *)(uintptr_t)(dt_u32() % 2);
+}
+
+static RpAtomic *mkRenderAtomic(void)
+{
+    RpAtomic *a = dt_alloc(0x78);
+    a->object.object.flags = (uint8_t)dt_u32();
+    a->renderFrame = (uint16_t)(dt_u32() % 3 == 0 ? RwEngineInstance->renderFrame : dt_u32());
+    a->renderCallBack = cbAtomicRender;
+    float *sphere = (float *)((uint8_t *)a + 0x30);
+    for (int i = 0; i < 4; i++) {
+        sphere[i] = dt_float_edgy(-20.0F, 20.0F);
+    }
+    return a;
+}
+
+static RpWorldSector *mkAtomicSector(void)
+{
+    RwGlobals *g = RwEngineInstance;
+    g->curCamera = dt_alloc(0x40);
+    g->renderFrame = (uint16_t)dt_u32();
+    RpWorldSector *s = pvsSector();
+    listInit(&s->collAtomicsInWorldSector);
+    listInit(&s->noCollAtomicsInWorldSector);
+    listInit(&s->lightsInWorldSector);
+    RwLLLink *lists[2] = {&s->collAtomicsInWorldSector, &s->noCollAtomicsInWorldSector};
+    for (int l = 0; l < 2; l++) {
+        for (int n = dt_range(0, 3); n > 0; n--) {
+            RpTie *tie = dt_alloc(sizeof(RpTie));
+            tie->apAtom = mkRenderAtomic();
+            listAddTail(lists[l], &tie->lAtomicInWorldSector);
+        }
+    }
+    return s;
+}
+
+static void stubAtomicRender(void)
+{
+    dt_stub(0x004b1280, NULL, (void *)stAtomicSphere);
+    dt_stub(0x004de820, NULL, (void *)stFrustumSphere);
+}
+
+static void setup_sector_atomics(DtCtx *c)
+{
+    worldEnv(c, 0);
+    stubAtomicRender();
+    DT_ARG_PTR(c, 0, mkAtomicSector());
+    rwtEnd();
+}
+
+static void sectorAtomicsOrig(RpWorldSector *s)
+{
+    REG1(0x004ba360, void, RpWorldSector *)(s);
+}
+
+static void sectorAtomicsImpl(RpWorldSector *s)
+{
+    rpSectorRenderAtomics(s);
+}
+
+static void setup_sector_render_atomics(DtCtx *c)
+{
+    worldEnv(c, 0);
+    stubAtomicRender();
+    dt_stub(0x004c21e0, NULL, (void *)stSectorRenderCurrent);
+    DT_ARG_PTR(c, 0, mkAtomicSector());
+    rwtEnd();
+}
+
+/* Lights: the routine of the light walks logs its arguments (the float by bits). */
+static void *BMX_CDECL cbLightApply(void *object, RpLight *light, int32_t zero, float one,
+                                    const RwSurfaceProperties *props)
+{
+    rwtLog(0x11a7);
+    rwtLogPtr(object);
+    rwtLogPtr(light);
+    rwtLog((uint32_t)zero);
+    rwtLogFloatBits(one);
+    rwtLogPtr(props);
+    return object;
+}
+
+static void *BMX_CDECL cbLightWalk(void *light, void *data)
+{
+    rwtLog(0x11b8);
+    rwtLogPtr(light);
+    rwtLogPtr(data);
+    return (void *)(uintptr_t)(dt_u32() % 4 != 0);
+}
+
+static RpLight *mkLightObject(void)
+{
+    RpLight *l = dt_alloc(0x58);
+    l->object.object.flags = (uint8_t)dt_u32();
+    return l;
+}
+
+static RpWorld *mkLitWorld(void)
+{
+    RpWorld *w = mkWorld();
+    for (int n = dt_range(0, 3); n > 0; n--) {
+        listAddTail(&w->directionalLightList, &mkLightObject()->inWorld);
+    }
+    RwEngineInstance->curWorld = w;
+    return w;
+}
+
+static void addLightTies(RpWorldSector *s)
+{
+    for (int n = dt_range(0, 3); n > 0; n--) {
+        RpLightTie *tie = dt_alloc(sizeof(RpLightTie));
+        tie->light = dt_u32() % 4 == 0 ? NULL : mkLightObject();
+        listAddTail(&s->lightsInWorldSector, &tie->lightInWorldSector);
+    }
+}
+
+static void setup_light_apply(DtCtx *c)
+{
+    worldEnv(c, 0);
+    RpLightApplyArgs *args = dt_alloc(12);
+    args->object = dt_alloc(8);
+    args->apply = (RpLightApplyFn)cbLightApply;
+    args->surfaceProps = dt_alloc(12);
+    DT_ARG_PTR(c, 0, mkLightObject());
+    DT_ARG_PTR(c, 1, args);
+    rwtEnd();
+}
+
+static int dirLightsOrig(RwObjectCallBack fn, void *data)
+{
+    return REG2(0x004b9ac8, int, RwObjectCallBack, void *)(fn, data);
+}
+
+static int dirLightsImpl(RwObjectCallBack fn, void *data)
+{
+    return rpWorldForAllDirectionalLights(fn, data);
+}
+
+static void setup_dir_lights(DtCtx *c)
+{
+    worldEnv(c, 0);
+    mkLitWorld();
+    DT_ARG_PTR(c, 0, cbLightWalk);
+    DT_ARG_PTR(c, 1, dt_alloc(8));
+    rwtEnd();
+}
+
+static void *sectorLightsOrig(RpWorldSector *s, RwObjectCallBack fn, void *data)
+{
+    return ((void *(__attribute__((regparm(3))) *)(RpWorldSector *, RwObjectCallBack, void *))(
+        uintptr_t)0x004b9b2c)(s, fn, data);
+}
+
+static void *sectorLightsImpl(RpWorldSector *s, RwObjectCallBack fn, void *data)
+{
+    return rpSectorForAllLights(s, fn, data);
+}
+
+static void setup_sector_lights(DtCtx *c)
+{
+    worldEnv(c, 0);
+    RpWorldSector *s = pvsSector();
+    listInit(&s->lightsInWorldSector);
+    addLightTies(s);
+    DT_ARG_PTR(c, 0, s);
+    DT_ARG_PTR(c, 1, cbLightWalk);
+    DT_ARG_PTR(c, 2, dt_alloc(8));
+    rwtEnd();
+}
+
+static void setup_light_object(DtCtx *c)
+{
+    worldEnv(c, 0);
+    mkLitWorld();
+    RpWorldSector *s = pvsSector();
+    s->type = dt_u32() % 3 == 0 ? (int32_t)(dt_u32() & 0xff00ffffU) : -1;
+    listInit(&s->lightsInWorldSector);
+    addLightTies(s);
+    void **object = (void **)dt_alloc(0x20);
+    object[3] = s;
+    DT_ARG_PTR(c, 0, object);
+    DT_ARG_PTR(c, 1, cbLightApply);
+    rwtEnd();
+}
+
+/* The world module's open, close, default render and extension call. */
+static void *BMX_CDECL stPipelineOpen(void)
+{
+    rwtLog(0x4e8500);
+    return dt_u32() % 5 == 0 ? NULL : dt_alloc(0x40);
+}
+
+static RwFreeList *BMX_CDECL stFreeListCreate(int32_t size, int32_t count, int32_t alignment)
+{
+    rwtLog(0x4dba90);
+    rwtLog((uint32_t)size);
+    rwtLog((uint32_t)count);
+    rwtLog((uint32_t)alignment);
+    return dt_u32() % 5 == 0 ? NULL : (RwFreeList *)dt_alloc(0x20);
+}
+
+static int BMX_CDECL stFreeListDestroy(RwFreeList *list)
+{
+    rwtLog(0x4dbbc0);
+    rwtLogPtr(list);
+    return 1;
+}
+
+static int BMX_CDECL stPipelineRelease(void *pipeline)
+{
+    rwtLog(0x4e8580);
+    rwtLogPtr(pipeline);
+    return 1;
+}
+
+static int BMX_CDECL cbExtSlot2(void *pipeline)
+{
+    rwtLog(0xe572);
+    rwtLogPtr(pipeline);
+    return (int)(dt_u32() & 0xffff);
+}
+
+static void **BMX_CDECL stExtFuncs(void)
+{
+    static void *table[4];
+    rwtLog(0x4c5ac0);
+    table[2] = (void *)cbExtSlot2;
+    return table;
+}
+
+static void setup_world_open(DtCtx *c)
+{
+    worldEnv(c, 0);
+    dt_stub(0x004e8500, NULL, (void *)stPipelineOpen);
+    dt_stub(0x004dba90, NULL, (void *)stFreeListCreate);
+    dt_stub(0x004e8580, NULL, (void *)stPipelineRelease);
+    dt_stub(0x004c5ac0, NULL, (void *)stExtFuncs);
+    rpWorldModuleCount = dt_range(0, 3);
+    rpWorldDefaultSurfaceProps.ambient = dt_float_edgy(-5.0F, 5.0F);
+    rpWorldDefaultSurfaceProps.specular = dt_float_edgy(-5.0F, 5.0F);
+    rpWorldDefaultSurfaceProps.diffuse = dt_float_edgy(-5.0F, 5.0F);
+    DT_ARG_PTR(c, 0, dt_alloc(0x20));
+    DT_ARG_INT(c, 1, kWorldGlobalsOffset);
+    rwtEnd();
+}
+
+static void setup_world_close(DtCtx *c)
+{
+    RwGlobals *g = worldEnv(c, 0);
+    dt_stub(0x004dbbc0, NULL, (void *)stFreeListDestroy);
+    dt_stub(0x004e8580, NULL, (void *)stPipelineRelease);
+    RpWorldGlobals *globals = (RpWorldGlobals *)((uint8_t *)g + kWorldGlobalsOffset);
+    globals->pipeline = dt_u32() % 3 == 0 ? NULL : dt_alloc(0x40);
+    globals->entryFreeList = dt_u32() % 3 == 0 ? NULL : (RwFreeList *)dt_alloc(0x20);
+    rpWorldModuleCount = dt_range(1, 3);
+    DT_ARG_PTR(c, 0, dt_alloc(0x20));
+    rwtEnd();
+}
+
+static int BMX_CDECL stPipelinePush(void *pipeline)
+{
+    rwtLog(0x4e85b0);
+    rwtLogPtr(pipeline);
+    return (int)(dt_u32() % 4 != 0);
+}
+
+static void *BMX_CDECL stPipelineRun(void *info)
+{
+    rwtLog(0x4e8600);
+    rwtLogPtr(info);
+    return (void *)(uintptr_t)dt_u32();
+}
+
+static void *BMX_CDECL stPipelinePop(void)
+{
+    rwtLog(0x4e8690);
+    return NULL;
+}
+
+static void setup_default_render(DtCtx *c)
+{
+    RwGlobals *g = worldEnv(c, 0);
+    dt_stub(0x004e85b0, NULL, (void *)stPipelinePush);
+    dt_stub(0x004e8600, NULL, (void *)stPipelineRun);
+    dt_stub(0x004e8690, NULL, (void *)stPipelinePop);
+    ((RpWorldGlobals *)((uint8_t *)g + kWorldGlobalsOffset))->pipeline = dt_alloc(0x40);
+    DT_ARG_PTR(c, 0, dt_alloc(0x20));
+    rwtEnd();
+}
+
+static void setup_ext_slot2(DtCtx *c)
+{
+    worldEnv(c, 0);
+    dt_stub(0x004c5ac0, NULL, (void *)stExtFuncs);
+    DT_ARG_PTR(c, 0, dt_alloc(0x20));
+    rwtEnd();
+}
+
 DT_CASES(rwworld_cases) = {
     {"rpAtomicAddTies", (uint32_t)(uintptr_t)addTiesOrig, addTiesImpl, 2, DT_RET_VOID, setup_add_ties, 1500,
      0},
@@ -1867,6 +2519,37 @@ DT_CASES(rwworld_cases) = {
     {"RpPVSQuery", 0x004cc640, RpPVSQuery, 1, DT_RET_INT, setup_pvs_query, 60, 0},
     {"RpPVSStatisticsGet", 0x004cc670, RpPVSStatisticsGet, 3, DT_RET_INT, setup_pvs_stats, 60, 0},
     {"rpPVSCountSectors", 0x004cef40, rpPVSCountSectors, 1, DT_RET_INT, setup_pvs_count, 100, 0},
+    {"pvsRenderSector", 0x004cc1f0, pvsRenderSector, 1, DT_RET_INT, setup_pvs_render, 200, 0},
+    {"pvsSectorUnload", 0x004cc300, pvsSectorUnload, 1, DT_RET_INT, setup_pvs_sector_slot, 30, 0},
+    {"pvsCellRow", (uint32_t)(uintptr_t)cellRowOrig, cellRowImpl, 2, DT_RET_INT, setup_pvs_cell, 500, 0},
+    {"pvsViewSector", 0x004cc4e0, pvsViewSector, 3, DT_RET_INT, setup_pvs_view_cb, 500, 0},
+    {"pvsWorldConstruct", 0x004cc6b0, pvsWorldConstruct, 1, DT_RET_INT, setup_pvs_world_construct, 60, 0},
+    {"pvsWorldDestruct", 0x004cc710, pvsWorldDestruct, 1, DT_RET_INT, setup_pvs_world_destruct, 150, 0},
+    {"pvsWorldChunkSize", 0x004cc7b0, pvsWorldChunkSize, 1, DT_RET_INT, setup_pvs_world_size, 30, 0},
+    {"pvsSectorLoad", 0x004cc7d0, pvsSectorLoad, 2, DT_RET_INT, setup_pvs_load, 80, 0},
+    {"pvsWorldChunkRead", 0x004cc850, pvsWorldChunkRead, 3, DT_RET_INT, setup_pvs_chunk_read, 600, 0},
+    {"pvsWorldChunkWrite", 0x004cc940, pvsWorldChunkWrite, 3, DT_RET_INT, setup_pvs_chunk_write, 100, 0},
+    {"pvsSectorConstruct", 0x004cc9b0, pvsSectorConstruct, 1, DT_RET_INT, setup_pvs_sector_slot, 30, 0},
+    {"pvsSectorDestruct", 0x004cc9d0, pvsSectorDestruct, 1, DT_RET_INT, setup_pvs_sector_slot, 30, 0},
+    {"pvsSectorChunkSize", 0x004cc9f0, pvsSectorChunkSize, 1, DT_RET_INT, setup_pvs_sector_size, 60, 0},
+    {"pvsSectorChunkRead", 0x004cca30, pvsSectorChunkRead, 3, DT_RET_INT, setup_pvs_sector_read, 120, 0},
+    {"pvsSectorChunkWrite", 0x004cca90, pvsSectorChunkWrite, 3, DT_RET_INT, setup_pvs_sector_write, 100, 0},
+    {"pvsSectorPrepare", 0x004ce620, pvsSectorPrepare, 2, DT_RET_INT, setup_pvs_prepare, 200, 0},
+    {"pvsSectorCount", 0x004ceef0, pvsSectorCount, 2, DT_RET_INT, setup_pvs_sector_count, 80, 0},
+    {"rpSectorRenderAtomics", (uint32_t)(uintptr_t)sectorAtomicsOrig, sectorAtomicsImpl, 1, DT_RET_VOID,
+     setup_sector_atomics, 400, 0},
+    {"rpWorldSectorRenderWithAtomics", 0x004ba430, rpWorldSectorRenderWithAtomics, 1, DT_RET_INT,
+     setup_sector_render_atomics, 400, 0},
+    {"rpLightApplyToObject", 0x004bae30, rpLightApplyToObject, 2, DT_RET_INT, setup_light_apply, 100, 0},
+    {"rpWorldForAllDirectionalLights", (uint32_t)(uintptr_t)dirLightsOrig, dirLightsImpl, 2, DT_RET_INT,
+     setup_dir_lights, 200, 0},
+    {"rpSectorForAllLights", (uint32_t)(uintptr_t)sectorLightsOrig, sectorLightsImpl, 3, DT_RET_INT,
+     setup_sector_lights, 200, 0},
+    {"rpWorldLightObject", 0x004bae70, rpWorldLightObject, 2, DT_RET_INT, setup_light_object, 300, 0},
+    {"WorldOpen", 0x004bc090, WorldOpen, 2, DT_RET_INT, setup_world_open, 200, 0},
+    {"WorldClose", 0x004bc020, WorldClose, 1, DT_RET_INT, setup_world_close, 100, 0},
+    {"rpWorldDefaultRender", 0x004bc360, rpWorldDefaultRender, 1, DT_RET_INT, setup_default_render, 60, 0},
+    {"rpWorldExtCallSlot2", 0x004c46d0, rpWorldExtCallSlot2, 1, DT_RET_INT, setup_ext_slot2, 20, 0},
     {"RpPVSCreate", 0x004ce960, RpPVSCreate, 7, DT_RET_INT, setup_pvs_create, 300, 0},
     {"rpWorldAddCameraBody", (uint32_t)(uintptr_t)addCameraOrig, addCameraImpl, 2, DT_RET_INT,
      setup_add_camera_body, 100, 0},

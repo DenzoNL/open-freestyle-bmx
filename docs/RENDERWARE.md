@@ -112,7 +112,7 @@ callees outside the slice) and also lists the `skip` library callees. Ported RW 
 with `BMX_ADDR` annotations like the game code; `progress.py` recognises them and `CMakeLists.txt` builds
 `src/rw/*.c`. Rerun `rwmap.py` after porting: ported rows keep their file and status.
 
-Known gaps: the 305 `orig` rows the pointer pass added (97 KB) are sorted below; 105 `orig` rows (25 KB) are left
+Known gaps: the 305 `orig` rows the pointer pass added (97 KB) are sorted below; 42 `orig` rows (20 KB) are left (2026-10-28 after the PVS/world/bone/anim pass)
 (2026-10-28, after the x87 batches: RwMatrixTransform, the camera clip planes, the BSP line and sphere walks,
 rpBspStreamRead, then RpWorldCreate, the sector line-triangle test and the anim plugin's add-sequence, then the
 Sonnet batch of stream/camera/texture/clump leftovers: 53 functions).
@@ -143,17 +143,17 @@ load, riding) hit `_rpMeshGenerate` but none of the nine. If bmxnative ever trap
 Kept as `orig` although only render code calls them (unsure): `RwResourcesAllocateResEntry`/`RwResourcesUseResEntry`
 (0x4dc460, 0x4dc680, public arena API the SDL3 instancing will use), `RpMaterialGetColor` (0x4b9330) and
 `RpWorldSectorGetBBox` (0x4c2240) (accessors). Two bodies behind 4 byte stubs are folded into the ported stub function
-(`FOLDED` in rwmap.py, `skip`): 0x4c24c4 (RpLightDestroy) and 0x4b5ab4 (RpGeometryDestroy).
+(`FOLDED` in rwmap.py, `skip`): 0x4c24c4 (RpLightDestroy) and 0x4b5ab4 (RpGeometryDestroy). The PVS stubs RpPVSUnhook 0x4cc2c0 and RpPVSUnload 0x4cc320 fall into bodies at 0x4cc2c4/0x4cc324 whose only callers (PVSWorldDestructor 0x4cc710, the PVS chunk reader 0x4cc850) are ported now, so both stubs are hooked and the bodies are folded too.
 
 Remaining to port, per file:
 
 | File | Rows | Bytes | Notes |
 |---|---|---|---|
-| rw/world.c | 31 | 3.4 KB | the world plugin's sync callbacks of cameras and atomics (0x4b7730, 0x4b7ab0, with the BSP walk 0x4b7920) are ported, those of lights and the camera sector list (0x4b7bb0, 0x4b7e80) are listed under clump.c; PVS plugin callbacks (0x4cc..), WorldOpen/Close, frustum sector walk 0x4ba360/0x4ba430 |
+| rw/world.c | 2 | 0.5 KB | the x87 sphere walk over the camera's sector list 0x4bdde0 (539 bytes, reverses list links in place), and RpWorldDestroy's 4 byte stub 0x4ba9c0 (falls into the ported body 0x4ba9c4; the stub itself stays original, hooking it would overlap the body's hook). Done in the PVS/world pass: all PVS plugin callbacks (0x4cc1f0..0x4ceef0), WorldOpen/WorldClose, the world pipeline render 0x4bc360, the frustum sector walk 0x4ba360/0x4ba430 and the light hook 0x4bae70 with its walks |
 | rw/clump.c | 3 | 2.9 KB | RpGeometryStreamWrite 0x4b6350 (1.4 KB, no x87), the light sync 0x4b7bb0 (649 bytes, x87, not looked at) and the camera sector-list sync 0x4b7e80 (827 bytes, x87: Opus; `WorldCameraSync` calls it as `ORIG_FN_REGPARM`) |
 | rw/texture.c | 6 | 8.6 KB | texture readers 0x4e1470/0x4e1b50/0x4e0b10 (they call the colour quantiser as `ORIG_FN`), default mipmap generator 0x4e1140, RwImageRead 0x4e4c50, RwImageApplyMask 0x4e3eb8 (all large, no x87, slow). The path walk (0x4e44f0 with its callbacks 0x4e47e0/0x4e4950), RwImageFindFileType, the image copy 0x4e3c00/0x4e3c08, gamma 0x4e53c0, the box shrink 0x4e0f10, the BMP writer and raster lock/unlock are ported; the BMP file-size helper at 0x4e78e0 has no row in the CSV (nothing calls it) and is not ported |
-| rw/engine.c | 37 | 6.4 KB | anim plugin 0x4fbb30..0x502a40 (clump/frame data, stream callbacks), resource entries. The anim rows belong in plugins.c next to RpAnimPluginAttach and its engine module (0x4fc7fc moved there when ported); move the rest when they are ported |
-| rw/plugins.c | 28 | 4.2 KB | bone plugin 0x502b00..0x505830, skin helpers 0x4fbf30..0x4ff960, anim node helpers 0x4fc540 (frame walk), 0x5029e0 |
+| rw/engine.c | 21 | 5.5 KB | anim plugin leftovers 0x4fbb30..0x502a40 (frame list free/copy 0x4fbbc0/0x4fbd00/0x4fbd50/0x4fbdf8, the frame and clump chunk stream callbacks 0x4fcdd0/0x4fd280/0x4fd400, the engine module 0x4fcf20 (786 bytes), sequence play and interpolator code 0x502580..0x502a40, clump ext 0x4fc740/0x4fc760 over 0x5027c0/0x5026a0), resource entries 0x4dc460/0x4dc680. `rwmap.py` resets the file column of `orig` rows, so these stay listed under engine.c; move them to plugins.c when ported (ported rows keep their file) |
+| rw/plugins.c | 8 | 3.1 KB | skin helpers 0x4fbf30 (42), 0x4fbf60 (882, large), 0x4fc2e0 (521), 0x4ff960 (517, the key interpolator that the x87 default play callback 0x502990 calls), the bone frame search 0x504340 (335) and stream read 0x505670 (318), 0x51ce10 (370). The bone plugin callbacks, frame/geometry data, the anim frame and clump chunk sizes, add-sequence helpers and the clump copy are ported |
 | rw/camera.c | 0 | 0 | done: view matrices 0x4ddd40/0x4de2a0 (x87, 353 and 343 bytes), CameraSync/BeginUpdate/EndUpdate, the sphere test, the frame sync it calls (0x4ee410..0x4ee5d0, in rw/math.c) |
 | rw/stream.c | 0 | 0 | done: the null device stubs 0x4e32f2..0x4e335f (17 constant functions; the 3 and 4 byte ones spill their hook into the next stub, which the hook table's address order makes harmless), module close, the chunk header register entry 0x4e2e2c |
 | rw/math.c | 0 | 0 | done (`_rwMatrixClose` is in rw/engine.c next to its open routine) |

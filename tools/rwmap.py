@@ -145,6 +145,8 @@ FOLDED = {
     0x4B5AB4: ("rw/clump.c", "body of RpGeometryDestroy (0x4b5ab0, 4 byte stub)"),
     0x4B21E4: ("rw/clump.c", "body of RpClumpDestroy (0x4b21e0, 4 byte stub)"),
     0x4DF764: ("rw/texture.c", "body of RwTextureDestroy (0x4df760, 4 byte stub)"),
+    0x4CC2C4: ("rw/world.c", "body of RpPVSUnhook (0x4cc2c0, 4 byte stub)"),
+    0x4CC324: ("rw/world.c", "body of RpPVSUnload (0x4cc320, 4 byte stub)"),
 }
 
 

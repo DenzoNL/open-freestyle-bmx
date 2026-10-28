@@ -67,7 +67,7 @@ struct RpAtomic {
     RwLLLink inClumpLink;                  /* 0x44 link in the clump's atomic list */
     RpAtomicRenderCallBack renderCallBack; /* 0x4c */
     RpInterpolator interpolator;           /* 0x50 */
-    uint8_t pad64[2];                      /* 0x64 */
+    uint16_t renderFrame;                  /* 0x64 RwGlobals.renderFrame when it was last rendered */
     uint16_t collisionTag;                 /* 0x66 RwGlobals.lightFrame of the last query that visited it */
     RwLLLink llWorldSectorsInAtomic;       /* 0x68 RpTie links of the sectors it touches */
 };
@@ -102,9 +102,10 @@ _Static_assert(offsetof(RpClump, callback) == 0x1c, "RpClump layout");
 
 /* A bone as the skin code uses it: the matrix applied to its vertices and a flag word (bit 1: active). */
 typedef struct RpSkinBone {
-    uint8_t pad00[0x44];
-    RwMatrix matrix; /* 0x44 */
-    uint32_t flags;  /* 0x84 */
+    RwFrame *frame;   /* 0x00 the bone's frame */
+    RwMatrix invRest; /* 0x04 the inverse of the frame's rest pose, in the clump frame's space */
+    RwMatrix matrix;  /* 0x44 */
+    uint32_t flags;   /* 0x84 */
 } RpSkinBone;
 
 /* A run of vertices driven by one bone; the list ends with a block whose numVertices is 0. */
@@ -123,6 +124,7 @@ typedef struct RpSkinGeometry {
 } RpSkinGeometry;
 
 _Static_assert(sizeof(RpSkinBoneBlock) == 0x10, "RpSkinBoneBlock layout");
+_Static_assert(sizeof(RpSkinBone) == 0x88, "RpSkinBone layout");
 _Static_assert(sizeof(RpSkinGeometry) == 0xc, "RpSkinGeometry layout");
 
 /* The registries of the object types, in .data. */
@@ -148,6 +150,8 @@ _Static_assert(sizeof(RpSkinGeometry) == 0xc, "RpSkinGeometry layout");
 #define rpAnimFrameOffset     ORIG_VAR(0x00678288, int32_t, rpAnimFrameOffset)
 #define rpAnimClumpOffset     ORIG_VAR(0x0067828c, int32_t, rpAnimClumpOffset)
 #define rpBoneFrameOffset     ORIG_VAR(0x00678290, int32_t, rpBoneFrameOffset)
+#define rpBoneEngineOffset    ORIG_VAR(0x00678298, int32_t, rpBoneEngineOffset)
+#define rpBoneModuleCount     ORIG_VAR(0x0067829c, int32_t, rpBoneModuleCount)
 #define rpBoneStreamResult    ORIG_VAR(0x006782a0, int32_t, rpBoneStreamResult)
 #define rpBoneGeometryOffset  ORIG_VAR(0x006782a4, int32_t, rpBoneGeometryOffset)
 #define rpLodEngineOffset     ORIG_VAR(0x00697370, int32_t, rpLodEngineOffset)
@@ -221,6 +225,41 @@ float RwV3dLength(const ZVec3 *vector);
 int RpSkinClumpUpdate(RpClump *clump);
 RpClump *RpSkinClumpSetup(RpClump *clump);
 void RpSkinFindBoneFrames(RpSkinBoneBlock *blocks, RwFrame *frame);
+
+/* The bone plugin's frame walk callbacks, bone data of frames and plugin callbacks (rw/plugins.c). */
+void *rpBoneFindAtomic(void *object, void *found);
+void *rpBoneFindSkinAtomic(void *object, void *found);
+__attribute__((regparm(1))) RpSkinBone *rpBoneGet(RwFrame *frame);
+__attribute__((regparm(2))) RwFrame *rpBoneSet(RwFrame *frame, RpSkinBone *bone);
+RpSkinBone *rpBoneCreate(void);
+__attribute__((regparm(1))) void rpBoneDestroy(RpSkinBone *bone);
+void *rpBoneFindFrame(void *frame, void *search);
+void *rpBoneAttachFrames(void *frame, void *reference);
+void *rpBoneEngineOpen(void *engine, int32_t offset);
+void *rpBoneEngineClose(void *engine);
+void *rpBoneGeometryInit(void *geometry);
+void *rpBoneGeometryDeinit(void *geometry);
+void *rpBoneGeometryCopy(void *destination);
+void *rpBoneGeometryWrite(void *stream, int32_t length, const void *geometry);
+int32_t rpBoneGeometrySize(const void *geometry);
+void *rpBoneFrameInit(void *frame);
+void *rpBoneFrameDeinit(void *frame);
+void *rpBoneFrameCopy(void *destination, const void *source);
+void *rpAnimInterpolatorDeinit(void *interpolator);
+void *rpAnimInterpolatorInit(void *interpolator);
+void *rpAnimFrameInit(void *frame);
+__attribute__((regparm(1))) const char *rpAnimSequenceName(const void *sequence);
+uint32_t rpAnimSequenceType(const uint32_t *sequence);
+__attribute__((regparm(1))) int32_t rpAnimSequenceSize(const uint32_t *sequence);
+int32_t rpAnimFrameChunkSize(const void *frame);
+void *rpAnimClumpAddFrameSequence(void *sequence, void *clump);
+__attribute__((regparm(2))) void *rpAnimClumpAddFrameSequences(void *frame, void *clump);
+void *rpAnimClumpAddFrameSequencesCallback(void *frame, void *clump);
+__attribute__((regparm(1))) RpClump *rpAnimClumpAddAllSequences(RpClump *clump);
+void *rpAnimClumpChunkRead(void *stream, int32_t length, RpClump *clump);
+void *rpAnimClumpChunkWrite(void *stream, int32_t length, const void *clump);
+int32_t rpAnimClumpChunkSize(const void *clump);
+void *rpAnimClumpCopy(void *destination, const void *source);
 
 /* Matrix inverse helpers of RwMatrixInvert (register arguments: EAX = out, EDX = in). */
 __attribute__((regparm(2))) RwMatrix *RwMatrixInvertOrthonormal(RwMatrix *out, const RwMatrix *in);

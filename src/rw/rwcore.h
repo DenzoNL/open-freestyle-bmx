@@ -401,6 +401,7 @@ RwFreeList *rwFreeListFreePlain(RwFreeList *freeList, void *entry);
 /* Modules of the engine registry: open(engine, offset of its data) returns the engine, NULL when it failed.
  */
 void *_rwErrorOpen(void *engine, int32_t offset);
+void *_rwErrorClose(void *engine);
 void *_rwColorOpen(void *engine);
 void *_rwColorClose(void *engine);
 void *_rwMatrixClose(void *engine);

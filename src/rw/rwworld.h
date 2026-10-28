@@ -192,7 +192,7 @@ typedef struct RpWorldListEntry {
 
 /* The world module's data in the engine instance (at rpWorldGlobalsOffset). */
 typedef struct RpWorldGlobals {
-    int32_t pad00;             /* 0x00 */
+    void *pipeline;            /* 0x00 the render pipeline of the world sectors (RwIm3DPipeline) */
     RwFreeList *entryFreeList; /* 0x04 free list of RpWorldListEntry */
     RwLLLink worlds;           /* 0x08 */
 } RpWorldGlobals;
@@ -260,19 +260,20 @@ typedef void(BMX_CDECL *RpPVSProgressCallBack)(int32_t stage, float progress);
  * rowBuffer from the world; hooked is set while the PVS render callback replaces the world's own.
  */
 typedef struct RpPVSWorldData {
-    int32_t numSectors;  /* 0x00 */
-    int32_t rowBytes;    /* 0x04 bytes of a row of visibility bits */
-    int32_t rowStride;   /* 0x08 a row padded to 4 bytes, plus 3 */
-    int32_t granularity; /* 0x0c */
-    int32_t numCells;    /* 0x10 1 << granularity */
-    uint8_t *visibility; /* 0x14 numSectors rows of rowStride bytes; NULL: no PVS */
-    uint8_t pad18[8];    /* 0x18 */
-    uint8_t *rowBuffer;  /* 0x20 */
+    int32_t numSectors;        /* 0x00 */
+    int32_t rowBytes;          /* 0x04 bytes of a row of visibility bits */
+    int32_t rowStride;         /* 0x08 a row padded to 4 bytes, plus 3 */
+    int32_t granularity;       /* 0x0c */
+    int32_t numCells;          /* 0x10 1 << granularity */
+    uint8_t *visibility;       /* 0x14 numSectors rows of rowStride bytes; NULL: no PVS */
+    RpWorldSector *viewSector; /* 0x18 sector the view position walk found */
+    const uint8_t *viewRow;    /* 0x1c its row of visibility bits (NULL: none) */
+    uint8_t *rowBuffer;        /* 0x20 */
     RpWorldSectorCallBackRender savedRenderCallBack; /* 0x24 */
     int32_t hooked;                                  /* 0x28 */
     uint8_t pad2c[8];                                /* 0x2c */
     RpPVSProgressCallBack progressCallBack;          /* 0x34 */
-    int32_t pad38;                                   /* 0x38 */
+    int32_t sectorCounter;                           /* 0x38 next sector index of the generation */
     uint8_t *cursor;                                 /* 0x3c */
     uint8_t pad40[4];                                /* 0x40 */
     int32_t numEntries;                              /* 0x44 */
@@ -370,6 +371,50 @@ RpWorld *RpPVSCreate(RpWorld *world, RwRaster *raster, RwRaster *zRaster, float 
 int32_t rpPVSCountSectors(RpWorld *world);
 /* EAX = world: tears down the camera, rasters and image of a PVS generation. */
 __attribute__((regparm(1))) void rpPVSCameraDestroy(RpWorld *world);
+
+/* Rendering the atomics of a sector, lighting an object with the lights of the world and its sector, and the
+ * world module's open/close. The lighting routine gets the object, the light, 0, 1.0 and the world's surface
+ * properties. */
+typedef void *(BMX_CDECL *RpLightApplyFn)(void *object, RpLight *light, int32_t zero, float one,
+                                          const RwSurfaceProperties *surfaceProps);
+
+typedef struct RpLightApplyArgs {
+    void *object;
+    RpLightApplyFn apply;
+    const RwSurfaceProperties *surfaceProps;
+} RpLightApplyArgs;
+
+__attribute__((regparm(1))) void rpSectorRenderAtomics(RpWorldSector *sector);
+void *rpWorldSectorRenderWithAtomics(RpWorldSector *sector);
+RpLight *rpLightApplyToObject(RpLight *light, RpLightApplyArgs *args);
+__attribute__((regparm(2))) int rpWorldForAllDirectionalLights(RwObjectCallBack callback, void *data);
+__attribute__((regparm(3))) RpWorldSector *rpSectorForAllLights(RpWorldSector *sector,
+                                                                RwObjectCallBack callback, void *data);
+void *rpWorldLightObject(void *object, RpLightApplyFn apply);
+void *WorldOpen(void *engine, int32_t offset);
+void *WorldClose(void *engine);
+void *rpWorldDefaultRender(RpWorldSector *sector);
+int rpWorldExtCallSlot2(void *pipeline);
+
+/* The PVS plugin's callbacks (plugin constructors/destructors, stream chunks, sector walks). */
+void *pvsRenderSector(RpWorldSector *sector);
+void *pvsSectorUnload(void *sector);
+/* EAX = sector, EDX = position: the row of visibility bits of the cell holding the position. */
+__attribute__((regparm(2))) const uint8_t *pvsCellRow(const RpWorldSector *sector, const float *position);
+void *pvsViewSector(RpIntersection *intersection, RpWorldSector *sector, RpPVSWorldData *pvs);
+void *pvsWorldConstruct(void *world);
+void *pvsWorldDestruct(RpWorld *world);
+int32_t pvsWorldChunkSize(const RpWorld *world);
+void *pvsSectorLoad(RpWorldSector *sector, RpPVSWorldData *pvs);
+RwStream *pvsWorldChunkRead(RwStream *stream, int32_t length, RpWorld *world);
+RwStream *pvsWorldChunkWrite(RwStream *stream, int32_t length, const RpWorld *world);
+void *pvsSectorConstruct(void *sector);
+void *pvsSectorDestruct(void *sector);
+int32_t pvsSectorChunkSize(RpWorldSector *sector);
+RwStream *pvsSectorChunkRead(RwStream *stream, int32_t length, RpWorldSector *sector);
+RwStream *pvsSectorChunkWrite(RwStream *stream, int32_t length, const RpWorldSector *sector);
+void *pvsSectorPrepare(RpWorldSector *sector, RpPVSWorldData *pvs);
+void *pvsSectorCount(void *sector, int32_t *count);
 
 /* Vertex and polygon counts of a world sector (zero-extended 16-bit fields). */
 int32_t RpWorldSectorGetNumVertices(const RpWorldSector *sector);
