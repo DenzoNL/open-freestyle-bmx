@@ -25,6 +25,26 @@ def scan(src_dir):
 def main():
     out, src = sys.argv[1], sys.argv[2]
     hooks = scan(src)
+    # A hook writes a 5 byte jmp: a hooked function closer than that to the next one would have the tail of its jmp
+    # overwritten by the next hook (the 4 byte stream stubs at 0x4e3334/0x4e3354 were such a case).
+    addrs = sorted(hooks)
+    for a, b in zip(addrs, addrs[1:]):
+        if b - a < 5:
+            sys.exit(f"{hooks[a]} at {a:#x} is {b - a} bytes before {hooks[b]} at {b:#x}: its 5 byte jmp would overlap")
+    # Nor may the jmp cover the start of a function that still runs as original code (a body behind a 4 byte stub
+    # that original callers call directly).
+    import csv
+
+    # Known overlaps, to remove once the original callers of the bodies (0x4cc710 -> 0x4cc2c4, 0x4cc850 -> 0x4cc324)
+    # are ported and the bodies can be folded like 0x4b21e4.
+    allowed = {0x4CC2C4, 0x4CC324}
+    for table in ("functions.csv", "functions-rw.csv"):
+        path = Path(src).parent / "data" / table
+        if path.exists():
+            for row in csv.DictReader(path.open()):
+                b = int(row["addr"], 16)
+                if row["status"] == "orig" and b not in allowed and any(b - d in hooks for d in range(1, 5)):
+                    sys.exit(f"{table}: {b:#x} (orig) starts inside the 5 byte jmp of a hook just before it")
     lines = ['#include "hook/hook.h"', ""]
     lines += [f"void {name}(void);" for name in sorted(set(hooks.values()))]
     lines += ["", "const BmxHook bmxHooks[] = {"]

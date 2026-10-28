@@ -10,6 +10,7 @@
 #define RW_RWTEXTURE_H
 
 #include "rw/rwcore.h"
+#include "rw/rwstream.h"
 
 /* Indices into RwGlobals.stdFunc (the device's standard functions). */
 enum {
@@ -21,6 +22,8 @@ enum {
     rwSTANDARDSETRASTERCONTEXT = 11,
     rwSTANDARDRASTERSUBRASTER = 12,
     rwSTANDARDRASTERSHOWRASTER = 20,
+    rwSTANDARDRASTERLOCK = 15,
+    rwSTANDARDRASTERUNLOCK = 16,
     rwSTANDARDRASTERLOCKPALETTE = 23,
     rwSTANDARDRASTERUNLOCKPALETTE = 24,
 };
@@ -35,6 +38,7 @@ enum {
     rwRASTERDONTALLOCATE = 0x80,   /* RwRaster.flags: a sub raster must have this on its parent */
     rwRASTERGAMMACORRECTED = 0x01, /* RwRaster.privateFlags */
     rwRASTERPALETTELOCKED = 0x18,  /* RwRaster.privateFlags: the palette lock bits */
+    rwRASTERPIXELSLOCKED = 0x06,   /* RwRaster.privateFlags: the pixel lock bits (read, write) */
 };
 
 /* An RwRaster; type, flags and format are filled in by the device's create function. */
@@ -155,13 +159,19 @@ _Static_assert(sizeof(RwImageFormat) == 0x34, "RwImageFormat layout");
 
 /* The image module's data in the engine instance. */
 typedef struct RwImageGlobals {
-    RwFreeList *imageFreeList;  /* 0x000 */
-    char *path;                 /* 0x004 the image search path */
-    int32_t pathSize;           /* 0x008 bytes allocated for it */
-    uint8_t gammaUp[0x100];     /* 0x00c table of the gamma applied when reading */
-    uint8_t gammaDown[0x100];   /* 0x10c and its inverse */
-    float gamma;                /* 0x20c */
-    uint8_t pad210[8];          /* 0x210 */
+    RwFreeList *imageFreeList; /* 0x000 */
+    char *path;                /* 0x004 the image search path */
+    int32_t pathSize;          /* 0x008 bytes allocated for it */
+    uint8_t gammaUp[0x100];    /* 0x00c table of the gamma applied when reading */
+    uint8_t gammaDown[0x100];  /* 0x10c and its inverse */
+    float gamma;               /* 0x20c */
+    union {
+        uint8_t pad210[8]; /* 0x210 */
+        struct {
+            void *nameBuffer;       /* 0x210 the buffer a candidate file name is built in (grown on demand) */
+            int32_t nameBufferSize; /* 0x214 */
+        };
+    };
     RwFreeList *formatFreeList; /* 0x218 */
     RwImageFormat *formats;     /* 0x21c newest first */
 } RwImageGlobals;
@@ -196,6 +206,8 @@ RwRaster *RwRasterPopContext(void);
 RwRaster *RwRasterShowRaster(RwRaster *raster, void *dev, uint32_t flags);
 uint8_t *RwRasterLockPalette(RwRaster *raster, int32_t lockMode);
 RwRaster *RwRasterUnlockPalette(RwRaster *raster);
+uint8_t *RwRasterLock(RwRaster *raster, uint32_t level, uint32_t mode);
+RwRaster *RwRasterUnlock(RwRaster *raster);
 
 /* ---- textures and dictionaries ---------------------------------------------------------------------- */
 
@@ -209,6 +221,8 @@ RwRaster *RwTextureGetRaster(const RwTexture *texture);
 RwTexDictionary *RwTexDictionaryCreate(void);
 RwTexture *RwTextureDestroyAll(RwTexture *texture);
 int RwTextureDestroy(RwTexture *texture);
+/* The release body of RwTextureDestroy (EAX = texture). */
+__attribute__((regparm(1))) int rwTextureRelease(RwTexture *texture);
 
 /* Module open/close routines the engine registry calls (plugin data at the given offset; NULL = failed). */
 void *_rwRasterOpen(void *engine, int32_t offset);
@@ -216,6 +230,7 @@ void *_rwRasterClose(void *engine);
 void *_rwTextureOpen(void *engine, int32_t offset);
 void *_rwTextureClose(void *engine);
 void *_rwImageOpen(void *engine, int32_t offset);
+void *_rwImageClose(void *engine);
 int RwTexDictionaryDestroy(RwTexDictionary *dictionary);
 RwTexture *RwTextureCreate(RwRaster *raster);
 RwTexture *RwTextureAddRef(RwTexture *texture);
@@ -240,6 +255,39 @@ RwImage *RwImageAllocatePixels(RwImage *image);
 RwImage *RwImageFreePixels(RwImage *image);
 const char *RwImageSetPath(const char *path);
 int RwImageRegisterImageFormat(const char *extension, RwImageCallBackRead read, RwImageCallBackWrite write);
+
+/* The BMP writer: the ".bmp" write callback and its pieces (register entries, see texture.c). */
+RwImage *BMPImageWrite(RwImage *image, const char *name);
+__attribute__((regparm(1))) int32_t bmpFileHeaderSize(int32_t format);
+__attribute__((regparm(1))) int32_t bmpInfoHeaderSize(int32_t format);
+__attribute__((regparm(3))) uint32_t bmpRowBytes(int32_t format, int32_t bits, int32_t width);
+__attribute__((regparm(3))) int32_t bmpWriteRows(RwStream *stream, uint32_t width, int32_t height,
+                                                 int32_t unused0, int32_t unused1, int32_t unused2,
+                                                 int32_t unused3, const RwImage *image);
+__attribute__((regparm(3))) int32_t bmpWriteImage(RwStream *stream, int32_t format, int32_t width,
+                                                  int32_t unused0, int32_t unused1, int32_t unused2,
+                                                  int32_t height, const RwImage *image);
+
+/* Image files: the walk over the image search path and its callbacks (rw/texture.c). */
+typedef const char *(BMX_CDECL *RwImagePathCallback)(char *path, void *data);
+typedef struct RwImageAttempt {
+    RwImageCallBackRead read;
+    RwImage *image;
+} RwImageAttempt;
+
+__attribute__((regparm(3))) const char *ImagePathForAllFullNames(const char *name, int32_t extra,
+                                                                 RwImagePathCallback callback,
+                                                                 int32_t unused0, int32_t unused1,
+                                                                 int32_t unused2, void *data);
+const char *rwImageFindFormatCallback(char *path, void *data);
+const char *RwImageFindFileType(const char *name);
+const char *ImageAttempRead(char *name, void *data);
+/* Copy the pixels of one image into another (EAX = dest, EDX = source for the register entry). */
+__attribute__((regparm(2))) RwImage *rwImageCopyPixels(RwImage *dest, RwImage *source);
+RwImage *RwImageResize(RwImage *dest, RwImage *source);
+RwImage *RwImageGammaCorrect(RwImage *image);
+/* Shrinks a 32 bit image by block averages (EAX = source, EDX = dest). */
+__attribute__((regparm(2))) int rwImageBoxShrink(const RwImage *source, RwImage *dest);
 void *RwRGBAFromPixel(void *rgba, uint32_t pixel, int32_t format);
 int RwImageSetGamma(float gamma);
 RwImage *RtBMPImageRead(const char *name);

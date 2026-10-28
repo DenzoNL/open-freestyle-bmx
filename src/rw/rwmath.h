@@ -92,6 +92,10 @@ __attribute__((regparm(2))) void rwFrameSetRoot(RwFrame *frame, RwFrame *root);
 /* Recompute the LTMs below a frame (EAX = frame, EDX = parent changed), and from a root. */
 __attribute__((regparm(2))) void rwFrameSyncLTM(RwFrame *frame, int32_t force);
 void rwFrameSyncHierarchyLTM(RwFrame *root);
+/* Sync the objects of a frame subtree (EAX = frame, EDX = force) and of the engine's dirty frame list. */
+__attribute__((regparm(2))) void rwFrameSyncObjects(RwFrame *frame, uint32_t force);
+int rwFrameSyncDirtyList(void);
+void *rwFrameSyncObjectCB(void *object, void *data);
 
 RwFrameList *_rwFrameListStreamRead(void *stream, RwFrameList *frameList);
 RwFrameList *_rwFrameListDeinitialize(RwFrameList *frameList);

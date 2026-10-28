@@ -112,9 +112,10 @@ callees outside the slice) and also lists the `skip` library callees. Ported RW 
 with `BMX_ADDR` annotations like the game code; `progress.py` recognises them and `CMakeLists.txt` builds
 `src/rw/*.c`. Rerun `rwmap.py` after porting: ported rows keep their file and status.
 
-Known gaps: the 305 `orig` rows the pointer pass added (97 KB) are sorted below; 167 `orig` rows (44 KB) are left
+Known gaps: the 305 `orig` rows the pointer pass added (97 KB) are sorted below; 105 `orig` rows (25 KB) are left
 (2026-10-28, after the x87 batches: RwMatrixTransform, the camera clip planes, the BSP line and sphere walks,
-rpBspStreamRead, then RpWorldCreate, the sector line-triangle test and the anim plugin's add-sequence).
+rpBspStreamRead, then RpWorldCreate, the sector line-triangle test and the anim plugin's add-sequence, then the
+Sonnet batch of stream/camera/texture/clump leftovers: 53 functions).
 
 ## Classification of the pointer-only functions (2026-10-28)
 
@@ -148,20 +149,20 @@ Remaining to port, per file:
 
 | File | Rows | Bytes | Notes |
 |---|---|---|---|
-| rw/world.c | 31 | 3.4 KB | camera/light sync (0x4b7730, 0x4b7bb0, 0x4b7e80 with x87), PVS plugin callbacks (0x4cc..), WorldOpen/Close, frustum sector walk 0x4ba360/0x4ba430 |
-| rw/clump.c | 8 | 3.9 KB | RpBuildMesh 0x4c5bd0/0x4c5e10, RpGeometryStreamWrite 0x4b6350, 0x4b77..0x4b7e80 |
-| rw/texture.c | 24 | 13.2 KB | texture readers 0x4e1470/0x4e1b50/0x4e0b10, default mipmap generator 0x4e1140, RwImageRead/ApplyMask/FindFileType/path walk 0x4e3c08..0x4e53c0, BMP writer 0x4e7860.. |
-| rw/engine.c | 38 | 6.4 KB | anim plugin 0x4fbb30..0x502a40 (clump/frame data, stream callbacks), resource entries. The anim rows belong in plugins.c next to RpAnimPluginAttach and its engine module (0x4fc7fc moved there when ported); move the rest when they are ported |
+| rw/world.c | 31 | 3.4 KB | the world plugin's sync callbacks of cameras and atomics (0x4b7730, 0x4b7ab0, with the BSP walk 0x4b7920) are ported, those of lights and the camera sector list (0x4b7bb0, 0x4b7e80) are listed under clump.c; PVS plugin callbacks (0x4cc..), WorldOpen/Close, frustum sector walk 0x4ba360/0x4ba430 |
+| rw/clump.c | 3 | 2.9 KB | RpGeometryStreamWrite 0x4b6350 (1.4 KB, no x87), the light sync 0x4b7bb0 (649 bytes, x87, not looked at) and the camera sector-list sync 0x4b7e80 (827 bytes, x87: Opus; `WorldCameraSync` calls it as `ORIG_FN_REGPARM`) |
+| rw/texture.c | 6 | 8.6 KB | texture readers 0x4e1470/0x4e1b50/0x4e0b10 (they call the colour quantiser as `ORIG_FN`), default mipmap generator 0x4e1140, RwImageRead 0x4e4c50, RwImageApplyMask 0x4e3eb8 (all large, no x87, slow). The path walk (0x4e44f0 with its callbacks 0x4e47e0/0x4e4950), RwImageFindFileType, the image copy 0x4e3c00/0x4e3c08, gamma 0x4e53c0, the box shrink 0x4e0f10, the BMP writer and raster lock/unlock are ported; the BMP file-size helper at 0x4e78e0 has no row in the CSV (nothing calls it) and is not ported |
+| rw/engine.c | 37 | 6.4 KB | anim plugin 0x4fbb30..0x502a40 (clump/frame data, stream callbacks), resource entries. The anim rows belong in plugins.c next to RpAnimPluginAttach and its engine module (0x4fc7fc moved there when ported); move the rest when they are ported |
 | rw/plugins.c | 28 | 4.2 KB | bone plugin 0x502b00..0x505830, skin helpers 0x4fbf30..0x4ff960, anim node helpers 0x4fc540 (frame walk), 0x5029e0 |
-| rw/camera.c | 8 | 1.7 KB | view matrices 0x4ddd40/0x4de2a0 (x87), CameraSync/BeginUpdate/EndUpdate |
-| rw/stream.c | 20 | 0.6 KB | stream plugin vtable stubs 0x4e32f2..0x4e335f |
-| rw/math.c | 1 | 0.1 KB | `_rwMatrixClose` |
+| rw/camera.c | 0 | 0 | done: view matrices 0x4ddd40/0x4de2a0 (x87, 353 and 343 bytes), CameraSync/BeginUpdate/EndUpdate, the sphere test, the frame sync it calls (0x4ee410..0x4ee5d0, in rw/math.c) |
+| rw/stream.c | 0 | 0 | done: the null device stubs 0x4e32f2..0x4e335f (17 constant functions; the 3 and 4 byte ones spill their hook into the next stub, which the hook table's address order makes harmless), module close, the chunk header register entry 0x4e2e2c |
+| rw/math.c | 0 | 0 | done (`_rwMatrixClose` is in rw/engine.c next to its open routine) |
 
 Opus batch done (2026-10-28): RpWorldCreate 0x4bb080 (rw/world.c), the sector line-triangle walk 0x4be560 with its
 Moeller-Trumbore kernel 0x4beab0 (EAX/EDX/ECX, stack slots 4..6 and the length in ST0; both moved to rw/collision.c,
 where the other per-sector tests are) and rpAnimClumpAddSequence 0x4fc7fc (WorldCopyClumpExt's callee, moved from
 engine.c to rw/plugins.c). Large without x87 (Sonnet, slow):
-0x4b6350, 0x4e1470, 0x4e1b50, 0x4e3eb8, 0x4e4c50.
+0x4b6350, 0x4e1470, 0x4e1b50, 0x4e3eb8, 0x4e4c50 (still open after the Sonnet batch of 2026-10-28).
 
 x87 porting notes from that batch: Ghidra prints `FMUL ST5` both for `ST0 = ST0 * ST5` and for `ST5 = ST5 * ST0`;
 decode register forms from the bytes (D8 vs DC/DE) or with capstone. LLVM treats the sign of a NaN as unspecified:

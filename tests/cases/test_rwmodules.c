@@ -901,7 +901,92 @@ static void setup_no_args(DtCtx *c)
     dt_seed(c);
 }
 
+/* ---- module close routines: free list slots that may be empty, counters ------------------------------- */
+
+static void setup_matrix_close(DtCtx *c)
+{
+    RwGlobals *g = modEnv(c);
+    const int32_t offset = modOffset();
+    rwMatrixOffset = offset;
+    *(RwFreeList **)at(g, offset) = dt_u32() % 3 == 0 ? NULL : ORIG_FREELIST_CREATE(0x40, 5, 4);
+    DT_ARG_PTR(c, 0, dt_alloc(16));
+    rwtEnd();
+}
+
+static void setup_camera_close(DtCtx *c)
+{
+    RwGlobals *g = modEnv(c);
+    const int32_t offset = modOffset();
+    rwCameraOffset = offset;
+    *(RwFreeList **)at(g, offset) = dt_u32() % 3 == 0 ? NULL : ORIG_FREELIST_CREATE(0x188, 4, 4);
+    DT_ARG_PTR(c, 0, dt_alloc(16));
+    rwtEnd();
+}
+
+static void setup_stream_module_close(DtCtx *c)
+{
+    RwGlobals *g = modEnv(c);
+    const int32_t offset = modOffset();
+    rwStreamOffset = offset;
+    *(RwFreeList **)at(g, offset) = dt_u32() % 3 == 0 ? NULL : ORIG_FREELIST_CREATE(0x20, 10, 0);
+    DT_ARG_PTR(c, 0, dt_alloc(16));
+    rwtEnd();
+}
+
+/* The image module: free lists, a path buffer, the extra block at 0x210 and a chain of 0..3 formats. */
+static void setup_image_close(DtCtx *c)
+{
+    RwGlobals *g = modEnv(c);
+    const int32_t offset = modOffset();
+    rwImageOffset = offset;
+    RwImageGlobals *images = (RwImageGlobals *)at(g, offset);
+    images->imageFreeList = dt_u32() % 3 == 0 ? NULL : ORIG_FREELIST_CREATE(0x30, 20, 0);
+    images->formatFreeList = dt_u32() % 3 == 0 ? NULL : ORIG_FREELIST_CREATE(0x34, 3, 0);
+    images->path = dt_u32() % 3 == 0 ? NULL : dt_alloc(0x100);
+    images->pathSize = (int32_t)dt_u32();
+    images->nameBuffer = dt_u32() % 2 == 0 ? NULL : dt_alloc(16);
+    images->nameBufferSize = (int32_t)dt_u32();
+    images->formats = NULL;
+    for (int n = dt_range(0, 3); n > 0; n--) {
+        RwImageFormat *format = dt_alloc(sizeof *format);
+        format->next = images->formats;
+        images->formats = format;
+    }
+    DT_ARG_PTR(c, 0, dt_alloc(16));
+    rwtEnd();
+}
+
+/* The null device callbacks take no arguments the code reads. */
+static void setup_stub_return(DtCtx *c)
+{
+    dt_seed(c);
+}
+
+#define RET_STUB(name, addr) {#name, addr, name, 0, DT_RET_INT, setup_stub_return, 3, 0}
+
 DT_CASES(rwmodules_cases) = {
+    {"_rwMatrixClose", 0x004d2040, _rwMatrixClose, 1, DT_RET_INT, setup_matrix_close, 40, 0},
+    {"_rwCameraClose", 0x004dd490, _rwCameraClose, 1, DT_RET_INT, setup_camera_close, 40, 0},
+    {"_rwStreamModuleClose", 0x004e23b0, _rwStreamModuleClose, 1, DT_RET_INT, setup_stream_module_close, 40,
+     0},
+    {"_rwImageClose", 0x004e36e0, _rwImageClose, 1, DT_RET_INT, setup_image_close, 150, 0},
+    RET_STUB(rwStubReturn0_4e32f2, 0x004e32f2),
+    RET_STUB(rwStubReturn0_4e32f9, 0x004e32f9),
+    RET_STUB(rwStubReturn1_4e3300, 0x004e3300),
+    RET_STUB(rwStubReturn1_4e330a, 0x004e330a),
+    RET_STUB(rwStubReturn1_4e3311, 0x004e3311),
+    RET_STUB(rwStubReturn1_4e3318, 0x004e3318),
+    RET_STUB(rwStubReturn1_4e331f, 0x004e331f),
+    RET_STUB(rwStubReturn1_4e3326, 0x004e3326),
+    RET_STUB(rwStubReturn1_4e332d, 0x004e332d),
+    RET_STUB(rwStubReturn0_4e3334, 0x004e3334),
+    RET_STUB(rwStubReturn1_4e3338, 0x004e3338),
+    RET_STUB(rwStubReturn1_4e333f, 0x004e333f),
+    RET_STUB(rwStubReturn1_4e3346, 0x004e3346),
+    RET_STUB(rwStubReturn1_4e334d, 0x004e334d),
+    RET_STUB(rwStubReturn0_4e3354, 0x004e3354),
+    RET_STUB(rwStubReturn1_4e3358, 0x004e3358),
+    RET_STUB(rwStubReturn0_4e335f, 0x004e335f),
     {"_rwFreeListAllocReal", 0x004dbc30, _rwFreeListAllocReal, 1, DT_RET_INT, setup_alloc_real, 300, 0},
     {"_rwFreeListFreeReal", 0x004dbd90, _rwFreeListFreeReal, 2, DT_RET_VOID, setup_free_real, 100, 0},
     {"rwFreeListAllocPlain", 0x004cf800, rwFreeListAllocPlain, 1, DT_RET_INT, setup_alloc_plain, 40, 0},

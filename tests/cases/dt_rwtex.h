@@ -155,6 +155,9 @@ TEX_FN int texStd(int index, void *out, void *in, int32_t flags)
         raster->stride = dt_range(0, 512);
         break;
     }
+    case rwSTANDARDRASTERLOCK:
+        *(void **)out = gTexPalette;
+        break;
     case rwSTANDARDRASTERLOCKPALETTE:
         *(void **)out = gTexPalette;
         break;
@@ -180,6 +183,8 @@ TEX_STD(7)
 TEX_STD(8)
 TEX_STD(11)
 TEX_STD(12)
+TEX_STD(15)
+TEX_STD(16)
 TEX_STD(20)
 TEX_STD(23)
 TEX_STD(24)
@@ -214,6 +219,8 @@ TEX_FN RwGlobals *texEnv(DtCtx *c)
     g->stdFunc[rwSTANDARDTEXTURESETRASTER] = (uint32_t)(uintptr_t)texStd8;
     g->stdFunc[rwSTANDARDSETRASTERCONTEXT] = (uint32_t)(uintptr_t)texStd11;
     g->stdFunc[rwSTANDARDRASTERSUBRASTER] = (uint32_t)(uintptr_t)texStd12;
+    g->stdFunc[rwSTANDARDRASTERLOCK] = (uint32_t)(uintptr_t)texStd15;
+    g->stdFunc[rwSTANDARDRASTERUNLOCK] = (uint32_t)(uintptr_t)texStd16;
     g->stdFunc[rwSTANDARDRASTERSHOWRASTER] = (uint32_t)(uintptr_t)texStd20;
     g->stdFunc[rwSTANDARDRASTERLOCKPALETTE] = (uint32_t)(uintptr_t)texStd23;
     g->stdFunc[rwSTANDARDRASTERUNLOCKPALETTE] = (uint32_t)(uintptr_t)texStd24;

@@ -11,6 +11,7 @@
  */
 #include "dt.h"
 #include "dt_rwmath.h"
+#include "rw/rwtexture.h"
 
 /* ---- cameras ---------------------------------------------------------------------------------------- */
 
@@ -623,7 +624,290 @@ static void setup_clip_planes(DtCtx *c)
     rwtEnd();
 }
 
+/* ---- view matrices (EAX = camera, returned in EAX) and the sync callback ---------------------------------
+ */
+
+static uint32_t view_call(uint32_t target, RwCamera *camera)
+{
+    uint32_t eax = (uint32_t)(uintptr_t)camera;
+    __asm__ volatile("call *%1"
+                     : "+a"(eax)
+                     : "r"(target)
+                     : "memory", "cc", "ecx", "edx", "st", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5",
+                       "xmm6", "xmm7");
+    return eax;
+}
+
+static uint32_t persp_view_orig(RwCamera *camera)
+{
+    return view_call(0x004ddd40, camera);
+}
+
+static uint32_t persp_view_impl(RwCamera *camera)
+{
+    return view_call((uint32_t)(uintptr_t)CameraBuildPerspViewMatrix, camera);
+}
+
+static uint32_t parallel_view_orig(RwCamera *camera)
+{
+    return view_call(0x004de2a0, camera);
+}
+
+static uint32_t parallel_view_impl(RwCamera *camera)
+{
+    return view_call((uint32_t)(uintptr_t)CameraBuildParallelViewMatrix, camera);
+}
+
+/* A camera on a frame with a random LTM (moderate values, edges and infinities, no NaN), window and offset.
+ */
+static RwCamera *make_view_camera(void)
+{
+    RwCamera *camera = dt_alloc(sizeof(RwCamera));
+    dt_fill(camera, sizeof(RwCamera));
+    RwFrame *frame = dt_alloc(sizeof(RwFrame));
+    dt_fill(frame, sizeof(RwFrame));
+    float *f = (float *)&frame->ltm;
+    const float range = dt_u32() % 4 == 0 ? 1e6f : 4.0f;
+    for (int i = 0; i < 16; i++) {
+        if (i % 4 != 3) {
+            f[i] = clip_float(-range, range);
+        }
+    }
+    camera->object.object.parent = frame;
+    camera->recipViewWindow.x = clip_float(-3.0f, 3.0f);
+    camera->recipViewWindow.y = clip_float(-3.0f, 3.0f);
+    camera->viewOffset.x = dt_u32() % 3 == 0 ? 0.0f : clip_float(-1.0f, 1.0f);
+    camera->viewOffset.y = dt_u32() % 3 == 0 ? 0.0f : clip_float(-1.0f, 1.0f);
+    return camera;
+}
+
+static void setup_view_matrix(DtCtx *c)
+{
+    camera_env(c);
+    DT_ARG_PTR(c, 0, make_view_camera());
+    rwtEnd();
+}
+
+/* Projection 1 or 2 mostly, now and then another value; finite corners for the bounding box of the others. */
+static void setup_camera_sync(DtCtx *c)
+{
+    setup_clip_planes(c);
+    RwCamera *camera = (RwCamera *)(uintptr_t)c->args[0];
+    camera->projection = dt_u32() % 5 == 0 ? dt_range(-1, 4) : dt_range(1, 2);
+    camera->recipViewWindow.x = clip_float(-3.0f, 3.0f);
+    camera->recipViewWindow.y = clip_float(-3.0f, 3.0f);
+    for (int i = 0; i < 8; i++) {
+        camera->frustumCorners[i].x = dt_float(-100.0f, 100.0f);
+        camera->frustumCorners[i].y = dt_float(-100.0f, 100.0f);
+        camera->frustumCorners[i].z = dt_float(-100.0f, 100.0f);
+    }
+    rwtEnd();
+}
+
+/* ---- begin / end update and the sphere test ---------------------------------------------------------- */
+
+static int BMX_CDECL stub_device_update(void *out, RwCamera *camera, int32_t flags)
+{
+    rwtLog(0x4d1e);
+    rwtLogPtr(out);
+    rwtLogPtr(camera);
+    rwtLog((uint32_t)flags);
+    return (int)(dt_u32() % 4 != 0);
+}
+
+static void BMX_CDECL stub_core_ext(void *camera)
+{
+    rwtLog(0xe5107);
+    rwtLogPtr(camera);
+}
+
+static void BMX_CDECL stub_frame_sync(void *object)
+{
+    rwtLog(0x5111c);
+    rwtLogPtr(object);
+}
+
+/*
+ * A forest of frames (queued roots are in the engine's dirty list) with 0..2 objects each whose sync function
+ * logs; the first root gets a parent so that it can be synced on its own. Returns the frame count.
+ */
+static int synced_forest(RwFrame **frames, int maxN)
+{
+    const int n = mathFrameTree(frames, maxN);
+    for (int i = 0; i < n; i++) {
+        for (int k = dt_range(0, 2); k > 0; k--) {
+            RwObjectHasFrame *object = dt_alloc(sizeof *object);
+            object->sync = (void *)stub_frame_sync;
+            object->lFrame.prev = frames[i]->objectList.prev;
+            object->lFrame.next = &frames[i]->objectList;
+            frames[i]->objectList.prev->next = &object->lFrame;
+            frames[i]->objectList.prev = &object->lFrame;
+        }
+    }
+    RwFrame *parent = dt_alloc(sizeof(RwFrame));
+    mathFillMatrix(&parent->ltm);
+    frames[0]->object.parent = parent;
+    return n;
+}
+
+/* A raster object whose parent has the given size (it is its own parent for a normal raster). */
+static RwRaster *make_sized_raster(int32_t width, int32_t height, int self)
+{
+    RwRaster *raster = dt_alloc(sizeof(RwRaster));
+    dt_fill(raster, sizeof(RwRaster));
+    raster->parent = raster;
+    raster->width = width;
+    raster->height = height;
+    if (!self) {
+        RwRaster *parent = dt_alloc(sizeof(RwRaster));
+        dt_fill(parent, sizeof(RwRaster));
+        parent->width = width;
+        parent->height = height;
+        raster->parent = parent;
+        raster->width = dt_range(1, 3); /* a sub raster's own size is not what is compared */
+    }
+    return raster;
+}
+
+static void setup_begin_update(DtCtx *c)
+{
+    camera_env(c);
+    RwGlobals *g = RwEngineInstance;
+    g->stdFunc[1] = (uint32_t)(uintptr_t)stub_device_update;
+    g->stdFunc[10] = (uint32_t)(uintptr_t)stub_device_update;
+    ((uint32_t *)(uintptr_t)0x0069bee0)[1] = (uint32_t)(uintptr_t)stub_core_ext;
+    g->curCamera = dt_alloc(8);
+    RwCamera *camera = make_camera(0);
+    const int32_t w = dt_range(1, 3), h = dt_range(1, 3);
+    camera->frameBuffer = dt_u32() % 8 == 0 ? NULL : make_sized_raster(w, h, dt_u32() % 2);
+    camera->zBuffer =
+        dt_u32() % 3 == 0 ? NULL : make_sized_raster(dt_u32() % 4 == 0 ? w + 1 : w, h, dt_u32() % 2);
+    if (dt_u32() % 7 == 0 && camera->zBuffer != NULL) {
+        camera->zBuffer->parent->height = h + 1;
+    }
+    /* dirty frames with objects: the sync runs between the checks and the device call */
+    RwFrame *frames[5];
+    synced_forest(frames, 5);
+    DT_ARG_PTR(c, 0, dt_u32() % 12 == 0 ? NULL : camera);
+    rwtEnd();
+}
+
+static void setup_end_update(DtCtx *c)
+{
+    camera_env(c);
+    RwGlobals *g = RwEngineInstance;
+    g->stdFunc[1] = (uint32_t)(uintptr_t)stub_device_update;
+    g->stdFunc[10] = (uint32_t)(uintptr_t)stub_device_update;
+    g->curCamera = dt_alloc(8);
+    DT_ARG_PTR(c, 0, make_camera(0));
+    rwtEnd();
+}
+
+/*
+ * Planes with small integer normals and distances and spheres on integer centres half of the time, so that
+ * the distance equals the radius (or its negation) exactly; otherwise random edgy values. A NaN radius now
+ * and then (a single NaN: two different ones meet differently on the x87 and SSE).
+ */
+static void setup_frustum_sphere(DtCtx *c)
+{
+    camera_env(c);
+    RwCamera *camera = dt_alloc(sizeof(RwCamera));
+    dt_fill(camera, sizeof(RwCamera));
+    float *sphere = dt_alloc(16);
+    const int integral = dt_u32() % 2;
+    for (int i = 0; i < 6; i++) {
+        RwFrustumPlane *plane = &camera->frustumPlanes[i];
+        if (integral) {
+            plane->normal.x = (float)dt_range(-2, 2);
+            plane->normal.y = (float)dt_range(-2, 2);
+            plane->normal.z = (float)dt_range(-2, 2);
+            plane->distance = (float)dt_range(-6, 6);
+        } else {
+            plane->normal.x = clip_float(-2.0f, 2.0f);
+            plane->normal.y = clip_float(-2.0f, 2.0f);
+            plane->normal.z = clip_float(-2.0f, 2.0f);
+            plane->distance = clip_float(-100.0f, 100.0f);
+        }
+    }
+    for (int i = 0; i < 3; i++) {
+        sphere[i] = integral ? (float)dt_range(-3, 3) : clip_float(-50.0f, 50.0f);
+    }
+    sphere[3] = integral ? (float)dt_range(-1, 5) : clip_float(-10.0f, 10.0f);
+    if (dt_u32() % 12 == 0) {
+        const uint32_t nan = 0x7fc00000u;
+        __builtin_memcpy(&sphere[3], &nan, 4);
+    }
+    DT_ARG_PTR(c, 0, camera);
+    DT_ARG_PTR(c, 1, sphere);
+    rwtEnd();
+}
+
+/* ---- frame sync (called by the camera's begin update) ------------------------------------------------ */
+
+static void setup_sync_dirty_list(DtCtx *c)
+{
+    camera_env(c);
+    RwFrame *frames[6];
+    synced_forest(frames, 6);
+    rwtEnd();
+}
+
+/* EAX = frame, EDX = force; EAX is not an output (the original leaves the frame there or a callee result). */
+static void sync_call(uint32_t target, RwFrame *frame, uint32_t force)
+{
+    uint32_t eax = (uint32_t)(uintptr_t)frame, edx = force;
+    __asm__ volatile("call *%2"
+                     : "+a"(eax), "+d"(edx)
+                     : "r"(target)
+                     : "memory", "cc", "ecx", "st", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6",
+                       "xmm7");
+}
+
+static void sync_objects_orig(RwFrame *frame, uint32_t force)
+{
+    sync_call(0x004ee430, frame, force);
+}
+
+static void sync_objects_impl(RwFrame *frame, uint32_t force)
+{
+    sync_call((uint32_t)(uintptr_t)rwFrameSyncObjects, frame, force);
+}
+
+static void setup_sync_objects(DtCtx *c)
+{
+    camera_env(c);
+    RwFrame *frames[6];
+    synced_forest(frames, 6);
+    static const uint32_t forces[] = {0, 4, 8, 0xc, 1};
+    DT_ARG_PTR(c, 0, dt_u32() % 10 == 0 ? NULL : frames[0]);
+    DT_ARG_INT(c, 1, dt_u32() % 8 == 0 ? dt_u32() : forces[dt_u32() % 5]);
+    rwtEnd();
+}
+
+static void setup_sync_object_cb(DtCtx *c)
+{
+    camera_env(c);
+    RwObjectHasFrame *object = dt_alloc(sizeof *object);
+    object->sync = (void *)stub_frame_sync;
+    DT_ARG_PTR(c, 0, object);
+    DT_ARG_INT(c, 1, dt_u32());
+    rwtEnd();
+}
+
 DT_CASES(rwcamera_cases) = {
+    {"rwFrameSyncDirtyList", 0x004ee5d0, rwFrameSyncDirtyList, 0, DT_RET_INT, setup_sync_dirty_list, 600, 0},
+    {"rwFrameSyncObjects", (uint32_t)(uintptr_t)sync_objects_orig, sync_objects_impl, 2, DT_RET_VOID,
+     setup_sync_objects, 600, 0},
+    {"rwFrameSyncObjectCB", 0x004ee410, rwFrameSyncObjectCB, 2, DT_RET_INT, setup_sync_object_cb, 30, 0},
+    {"CameraBuildPerspViewMatrix", (uint32_t)(uintptr_t)persp_view_orig, persp_view_impl, 1, DT_RET_INT,
+     setup_view_matrix, 2000, 0},
+    {"CameraBuildParallelViewMatrix", (uint32_t)(uintptr_t)parallel_view_orig, parallel_view_impl, 1,
+     DT_RET_INT, setup_view_matrix, 2000, 0},
+    {"CameraSync", 0x004de400, CameraSync, 1, DT_RET_INT, setup_camera_sync, 1500, 0},
+    {"CameraBeginUpdate", 0x004de690, CameraBeginUpdate, 1, DT_RET_INT, setup_begin_update, 800, 0},
+    {"CameraEndUpdate", 0x004de7b0, CameraEndUpdate, 1, DT_RET_INT, setup_end_update, 100, 0},
+    {"RwCameraFrustumTestSphere", 0x004de820, RwCameraFrustumTestSphere, 2, DT_RET_INT, setup_frustum_sphere,
+     2000, 0},
     {"CameraBuildPerspClipPlanes", (uint32_t)(uintptr_t)persp_orig, persp_impl, 1, DT_RET_VOID,
      setup_clip_planes, 2000, 0},
     {"CameraBuildParallelClipPlanes", (uint32_t)(uintptr_t)parallel_orig, parallel_impl, 1, DT_RET_VOID,

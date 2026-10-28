@@ -8,6 +8,7 @@
 #include "rw/rwworld.h"
 
 #include "rw/rwclump.h"
+#include "rw/rwcollision.h"
 
 /*
  * The camera set-up of the PVS generation (0x4ce6d0, original code of the camera group): EAX = world, EDX =
@@ -1153,7 +1154,8 @@ RpWorld *RpPVSHook(RpWorld *world)
 
 /*
  * Puts the world's own render callback back. The original is a four byte stub that loads the argument into
- * EAX and falls into this; its tail has no other entry, so the whole thing is ported at the stub's address.
+ * EAX and falls into this. Its jmp overwrites the first byte of the body 0x4cc2c4, which PVSWorldDestructor
+ * (0x4cc710, original) still calls directly: allowlisted in gen_hooks.py until that caller is ported.
  */
 BMX_ADDR(0x004cc2c0)
 RpWorld *RpPVSUnhook(RpWorld *world)
@@ -1168,8 +1170,8 @@ RpWorld *RpPVSUnhook(RpWorld *world)
     return world;
 }
 
-/* Frees the PVS data of the world and of its sectors. (Stub at 0x4cc320 and tail ported as one, like above.)
- */
+/* Frees the PVS data of the world and of its sectors. Stub at 0x4cc320 and tail ported as one, like above;
+ * allowlisted in gen_hooks.py until 0x4cc850 (original, calls the body 0x4cc324) is ported. */
 BMX_ADDR(0x004cc320)
 RpWorld *RpPVSUnload(RpWorld *world)
 {
@@ -1608,6 +1610,131 @@ __attribute__((regparm(1))) void rpAtomicTiesDestroy(RpAtomic *atomic)
             RwEngineInstance->freeListFree(tieGlobals()->tieFreeList, tie);
         }
     }
+}
+
+/* a - b with b opaque to the optimiser (no rewrite as a + -b, which flips the sign of a NaN b). */
+static double worldSub(double a, double b)
+{
+    __asm__("" : "+x"(b));
+    return a - b;
+}
+
+/*
+ * Ties the atomic to every sector its world bounding box touches. The box is the sphere's centre -+ radius;
+ * it is skipped altogether when a minimum has its sign bit set (negative, also -0 and negative NaNs). The BSP
+ * is walked with an explicit stack of 64 entries; the floats of the planes and the box are compared as
+ * integers (signed), which equals the float order only for non-negative values. A plane's type is the byte
+ * offset of its axis in the box (0, 4, 8). Each leaf gets a tie from the tie free list (not checked for
+ * NULL), linked into the sector's list (the one for atomics with collision when flag bit 0 of the atomic is
+ * set) and the atomic's list. EAX = world, EDX = atomic.
+ */
+BMX_ADDR(0x004b7920)
+__attribute__((regparm(2))) void rpAtomicAddTies(RpWorld *world, RpAtomic *atomic)
+{
+    const RwSphere *sphere = RpAtomicGetWorldBoundingSphere(atomic);
+    const float x = sphere->center.x;
+    const float y = sphere->center.y;
+    const float z = sphere->center.z;
+    const double radius = (double)sphere->radius;
+    float bounds[6];
+    bounds[0] = (float)worldSub((double)x, radius);
+    bounds[1] = (float)worldSub((double)y, radius);
+    bounds[2] = (float)worldSub((double)z, radius);
+    if ((int32_t)((uint32_t)floatBits(bounds[0]) | (uint32_t)floatBits(bounds[2]) |
+                  (uint32_t)floatBits(bounds[1])) < 0) {
+        return;
+    }
+    bounds[3] = (float)(radius + (double)x);
+    bounds[4] = (float)((double)y + radius);
+    bounds[5] = (float)((double)z + radius);
+    RpSector *stack[65] = {0};
+    int32_t top = 0;
+    RpSector *node = world->rootSector;
+    for (;;) {
+        const int32_t type = *(const int32_t *)node;
+        if (type >= 0) {
+            const RpPlaneSector *plane = (const RpPlaneSector *)node;
+            const int32_t low = floatBits(*(const float *)((const uint8_t *)bounds + type));
+            const int32_t high = floatBits(*(const float *)((const uint8_t *)bounds + type + 0xc));
+            if (low < floatBits(plane->leftValue)) {
+                node = plane->leftSubTree;
+                if (floatBits(plane->rightValue) >= high) {
+                    continue;
+                }
+                stack[++top] = plane->rightSubTree;
+                continue;
+            }
+            if (floatBits(plane->rightValue) < high) {
+                node = plane->rightSubTree;
+                continue;
+            }
+            node = stack[top--];
+        } else {
+            RpWorldSector *sector = (RpWorldSector *)node;
+            RpTie *tie = RwEngineInstance->freeListAlloc(tieGlobals()->tieFreeList);
+            tie->worldSector = sector;
+            tie->apAtom = atomic;
+            if ((atomic->object.object.flags & 1) == 0) {
+                linkFirst(&sector->noCollAtomicsInWorldSector, &tie->lAtomicInWorldSector);
+            } else {
+                linkFirst(&sector->collAtomicsInWorldSector, &tie->lAtomicInWorldSector);
+            }
+            linkFirst(&atomic->llWorldSectorsInAtomic, &tie->lWorldSectorInAtomic);
+            node = stack[top--];
+        }
+        if (top < 0) {
+            break;
+        }
+    }
+}
+
+/*
+ * The atomic's sync callback (the world plugin's replacement): counts a change, runs the callback it
+ * replaced and, for an atomic in a world, renews its ties. Returns the atomic, NULL if the old callback did.
+ */
+BMX_ADDR(0x004b7ab0)
+RpAtomic *WorldAtomicSync(RpAtomic *atomic)
+{
+    const int32_t offset = rpWorldAtomicOffset;
+    atomic->stamp++;
+    RpWorldAtomicData *data = (RpWorldAtomicData *)((uint8_t *)atomic + offset);
+    if (((void *(BMX_CDECL *)(RpAtomic *))data->sync)(atomic) == NULL) {
+        return NULL;
+    }
+    RpWorld *world = data->world;
+    if (world != NULL) {
+        rpAtomicTiesDestroy(atomic);
+        rpAtomicAddTies(world, atomic);
+    }
+    return atomic;
+}
+
+/* The camera's sector list sync (still original code: EAX = world, EDX = camera, x87). */
+ORIG_FN_REGPARM(2, 0x004b7e80, void, rpWorldCameraSyncSectors, (RpWorld * world, RwCamera *camera));
+
+enum { rwSTANDARDWORLDCAMERASYNC = 22 };
+
+/*
+ * The camera's sync callback (the world plugin's replacement): runs the callback it replaced, then for a
+ * camera in a world rebuilds the camera's sector list and tells the device (standard function 22, with a
+ * flag for worlds of kind 1). Counts the change; returns the camera, NULL if the old callback did.
+ */
+BMX_ADDR(0x004b7730)
+RwCamera *WorldCameraSync(RwCamera *camera)
+{
+    const int32_t offset = rpWorldCameraOffset;
+    RpWorldCameraData *data = (RpWorldCameraData *)((uint8_t *)camera + offset);
+    if (((void *(BMX_CDECL *)(RwCamera *))data->sync)(camera) == NULL) {
+        return NULL;
+    }
+    RpWorld *world = data->world;
+    if (world != NULL) {
+        rpWorldCameraSyncSectors(world, camera);
+        ((void(BMX_CDECL *)(void *, void *, int32_t))(
+             uintptr_t)RwEngineInstance->stdFunc[rwSTANDARDWORLDCAMERASYNC])(NULL, NULL, world->flags == 1);
+    }
+    camera->version++;
+    return camera;
 }
 
 /* Destroys the ties of the light with sectors. */

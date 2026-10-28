@@ -420,7 +420,59 @@ static void setup_set_from_image(DtCtx *c)
     rwtEnd();
 }
 
+/* ---- pixel lock, texture release ------------------------------------------------------------------------
+ */
+
+/* Lock flags (privateFlags & 6) clear half of the time; formats with and without the mip (0x80) and 0x10
+ * bits. */
+static void setup_raster_lock(DtCtx *c)
+{
+    texEnv(c);
+    RwRaster *r = mkRaster();
+    r->privateFlags = (uint8_t)(dt_u32() % 2 ? dt_u32() & ~6u : dt_u32());
+    r->format = (uint8_t)(dt_u32() % 3 == 0 ? dt_u32() : (dt_u32() % 2 ? 0x90 : 0x80) | (dt_u32() & 0x0f));
+    DT_ARG_PTR(c, 0, r);
+    DT_ARG_INT(c, 1, dt_u32() % 3 == 0 ? dt_u32() : (uint32_t)dt_range(0, 3));
+    DT_ARG_INT(c, 2, dt_u32() % 4 == 0 ? dt_u32() : (uint32_t)dt_range(0, 3));
+    rwtEnd();
+}
+
+static void setup_raster_unlock(DtCtx *c)
+{
+    texEnv(c);
+    RwRaster *r = mkRaster();
+    r->privateFlags = (uint8_t)(dt_u32() % 2 ? dt_u32() & ~6u : dt_u32());
+    DT_ARG_PTR(c, 0, r);
+    rwtEnd();
+}
+
+/* The release body behind RwTextureDestroy (EAX = texture). */
+static uint32_t release_call(uint32_t target, RwTexture *texture)
+{
+    uint32_t eax = (uint32_t)(uintptr_t)texture;
+    __asm__ volatile("call *%1"
+                     : "+a"(eax)
+                     : "r"(target)
+                     : "memory", "cc", "ecx", "edx", "st", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5",
+                       "xmm6", "xmm7");
+    return eax;
+}
+
+static uint32_t release_orig(RwTexture *texture)
+{
+    return release_call(0x004df764, texture);
+}
+
+static uint32_t release_impl(RwTexture *texture)
+{
+    return release_call((uint32_t)(uintptr_t)rwTextureRelease, texture);
+}
+
 DT_CASES(rwtexture_cases) = {
+    {"RwRasterLock", 0x004dd010, RwRasterLock, 3, DT_RET_INT, setup_raster_lock, 600, 0},
+    {"RwRasterUnlock", 0x004dd100, RwRasterUnlock, 1, DT_RET_INT, setup_raster_unlock, 200, 0},
+    {"rwTextureRelease", (uint32_t)(uintptr_t)release_orig, release_impl, 1, DT_RET_INT,
+     setup_texture_destroy, 300, 0},
     {"RwRasterCreate", 0x004dcb10, RwRasterCreate, 4, DT_RET_INT, setup_raster_create, 100, 0},
     {"RwRasterDestroy", 0x004dcbd0, RwRasterDestroy, 1, DT_RET_INT, setup_raster, 80, 0},
     {"RwRasterGetWidth", 0x004dcc30, RwRasterGetWidth, 1, DT_RET_INT, setup_raster, 30, 0},

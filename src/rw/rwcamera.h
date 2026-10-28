@@ -77,6 +77,7 @@ _Static_assert(sizeof(RwCamera) == 0x188, "RwCamera layout");
 #define rwCameraOffset ORIG_VAR(0x00676d10, int32_t, rwCameraOffset)
 
 void *_rwCameraOpen(void *engine, int32_t offset);
+void *_rwCameraClose(void *engine);
 RwCamera *RwCameraCreate(void);
 int RwCameraDestroy(RwCamera *camera);
 RwCamera *RwCameraSetFrame(RwCamera *camera, RwFrame *frame);
@@ -100,12 +101,21 @@ void rwPvsCameraCreate(void);
 RwCamera *RwCameraBeginUpdate(RwCamera *camera);
 RwCamera *RwCameraEndUpdate(RwCamera *camera);
 RwCamera *RwCameraGetCurrentCamera(void);
+/* The camera's own begin / end update callbacks (stored in new cameras) and the sphere test: 0 outside, 1
+ * crossing, 2 inside (sphere = x, y, z, radius). */
+RwCamera *CameraBeginUpdate(RwCamera *camera);
+RwCamera *CameraEndUpdate(RwCamera *camera);
+int RwCameraFrustumTestSphere(const RwCamera *camera, const float *sphere);
 RwCamera *RwCameraClear(RwCamera *camera, const void *color, int32_t flags);
 float RwIm2DGetFarScreenZ(void);
 
 /* Rebuild the frustum corners and clip planes in world space from the camera's frame (EAX = camera). */
 __attribute__((regparm(1))) void CameraBuildPerspClipPlanes(RwCamera *camera);
 __attribute__((regparm(1))) void CameraBuildParallelClipPlanes(RwCamera *camera);
+/* The view matrix builders (EAX = camera, which they return) and the camera sync callback. */
+__attribute__((regparm(1))) RwCamera *CameraBuildPerspViewMatrix(RwCamera *camera);
+__attribute__((regparm(1))) RwCamera *CameraBuildParallelViewMatrix(RwCamera *camera);
+RwCamera *CameraSync(RwCamera *camera);
 
 /* Recomputes zScale and zShift from the clip planes and the device's screen z range (EAX = camera). */
 __attribute__((regparm(1))) void CameraUpdateZShiftScale(RwCamera *camera);

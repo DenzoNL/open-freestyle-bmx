@@ -392,6 +392,11 @@ void *rpWorldRemoveAtomicCallback(void *atomic, void *world);
 /* EAX = atomic / light: destroy the ties the object has with sectors. */
 __attribute__((regparm(1))) void rpAtomicTiesDestroy(RpAtomic *atomic);
 __attribute__((regparm(1))) void rpLightTiesDestroy(RpLight *light);
+/* Ties an atomic to the sectors of its bounding box (EAX = world, EDX = atomic), and the sync callbacks of
+ * atomics and cameras that call it. */
+__attribute__((regparm(2))) void rpAtomicAddTies(RpWorld *world, RpAtomic *atomic);
+RpAtomic *WorldAtomicSync(RpAtomic *atomic);
+RwCamera *WorldCameraSync(RwCamera *camera);
 void *WorldInitCameraExt(void *camera);
 void *WorldDeInitCameraExt(void *camera);
 void *WorldCopyCameraExt(void *camera, const void *source);

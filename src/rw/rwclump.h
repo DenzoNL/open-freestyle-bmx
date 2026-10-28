@@ -248,4 +248,14 @@ __attribute__((regparm(3))) RpPlaneSector *rpBspStreamRead(RwStream *stream, uin
 RpWorld *RpWorldStreamWrite(RpWorld *world, RwStream *stream);
 RpWorld *RpWorldStreamRead(RwStream *stream);
 
+/* A list of 16 bit triangle indices (three per triangle) and its length in indices. */
+typedef struct RwIndexList {
+    uint16_t *indices;
+    uint32_t count;
+} RwIndexList;
+
+RwIndexList *rpMeshSeparateTriangles(RwIndexList *list);
+/* Zeroes size bytes (EAX = buffer, EDX unused, ECX = size) and returns the buffer. */
+__attribute__((regparm(3))) void *rwZeroBytes(void *buffer, int32_t unused, uint32_t size);
+
 #endif

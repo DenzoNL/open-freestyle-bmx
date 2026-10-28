@@ -298,6 +298,49 @@ RwRaster *RwRasterUnlockPalette(RwRaster *raster)
     return raster;
 }
 
+/*
+ * Locks one mip level (the low byte of `level`) of a raster; the device gets mode + level * 256. Returns the
+ * pixels, or NULL (with an error) if the raster is locked already, the level is not 0 on a format without the
+ * mip bit 0x80, or a write lock (mode bit 0) asks for a level above 0 on a format with bit 0x10; NULL too if
+ * the device refuses.
+ */
+BMX_ADDR(0x004dd010)
+uint8_t *RwRasterLock(RwRaster *raster, uint32_t level, uint32_t mode)
+{
+    if ((raster->privateFlags & rwRASTERPIXELSLOCKED) != 0) {
+        reportError((int32_t)0x80000014);
+        return NULL;
+    }
+    const int32_t mip = (int32_t)(uint8_t)level;
+    if ((raster->format & 0x80) != 0) {
+        if ((raster->format & 0x10) != 0 && mip > 0 && (mode & 1) != 0) {
+            reportError((int32_t)0x80000014);
+            return NULL;
+        }
+    } else if (mip > 0) {
+        reportError((int32_t)0x80000013);
+        return NULL;
+    }
+    uint8_t *pixels = NULL;
+    if (standardFunc(rwSTANDARDRASTERLOCK)((void *)&pixels, raster, (int32_t)(mode + ((uint32_t)mip << 8))) ==
+        0) {
+        return NULL;
+    }
+    return pixels;
+}
+
+/* Unlocks a locked raster (the device call has no result); NULL if it was not locked. */
+BMX_ADDR(0x004dd100)
+RwRaster *RwRasterUnlock(RwRaster *raster)
+{
+    if ((raster->privateFlags & rwRASTERPIXELSLOCKED) == 0) {
+        reportError((int32_t)0x80000015);
+        return NULL;
+    }
+    standardFunc(rwSTANDARDRASTERUNLOCK)(NULL, raster, 0);
+    return raster;
+}
+
 /* ---- textures and dictionaries ---------------------------------------------------------------------- */
 
 BMX_ADDR(0x004df520)
@@ -389,13 +432,15 @@ static void linkOut(RwLLLink *link)
 
 /*
  * Drops one reference; at zero the texture leaves its dictionary and loses its raster, names and memory.
- * This is the body the original enters at 0x4df764 with the texture in EAX (RwTextureDestroy falls into it).
+ * The register entry 0x4df764 (EAX = texture) that RwTextureDestroy falls into; returns 1. No hook of its
+ * own: it is 4 bytes behind RwTextureDestroy's entry (that jmp covers it) and its only caller 0x4df730 is
+ * ported.
  */
-static void textureRelease(RwTexture *texture)
+__attribute__((regparm(1))) int rwTextureRelease(RwTexture *texture)
 {
     texture->refCount--;
     if (texture->refCount != 0) {
-        return;
+        return 1;
     }
     _rwPluginRegistryDeInitObject(&rwTextureRegistry, texture);
     if (texture->dict != NULL) {
@@ -412,6 +457,7 @@ static void textureRelease(RwTexture *texture)
         RwEngineInstance->memoryFuncs.rwfree(texture->mask);
     }
     RwEngineInstance->freeListFree(textureGlobals()->textureFreeList, texture);
+    return 1;
 }
 
 /* Releases the texture until it is gone (a reference count of one or less takes the final release). */
@@ -419,9 +465,9 @@ BMX_ADDR(0x004df730)
 RwTexture *RwTextureDestroyAll(RwTexture *texture)
 {
     while (texture->refCount > 1) {
-        textureRelease(texture);
+        rwTextureRelease(texture);
     }
-    textureRelease(texture);
+    rwTextureRelease(texture);
     return texture;
 }
 
@@ -429,7 +475,7 @@ RwTexture *RwTextureDestroyAll(RwTexture *texture)
 BMX_ADDR(0x004df760)
 int RwTextureDestroy(RwTexture *texture)
 {
-    textureRelease(texture);
+    rwTextureRelease(texture);
     return 1;
 }
 
@@ -1559,6 +1605,45 @@ void *_rwImageOpen(void *engine, int32_t offset)
     return engine;
 }
 
+/*
+ * Image module close: frees the name buffer and the search path, every registered format and both free
+ * lists, then counts the module down. Each step runs only if its pointer is set.
+ */
+BMX_ADDR(0x004e36e0)
+void *_rwImageClose(void *engine)
+{
+    RwImageGlobals *globals = imageGlobals();
+    if (globals->nameBuffer != NULL) {
+        RwEngineInstance->memoryFuncs.rwfree(globals->nameBuffer);
+        globals = imageGlobals();
+        globals->nameBuffer = NULL;
+        globals->nameBufferSize = 0;
+    }
+    if (globals->path != NULL) {
+        RwEngineInstance->memoryFuncs.rwfree(globals->path);
+        globals = imageGlobals();
+        globals->path = NULL;
+        globals->pathSize = 0;
+    }
+    while (globals->formats != NULL) {
+        RwImageFormat *format = globals->formats;
+        globals->formats = format->next;
+        RwEngineInstance->freeListFree(globals->formatFreeList, format);
+        globals = imageGlobals();
+    }
+    if (globals->formatFreeList != NULL) {
+        RwFreeListDestroy(globals->formatFreeList);
+        globals = imageGlobals();
+        globals->formatFreeList = NULL;
+    }
+    if (globals->imageFreeList != NULL) {
+        RwFreeListDestroy(globals->imageFreeList);
+        imageGlobals()->imageFreeList = NULL;
+    }
+    rwImageModuleCount--;
+    return engine;
+}
+
 /* ---- default texture read callback, image/raster glue ---------------------------------------------------
  */
 
@@ -1642,5 +1727,496 @@ int _rwpathisabsolute(const char *path)
 BMX_ADDR(0x004e003c)
 int rwImageFormatSucceed(void)
 {
+    return 1;
+}
+
+/* ---- BMP writer --------------------------------------------------------------------------------------- */
+
+/* Size of the file header (format 1, Windows, or 2, OS/2: 14 bytes) and of the info header (40 or 12). EAX.
+ */
+BMX_ADDR(0x004e7860)
+__attribute__((regparm(1))) int32_t bmpFileHeaderSize(int32_t format)
+{
+    return format == 1 || format == 2 ? 0xe : 0;
+}
+
+BMX_ADDR(0x004e7880)
+__attribute__((regparm(1))) int32_t bmpInfoHeaderSize(int32_t format)
+{
+    if (format == 1) {
+        return 0x28;
+    }
+    return format == 2 ? 0xc : 0;
+}
+
+/* Bytes of a row of `width` pixels of `bits` bits, padded to 32 bits (0 for another format). EAX, EDX, ECX.
+ */
+BMX_ADDR(0x004e78a0)
+__attribute__((regparm(3))) uint32_t bmpRowBytes(int32_t format, int32_t bits, int32_t width)
+{
+    if (format != 1 && format != 2) {
+        return 0;
+    }
+    uint32_t total = (uint32_t)bits * (uint32_t)width;
+    if ((total & 0x1f) != 0) {
+        total = total + 0x20 - (total & 0x1f);
+    }
+    return (total & 0x1f) == 0 ? total >> 3 : 0;
+}
+
+/* A byte read that stays a read when the pointer is null (the original faults there). */
+static uint8_t bmpByte(const uint8_t *pixel, int i)
+{
+    return ((const volatile uint8_t *)pixel)[i];
+}
+
+/*
+ * The colour of pixel (x, y): 4 bytes of RGBA, from the pixels themselves (depth 32) or the palette (depths 4
+ * and 8, one index byte per pixel). Any other depth reads from address 0, as the original does.
+ */
+static const uint8_t *bmpPixel(const RwImage *image, int32_t y, uint32_t x)
+{
+    if (image->depth == 0x20) {
+        return (const uint8_t *)(uintptr_t)((uint32_t)y * (uint32_t)image->stride + x * 4u +
+                                            (uint32_t)(uintptr_t)image->pixels);
+    }
+    if (image->depth == 8 || image->depth == 4) {
+        const uint32_t row = (uint32_t)y * (uint32_t)image->stride + (uint32_t)(uintptr_t)image->pixels;
+        const uint32_t index = *(const uint8_t *)(uintptr_t)(row + x);
+        return (const uint8_t *)(uintptr_t)((uint32_t)(uintptr_t)image->palette + index * 4u);
+    }
+    return NULL;
+}
+
+/*
+ * Writes the pixel rows of a BMP, bottom row first, as 24 bit BGR padded to 4 bytes: through a row buffer
+ * (one write per row), or pixel by pixel (3 byte writes) when the buffer cannot be allocated. EAX = stream,
+ * EDX = width, ECX = height, the image is the fifth stack word. Returns the bytes written; the stream's
+ * own failures are ignored.
+ */
+BMX_ADDR(0x004e7920)
+__attribute__((regparm(3))) int32_t bmpWriteRows(RwStream *stream, uint32_t width, int32_t height,
+                                                 int32_t unused0, int32_t unused1, int32_t unused2,
+                                                 int32_t unused3, const RwImage *image)
+{
+    (void)unused0;
+    (void)unused1;
+    (void)unused2;
+    (void)unused3;
+    int32_t total = 0;
+    uint8_t *row = RwEngineInstance->memoryFuncs.rwmalloc(width * 3);
+    for (int32_t y = (int32_t)((uint32_t)height - 1u); y >= 0; y--) {
+        int32_t written = 0;
+        if (row != NULL) {
+            uint8_t *out = row;
+            for (uint32_t x = 0; x < width; x++) {
+                const uint8_t *src = bmpPixel(image, y, x);
+                out[2] = bmpByte(src, 0);
+                out[1] = bmpByte(src, 1);
+                out[0] = bmpByte(src, 2);
+                out += 3;
+                written += 3;
+            }
+            RwStreamWrite(stream, row, (uint32_t)written);
+        } else {
+            for (uint32_t x = 0; x < width; x++) {
+                const uint8_t *src = bmpPixel(image, y, x);
+                uint8_t pixel[3];
+                pixel[2] = bmpByte(src, 0);
+                pixel[1] = bmpByte(src, 1);
+                pixel[0] = bmpByte(src, 2);
+                RwStreamWrite(stream, pixel, 3);
+                written += 3;
+            }
+        }
+        if ((written & 3) != 0) {
+            do {
+                const uint8_t zero = 0;
+                RwStreamWrite(stream, &zero, 1);
+                written++;
+            } while ((written & 3) != 0);
+        }
+        total += written;
+    }
+    if (row != NULL) {
+        RwEngineInstance->memoryFuncs.rwfree(row);
+    }
+    return total;
+}
+
+/*
+ * Writes a BMP: "BM", the file size, two zero words, the offset of the pixels, the info header of the format
+ * (1: 40 bytes, 2: 12 bytes, another value none) and the rows. EAX = stream, EDX = format, ECX = width, the
+ * height and the image are the fourth and fifth stack words. Returns the bytes of the rows.
+ */
+BMX_ADDR(0x004e7b60)
+__attribute__((regparm(3))) int32_t bmpWriteImage(RwStream *stream, int32_t format, int32_t width,
+                                                  int32_t unused0, int32_t unused1, int32_t unused2,
+                                                  int32_t height, const RwImage *image)
+{
+    (void)unused0;
+    (void)unused1;
+    (void)unused2;
+    uint8_t letter = 0x42;
+    RwStreamWrite(stream, &letter, 1);
+    letter = 0x4d;
+    RwStreamWrite(stream, &letter, 1);
+    const int32_t headers = bmpFileHeaderSize(format) + bmpInfoHeaderSize(format);
+    uint32_t value = (uint32_t)headers + bmpRowBytes(format, 0x18, width) * (uint32_t)height;
+    RwStreamWriteInt32(stream, &value, 4);
+    uint16_t half = 0;
+    RwStreamWrite(stream, &half, 2);
+    half = 0;
+    RwStreamWrite(stream, &half, 2);
+    value = (uint32_t)(bmpFileHeaderSize(format) + bmpInfoHeaderSize(format));
+    RwStreamWriteInt32(stream, &value, 4);
+    if (format == 1) {
+        value = 0x28;
+        RwStreamWriteInt32(stream, &value, 4);
+        value = (uint32_t)width;
+        RwStreamWriteInt32(stream, &value, 4);
+        value = (uint32_t)height;
+        RwStreamWriteInt32(stream, &value, 4);
+        half = 1;
+        RwStreamWrite(stream, &half, 2);
+        half = 0x18;
+        RwStreamWrite(stream, &half, 2);
+        for (int i = 0; i < 6; i++) {
+            value = 0;
+            RwStreamWriteInt32(stream, &value, 4);
+        }
+    } else if (format == 2) {
+        value = 0xc;
+        RwStreamWriteInt32(stream, &value, 4);
+        half = (uint16_t)width;
+        RwStreamWrite(stream, &half, 2);
+        half = (uint16_t)height;
+        RwStreamWrite(stream, &half, 2);
+        half = 1;
+        RwStreamWrite(stream, &half, 2);
+        half = 0x18;
+        RwStreamWrite(stream, &half, 2);
+    }
+    return bmpWriteRows(stream, (uint32_t)width, height, 0, 0, 0, 0x18, image);
+}
+
+/* The image format callback of ".bmp" for writing: opens the file and writes the image as a Windows BMP. */
+BMX_ADDR(0x004e7eb0)
+RwImage *BMPImageWrite(RwImage *image, const char *name)
+{
+    RwStream *stream = RwStreamOpen(rwSTREAMFILENAME, rwSTREAMWRITE, name);
+    if (stream == NULL) {
+        return NULL;
+    }
+    bmpWriteImage(stream, 1, image->width, 0, 0, 0, image->height, image);
+    RwStreamClose(stream, NULL);
+    return image;
+}
+
+/* ---- image files: search path walk, format lookup, copy, gamma ----------------------------------------- */
+
+static char *rwStrchr(const char *s, int c)
+{
+    return ((char *(BMX_CDECL *)(const char *, int))RwEngineInstance->stringFuncs.rwstrchr)(s, c);
+}
+
+/*
+ * Makes the module's name buffer at least `need` bytes (malloc the first time, realloc after) and returns it;
+ * NULL, with an out of memory error for `need`, when the allocation fails. A buffer that is big enough
+ * is kept as it is.
+ */
+static char *imageNameBuffer(int32_t need)
+{
+    if (imageGlobals()->nameBufferSize < need) {
+        void *block;
+        if (imageGlobals()->nameBuffer == NULL) {
+            block = RwEngineInstance->memoryFuncs.rwmalloc((size_t)(uint32_t)need);
+        } else {
+            block =
+                RwEngineInstance->memoryFuncs.rwrealloc(imageGlobals()->nameBuffer, (size_t)(uint32_t)need);
+        }
+        if (block == NULL) {
+            reportNoMemory(need);
+            return NULL;
+        }
+        imageGlobals()->nameBuffer = block;
+        imageGlobals()->nameBufferSize = need;
+    }
+    return imageGlobals()->nameBuffer;
+}
+
+/*
+ * Calls `callback(path, data)` with the file name prefixed by each directory of the image search path in turn
+ * (the path is a list separated by semicolons), until it returns 0; `extra` bytes are left behind the name in
+ * the buffer for the caller (an extension). With an absolute name, an empty or no search path the name itself
+ * is tried once. The directory end is found with two identical strchr calls (the first result is not used).
+ * Returns the name, or NULL when the buffer cannot be made. EAX = name, EDX = extra, ECX = callback, the data
+ * is the fourth stack word.
+ */
+BMX_ADDR(0x004e44f0)
+__attribute__((regparm(3))) const char *ImagePathForAllFullNames(const char *name, int32_t extra,
+                                                                 RwImagePathCallback callback,
+                                                                 int32_t unused0, int32_t unused1,
+                                                                 int32_t unused2, void *data)
+{
+    (void)unused0;
+    (void)unused1;
+    (void)unused2;
+    const char *dir = imageGlobals()->path;
+    if (_rwpathisabsolute(name) != 1 && dir != NULL && *dir != 0) {
+        while (*dir != 0) {
+            (void)rwStrchr(dir, ';');
+            const char *semicolon = rwStrchr(dir, ';');
+            const char *next;
+            int32_t dirLength;
+            if (semicolon != NULL) {
+                next = semicolon + 1;
+                dirLength = (int32_t)(semicolon - dir);
+            } else {
+                dirLength = (int32_t)rwStrlen(dir);
+                next = NULL;
+            }
+            const int32_t need = (int32_t)rwStrlen(name) + dirLength + extra;
+            char *buffer = imageNameBuffer(need);
+            if (buffer == NULL) {
+                return NULL;
+            }
+            memcpy(buffer, dir, (uint32_t)dirLength);
+            rwStrcpy(buffer + dirLength, name);
+            if (callback(buffer, data) == NULL) {
+                return name;
+            }
+            if (next == NULL) {
+                return name;
+            }
+            dir = next;
+        }
+        return name;
+    }
+    char *buffer = imageNameBuffer((int32_t)rwStrlen(name) + extra);
+    if (buffer == NULL) {
+        return NULL;
+    }
+    rwStrcpy(buffer, name);
+    callback(buffer, data);
+    return name;
+}
+
+/*
+ * The callback of RwImageFindFileType: tries the path with each registered format's extension (lower case,
+ * then upper case) appended and stops (0) at the first file that exists, handing the extension that fit to
+ * *found; otherwise returns the path, which makes the walk go on.
+ */
+BMX_ADDR(0x004e4950)
+const char *rwImageFindFormatCallback(char *path, void *data)
+{
+    const char **found = (const char **)data;
+    char *end = path + rwStrlen(path);
+    for (const RwImageFormat *format = imageGlobals()->formats; format != NULL; format = format->next) {
+        rwStrcpy(end, format->extension);
+        if (RwEngineInstance->fileFuncs.rwfexist(path) != 0) {
+            *found = format->extension;
+            return NULL;
+        }
+        rwStrcpy(end, format->extensionUpper);
+        if (RwEngineInstance->fileFuncs.rwfexist(path) != 0) {
+            *found = format->extensionUpper;
+            return NULL;
+        }
+    }
+    return path;
+}
+
+/*
+ * Finds which registered image format the file `name` (without extension) has, searching the image path:
+ * the extension string inside the format entry (lower or upper case spelling), or NULL.
+ */
+BMX_ADDR(0x004e4a00)
+const char *RwImageFindFileType(const char *name)
+{
+    const char *found = NULL;
+    ImagePathForAllFullNames(name, 0x14,
+                             BMX_FNPTR(RwImagePathCallback, 0x004e4950, rwImageFindFormatCallback), 0, 0, 0,
+                             (void *)&found);
+    return found;
+}
+
+/*
+ * A callback of the path walk: if the file exists, reads it with the format's reader and keeps the image
+ * in the attempt; 0 when an image came back (stop), else the name (go on).
+ */
+BMX_ADDR(0x004e47e0)
+const char *ImageAttempRead(char *name, void *data)
+{
+    RwImageAttempt *attempt = data;
+    if (RwEngineInstance->fileFuncs.rwfexist(name) == 0) {
+        return name;
+    }
+    attempt->image = attempt->read(name);
+    return attempt->image != NULL ? NULL : name;
+}
+
+/*
+ * Copies the pixels of `source` into `dest` (same size): equal depths copy the palette (depths up to 8) and
+ * the rows; 4 -> 8 bit copies the index bytes; 4 or 8 -> 32 bit looks the palette up. Anything else is an
+ * error (NULL). Bumps the destination's stamp. EAX = dest, EDX = source.
+ */
+BMX_ADDR(0x004e3c08)
+__attribute__((regparm(2))) RwImage *rwImageCopyPixels(RwImage *dest, RwImage *source)
+{
+    const int32_t destDepth = dest->depth;
+    const int32_t sourceDepth = source->depth;
+    if (destDepth == sourceDepth) {
+        if (dest->palette != NULL && source->palette != NULL && sourceDepth <= 8) {
+            memcpy(dest->palette, source->palette, ((uint32_t)1 << (sourceDepth & 0x1f)) << 2);
+        }
+        const uint32_t rowBytes = (uint32_t)(((destDepth + 7) >> 3) * dest->width);
+        uint8_t *to = dest->pixels;
+        const uint8_t *from = source->pixels;
+        for (int32_t y = 0; y < dest->height; y++) {
+            memcpy(to, from, rowBytes);
+            to += dest->stride;
+            from += source->stride;
+        }
+        dest->stamp++;
+        return dest;
+    }
+    uint8_t *to = dest->pixels;
+    const uint8_t *from = source->pixels;
+    const uint8_t *palette = source->palette;
+    const uint32_t key = (uint32_t)destDepth | ((uint32_t)sourceDepth << 8);
+    if (key == 0x404 || key == 0x808 || key == 0x2020) {
+        /* equal depths were handled above; these keys need unequal values with the same bits (garbage) */
+    } else if (key == 0x408) {
+        for (int32_t y = 0; y < dest->height; y++) {
+            memcpy(to, from, (uint32_t)dest->width);
+            to += dest->stride;
+            from += source->stride;
+        }
+    } else if (key == 0x420 || key == 0x820) {
+        for (int32_t y = 0; y < dest->height; y++) {
+            for (int32_t x = 0; x < dest->width; x++) {
+                memcpy(to + 4 * x, palette + 4 * (uint32_t)from[x], 4);
+            }
+            to += dest->stride;
+            from += source->stride;
+        }
+    } else {
+        reportError(0x8000000c);
+        return NULL;
+    }
+    dest->stamp++;
+    return dest;
+}
+
+/* The same with both images on the stack. */
+BMX_ADDR(0x004e3c00)
+RwImage *RwImageResize(RwImage *dest, RwImage *source)
+{
+    return rwImageCopyPixels(dest, source);
+}
+
+/*
+ * Applies the image's gamma table (the module's table at 0xc: gammaUp) to the colour channels of the palette
+ * (depths 4, 8) or of every pixel (depth 32, alpha untouched) and marks the image gamma corrected.
+ * NULL (with an error) for a missing palette or pixel block or another depth.
+ */
+BMX_ADDR(0x004e53c0)
+RwImage *RwImageGammaCorrect(RwImage *image)
+{
+    const int32_t depth = image->depth;
+    if (depth == 4 || depth == 8) {
+        uint8_t *palette = image->palette;
+        if (palette == NULL) {
+            reportError((int32_t)0x80000001);
+            return NULL;
+        }
+        const uint8_t *table = imageGlobals()->gammaUp;
+        for (int32_t n = 1 << depth; n != 0; n--) {
+            palette[0] = table[palette[0]];
+            palette[1] = table[palette[1]];
+            palette[2] = table[palette[2]];
+            palette += 4;
+        }
+    } else if (depth == 0x20) {
+        const uint32_t width = (uint32_t)image->width;
+        const int32_t height = image->height;
+        uint8_t *row = image->pixels;
+        if (row == NULL) {
+            reportError((int32_t)0x80000001);
+            return NULL;
+        }
+        for (int32_t y = 0; y < height; y++) {
+            const uint8_t *table = imageGlobals()->gammaUp;
+            uint8_t *pixel = row;
+            for (uint32_t x = 0; x < width; x++) {
+                pixel[0] = table[pixel[0]];
+                pixel[1] = table[pixel[1]];
+                pixel[2] = table[pixel[2]];
+                pixel += 4;
+            }
+            row += image->stride;
+        }
+    } else {
+        reportError((int32_t)0x8000000f);
+        return NULL;
+    }
+    image->flags |= 2;
+    return image;
+}
+
+/*
+ * Shrinks the 32 bit image `source` into the 32 bit image `dest` by averaging blocks: the source size must be
+ * a multiple of the destination size (else, or for another depth, the result is 0). Each destination pixel is
+ * the integer mean (signed division, per channel) of a block of source pixels. Sizes of 0 divide by zero and
+ * fault, as in the original. EAX = source, EDX = dest. Returns 1.
+ */
+BMX_ADDR(0x004e0f10)
+__attribute__((regparm(2))) int rwImageBoxShrink(const RwImage *source, RwImage *dest)
+{
+    const int32_t sourceWidth = source->width;
+    const int32_t destWidth = dest->width;
+    if (sourceWidth % destWidth != 0) {
+        return 0;
+    }
+    const int32_t sourceHeight = source->height;
+    const int32_t destHeight = dest->height;
+    if (sourceHeight % destHeight != 0 || source->depth != 0x20 || dest->depth != 0x20) {
+        return 0;
+    }
+    const int32_t blockStep = (sourceWidth / destWidth) * ((source->depth + 7) >> 3);
+    const int32_t blockRows = sourceHeight / destHeight;
+    const int32_t blockSkip = blockRows * source->stride;
+    const uint8_t *sourceRow = source->pixels;
+    uint8_t *destRow = dest->pixels;
+    for (int32_t y = 0; y < destHeight; y++) {
+        const uint8_t *block = sourceRow;
+        uint8_t *out = destRow;
+        for (int32_t x = 0; x < dest->width; x++) {
+            const int32_t blockColumns = source->width / dest->width;
+            int32_t red = 0, green = 0, blue = 0, alpha = 0;
+            const uint8_t *line = block;
+            for (int32_t row = 0; row < blockRows; row++) {
+                const uint8_t *pixel = line;
+                for (int32_t column = 0; column < blockColumns; column++) {
+                    red += pixel[0];
+                    green += pixel[1];
+                    blue += pixel[2];
+                    alpha += pixel[3];
+                    pixel += 4;
+                }
+                line += source->stride;
+            }
+            const int32_t count = blockRows * blockColumns;
+            out[0] = (uint8_t)(red / count);
+            out[1] = (uint8_t)(green / count);
+            out[2] = (uint8_t)(blue / count);
+            out[3] = (uint8_t)(alpha / count);
+            out += 4;
+            block += blockStep;
+        }
+        destRow += dest->stride;
+        sourceRow += blockSkip;
+    }
     return 1;
 }

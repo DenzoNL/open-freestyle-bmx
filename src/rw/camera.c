@@ -1,7 +1,9 @@
 /* RenderWare 3.1 camera: creation, clip planes and view window, and the calls that reach the device. */
 #include "compat/crt.h"
 #include "rw/rwcamera.h"
+#include "rw/rwim.h"
 #include "rw/rwmath.h"
+#include "rw/rwtexture.h"
 
 typedef int(BMX_CDECL *RwCameraClearFunc)(RwCamera *camera, const void *color, int32_t flags);
 
@@ -399,6 +401,259 @@ RwCamera *RwCameraEndUpdate(RwCamera *camera)
     return camera->endUpdate(camera);
 }
 
+/* ---- the camera's own update callbacks and the frustum test ----------------------------------------- */
+
+enum {
+    rwERR_CAMERANOFRAMEBUFFER = 0x16,
+    rwERR_CAMERABUFFERSIZE = 0x17,
+    rwSTANDARDCAMERABEGINUPDATE = 1,
+    rwSTANDARDCAMERAENDUPDATE = 10,
+};
+
+typedef int(BMX_CDECL *RwStandardCameraFunc)(void *out, RwCamera *camera, int32_t flags);
+
+static void camReportError(int32_t code)
+{
+    RwError error;
+    error.pluginID = 1;
+    error.errorCode = _rwerror(code);
+    RwErrorSet(&error);
+}
+
+/*
+ * The camera's begin update: needs a camera with a frame buffer, and a z buffer of the same size. Makes it
+ * the current camera, syncs the dirty frames and asks the device (standard function 1) to start; NULL on any
+ * failure.
+ */
+BMX_ADDR(0x004de690)
+RwCamera *CameraBeginUpdate(RwCamera *camera)
+{
+    if (camera == NULL) {
+        camReportError(rwERR_NOCAMERA);
+        return NULL;
+    }
+    if (camera->frameBuffer == NULL) {
+        camReportError(rwERR_CAMERANOFRAMEBUFFER);
+        return NULL;
+    }
+    if (camera->zBuffer != NULL) {
+        const RwRaster *frame = camera->frameBuffer->parent;
+        const RwRaster *depth = camera->zBuffer->parent;
+        if (frame->width != depth->width || frame->height != depth->height) {
+            camReportError(rwERR_CAMERABUFFERSIZE);
+            return NULL;
+        }
+    }
+    RwEngineInstance->curCamera = camera;
+    rwFrameSyncDirtyList();
+    if (((RwStandardCameraFunc)(uintptr_t)RwEngineInstance->stdFunc[rwSTANDARDCAMERABEGINUPDATE])(
+            NULL, camera, 0) == 0) {
+        return NULL;
+    }
+    rwCoreExtCallSlot1(camera);
+    return camera;
+}
+
+/* The camera's end update: the device's standard function 10 ends it; the current camera is cleared. */
+BMX_ADDR(0x004de7b0)
+RwCamera *CameraEndUpdate(RwCamera *camera)
+{
+    if (((RwStandardCameraFunc)(uintptr_t)RwEngineInstance->stdFunc[rwSTANDARDCAMERAENDUPDATE])(NULL, camera,
+                                                                                                0) == 0) {
+        return NULL;
+    }
+    RwEngineInstance->curCamera = NULL;
+    return camera;
+}
+
+/*
+ * Tests a sphere (x, y, z, radius) against the six frustum planes: 0 if it lies wholly outside one, 1 if it
+ * crosses a plane (or a distance compares unordered), else 2. The plane distances are doubles on the x87.
+ */
+BMX_ADDR(0x004de820)
+int RwCameraFrustumTestSphere(const RwCamera *camera, const float *sphere)
+{
+    int result = 2;
+    for (int i = 0; i < 6; i++) {
+        const RwFrustumPlane *plane = &camera->frustumPlanes[i];
+        const double sum = (camMul(plane->normal.z, sphere[2]) + camMul(plane->normal.y, sphere[1])) +
+                           camMul(plane->normal.x, sphere[0]);
+        const double distance = sum - (double)plane->distance;
+        const double radius = (double)sphere[3];
+        if (distance > radius) {
+            return 0;
+        }
+        if (!(-radius >= distance)) {
+            result = 1;
+        }
+    }
+    return result;
+}
+
+/* ---- view matrices ---------------------------------------------------------------------------------- */
+
+/*
+ * The 0.5 / -0.5 factors of the view matrix builders, read from the exe's data as the original does (so that
+ * a - b * 0.5 is not rewritten as a + b * -0.5, which flips the sign of a NaN): perspective 0x69bc88 (-0.5),
+ * 0x69bc8c (0.5), 0x69bc90 (0.5), 0x69bc94 (-0.5), 0x69bc98 (0.5), 0x69bc9c (0.5); parallel 0x69bca0 (-0.5),
+ * 0x69bca4 (0.5), 0x69bca8 (-0.5), 0x69bcac (0.5).
+ */
+typedef float RwViewFactors[10];
+#define rwViewFactors ORIG_VAR(0x0069bc88, RwViewFactors, rwViewFactors)
+
+/* Copies the bits of a float (a move, not an arithmetic operation). */
+static void camCopyBits(float *dst, const float *src)
+{
+    memcpy(dst, src, sizeof *dst);
+}
+
+/*
+ * The last part of both builders: the view matrix's third column and the translation row's z come from the
+ * frame's at vector and position, then the matrix is marked changed.
+ */
+static void camFinishViewMatrix(RwCamera *camera, const RwMatrix *ltm)
+{
+    camCopyBits(&camera->viewMatrix.right.z, &ltm->at.x);
+    camCopyBits(&camera->viewMatrix.up.z, &ltm->at.y);
+    camCopyBits(&camera->viewMatrix.at.z, &ltm->at.z);
+    const double a = (double)ltm->pos.z * (double)ltm->at.z;
+    const double b = (double)ltm->pos.y * (double)ltm->at.y;
+    const double c = (double)ltm->pos.x * (double)ltm->at.x;
+    camera->viewMatrix.pos.z = (float)-((a + b) + c);
+    RwMatrixUpdate(&camera->viewMatrix);
+}
+
+/*
+ * The view matrix of a perspective camera: the frame's matrix inverse with the view offset folded in (the
+ * rows are scaled by the reciprocal view window and shifted by the offset, every column from the frame's
+ * right, up and at). EAX = camera; returns it. Values stay doubles where the x87 keeps them on its stack.
+ */
+BMX_ADDR(0x004ddd40)
+__attribute__((regparm(1))) RwCamera *CameraBuildPerspViewMatrix(RwCamera *camera)
+{
+#pragma clang fp exceptions(strict)
+    const RwMatrix *ltm = &((const RwFrame *)camera->object.object.parent)->ltm;
+    const double t1 = camMul(camera->recipViewWindow.x, rwViewFactors[0]);
+    const double t2 = (double)camera->viewOffset.x * t1;
+    const double t3 = (double)ltm->right.z * t1;
+    const double t4 = camSub((double)rwViewFactors[1], t2);
+    const double t5 = (double)ltm->right.x * t1;
+    const double t6 = (double)ltm->at.x * t4;
+    const double t7 = (double)ltm->at.y * t4;
+    const double t8 = t6 + t5;
+    const double t9 = (double)ltm->at.z * t4;
+    const double t10 = camMul(camera->recipViewWindow.y, rwViewFactors[3]);
+    const double t11 = t9 + t3;
+    const double t12 = t1 * (double)ltm->right.y;
+    camera->viewMatrix.right.x = (float)t8;
+    camera->viewMatrix.at.x = (float)t11;
+    const double t13 = t7 + t12;
+    const double t14 = (double)camera->viewOffset.y * t10;
+    camera->viewMatrix.up.x = (float)t13;
+    const double t15 = t13 * (double)ltm->pos.y;
+    const double t16 = t14 + (double)rwViewFactors[4];
+    const double t17 = t11 * (double)ltm->pos.z;
+    const double t18 = t8 * (double)ltm->pos.x;
+    const double t19 = t17 + t15;
+    const double t20 = t19 + t18;
+    const double t21 = t20 + t4;
+    camera->viewMatrix.pos.x = (float)camSub((double)rwViewFactors[2], t21);
+    const double t23 = (double)ltm->at.z * t16;
+    const double t24 = (double)ltm->up.z * t10;
+    const double t25 = (double)ltm->up.x * t10;
+    const double t26 = t23 + t24;
+    const double t27 = (double)ltm->at.x * t16;
+    const double t28 = (double)ltm->at.y * t16;
+    const double t29 = t27 + t25;
+    const double t30 = t10 * (double)ltm->up.y;
+    camera->viewMatrix.at.y = (float)t26;
+    const double t31 = t28 + t30;
+    camera->viewMatrix.right.y = (float)t29;
+    camera->viewMatrix.up.y = (float)t31;
+    const double t32 = t31 * (double)ltm->pos.y;
+    const double t33 = t26 * (double)ltm->pos.z;
+    const double t34 = t29 * (double)ltm->pos.x;
+    const double t35 = t33 + t32;
+    const double t36 = t35 + t34;
+    const double t37 = t16 + t36;
+    camera->viewMatrix.pos.y = (float)camSub((double)rwViewFactors[5], t37);
+    camFinishViewMatrix(camera, ltm);
+    return camera;
+}
+
+/* The view matrix of a parallel camera: as above without the perspective shift of the view offset. */
+BMX_ADDR(0x004de2a0)
+__attribute__((regparm(1))) RwCamera *CameraBuildParallelViewMatrix(RwCamera *camera)
+{
+#pragma clang fp exceptions(strict)
+    const RwMatrix *ltm = &((const RwFrame *)camera->object.object.parent)->ltm;
+    const double t1 = camMul(camera->recipViewWindow.x, rwViewFactors[6]);
+    const double t2 = (double)camera->viewOffset.x * t1;
+    const double t3 = (double)ltm->right.z * t1;
+    const double t4 = -t2;
+    const double t5 = (double)ltm->right.x * t1;
+    const double t6 = (double)ltm->at.x * t4;
+    const double t7 = (double)ltm->at.y * t4;
+    const double t8 = t6 + t5;
+    const double t9 = (double)ltm->at.z * t4;
+    const double t10 = camMul(camera->recipViewWindow.y, rwViewFactors[8]);
+    const double t11 = t9 + t3;
+    const double t12 = t1 * (double)ltm->right.y;
+    camera->viewMatrix.right.x = (float)t8;
+    camera->viewMatrix.at.x = (float)t11;
+    const double t13 = t7 + t12;
+    const double t14 = (double)camera->viewOffset.y * t10;
+    camera->viewMatrix.up.x = (float)t13;
+    const double t15 = t13 * (double)ltm->pos.y;
+    const double t16 = t11 * (double)ltm->pos.z;
+    const double t17 = t8 * (double)ltm->pos.x;
+    const double t18 = t16 + t15;
+    const double t19 = t18 + t17;
+    const double t20 = t19 + t4;
+    camera->viewMatrix.pos.x = (float)camSub((double)rwViewFactors[7], t20);
+    const double t22 = (double)ltm->at.z * t14;
+    const double t23 = (double)ltm->up.z * t10;
+    const double t24 = (double)ltm->up.x * t10;
+    const double t25 = t22 + t23;
+    const double t26 = (double)ltm->at.x * t14;
+    const double t27 = (double)ltm->at.y * t14;
+    const double t28 = t26 + t24;
+    const double t29 = t10 * (double)ltm->up.y;
+    camera->viewMatrix.at.y = (float)t25;
+    const double t30 = t27 + t29;
+    camera->viewMatrix.right.y = (float)t28;
+    camera->viewMatrix.up.y = (float)t30;
+    const double t31 = t30 * (double)ltm->pos.y;
+    const double t32 = t25 * (double)ltm->pos.z;
+    const double t33 = t28 * (double)ltm->pos.x;
+    const double t34 = t32 + t31;
+    const double t35 = t34 + t33;
+    const double t36 = t14 + t35;
+    camera->viewMatrix.pos.y = (float)camSub((double)rwViewFactors[9], t36);
+    camFinishViewMatrix(camera, ltm);
+    return camera;
+}
+
+/*
+ * The camera's sync callback (stored in new cameras): bumps the version, rebuilds the view matrix and the
+ * clip planes for the camera's projection (other values leave them), then recomputes the frustum bounding box
+ * from the eight corners. Returns the camera.
+ */
+BMX_ADDR(0x004de400)
+RwCamera *CameraSync(RwCamera *camera)
+{
+    camera->version++;
+    if (camera->projection == rwPERSPECTIVE) {
+        CameraBuildPerspViewMatrix(camera);
+        CameraBuildPerspClipPlanes(camera);
+    } else if (camera->projection == rwPARALLEL) {
+        CameraBuildParallelViewMatrix(camera);
+        CameraBuildParallelClipPlanes(camera);
+    }
+    RwBBoxCalculate((RwBBox *)camera->frustumBoundBox, camera->frustumCorners, 8);
+    return camera;
+}
+
 BMX_ADDR(0x004de810)
 RwCamera *RwCameraGetCurrentCamera(void)
 {
@@ -521,13 +776,7 @@ RwCamera *RwCameraCreate(void)
 
 /* ---- the PVS camera ---------------------------------------------------------------------------------- */
 
-/* Rasters, images and the world, still original code (rw/texture.c, rw/world.c). */
-ORIG_FN(0x004dcb10, RwRaster *, RwRasterCreate,
-        (int32_t width, int32_t height, int32_t depth, int32_t flags));
-ORIG_FN(0x004dcc80, RwRaster *, RwRasterSubRaster,
-        (RwRaster * raster, RwRaster *parent, const int32_t *rect));
-ORIG_FN(0x004e38e0, void *, RwImageCreate, (int32_t width, int32_t height, int32_t depth));
-ORIG_FN(0x004e3ab0, void *, RwImageAllocatePixels, (void *image));
+/* The world, still original code (rw/world.c). */
 ORIG_FN(0x004b81f0, void *, RpWorldAddCamera, (void *world, RwCamera *camera));
 
 /* The camera the PVS builder renders the world with, and its 128 x 128 x 32 image (0x676814, 0x676818). */
@@ -599,5 +848,17 @@ void *_rwCameraOpen(void *engine, int32_t offset)
         return NULL;
     }
     rwCameraModuleCount++;
+    return engine;
+}
+
+/* Destroys the camera free list (if there is one) and counts the module down. */
+BMX_ADDR(0x004dd490)
+void *_rwCameraClose(void *engine)
+{
+    if (rwCameraFreeList() != NULL) {
+        RwFreeListDestroy(rwCameraFreeList());
+        *(RwFreeList **)((uint8_t *)RwEngineInstance + rwCameraOffset) = NULL;
+    }
+    rwCameraModuleCount--;
     return engine;
 }

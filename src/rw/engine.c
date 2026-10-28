@@ -537,6 +537,18 @@ void *_rwMatrixOpen(void *engine, int32_t offset)
     return engine;
 }
 
+/* Destroys the matrix free list (if there is one) and counts the module down. */
+BMX_ADDR(0x004d2040)
+void *_rwMatrixClose(void *engine)
+{
+    if (rwMatrixGlobals()->freeList != NULL) {
+        RwFreeListDestroy(rwMatrixGlobals()->freeList);
+        rwMatrixGlobals()->freeList = NULL;
+    }
+    rwMatrixModuleCount--;
+    return engine;
+}
+
 /* Resource arena: empty lists, no entries, 8 MB limit. */
 BMX_ADDR(0x004dc990)
 void ResourcesInit(RwResourcesGlobals *resources)

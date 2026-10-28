@@ -738,6 +738,66 @@ void rwFrameSyncHierarchyLTM(RwFrame *root)
     rwFrameSyncLTM(root->child, (int32_t)dirty);
 }
 
+/* The per object callback of the sync below: calls the object's sync function; returns the object. */
+BMX_ADDR(0x004ee410)
+void *rwFrameSyncObjectCB(void *object, void *data)
+{
+    (void)data;
+    ((void(BMX_CDECL *)(void *))((RwObjectHasFrame *)object)->sync)(object);
+    return object;
+}
+
+/*
+ * Lets the objects attached to a frame list and its subtrees follow their frames (EAX = frame, EDX = force):
+ * a frame that is marked (bits 2 and 3) or is forced updates its world matrix (bit 2 or a forced bit 2),
+ * clears its flags and calls every object's sync function; children take the combined bits, siblings the
+ * caller's.
+ */
+BMX_ADDR(0x004ee430)
+__attribute__((regparm(2))) void rwFrameSyncObjects(RwFrame *frame, uint32_t force)
+{
+    if (frame == NULL) {
+        return;
+    }
+    const uint32_t dirty = (frame->object.privateFlags & 0xcu) | force;
+    if (dirty != 0) {
+        if ((dirty & 4) != 0) {
+            RwMatrixMultiply(&frame->ltm, &frame->modelling, &((RwFrame *)frame->object.parent)->ltm);
+        }
+        frame->object.privateFlags = 0;
+        RwFrameForAllObjects(frame, BMX_FNPTR(RwObjectCallBack, 0x004ee410, rwFrameSyncObjectCB), NULL);
+    }
+    rwFrameSyncObjects(frame->child, dirty);
+    rwFrameSyncObjects(frame->next, force);
+}
+
+/*
+ * Syncs every hierarchy in the engine's dirty list (the camera's begin update does this): a marked root
+ * copies its modelling matrix to its world matrix, then it and its subtrees sync their objects. The list is
+ * empty afterwards. Returns 1.
+ */
+BMX_ADDR(0x004ee5d0)
+int rwFrameSyncDirtyList(void)
+{
+    const RwLLLink *head = &RwEngineInstance->dirtyFrameList;
+    for (RwLLLink *link = RwEngineInstance->dirtyFrameList.next; link != head; link = link->next) {
+        RwFrame *frame = (RwFrame *)((uint8_t *)link - offsetof(RwFrame, dirtyLink));
+        const uint8_t flags = frame->object.privateFlags;
+        frame->object.privateFlags = 0;
+        const uint32_t changed = flags & 0xcu;
+        if (changed != 0) {
+            if ((changed & 4) != 0) {
+                frame->ltm = frame->modelling;
+            }
+            RwFrameForAllObjects(frame, BMX_FNPTR(RwObjectCallBack, 0x004ee410, rwFrameSyncObjectCB), NULL);
+        }
+        rwFrameSyncObjects(frame->child, changed);
+    }
+    RwEngineInstance->dirtyFrameList.next = &RwEngineInstance->dirtyFrameList;
+    RwEngineInstance->dirtyFrameList.prev = &RwEngineInstance->dirtyFrameList;
+    return 1;
+}
+
 /* ---- frame lists ------------------------------------------------------------------------------------ */
 
 /* A frame as it is stored in a stream: the matrix rows and position, the parent's index and a flags word. */

@@ -81,6 +81,30 @@ RwStream *RwStreamReadReal(RwStream *stream, void *reals, uint32_t size);
 RwStream *RwStreamReadInt32(RwStream *stream, void *ints, uint32_t size);
 
 void *_rwStreamModuleOpen(void *engine, int32_t offset);
+void *_rwStreamModuleClose(void *engine);
+/* The chunk header reader's register entry (EAX = stream, EDX = type, ECX = length, version fourth stack
+ * word). */
+__attribute__((regparm(3))) int rwStreamReadChunkHeaderReg(RwStream *stream, uint32_t *type, uint32_t *length,
+                                                           int32_t unused0, int32_t unused1, int32_t unused2,
+                                                           uint32_t *version);
+/* Constant results of a table of null device callbacks (0x4e32f2..0x4e335f). */
+int rwStubReturn0_4e32f2(void);
+int rwStubReturn0_4e32f9(void);
+int rwStubReturn1_4e3300(void);
+int rwStubReturn1_4e330a(void);
+int rwStubReturn1_4e3311(void);
+int rwStubReturn1_4e3318(void);
+int rwStubReturn1_4e331f(void);
+int rwStubReturn1_4e3326(void);
+int rwStubReturn1_4e332d(void);
+int rwStubReturn0_4e3334(void);
+int rwStubReturn1_4e3338(void);
+int rwStubReturn1_4e333f(void);
+int rwStubReturn1_4e3346(void);
+int rwStubReturn1_4e334d(void);
+int rwStubReturn0_4e3354(void);
+int rwStubReturn1_4e3358(void);
+int rwStubReturn0_4e335f(void);
 const RwFileFunctions *RwOSGetFileInterface(void);
 int _rwFSOpen(void);
 

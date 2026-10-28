@@ -143,6 +143,8 @@ RECLASS = [
 FOLDED = {
     0x4C24C4: ("rw/light.c", "body of RpLightDestroy (0x4c24c0, 4 byte stub)"),
     0x4B5AB4: ("rw/clump.c", "body of RpGeometryDestroy (0x4b5ab0, 4 byte stub)"),
+    0x4B21E4: ("rw/clump.c", "body of RpClumpDestroy (0x4b21e0, 4 byte stub)"),
+    0x4DF764: ("rw/texture.c", "body of RwTextureDestroy (0x4df760, 4 byte stub)"),
 }
 
 

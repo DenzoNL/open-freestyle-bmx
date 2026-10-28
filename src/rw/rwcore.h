@@ -403,6 +403,7 @@ RwFreeList *rwFreeListFreePlain(RwFreeList *freeList, void *entry);
 void *_rwErrorOpen(void *engine, int32_t offset);
 void *_rwColorOpen(void *engine);
 void *_rwColorClose(void *engine);
+void *_rwMatrixClose(void *engine);
 void *_rwMatrixOpen(void *engine, int32_t offset);
 void *_rwResourcesOpen(void *engine, int32_t offset);
 void *_rwResourcesClose(void *engine);

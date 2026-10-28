@@ -232,7 +232,8 @@ void crtFpInit(void)
     __asm__ volatile("fnclex");
 }
 
-BMX_ADDR(0x004a4a37)
+/* 0x4a4a37: a 1 byte ret directly before crtInstallFloatHooks, too short for a hooking jmp (gen_hooks.py
+ * checks this); the original stays in place. */
 void crtNop(void) {}
 
 BMX_ADDR(0x004a4a38)

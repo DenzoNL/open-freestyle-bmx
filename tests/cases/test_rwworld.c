@@ -1688,7 +1688,139 @@ static void setup_world_create(DtCtx *c)
     DT_ARG_PTR(c, 0, dt_u32() % 16 == 0 ? NULL : box);
 }
 
+/* ---- the sync callbacks and the atomic's sector walk ------------------------------------------------- */
+
+static RwSphere gWorldSphere;
+static int gBspIntegral; /* plane values and the box on whole numbers, so that they meet exactly */
+
+static RwSphere *BMX_CDECL stWorldSphere(RpAtomic *atomic)
+{
+    rwtLog(0x4b1280);
+    rwtLogPtr(atomic);
+    return &gWorldSphere;
+}
+
+static __attribute__((regparm(2))) void stCameraSectors(RpWorld *world, RwCamera *camera)
+{
+    rwtLog(0x4b7e80);
+    rwtLogPtr(world);
+    rwtLogPtr(camera);
+}
+
+static int BMX_CDECL stDeviceWorldSync(void *out, void *in, int32_t flag)
+{
+    rwtLog(0xde22);
+    rwtLogPtr(out);
+    rwtLogPtr(in);
+    rwtLog((uint32_t)flag);
+    return 1;
+}
+
+static void *BMX_CDECL cbAtomicSync(RpAtomic *atomic)
+{
+    rwtLog(0xca71);
+    rwtLogPtr(atomic);
+    return dt_u32() % 4 == 0 ? NULL : atomic;
+}
+
+/* A BSP tree: planes on the three axes with random (mostly non-negative) values, leaves with their lists. */
+static RpSector *mkBsp(int depth)
+{
+    if (depth == 0 || dt_u32() % 3 == 0) {
+        return (RpSector *)mkLeaf(-1);
+    }
+    RpPlaneSector *plane = dt_alloc(sizeof *plane);
+    plane->type = 4 * dt_range(0, 2);
+    plane->value = dt_float(0.0F, 30.0F);
+    plane->leftValue = dt_u32() % 8 == 0 ? dt_float_edgy(-5.0F, 30.0F) : dt_float(0.0F, 30.0F);
+    plane->rightValue = dt_u32() % 8 == 0 ? dt_float_edgy(-5.0F, 30.0F) : dt_float(0.0F, 30.0F);
+    if (gBspIntegral) {
+        plane->leftValue = (float)dt_range(0, 12);
+        plane->rightValue = (float)dt_range(0, 12);
+    }
+    plane->leftSubTree = mkBsp(depth - 1);
+    plane->rightSubTree = mkBsp(depth - 1);
+    return (RpSector *)plane;
+}
+
+/* A world with a BSP tree of 1..4 levels, an atomic with random flags and a world sphere (now and then one
+ * that starts below zero, which makes the walk skip the atomic). */
+static RpWorld *addTiesFixture(DtCtx *c, RpAtomic **atomic)
+{
+    worldEnv(c, 0);
+    RpWorld *world = mkWorld();
+    gBspIntegral = (int)(dt_u32() % 2);
+    world->rootSector = mkBsp(dt_range(0, 4));
+    *atomic = mkAtomic();
+    (*atomic)->object.object.flags = (uint8_t)dt_u32();
+    gWorldSphere.center.x = dt_float_edgy(-1.0F, 30.0F);
+    gWorldSphere.center.y = dt_float_edgy(-1.0F, 30.0F);
+    gWorldSphere.center.z = dt_float_edgy(-1.0F, 30.0F);
+    gWorldSphere.radius = dt_u32() % 6 == 0 ? dt_float_edgy(-1.0F, 40.0F) : dt_float(0.0F, 6.0F);
+    if (dt_u32() % 3 != 0) {
+        gWorldSphere.center.x += 4.0F;
+        gWorldSphere.center.y += 4.0F;
+        gWorldSphere.center.z += 4.0F;
+    }
+    if (gBspIntegral) {
+        gWorldSphere.center.x = (float)dt_range(0, 10);
+        gWorldSphere.center.y = (float)dt_range(0, 10);
+        gWorldSphere.center.z = (float)dt_range(0, 10);
+        gWorldSphere.radius = (float)dt_range(0, 4);
+    }
+    dt_stub(0x004b1280, NULL, (void *)stWorldSphere);
+    return world;
+}
+
+static void setup_add_ties(DtCtx *c)
+{
+    RpAtomic *atomic;
+    RpWorld *world = addTiesFixture(c, &atomic);
+    DT_ARG_PTR(c, 0, world);
+    DT_ARG_PTR(c, 1, atomic);
+    rwtEnd();
+}
+
+static void addTiesOrig(RpWorld *w, RpAtomic *atomic)
+{
+    REG2(0x004b7920, void, RpWorld *, RpAtomic *)(w, atomic);
+}
+
+static void addTiesImpl(RpWorld *w, RpAtomic *atomic)
+{
+    rpAtomicAddTies(w, atomic);
+}
+
+static void setup_atomic_sync(DtCtx *c)
+{
+    RpAtomic *atomic;
+    RpWorld *world = addTiesFixture(c, &atomic);
+    *(void **)((uint8_t *)atomic + kAtomicWorld) = dt_u32() % 4 == 0 ? NULL : world;
+    *(void **)((uint8_t *)atomic + kAtomicWorld + 4) = (void *)cbAtomicSync;
+    DT_ARG_PTR(c, 0, atomic);
+    rwtEnd();
+}
+
+static void setup_camera_sync(DtCtx *c)
+{
+    RwGlobals *g = worldEnv(c, 0);
+    g->stdFunc[22] = (uint32_t)(uintptr_t)stDeviceWorldSync;
+    dt_stub(0x004b7e80, NULL, (void *)stCameraSectors);
+    RpWorld *world = dt_u32() % 4 == 0 ? NULL : mkWorld();
+    if (world != NULL && dt_u32() % 2) {
+        world->flags = 1;
+    }
+    RwCamera *camera = mkExtCamera(world, 1);
+    ((RpWorldCameraData *)((uint8_t *)camera + kCameraData))->sync = (void *)cbCamUpdate;
+    DT_ARG_PTR(c, 0, camera);
+    rwtEnd();
+}
+
 DT_CASES(rwworld_cases) = {
+    {"rpAtomicAddTies", (uint32_t)(uintptr_t)addTiesOrig, addTiesImpl, 2, DT_RET_VOID, setup_add_ties, 1500,
+     0},
+    {"WorldAtomicSync", 0x004b7ab0, WorldAtomicSync, 1, DT_RET_INT, setup_atomic_sync, 800, 0},
+    {"WorldCameraSync", 0x004b7730, WorldCameraSync, 1, DT_RET_INT, setup_camera_sync, 300, 0},
     {"RpWorldCreate", 0x004bb080, RpWorldCreate, 1, DT_RET_INT, setup_world_create, 1500, 0},
     {"RpWorldAddCamera", 0x004b81f0, RpWorldAddCamera, 2, DT_RET_INT, setup_add_camera, 100, 0},
     {"RpWorldRemoveCamera", 0x004b8240, RpWorldRemoveCamera, 2, DT_RET_INT, setup_remove_camera, 150, 0},

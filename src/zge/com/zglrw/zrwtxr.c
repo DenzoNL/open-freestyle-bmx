@@ -23,10 +23,6 @@
 
 static const char kZrwTxrFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwTxr.c";
 
-/* RenderWare library calls (statically linked in the exe, not ported). */
-/* The image writers registered next to the readers, and worlds (RpWorld) with their PVS. */
-ORIG_FN(0x004e7eb0, int, rwBmpImageWrite, (void *image, void *name));
-
 /* Other modules: the camera (pcinput.c), the world callbacks, the RAM disk file hook (zprofile.c), materials.
  */
 ORIG_FN(0x00492eb0, uint8_t *, zrwGetCurrentCamera, (void));
@@ -668,7 +664,7 @@ int zrwTextureSystemInitialize(void)
     if (gZrwTxr.dictionary != NULL) {
         RwTexDictionarySetCurrent(gZrwTxr.dictionary);
         RwImageRegisterImageFormat(kZrwFormatBmp, BMX_FNPTR(void *, 0x004979e0, BMPImageRead),
-                                   (void *)(uintptr_t)rwBmpImageWrite);
+                                   BMX_FNPTR(void *, 0x004e7eb0, BMPImageWrite));
         RwImageRegisterImageFormat(kZrwFormatPng, BMX_FNPTR(void *, 0x00497a30, PNGImageRead), NULL);
         RwImageRegisterImageFormat(kZrwFormatDds, BMX_FNPTR(void *, 0x00497a80, DDSImageRead), NULL);
         gZrwTxr.mipmapped = 0;

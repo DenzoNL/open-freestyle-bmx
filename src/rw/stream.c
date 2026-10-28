@@ -475,3 +475,138 @@ void *_rwStreamModuleOpen(void *engine, int32_t offset)
     rwStreamModuleCount++;
     return engine;
 }
+
+/* Destroys the stream free list (if it was made) and counts the module down. */
+BMX_ADDR(0x004e23b0)
+void *_rwStreamModuleClose(void *engine)
+{
+    if (rwStreamFreeList() != NULL) {
+        RwFreeListDestroy(rwStreamFreeList());
+    }
+    rwStreamModuleCount--;
+    return engine;
+}
+
+/*
+ * The register entry of the chunk header reader: EAX = stream, EDX = type, ECX = length, the version pointer
+ * is the fourth stack word. Only RwStreamFindChunk's original code called it, and ours replaces that.
+ */
+BMX_ADDR(0x004e2e2c)
+__attribute__((regparm(3))) int rwStreamReadChunkHeaderReg(RwStream *stream, uint32_t *type, uint32_t *length,
+                                                           int32_t unused0, int32_t unused1, int32_t unused2,
+                                                           uint32_t *version)
+{
+    (void)unused0;
+    (void)unused1;
+    (void)unused2;
+    return _rwStreamReadChunkHeader(stream, type, length, version);
+}
+
+/*
+ * The constant results of a table of device callbacks (a null implementation set); none reads its arguments.
+ * Three of them are 3 or 4 bytes long, so their hooks spill into the next stub (patched later, the hook table
+ * is in address order) and into the padding behind the last.
+ */
+BMX_ADDR(0x004e32f2)
+int rwStubReturn0_4e32f2(void)
+{
+    return 0;
+}
+
+BMX_ADDR(0x004e32f9)
+int rwStubReturn0_4e32f9(void)
+{
+    return 0;
+}
+
+BMX_ADDR(0x004e3300)
+int rwStubReturn1_4e3300(void)
+{
+    return 1;
+}
+
+BMX_ADDR(0x004e330a)
+int rwStubReturn1_4e330a(void)
+{
+    return 1;
+}
+
+BMX_ADDR(0x004e3311)
+int rwStubReturn1_4e3311(void)
+{
+    return 1;
+}
+
+BMX_ADDR(0x004e3318)
+int rwStubReturn1_4e3318(void)
+{
+    return 1;
+}
+
+BMX_ADDR(0x004e331f)
+int rwStubReturn1_4e331f(void)
+{
+    return 1;
+}
+
+BMX_ADDR(0x004e3326)
+int rwStubReturn1_4e3326(void)
+{
+    return 1;
+}
+
+BMX_ADDR(0x004e332d)
+int rwStubReturn1_4e332d(void)
+{
+    return 1;
+}
+
+/* 0x4e3334: 4 bytes, directly followed by the next stub, too short for a hooking jmp (gen_hooks.py checks
+ * this); the original stays in place. */
+int rwStubReturn0_4e3334(void)
+{
+    return 0;
+}
+
+BMX_ADDR(0x004e3338)
+int rwStubReturn1_4e3338(void)
+{
+    return 1;
+}
+
+BMX_ADDR(0x004e333f)
+int rwStubReturn1_4e333f(void)
+{
+    return 1;
+}
+
+BMX_ADDR(0x004e3346)
+int rwStubReturn1_4e3346(void)
+{
+    return 1;
+}
+
+BMX_ADDR(0x004e334d)
+int rwStubReturn1_4e334d(void)
+{
+    return 1;
+}
+
+/* 0x4e3354: 4 bytes, directly followed by the next stub, too short for a hooking jmp (gen_hooks.py checks
+ * this); the original stays in place. */
+int rwStubReturn0_4e3354(void)
+{
+    return 0;
+}
+
+BMX_ADDR(0x004e3358)
+int rwStubReturn1_4e3358(void)
+{
+    return 1;
+}
+
+BMX_ADDR(0x004e335f)
+int rwStubReturn0_4e335f(void)
+{
+    return 0;
+}

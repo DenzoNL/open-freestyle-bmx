@@ -355,6 +355,20 @@ static void setup_read_header(DtCtx *c)
     rwtEnd();
 }
 
+/* The register entry 0x4e2e2c: EAX = stream, EDX = type, ECX = length, the version is the fourth stack word.
+ */
+static int header_reg_orig(RwStream *stream, uint32_t *type, uint32_t *length, uint32_t *version)
+{
+    return ((int(__attribute__((regparm(3))) *)(RwStream *, uint32_t *, uint32_t *, int32_t, int32_t, int32_t,
+                                                uint32_t *))(uintptr_t)0x004e2e2c)(stream, type, length, 0, 0,
+                                                                                   0, version);
+}
+
+static int header_reg_impl(RwStream *stream, uint32_t *type, uint32_t *length, uint32_t *version)
+{
+    return rwStreamReadChunkHeaderReg(stream, type, length, 0, 0, 0, version);
+}
+
 static void setup_find_chunk(DtCtx *c)
 {
     stEnv(c);
@@ -449,6 +463,8 @@ DT_CASES(rwstream_cases) = {
     {"RwMemFloat32ToReal", 0x004e2e00, RwMemFloat32ToReal, 2, DT_RET_INT, setup_mem, 20, 0},
     {"_rwStreamReadChunkHeader", 0x004e2e20, _rwStreamReadChunkHeader, 4, DT_RET_INT, setup_read_header, 300,
      0},
+    {"rwStreamReadChunkHeaderReg", (uint32_t)(uintptr_t)header_reg_orig, header_reg_impl, 4, DT_RET_INT,
+     setup_read_header, 300, 0},
     {"RwStreamFindChunk", 0x004e2ec0, RwStreamFindChunk, 4, DT_RET_INT, setup_find_chunk, 600, 0},
     {"_rwStreamWriteVersionedChunkHeader", 0x004e2fd0, _rwStreamWriteVersionedChunkHeader, 4, DT_RET_INT,
      setup_write_header, 200, 0},

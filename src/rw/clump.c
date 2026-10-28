@@ -2942,8 +2942,9 @@ void *rpClumpDefaultCallback(void *clump)
     return clump;
 }
 
-/* Releases a clump that is still alive when the module closes (EAX = clump); 1. */
-BMX_ADDR(0x004b21e4)
+/* Releases a clump that is still alive when the module closes (EAX = clump); 1. Body at 0x4b21e4, 4 bytes
+ * behind RpClumpDestroy's entry: no hook of its own (RpClumpDestroy's jmp covers it), its only caller
+ * 0x4b1060 is ported. */
 __attribute__((regparm(1))) int rpClumpEntryDestroy(RpClump *clump)
 {
     clumpRelease(clump);
@@ -3216,4 +3217,87 @@ int rpAtomicPipelineInit(RwIm3DPipeline *pipeline)
         rpPipelineSizesB[i] = (i & 4) != 0 ? 0x24 : 0x1c;
     }
     return 1;
+}
+
+/* ---- triangle index order ----------------------------------------------------------------------------- */
+
+/* Zeroes `size` bytes; returns the buffer. EAX = buffer, EDX is unused, ECX = size. */
+BMX_ADDR(0x004c5e10)
+__attribute__((regparm(3))) void *rwZeroBytes(void *buffer, int32_t unused, uint32_t size)
+{
+    (void)unused;
+    uint8_t *bytes = buffer;
+    for (uint32_t i = 0; i < size; i++) {
+        bytes[i] = 0;
+    }
+    return buffer;
+}
+
+/*
+ * Reorders a triangle list in place so that the triangles come in passes of triangles that share no
+ * vertex:
+ * each pass takes, in the order of the list, every remaining triangle none of whose vertices is
+ * used by a
+ * triangle taken in the same pass (a bit set sized by the largest index marks the used ones),
+ * until all are
+ * taken. Works on a copy of the list (a taken triangle is overwritten with 0xffff); a
+ * triangle of three
+ * 0xffff is "taken" already (a list that contains one never ends). Leaves the list alone
+ * when an allocation
+ * fails. The bit set is sized (largest index + 31) / 8 bytes, one byte short for some
+ * sizes (the original
+ * writes into the allocation's slack then). Returns the list.
+ */
+BMX_ADDR(0x004c5bd0)
+RwIndexList *rpMeshSeparateTriangles(RwIndexList *list)
+{
+    uint16_t *indices = list->indices;
+    const uint32_t count = list->count;
+    const uint32_t triangles = count / 3;
+    uint32_t largest = 0;
+    for (uint32_t i = 0; i < count; i++) {
+        largest |= indices[i];
+    }
+    const uint32_t setBytes = (largest + 0x1f) >> 3;
+    uint32_t *used = RwEngineInstance->memoryFuncs.rwmalloc(setBytes);
+    if (used == NULL) {
+        return list;
+    }
+    uint16_t *copy = RwEngineInstance->memoryFuncs.rwmalloc(count * 2);
+    if (copy != NULL) {
+        memcpy(copy, indices, count * 2);
+        uint32_t taken = 0;
+        uint16_t *out = indices;
+        if (triangles != 0) {
+            do {
+                rwZeroBytes(used, 0, setBytes);
+                for (uint16_t *tri = copy; tri < copy + triangles * 3; tri += 3) {
+                    const uint32_t a = tri[0];
+                    const uint32_t b = tri[1];
+                    const uint32_t c = tri[2];
+                    if ((a & b & c) == 0xffff) {
+                        continue;
+                    }
+                    const uint32_t wordA = used[a >> 5];
+                    const uint32_t bitA = 1u << (a & 0x1f);
+                    if ((bitA & wordA) != 0 || ((1u << (b & 0x1f)) & used[b >> 5]) != 0 ||
+                        ((1u << (c & 0x1f)) & used[c >> 5]) != 0) {
+                        continue;
+                    }
+                    used[a >> 5] = wordA | bitA;
+                    used[tri[1] >> 5] |= 1u << (tri[1] & 0x1f);
+                    taken++;
+                    used[tri[2] >> 5] |= 1u << (tri[2] & 0x1f);
+                    out[0] = tri[0];
+                    out[1] = tri[1];
+                    out[2] = tri[2];
+                    out += 3;
+                    tri[0] = tri[1] = tri[2] = 0xffff;
+                }
+            } while (taken < triangles);
+        }
+        RwEngineInstance->memoryFuncs.rwfree(copy);
+    }
+    RwEngineInstance->memoryFuncs.rwfree(used);
+    return list;
 }
