@@ -9,6 +9,7 @@
 #include "rw/rwmath.h"
 
 /* Callees in other RenderWare groups (clump), still original code. */
+ORIG_FN(0x004b6350, RpGeometry *, RpGeometryStreamWrite, (RpGeometry * geometry, RwStream *stream));
 
 /* The error record the RpWorld module (plugin id 2) reports. */
 static void rpReportError(int32_t code)
@@ -735,4 +736,381 @@ void *WorldObjectClose(void *engine)
         RwFreeListDestroy(*(RwFreeList **)((uint8_t *)RwEngineInstance + rpAnimEngineOffset));
     }
     return engine;
+}
+
+/* ---- LOD atomic plugin (id 0x112): the per-atomic data, its render hook and its stream callbacks ------- */
+
+static RpLodAtomicData **lodSlot(const void *object, int32_t offset)
+{
+    return (RpLodAtomicData **)((uint8_t *)object + offset);
+}
+
+/* The original's inline double to int conversion: it truncates, values below 1 give 0. */
+static int32_t truncateToInt(double x)
+{
+    uint64_t bits;
+    memcpy(&bits, &x, sizeof bits);
+    const uint32_t high = (uint32_t)(bits >> 32);
+    const uint32_t low = (uint32_t)bits;
+    const uint32_t exponent = (high >> 20) & 0x7ff;
+    if (exponent <= 0x3fe) {
+        return 0;
+    }
+    const uint32_t value = (((high << 11) | (low >> 21)) | 0x80000000U) >> ((0x41eU - exponent) & 31);
+    return (int32_t)((high & 0x80000000U) != 0 ? 0U - value : value);
+}
+
+/*
+ * The default level selection: the distance of the atomic from the current camera along the camera's view
+ * direction (the dot product of the offset and the camera's at vector), times the data's scale, truncated
+ * and clamped to 0..9. -1 when there is no plugin data, atomic or camera.
+ */
+BMX_ADDR(0x00505b30)
+int32_t rpLodAtomicSelectLevel(RpAtomic *atomic)
+{
+    const int32_t offset = rpLodAtomicOffset;
+    int32_t level = -1;
+    RwCamera *camera = RwCameraGetCurrentCamera();
+    if (offset >= 0 && atomic != NULL && camera != NULL) {
+        const RpLodAtomicData *lod = *lodSlot(atomic, offset);
+        if (lod != NULL) {
+            const RwMatrix *ltm = RwFrameGetLTM(atomic->object.object.parent);
+            const float ax = ltm->pos.x;
+            const float ay = ltm->pos.y;
+            const float az = ltm->pos.z;
+            ltm = RwFrameGetLTM(RwCameraGetFrame(camera));
+            const float cx = ltm->pos.x;
+            const float cy = ltm->pos.y;
+            const float cz = ltm->pos.z;
+            ltm = RwFrameGetLTM(RwCameraGetFrame(camera));
+            const double dz = (double)az - (double)cz;
+            const double dy = (double)ay - (double)cy;
+            const double dx = (double)ax - (double)cx;
+            const double distance =
+                (dx * (double)ltm->at.x + (dz * (double)ltm->at.z + dy * (double)ltm->at.y)) *
+                (double)lod->scale;
+            level = truncateToInt(distance);
+            level = level < 0 ? 0 : (level < 10 ? level : 9);
+        }
+    }
+    return level;
+}
+
+/*
+ * EAX = atomic, EDX = LOD data. Selects the level (-1 keeps the current one, 10 and up the last) and gives
+ * the atomic that geometry if it has another; remembers the level. Returns the atomic when the level has a
+ * geometry, NULL otherwise (and when there is no data).
+ */
+BMX_ADDR(0x00505c60)
+__attribute__((regparm(2))) RpAtomic *rpLodAtomicApply(RpAtomic *atomic, RpLodAtomicData *lod)
+{
+    RpAtomic *result = NULL;
+    if (lod != NULL) {
+        int32_t level = lod->select(atomic);
+        if (level < 0) {
+            level = lod->current;
+        } else if (level >= 10) {
+            level = 9;
+        }
+        RpGeometry *geometry = *(RpGeometry **)((uint8_t *)lod + 0x18 + 4 * level);
+        if (geometry != atomic->geometry) {
+            RpAtomicSetGeometry(atomic, geometry, 0);
+        }
+        lod->current = level;
+        if (geometry != NULL) {
+            result = atomic;
+        }
+    }
+    return result;
+}
+
+/* The render callback that replaces the atomic's: picks the level, then calls the atomic's own callback. */
+BMX_ADDR(0x00505cd0)
+RpAtomic *rpLodAtomicRender(RpAtomic *atomic)
+{
+    if (rpLodAtomicOffset < 0 || atomic == NULL) {
+        return NULL;
+    }
+    RpLodAtomicData *lod = *lodSlot(atomic, rpLodAtomicOffset);
+    if (lod == NULL) {
+        return NULL;
+    }
+    if (rpLodAtomicApply(atomic, lod) == NULL) {
+        return NULL;
+    }
+    return lod->savedRender(atomic);
+}
+
+/* EAX = atomic, EDX = LOD data: puts the plugin's render callback on the atomic (once). */
+BMX_ADDR(0x00505d10)
+__attribute__((regparm(2))) void rpLodAtomicHook(RpAtomic *atomic, RpLodAtomicData *lod)
+{
+    if (lod != NULL && lod->hooked == 0) {
+        lod->savedRender = atomic->renderCallBack;
+        atomic->renderCallBack = RW_CB(RpAtomicRenderCallBack, 0x00505cd0);
+        atomic->stamp++;
+        lod->hooked = 1;
+    }
+}
+
+/* EAX = atomic, EDX = LOD data: gives the atomic its own render callback back. */
+BMX_ADDR(0x00505d40)
+__attribute__((regparm(2))) void rpLodAtomicUnhook(RpAtomic *atomic, RpLodAtomicData *lod)
+{
+    if (lod != NULL && lod->hooked == 1) {
+        if (lod->savedRender != NULL) {
+            atomic->renderCallBack = lod->savedRender;
+            atomic->stamp++;
+        }
+        lod->hooked = 0;
+        lod->savedRender = NULL;
+    }
+}
+
+/* Empty data: no levels, nothing selected, the default select callback. */
+BMX_ADDR(0x00506780)
+RpLodAtomicData *rpLodAtomicDataInit(RpLodAtomicData *lod)
+{
+    if (lod != NULL) {
+        lod->savedRender = NULL;
+        lod->hooked = 0;
+        lod->select = RW_CB(RpLodSelectCallBack, 0x00505b30);
+        lod->range = -1.0F;
+        lod->current = -1;
+        lod->scale = -1.0F;
+        for (int i = 0; i < 10; i++) {
+            lod->levels[i] = NULL;
+        }
+    }
+    return lod;
+}
+
+/* A new, initialised data block from the plugin's free list (NULL when there is none). */
+BMX_ADDR(0x00505d70)
+RpLodAtomicData *rpLodAtomicDataCreate(void)
+{
+    RpLodAtomicData *lod = RwEngineInstance->freeListAlloc(rpLodFreeList);
+    if (lod == NULL) {
+        return NULL;
+    }
+    rpLodAtomicDataInit(lod);
+    return lod;
+}
+
+/* EAX = destination, EDX = source: copies the data and takes a reference of every geometry. Returns the
+ * source. */
+BMX_ADDR(0x00505db0)
+__attribute__((regparm(2))) RpLodAtomicData *rpLodAtomicDataCopy(RpLodAtomicData *dst, RpLodAtomicData *src)
+{
+    if (dst != NULL && src != NULL) {
+        memcpy(dst, src, 0x18);
+        for (int i = 0; i < 10; i++) {
+            dst->levels[i] = src->levels[i];
+            if (src->levels[i] != NULL) {
+                RpGeometryAddRef(src->levels[i]);
+            }
+        }
+    }
+    return src;
+}
+
+/* EAX = data: releases the geometries, resets the data and gives it back to the free list. */
+BMX_ADDR(0x00505e10)
+__attribute__((regparm(1))) void rpLodAtomicDataDestroy(RpLodAtomicData *lod)
+{
+    if (lod != NULL) {
+        for (int i = 0; i < 10; i++) {
+            if (lod->levels[i] != NULL) {
+                RpGeometryDestroy(lod->levels[i]);
+            }
+        }
+        rpLodAtomicDataInit(lod);
+        RwEngineInstance->freeListFree(rpLodFreeList, lod);
+    }
+}
+
+/* Engine module of the plugin: the free list of data blocks (shared by all atomics). */
+BMX_ADDR(0x00506240)
+void *LODAtomicCallBackOpen(void *engine, int32_t offset)
+{
+    (void)offset;
+    rpLodFreeList = RwFreeListCreate(0x40, 0x40, 0);
+    if (rpLodFreeList == NULL) {
+        return NULL;
+    }
+    return engine;
+}
+
+BMX_ADDR(0x00506280)
+void *LODAtomicCallBackClose(void *engine)
+{
+    if (rpLodFreeList != NULL) {
+        RwFreeListDestroy(rpLodFreeList);
+    }
+    rpLodFreeList = NULL;
+    return engine;
+}
+
+BMX_ADDR(0x00506190)
+void *LODAtomicCallBackConstructor(void *atomic, int32_t offset)
+{
+    *lodSlot(atomic, offset) = NULL;
+    return atomic;
+}
+
+BMX_ADDR(0x00506200)
+void *LODAtomicCallBackDestructor(void *atomic, int32_t offset)
+{
+    RpLodAtomicData *lod = *lodSlot(atomic, offset);
+    if (lod != NULL) {
+        rpLodAtomicUnhook(atomic, lod);
+        rpLodAtomicDataDestroy(lod);
+        *lodSlot(atomic, offset) = NULL;
+    }
+    return atomic;
+}
+
+/* Gives the clone its own data when the source has some. Returns the source (a quirk of the original). */
+BMX_ADDR(0x005061b0)
+void *LODAtomicCallBackCopy(void *dst, const void *src, int32_t offset)
+{
+    RpLodAtomicData *srcLod = *lodSlot(src, offset);
+    if (srcLod != NULL) {
+        RpLodAtomicData *dstLod = *lodSlot(dst, offset);
+        if (dstLod == NULL) {
+            dstLod = rpLodAtomicDataCreate();
+        }
+        if (dstLod != NULL) {
+            rpLodAtomicDataCopy(dstLod, srcLod);
+        }
+        *lodSlot(dst, offset) = dstLod;
+    }
+    return (void *)(uintptr_t)src;
+}
+
+/* ---- the plugin's stream chunk: the data block, then the geometry of every level but the current --------
+ */
+
+BMX_ADDR(0x00505e60)
+void *LODAtomicCallBackReadChunk(RwStream *stream, int32_t length, void *atomic, int32_t offset, int32_t size)
+{
+    (void)length;
+    (void)size;
+    RwStream *result = NULL;
+    uint32_t chunkLength;
+    uint32_t version;
+    if (RwStreamFindChunk(stream, 1, &chunkLength, &version) == 0) {
+        *lodSlot(atomic, offset) = NULL;
+        return NULL;
+    }
+    if (version < 0x301 || version > 0x303) {
+        *lodSlot(atomic, offset) = NULL;
+        RwError error;
+        error.pluginID = 0x112;
+        error.errorCode = _rwerror(rwERR_BADVERSION);
+        RwErrorSet(&error);
+        return NULL;
+    }
+    result = stream;
+    RpLodAtomicData *lod = rpLodAtomicDataCreate();
+    RwStreamRead(stream, lod, chunkLength);
+    RwMemNative32(lod, 0x40);
+    for (int32_t i = 0; i < 10; i++) {
+        if (lod->levels[i] != NULL && i != lod->current) {
+            if (RwStreamFindChunk(stream, 0xf, NULL, &version) != 0) {
+                if (version >= 0x301 && version <= 0x303) {
+                    RpGeometry *geometry = RpGeometryStreamRead(stream);
+                    RpGeometryAddRef(geometry);
+                    lod->levels[i] = geometry;
+                } else {
+                    RwError error;
+                    error.pluginID = 0x112;
+                    error.errorCode = _rwerror(rwERR_BADVERSION);
+                    RwErrorSet(&error);
+                }
+            }
+        }
+    }
+    if (lod->current >= 0) {
+        RpGeometry *own = ((RpAtomic *)atomic)->geometry;
+        RpGeometryAddRef(own);
+        *(RpGeometry **)((uint8_t *)lod + 0x18 + 4 * lod->current) = own;
+    }
+    lod->select = RW_CB(RpLodSelectCallBack, 0x00505b30);
+    lod->hooked = 0;
+    rpLodAtomicHook(atomic, lod);
+    *lodSlot(atomic, offset) = lod;
+    return result;
+}
+
+BMX_ADDR(0x00506030)
+void *LODAtomicCallBackWriteChunk(RwStream *stream, int32_t length, const void *atomic, int32_t offset,
+                                  int32_t size)
+{
+    (void)length;
+    (void)size;
+    const RpLodAtomicData *lod = *lodSlot(atomic, offset);
+    if (lod == NULL) {
+        return stream;
+    }
+    _rwStreamWriteVersionedChunkHeader(stream, 1, 0x40, 0x303);
+    uint32_t copy[16];
+    memcpy(copy, lod, sizeof copy);
+    RwMemLittleEndian32(copy, 0x40);
+    RwStreamWrite(stream, lod, 0x40);
+    for (int32_t i = 0; i < 10; i++) {
+        if (lod->levels[i] != NULL && i != lod->current) {
+            RpGeometryStreamWrite(lod->levels[i], stream);
+        }
+    }
+    return stream;
+}
+
+BMX_ADDR(0x00506140)
+int32_t LODAtomicCallBackGetChunkSize(const void *atomic, int32_t offset, int32_t size)
+{
+    (void)size;
+    int32_t total = 0;
+    const RpLodAtomicData *lod = *lodSlot(atomic, offset);
+    if (lod != NULL) {
+        total = 0x4c;
+        for (int32_t i = 0; i < 10; i++) {
+            if (lod->levels[i] != NULL && i != lod->current) {
+                total += RpGeometryStreamGetSize(lod->levels[i]) + 0xc;
+            }
+        }
+    }
+    return total;
+}
+
+/* ---- libpng callbacks the RtPNGImageRead glue installs (the library itself is not ported) ------------- */
+
+/* libpng's png_error: does not return in practice (it longjmps); the glue returns whatever it leaves in EAX.
+ */
+ORIG_FN(0x00507050, uint32_t, png_error, (void *png, const char *message));
+
+/* libpng's allocator and free function: the engine's memory interface. */
+BMX_ADDR(0x00506820)
+void *rwPngMalloc(void *png, size_t size)
+{
+    (void)png;
+    return RwOsGetMemoryInterface()->rwmalloc(size);
+}
+
+BMX_ADDR(0x00506840)
+void rwPngFree(void *png, void *block)
+{
+    (void)png;
+    RwOsGetMemoryInterface()->rwfree(block);
+}
+
+/* libpng's read function: reads from the RenderWare stream the PNG struct carries (at 0x54). */
+BMX_ADDR(0x00506860)
+uint32_t rwPngRead(void *png, void *buffer, uint32_t length)
+{
+    RwStream *stream = *(RwStream **)((uint8_t *)png + 0x54);
+    if (stream != NULL) {
+        return RwStreamRead(stream, buffer, length);
+    }
+    return png_error(png, NULL);
 }

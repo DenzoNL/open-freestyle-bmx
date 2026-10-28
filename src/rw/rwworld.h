@@ -12,6 +12,7 @@
 #include "rw/rwcamera.h"
 #include "rw/rwlight.h"
 #include "rw/rwmath.h"
+#include "rw/rwstream.h"
 #include "rw/rwtexture.h"
 
 /* A node of the world BSP: type < 0 is a world sector (-1 owns its data, -2 is a stub), otherwise a plane. */
@@ -160,16 +161,21 @@ _Static_assert(offsetof(RpWorld, surfaceProps) == 0x60, "RpWorld layout");
 _Static_assert(offsetof(RpWorld, renderCallBack) == 0x6c, "RpWorld layout");
 _Static_assert(offsetof(RpWorld, stamp) == 0x70, "RpWorld layout");
 
-/* The world plugin's data of a camera (at RwCamera + rpWorldCameraOffset): the sectors in view and the world.
+/*
+ * The world plugin's data of a camera (at RwCamera + rpWorldCameraOffset): the sectors in view, the world and
+ * the camera's own callbacks the plugin replaced (it calls them from its begin/end update and sync).
  */
 typedef struct RpWorldCameraData {
-    RpWorldSector **sectors; /* 0x00 */
-    int32_t capacity;        /* 0x04 */
-    int32_t numSectors;      /* 0x08 */
-    RpWorld *world;          /* 0x0c */
+    RpWorldSector **sectors;        /* 0x00 */
+    int32_t capacity;               /* 0x04 */
+    int32_t numSectors;             /* 0x08 */
+    RpWorld *world;                 /* 0x0c */
+    RwCameraUpdateFunc beginUpdate; /* 0x10 saved RwCamera.beginUpdate */
+    RwCameraUpdateFunc endUpdate;   /* 0x14 saved RwCamera.endUpdate */
+    void *sync;                     /* 0x18 saved RwCamera.object.sync */
 } RpWorldCameraData;
 
-_Static_assert(sizeof(RpWorldCameraData) == 0x10, "RpWorldCameraData layout");
+_Static_assert(sizeof(RpWorldCameraData) == 0x1c, "RpWorldCameraData layout");
 
 /* The tie plugin's data in the engine instance (at rpTieOffset): free lists of the two kinds of ties. */
 typedef struct RpTieGlobals {
@@ -354,5 +360,56 @@ __attribute__((regparm(1))) void rpPVSCameraDestroy(RpWorld *world);
 /* Vertex and polygon counts of a world sector (zero-extended 16-bit fields). */
 int32_t RpWorldSectorGetNumVertices(const RpWorldSector *sector);
 int32_t RpWorldSectorGetNumPolygons(const RpWorldSector *sector);
+
+/* ---- world plugin callbacks: modules, extensions of cameras, atomics, clumps and lights -------------------
+ */
+
+void *_rpTieClose(void *engine);
+void *_rpMaterialOpen(void *engine, int32_t offset);
+void *_rpMaterialClose(void *engine);
+/* Bodies behind the register-argument stubs: EAX = world, EDX = camera / clump / light / atomic. */
+__attribute__((regparm(2))) RpWorld *rpWorldAddCameraBody(RpWorld *world, RwCamera *camera);
+__attribute__((regparm(2))) RpWorld *rpWorldAddClumpBody(RpWorld *world, RpClump *clump);
+__attribute__((regparm(2))) RpWorld *rpWorldAddLightBody(RpWorld *world, RpLight *light);
+__attribute__((regparm(2))) RpWorld *rpWorldAddAtomicBody(RpWorld *world, RpAtomic *atomic);
+__attribute__((regparm(2))) RpWorld *rpWorldRemoveAtomicBody(RpWorld *world, RpAtomic *atomic);
+void *rpWorldAddAtomicCallback(void *atomic, void *world);
+void *rpWorldRemoveAtomicCallback(void *atomic, void *world);
+/* EAX = atomic / light: destroy the ties the object has with sectors. */
+__attribute__((regparm(1))) void rpAtomicTiesDestroy(RpAtomic *atomic);
+__attribute__((regparm(1))) void rpLightTiesDestroy(RpLight *light);
+void *WorldInitCameraExt(void *camera);
+void *WorldDeInitCameraExt(void *camera);
+void *WorldCopyCameraExt(void *camera, const void *source);
+void *WorldInitAtomicExt(void *atomic);
+void *WorldDeInitAtomicExt(void *atomic);
+void *WorldCopyAtomicExt(void *atomic);
+void *WorldCopyClumpExt(void *clump, const void *source);
+void *WorldInitLightExt(void *light);
+void *WorldDeInitLightExt(void *light);
+void *WorldCopyLightExt(void *light, const void *source);
+RwCamera *WorldCameraBeginUpdate(RwCamera *camera);
+RwCamera *WorldCameraEndUpdate(RwCamera *camera);
+const RwRGBA *RpMaterialGetColor(const RpMaterial *material);
+const RwBBox *RpWorldSectorGetBBox(const RpWorldSector *sector);
+void *rpWorldSectorRenderCurrent(RpWorldSector *sector);
+RpWorld *rpWorldSectorGetWorld(RpWorldSector *sector);
+void *rpWorldSectorFindCallback(void *sector, void *search);
+
+/* ---- mesh stream (the sector and geometry plugin 0x50e)
+ * ---------------------------------------------------- */
+
+struct RpMeshHeader *_rpMeshRead(RwStream *stream, void *owner, const RpMaterialList *materials);
+RwStream *_rpMeshWrite(const struct RpMeshHeader *mesh, void *owner, RwStream *stream,
+                       const RpMaterialList *materials);
+int32_t _rpMeshSize(const struct RpMeshHeader *mesh);
+int32_t _rpMaterialListFindMaterialIndex(const RpMaterialList *list, const RpMaterial *material);
+RwStream *writeGeometryMesh(RwStream *stream, int32_t length, const void *geometry, int32_t offset,
+                            int32_t size);
+RwStream *readGeometryMesh(RwStream *stream, int32_t length, void *geometry, int32_t offset, int32_t size);
+int32_t sizeGeometryMesh(const void *geometry, int32_t offset, int32_t size);
+RwStream *writeSectorMesh(RwStream *stream, int32_t length, const void *sector, int32_t offset, int32_t size);
+RwStream *readSectorMesh(RwStream *stream, int32_t length, void *sector, int32_t offset, int32_t size);
+int32_t sizeSectorMesh(const void *sector, int32_t offset, int32_t size);
 
 #endif

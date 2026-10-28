@@ -579,6 +579,48 @@ static void setup_ptr_arg(DtCtx *c)
     DT_ARG_PTR(c, 1, dt_alloc(0x40));
 }
 
+static int BMX_CDECL stub_frame_destroy(RwFrame *frame)
+{
+    rwtLog(0x4d29c0);
+    rwtLogPtr(frame);
+    return 1;
+}
+
+/* A clump with a frame hierarchy (or none) and 0..3 atomics, in an engine whose clump free list is a marker.
+ */
+static void setup_clump_entry(DtCtx *c)
+{
+    RwGlobals *g = modEnv(c);
+    const int32_t offset = modOffset();
+    rpClumpModuleOffset = offset;
+    ((RpClumpGlobals *)at(g, offset))->clumpFreeList = dt_alloc(8);
+    dt_stub(0x004b1b64, NULL, (void *)stub_atomic_destroy);
+    dt_stub(0x004d29c0, NULL, (void *)stub_frame_destroy);
+    RpClump *clump = dt_alloc(0x80);
+    clump->object.parent = dt_u32() % 3 == 0 ? NULL : dt_alloc(0xa8);
+    clump->atomicList.next = clump->atomicList.prev = &clump->atomicList;
+    for (int n = dt_range(0, 3); n > 0; n--) {
+        RpAtomic *atomic = dt_alloc(sizeof(RpAtomic));
+        atomic->inClumpLink.prev = clump->atomicList.prev;
+        atomic->inClumpLink.next = &clump->atomicList;
+        clump->atomicList.prev->next = &atomic->inClumpLink;
+        clump->atomicList.prev = &atomic->inClumpLink;
+    }
+    DT_ARG_PTR(c, 0, clump);
+    DT_ARG_PTR(c, 1, dt_alloc(8));
+    rwtEnd();
+}
+
+static int clump_entry_orig(RpClump *clump)
+{
+    return ((int(__attribute__((regparm(1))) *)(RpClump *))(uintptr_t)0x004b21e4)(clump);
+}
+
+static int clump_entry_impl(RpClump *clump)
+{
+    return rpClumpEntryDestroy(clump);
+}
+
 static void setup_clump_close(DtCtx *c)
 {
     RwGlobals *g = modEnv(c);
@@ -926,6 +968,11 @@ DT_CASES(rwmodules_cases) = {
      0},
     {"rpClumpDefaultCallback", 0x004b20f0, rpClumpDefaultCallback, 1, DT_RET_INT, setup_ptr_arg, 10, 0},
     {"_rpClumpClose", 0x004b1080, _rpClumpClose, 1, DT_RET_INT, setup_clump_close, 30, 0},
+    {"rpClumpFreeListDestroyCB", 0x004b1060, rpClumpFreeListDestroyCB, 2, DT_RET_INT, setup_clump_entry, 150,
+     0},
+    {"rpClumpEntryDestroy", (uint32_t)(uintptr_t)clump_entry_orig, clump_entry_impl, 1, DT_RET_INT,
+     setup_clump_entry, 150, 0},
+    {"rpLightVisitEnabled", 0x004b17c0, rpLightVisitEnabled, 2, DT_RET_INT, setup_light_visit, 100, 0},
     {"rpAtomicUpdateBoundingSphere", (uint32_t)(uintptr_t)bsphere_orig, bsphere_impl, 1, DT_RET_INT,
      setup_atomic_bsphere, 500, 0},
     {"rpAtomicSyncCallback", 0x004b1490, rpAtomicSyncCallback, 1, DT_RET_INT, setup_atomic_sync, 200, 0},

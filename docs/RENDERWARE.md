@@ -88,10 +88,9 @@ replaces it, it is never ported). The heuristics are in the docstring of `tools/
 - Pointer targets: `RW_CB`/`BMX_FNPTR` addresses in `src/`, initial values of `ORIG_VAR` globals, dwords in the
   exe's data sections and `PUSH`/`MOV` immediates in RW code that are function starts.
 - Driver: the closure of the device table (0x566fe4), the standard functions table (0x56701c), the core extension
-  table (0x69bee0) and every function with a "D3D" community label, minus what the other roots reach. Things between
-  the driver functions that no root claims (D3D3 raster and format code around 0x4ef450..0x4f9db0, the world
-  instancing pipelines 0x4c8e30..0x4cb000) are still `orig`: check them before porting; they are probably render
-  code the SDL3 driver replaces.
+  table (0x69bee0) and every function with a "D3D" community label, minus what the other roots reach. What no root
+  claims but only serves rendering is moved by hand-checked rules (`RECLASS` in tools/rwmap.py, one comment each,
+  kept on regeneration; see "Classification of the pointer-only functions" below).
 - Pointer targets need a Ghidra function: `tools/ghidra/SeedPtrs.java` creates them (RenderWare pads with
   `lea esi,[esi+0]` style bytes behind a ret). `rwmap.py` lists pointer targets without a bundle on stderr; re-export
   with `BUNDLES_OUT=work/bundles-rw BUNDLES_FROM=4a4a80 BUNDLES_TO=54b000 GHIDRA_PROJECT=ngbmx-rw tools/ghidra/export.sh
@@ -113,8 +112,51 @@ callees outside the slice) and also lists the `skip` library callees. Ported RW 
 with `BMX_ADDR` annotations like the game code; `progress.py` recognises them and `CMakeLists.txt` builds
 `src/rw/*.c`. Rerun `rwmap.py` after porting: ported rows keep their file and status.
 
-Known gaps: 288 `orig` rows added by the pointer pass (80 KB) are not ported; the engine init-path ones are done, the rest
-are callbacks that run when worlds, clumps and textures load (see Next).
+Known gaps: the 305 `orig` rows the pointer pass added (97 KB) are sorted below; 70 of the remaining 249 are ported,
+177 (57 KB) are left.
+
+## Classification of the pointer-only functions (2026-10-28)
+
+Rule: port what determines data or behaviour (objects, streams, plugin callbacks that build or destroy objects, math,
+collision, image loading into an RwImage); the SDL3 driver replaces what only puts pixels on screen. Checked on the
+pseudo-C of every row; none of the 305 calls a DirectDraw/Direct3D import (the driver code goes through the device
+table, the exe's own data and the engine's standard functions).
+
+Moved to `lib/d3d7driver` (`skip`, 50 rows, 33.3 KB) and to `lib/crt` (6 rows, 0.3 KB):
+
+| Range | Rows / bytes | What and why |
+|---|---|---|
+| 0x4c8ba0..0x4cb000 | 14 / 9.7 KB | Instancing pipelines of world sectors and atomics: resource arena entries, vertex buffers in the D3D vertex format (0x20 byte vertices, 0x28 byte scratch vertices), morph interpolation, lighting and uv effects into them, the dynamic light stage. Hooked in by `rpWorldPipelineInit`/`rpAtomicPipelineInit`; only the device draws the result. |
+| 0x4eacc0..0x4eb100 | 4 / 0.4 KB | Instance buffer allocators and the driver's instance hook (0x4eb0d0 calls a driver function pointer); callers are the pipelines above and the D3D mesh code. |
+| 0x4ccd30..0x4ce000, 0x4ce250 | 11 / 6.0 KB | PVS generation: renders the world from sample points into an offscreen camera, reads the pixels back (RwImageSetFromRaster) and ORs the visible sectors into the PVS rows. Only `zrwWorldSetupPvs` uses it (the game loads precomputed PVS data); the result only culls drawing. The row setup (0x4ce620), counting and the runtime PVS callbacks stay `orig`. Unsure: revert by deleting the two rules if the in-game PVS build must work with SDL3. |
+| 0x4e0160 | 1 / 2.5 KB | Converts the mip levels of a paletted raster (only the default mipmap generator 0x4e1140 calls it). |
+| 0x4ef450..0x4f2e00 | 18 / 14.2 KB | Colour quantiser (histogram, variance minimisation, nearest palette entry), dithering and image resampling that turn an RwImage into the paletted or resized pixels of a raster. The raster format and size come from the device (0x4e7fc0 asks it) and the SDL3 driver offers 32 bit rasters of any size, so they never run. The texture readers 0x4e1b50/0x4e1470/0x4e0b10 keep calling them as `ORIG_FN`. `_rwpathisabsolute` (0x4f2ec0) is outside the range and ported. |
+| 0x4f9c90, 0x4f9db0 | 2 / 0.5 KB | Block averages for the D3D3 raster standards (data at 0x567290). |
+| 0x4ee1d0..0x4ee300, 0x4e8290 | 6 / 0.3 KB | `lib/crt`: rwstricmp/rwstrupr/rwstrlwr/rwstrchr/rwstrrchr and rwfexist, already implemented in src/native/crt.c. |
+
+Kept as `orig` although only render code calls them (unsure): `RwResourcesAllocateResEntry`/`RwResourcesUseResEntry`
+(0x4dc460, 0x4dc680, public arena API the SDL3 instancing will use), `RpMaterialGetColor` (0x4b9330) and
+`RpWorldSectorGetBBox` (0x4c2240) (accessors). Two bodies behind 4 byte stubs are folded into the ported stub function
+(`FOLDED` in rwmap.py, `skip`): 0x4c24c4 (RpLightDestroy) and 0x4b5ab4 (RpGeometryDestroy).
+
+Remaining to port (after the 70 ported in this pass), per file:
+
+| File | Rows | Bytes | Notes |
+|---|---|---|---|
+| rw/world.c | 34 | 7.2 KB | camera/light sync (0x4b7730, 0x4b7bb0, 0x4b7e80 with x87), PVS plugin callbacks (0x4cc..), WorldOpen/Close, frustum sector walk 0x4ba360/0x4ba430, RpWorldCreate **Opus** |
+| rw/clump.c | 18 | 15.6 KB | RpBuildMesh and tristrip code 0x4c5bd0..0x4c8870 (about 12 KB, no x87), RpGeometryStreamWrite 0x4b6350 |
+| rw/texture.c | 24 | 13.2 KB | texture readers 0x4e1470/0x4e1b50/0x4e0b10, default mipmap generator 0x4e1140, RwImageRead/ApplyMask/FindFileType/path walk 0x4e3c08..0x4e53c0, BMP writer 0x4e7860.. |
+| rw/engine.c | 40 | 7.8 KB | anim plugin 0x4fbb30..0x502a40 (clump/frame data, stream callbacks), resource entries |
+| rw/plugins.c | 27 | 4.1 KB | bone plugin 0x502b00..0x505830, skin helpers 0x4fbf30..0x4ff960 |
+| rw/camera.c | 10 | 4.8 KB | clip planes and view matrices 0x4dd4d0..0x4de2a0 (x87), CameraSync/BeginUpdate/EndUpdate |
+| rw/stream.c | 20 | 0.6 KB | stream plugin vtable stubs 0x4e32f2..0x4e335f |
+| rw/collision.c | 2 | 2.4 KB | 0x4bcd90 (x87), 0x4bda80 (x87) |
+| rw/math.c | 2 | 1.2 KB | RwMatrixTransform 0x4d16f0, `_rwMatrixClose` |
+
+Opus (1 KB or more with heavy x87): 0x4bb080 RpWorldCreate (1737 bytes), 0x4bcd90 line walk of the BSP (1563),
+0x4be560 collision sector triangles by line (1330), 0x4dd4d0 CameraBuildPerspClipPlanes (2152), 0x4fc7fc anim clump
+data copy (1360, 22 x87 instructions, borderline). Large without x87 (Sonnet, slow): 0x4c6490, 0x4c69d0, 0x4c7560,
+0x4c7a80 (mesh building), 0x4b6350, 0x4e1470, 0x4e1b50, 0x4e3eb8, 0x4e4c50, 0x4d16f0.
 
 ## Known issues
 
@@ -126,6 +168,10 @@ are callbacks that run when worlds, clumps and textures load (see Next).
 
 1. Port engine core + memory + plugins (the first traps in `bmxnative.exe`), oracle-tested like the game. Done up to
    the driver boundary (docs/NATIVE.md: first trap 0x4eac90, the driver's extension attach).
-2. Plug in the SDL3 driver at the device table / standards table / extension table, then port the pointer-only
-   code that runs once a world loads: plugin stream callbacks (rw/plugins.c, the 0x4fc..0x502 animation and bone
-   plugins), the world and sector readers (rw/world.c), texture and image callbacks (0x4e0160..0x4e1b50, 0x4e3c08..0x4e7fc0).
+2. Plug in the SDL3 driver at the device table / standards table / extension table (it also takes over what
+   "Classification" moved to `lib/d3d7driver`: instancing pipelines, PVS generation, palettised raster formats).
+3. Port the rest of the pointer-only code (table above): the anim and bone plugin callbacks (0x4fbb30..0x505830), the
+   texture readers and image loaders (0x4e0b10..0x4e53c0), the mesh builder (0x4c5bd0..0x4c8870) and the world
+   plugin's sync callbacks. Done in this pass: world plugin callbacks of cameras, atomics, clumps, lights, the tie and
+   material modules, `rpWorldSectorGetWorld`, the mesh stream plugin (0x50e), the LOD atomic plugin (0x112) with its
+   libpng glue, the clump/light module callbacks and the default texture read callback.

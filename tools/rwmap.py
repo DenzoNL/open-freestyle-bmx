@@ -98,6 +98,53 @@ NAME_RULES = [
 ]
 
 
+# Reclassification of `orig` functions after the pointer pass (checked by hand on the pseudo-C, 2026-10-28): what only
+# puts pixels on screen, or builds the pixel data a driver-chosen raster format needs, goes to the SDL3 driver set
+# (`lib/d3d7driver`); what the CRT layer of bmxnative.exe (src/native/crt.c) already provides goes to `lib/crt`.
+# (lo, hi, file, why); lo <= addr < hi. Ported rows are never touched.
+RECLASS = [
+    # Instancing pipelines of world sectors and atomics (resource arena entries, vertex buffers in the D3D vertex
+    # format, morph interpolation, lighting and uv effects into them): rpWorldPipelineInit/rpAtomicPipelineInit
+    # hang them in the pipeline, the device draws the result.
+    (0x4C8BA0, 0x4CB000, "lib/d3d7driver", "world/atomic instancing pipelines"),
+    # Instance buffer allocators and the driver's instance hook (0x4eb0d0 calls a function pointer of the driver);
+    # their callers are the pipelines above and the D3D mesh code.
+    (0x4EACC0, 0x4EB100, "lib/d3d7driver", "instance buffer allocators"),
+    # PVS generation: renders the world from sample points into an offscreen camera, reads the pixels back
+    # (RwImageSetFromRaster) and ORs the visible sectors into the PVS rows. Only used by zrwWorldSetupPvs (the
+    # game normally loads precomputed PVS data) and its result only culls drawing. 0x4ce250 is the sampling
+    # traversal, 0x4ccd30..0x4cd510 the sample callback, 0x4cdd14 its renderer; 0x4ce620 (row setup) stays.
+    (0x4CCD30, 0x4CE000, "lib/d3d7driver", "PVS generation by offscreen rendering"),
+    (0x4CE250, 0x4CE620, "lib/d3d7driver", "PVS generation sampling traversal"),
+    # Colour quantiser, palette matching, dithering and image resampling that turn an RwImage into the paletted or
+    # resized pixels of a raster. The raster format and size come from the device (0x4e7fc0 asks the device), and
+    # the SDL3 driver offers 32-bit rasters of any size, so these never run. 0x4e0160 converts the mip levels of a
+    # paletted raster, 0x4f9c90/0x4f9db0 average blocks for the D3D3 raster standards (data at 0x567290).
+    (0x4E0160, 0x4E0B10, "lib/d3d7driver", "palettised mip conversion"),
+    (0x4EF450, 0x4F2E00, "lib/d3d7driver", "image quantiser, dither, resample for device rasters"),
+    (0x4F9C90, 0x4F9E80, "lib/d3d7driver", "D3D3 raster block average"),
+    # The CRT layer already implements these string helpers the engine's string table points at.
+    (0x4EE1D0, 0x4EE300, "lib/crt", "rwstricmp, rwstrupr, rwstrlwr, rwstrchr, rwstrrchr (crt.c)"),
+    (0x4E8290, 0x4E82D0, "lib/crt", "rwfexist (crt.c)"),
+]
+
+
+# Bodies behind a stub too short for a hook: the ported function sits at the stub's address and contains the body
+# (a 5 byte jump at the stub would overwrite the first bytes of the body), so the body gets no hook of its own.
+# Rows stay in the CSV as `skip` in their group's file.
+FOLDED = {
+    0x4C24C4: ("rw/light.c", "body of RpLightDestroy (0x4c24c0, 4 byte stub)"),
+    0x4B5AB4: ("rw/clump.c", "body of RpGeometryDestroy (0x4b5ab0, 4 byte stub)"),
+}
+
+
+def reclass(a):
+    for lo, hi, f, _ in RECLASS:
+        if lo <= a < hi:
+            return f
+    return None
+
+
 def in_crt(a):
     return any(lo <= a < hi for lo, hi in CRT_BLOCKS)
 
@@ -264,6 +311,8 @@ def main():
                 zlib = not name.startswith("png_") and (a >= ZLIB_FROM or a == 0x5114B0)
                 skip[a] = "lib/zlib" if zlib else "lib/libpng"
     skip.update((a, f) for a, f in kept.items() if a in allf and a not in driver)
+    skip.update((a, reclass(a)) for a in allf if reclass(a) and a not in ported)
+    skip.update((a, FOLDED[a][0]) for a in allf if a in FOLDED and a not in ported)
     # group of every entry; internals take the groups of the entries that reach them
     egroup = {a: entry_group(a, labels.get(a, B[a]["name"])) for a in entries if a not in skip}
     reach = defaultdict(set)

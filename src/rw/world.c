@@ -150,9 +150,9 @@ static RpPVSWorldData *pvsData(const RpWorld *world)
 
 /* ---- cameras ---------------------------------------------------------------------------------------- */
 
-/* Puts the camera into the world (the original loads both arguments into EAX and EDX first). */
-BMX_ADDR(0x004b81f0)
-RpWorld *RpWorldAddCamera(RpWorld *world, RwCamera *camera)
+/* Puts the camera into the world (the body of RpWorldAddCamera: EAX = world, EDX = camera). */
+BMX_ADDR(0x004b81f8)
+__attribute__((regparm(2))) RpWorld *rpWorldAddCameraBody(RpWorld *world, RwCamera *camera)
 {
     RpWorldCameraData *data = cameraData(camera);
     RwFrame *frame = RwCameraGetFrame(camera);
@@ -162,6 +162,13 @@ RpWorld *RpWorldAddCamera(RpWorld *world, RwCamera *camera)
     data->world = world;
     camera->version++;
     return world;
+}
+
+/* The original loads both arguments into EAX and EDX and falls into the body. */
+BMX_ADDR(0x004b81f0)
+RpWorld *RpWorldAddCamera(RpWorld *world, RwCamera *camera)
+{
+    return rpWorldAddCameraBody(world, camera);
 }
 
 /* Frees the camera's list of sectors in view; 1. */
@@ -239,8 +246,8 @@ int _rpTieDestroy(RpTie *tie)
 }
 
 /* Adds the clump to the world, ties its atomics to the sectors; 0 (error 3) if it is in a world already. */
-BMX_ADDR(0x004b86a0)
-RpWorld *RpWorldAddClump(RpWorld *world, RpClump *clump)
+BMX_ADDR(0x004b86a8)
+__attribute__((regparm(2))) RpWorld *rpWorldAddClumpBody(RpWorld *world, RpClump *clump)
 {
     RpWorld **slot = clumpWorldSlot(clump);
     if (*slot != NULL) {
@@ -258,6 +265,12 @@ RpWorld *RpWorldAddClump(RpWorld *world, RpClump *clump)
     }
     (*clumpStamp(clump))++;
     return world;
+}
+
+BMX_ADDR(0x004b86a0)
+RpWorld *RpWorldAddClump(RpWorld *world, RpClump *clump)
+{
+    return rpWorldAddClumpBody(world, clump);
 }
 
 /* Takes the clump out of its world (not the one passed in: the world's own count and cursor change). */
@@ -292,8 +305,8 @@ RpWorld *RpClumpGetWorld(const RpClump *clump)
  * Adds the light to the world: ambient and directional lights (type below 0x80) to one list, point and spot
  * lights, whose frame is updated first, to the other.
  */
-BMX_ADDR(0x004b8af0)
-RpWorld *RpWorldAddLight(RpWorld *world, RpLight *light)
+BMX_ADDR(0x004b8af8)
+__attribute__((regparm(2))) RpWorld *rpWorldAddLightBody(RpWorld *world, RpLight *light)
 {
     *lightWorldSlot(light) = world;
     if (light->object.object.subType < 0x80) {
@@ -307,6 +320,12 @@ RpWorld *RpWorldAddLight(RpWorld *world, RpLight *light)
     }
     light->stamp++;
     return world;
+}
+
+BMX_ADDR(0x004b8af0)
+RpWorld *RpWorldAddLight(RpWorld *world, RpLight *light)
+{
+    return rpWorldAddLightBody(world, light);
 }
 
 /* Removes the light from its sectors and from the world. */
@@ -1055,4 +1074,548 @@ void *_rpMaterialListClose(void *engine)
 {
     rpMaterialListModuleCount--;
     return engine;
+}
+
+/* ---- more module and extension callbacks ------------------------------------------------------------ */
+
+#define rpMaterialModuleCount ORIG_VAR(0x00676754, int32_t, rpMaterialModuleCount)
+
+/* Ties module close: destroys both free lists of ties. */
+BMX_ADDR(0x004b7650)
+void *_rpTieClose(void *engine)
+{
+    RwFreeList **lists = (RwFreeList **)((uint8_t *)RwEngineInstance + rpTieOffset);
+    if (lists[1] != NULL) {
+        RwFreeListDestroy(lists[1]);
+        ((RwFreeList **)((uint8_t *)RwEngineInstance + rpTieOffset))[1] = NULL;
+    }
+    lists = (RwFreeList **)((uint8_t *)RwEngineInstance + rpTieOffset);
+    if (lists[0] != NULL) {
+        RwFreeListDestroy(lists[0]);
+        ((RwFreeList **)((uint8_t *)RwEngineInstance + rpTieOffset))[0] = NULL;
+    }
+    rpTieModuleCount--;
+    return engine;
+}
+
+/* Material module: the free list of materials (the registry's size); NULL when it cannot be created. */
+BMX_ADDR(0x004b9150)
+void *_rpMaterialOpen(void *engine, int32_t offset)
+{
+    rpMaterialOffset = offset;
+    RwFreeList *list = RwFreeListCreate(rpMaterialRegistry.sizeOfStruct, 0x14, 0);
+    *(RwFreeList **)((uint8_t *)RwEngineInstance + rpMaterialOffset) = list;
+    if (*(RwFreeList **)((uint8_t *)RwEngineInstance + rpMaterialOffset) == NULL) {
+        return NULL;
+    }
+    rpMaterialModuleCount++;
+    return engine;
+}
+
+BMX_ADDR(0x004b91b0)
+void *_rpMaterialClose(void *engine)
+{
+    RwFreeList *list = *(RwFreeList **)((uint8_t *)RwEngineInstance + rpMaterialOffset);
+    if (list != NULL) {
+        RwFreeListDestroy(list);
+        *(RwFreeList **)((uint8_t *)RwEngineInstance + rpMaterialOffset) = NULL;
+    }
+    rpMaterialModuleCount--;
+    return engine;
+}
+
+BMX_ADDR(0x004b9330)
+const RwRGBA *RpMaterialGetColor(const RpMaterial *material)
+{
+    return &material->color;
+}
+
+BMX_ADDR(0x004c2240)
+const RwBBox *RpWorldSectorGetBBox(const RpWorldSector *sector)
+{
+    return &sector->boundingBox;
+}
+
+/* Renders the sector with the render callback of the engine's current world. */
+BMX_ADDR(0x004c21e0)
+void *rpWorldSectorRenderCurrent(RpWorldSector *sector)
+{
+    return ((RpWorld *)RwEngineInstance->curWorld)->renderCallBack(sector);
+}
+
+/* ---- atomics and the world ---------------------------------------------------------------------------- */
+
+/* The world plugin's data of an atomic (at rpWorldAtomicOffset): the world it is in and its own sync
+ * callback. */
+typedef struct RpWorldAtomicData {
+    RpWorld *world; /* 0x00 */
+    void *sync;     /* 0x04 saved RpAtomic.object.sync */
+} RpWorldAtomicData;
+
+static RpWorldAtomicData *atomicData(const RpAtomic *atomic)
+{
+    return (RpWorldAtomicData *)((uint8_t *)atomic + rpWorldAtomicOffset);
+}
+
+/* Records the world in the atomic and refreshes its frame's objects; no sector ties yet. */
+BMX_ADDR(0x004b82b8)
+__attribute__((regparm(2))) RpWorld *rpWorldAddAtomicBody(RpWorld *world, RpAtomic *atomic)
+{
+    RpWorldAtomicData *data = atomicData(atomic);
+    RwFrame *frame = atomic->object.object.parent;
+    if (frame != NULL) {
+        RwFrameUpdateObjects(frame);
+    }
+    data->world = world;
+    atomic->stamp++;
+    return world;
+}
+
+/* Frees what the atomic has cached for rendering and its ties with sectors, and leaves the world. */
+BMX_ADDR(0x004b82f8)
+__attribute__((regparm(2))) RpWorld *rpWorldRemoveAtomicBody(RpWorld *world, RpAtomic *atomic)
+{
+    RpWorldAtomicData *data = atomicData(atomic);
+    if (atomic->repEntry != NULL) {
+        RwResourcesFreeResEntry(atomic->repEntry);
+    }
+    RwLLLink *end = &atomic->llWorldSectorsInAtomic;
+    RwLLLink *link = end->next;
+    while (link != end) {
+        RpTie *tie = (RpTie *)((uint8_t *)link - offsetof(RpTie, lWorldSectorInAtomic));
+        link = link->next;
+        if (tie->apAtom != NULL && tie->worldSector != NULL) {
+            linkOut(&tie->lWorldSectorInAtomic);
+            linkOut(&tie->lAtomicInWorldSector);
+            RwEngineInstance->freeListFree(tieGlobals()->tieFreeList, tie);
+        }
+    }
+    data->world = NULL;
+    atomic->stamp++;
+    return world;
+}
+
+/* RpClumpForAllAtomics callbacks: the world is the data argument. */
+BMX_ADDR(0x004b8680)
+void *rpWorldAddAtomicCallback(void *atomic, void *world)
+{
+    rpWorldAddAtomicBody(world, atomic);
+    return atomic;
+}
+
+BMX_ADDR(0x004b8750)
+void *rpWorldRemoveAtomicCallback(void *atomic, void *world)
+{
+    rpWorldRemoveAtomicBody(world, atomic);
+    return atomic;
+}
+
+/* Destroys the ties of the atomic (the ones with both ends set; the others stay in its list). */
+BMX_ADDR(0x004b78b0)
+__attribute__((regparm(1))) void rpAtomicTiesDestroy(RpAtomic *atomic)
+{
+    RwLLLink *end = &atomic->llWorldSectorsInAtomic;
+    RwLLLink *link = end->next;
+    while (link != end) {
+        RpTie *tie = (RpTie *)((uint8_t *)link - offsetof(RpTie, lWorldSectorInAtomic));
+        link = link->next;
+        if (tie->apAtom != NULL && tie->worldSector != NULL) {
+            linkOut(&tie->lWorldSectorInAtomic);
+            linkOut(&tie->lAtomicInWorldSector);
+            RwEngineInstance->freeListFree(tieGlobals()->tieFreeList, tie);
+        }
+    }
+}
+
+/* Destroys the ties of the light with sectors. */
+BMX_ADDR(0x004b7b40)
+__attribute__((regparm(1))) void rpLightTiesDestroy(RpLight *light)
+{
+    RwLLLink *end = &light->sectors;
+    RwLLLink *link = end->next;
+    while (link != end) {
+        RpLightTie *tie = (RpLightTie *)((uint8_t *)link - offsetof(RpLightTie, worldSectorInLight));
+        link = link->next;
+        linkOut(&tie->worldSectorInLight);
+        linkOut(&tie->lightInWorldSector);
+        RwEngineInstance->freeListFree(tieGlobals()->lightTieFreeList, tie);
+    }
+}
+
+/*
+ * The atomic's plugin data starts out empty; its sync callback is chained behind 0x4b7ab0. The halfword at
+ * 0x64 is the render frame minus one.
+ */
+BMX_ADDR(0x004b9040)
+void *WorldInitAtomicExt(void *atomic)
+{
+    RpAtomic *a = atomic;
+    RpWorldAtomicData *data = atomicData(a);
+    data->world = NULL;
+    void *sync = a->object.sync;
+    const uint16_t frame = (uint16_t)(RwEngineInstance->renderFrame - 1);
+    __builtin_memcpy(a->pad64, &frame, sizeof frame);
+    data->sync = sync;
+    a->object.sync = RW_CB(void *, 0x004b7ab0);
+    return atomic;
+}
+
+BMX_ADDR(0x004b9010)
+void *WorldDeInitAtomicExt(void *atomic)
+{
+    RpAtomic *a = atomic;
+    const int32_t offset = rpWorldAtomicOffset;
+    rpAtomicTiesDestroy(a);
+    a->object.sync = ((RpWorldAtomicData *)((uint8_t *)a + offset))->sync;
+    return atomic;
+}
+
+BMX_ADDR(0x004b7b00)
+void *WorldCopyAtomicExt(void *atomic)
+{
+    return atomic;
+}
+
+/* Clump copy: the clone joins the world of the source. */
+BMX_ADDR(0x004b7b10)
+void *WorldCopyClumpExt(void *clump, const void *source)
+{
+    RpWorld *world = *(RpWorld *const *)((const uint8_t *)source + rpWorldClumpOffset);
+    if (world != NULL) {
+        rpWorldAddClumpBody(world, clump);
+    }
+    return clump;
+}
+
+/* ---- lights ----------------------------------------------------------------------------------------------
+ */
+
+BMX_ADDR(0x004b8fc0)
+void *WorldInitLightExt(void *light)
+{
+    RpLight *l = light;
+    uint32_t *data = (uint32_t *)((uint8_t *)l + rpWorldLightOffset);
+    data[0] = 0;
+    data[1] = (uint32_t)(uintptr_t)l->object.sync;
+    l->object.sync = RW_CB(void *, 0x004b7bb0);
+    return light;
+}
+
+BMX_ADDR(0x004b8fa0)
+void *WorldDeInitLightExt(void *light)
+{
+    rpLightTiesDestroy(light);
+    return light;
+}
+
+BMX_ADDR(0x004b7e50)
+void *WorldCopyLightExt(void *light, const void *source)
+{
+    RpWorld *world = *(RpWorld *const *)((const uint8_t *)source + rpWorldLightOffset);
+    if (world != NULL) {
+        rpWorldAddLightBody(world, light);
+    }
+    return light;
+}
+
+/* ---- cameras ----------------------------------------------------------------------------------------------
+ */
+
+/* The plugin takes over the camera's begin/end update and sync callbacks and keeps the old ones. */
+BMX_ADDR(0x004b90c0)
+void *WorldInitCameraExt(void *camera)
+{
+    RwCamera *c = camera;
+    RpWorldCameraData *data = cameraData(c);
+    data->sectors = NULL;
+    data->numSectors = 0;
+    data->capacity = 0;
+    data->beginUpdate = c->beginUpdate;
+    data->endUpdate = c->endUpdate;
+    data->sync = c->object.sync;
+    c->endUpdate = RW_CB(RwCameraUpdateFunc, 0x004b7700);
+    c->beginUpdate = RW_CB(RwCameraUpdateFunc, 0x004b76c0);
+    c->object.sync = RW_CB(void *, 0x004b7730);
+    data->world = NULL;
+    return camera;
+}
+
+BMX_ADDR(0x004b9080)
+void *WorldDeInitCameraExt(void *camera)
+{
+    RwCamera *c = camera;
+    const int32_t offset = rpWorldCameraOffset;
+    rpWorldCameraDataDestroy(cameraData(c));
+    RpWorldCameraData *data = (RpWorldCameraData *)((uint8_t *)c + offset);
+    c->beginUpdate = data->beginUpdate;
+    c->endUpdate = data->endUpdate;
+    c->object.sync = data->sync;
+    return camera;
+}
+
+/* Camera copy: the clone has no sectors in view yet and joins the world of the source. */
+BMX_ADDR(0x004b77a0)
+void *WorldCopyCameraExt(void *camera, const void *source)
+{
+    RpWorldCameraData *data = cameraData(camera);
+    data->numSectors = 0;
+    data->capacity = 0;
+    data->sectors = NULL;
+    RpWorld *world = ((const RpWorldCameraData *)((const uint8_t *)source + rpWorldCameraOffset))->world;
+    if (world != NULL) {
+        rpWorldAddCameraBody(world, camera);
+    }
+    return camera;
+}
+
+/* Begin update: the camera's world becomes the engine's current world, then the camera's own callback. */
+BMX_ADDR(0x004b76c0)
+RwCamera *WorldCameraBeginUpdate(RwCamera *camera)
+{
+    RpWorldCameraData *data = cameraData(camera);
+    RwEngineInstance->curWorld = data->world;
+    RwEngineInstance->renderFrame++;
+    return data->beginUpdate(camera);
+}
+
+BMX_ADDR(0x004b7700)
+RwCamera *WorldCameraEndUpdate(RwCamera *camera)
+{
+    RpWorldCameraData *data = cameraData(camera);
+    RwEngineInstance->curWorld = NULL;
+    return data->endUpdate(camera);
+}
+
+/* ---- the world a sector belongs to --------------------------------------------------------------------- */
+
+/* Sector walk callback: stops (NULL) at the sector searched for and says so in the second word. */
+typedef struct RpSectorSearch {
+    void *target;
+    int32_t found;
+} RpSectorSearch;
+
+BMX_ADDR(0x004b9d30)
+void *rpWorldSectorFindCallback(void *sector, void *search)
+{
+    RpSectorSearch *s = search;
+    if (sector != s->target) {
+        return sector;
+    }
+    s->found = 1;
+    return NULL;
+}
+
+/*
+ * The world a sector belongs to: walks the engine's list of worlds. A world whose sectors form one block of
+ * memory is tested by address range, any other by walking its BSP (an explicit stack, sixty-odd entries) for
+ * the sector. NULL (and an error) without the world module.
+ */
+BMX_ADDR(0x004b9d50)
+RpWorld *rpWorldSectorGetWorld(RpWorldSector *sector)
+{
+    if (rpWorldModuleCount == 0) {
+        reportError(kWorldPluginId, rwERR_NOTOPEN);
+        return NULL;
+    }
+    RwLLLink *head = &worldGlobals()->worlds;
+    for (RwLLLink *link = head->next; link != head; link = link->next) {
+        RpWorldListEntry *entry = (RpWorldListEntry *)((uint8_t *)link - offsetof(RpWorldListEntry, link));
+        if ((entry->world->object.privateFlags & 1) != 0) {
+            if ((uintptr_t)sector < (uintptr_t)entry->world ||
+                (uintptr_t)sector >= (uintptr_t)entry->world + entry->size) {
+                continue;
+            }
+            return entry->world;
+        }
+        RpSectorSearch search = {sector, 0};
+        RpSector *stack[65] = {NULL};
+        int32_t depth = 0;
+        if (entry->world == NULL) {
+            reportError(kWorldPluginId, rwERR_NULLP);
+        } else {
+            RpSector *node = entry->world->rootSector;
+            do {
+                if (node->type >= 0) {
+                    stack[++depth] = ((RpPlaneSector *)node)->rightSubTree;
+                    node = ((RpPlaneSector *)node)->leftSubTree;
+                } else {
+                    if (rpWorldSectorFindCallback(node, &search) == NULL) {
+                        break;
+                    }
+                    node = stack[depth--];
+                }
+            } while (depth >= 0);
+        }
+        if (search.found != 0) {
+            return entry->world;
+        }
+    }
+    return NULL;
+}
+
+/* ---- the mesh stream plugin (0x50e) of geometries and sectors ----------------------------------------- */
+
+/* Index of the material in the list, -1 when it is not there. */
+BMX_ADDR(0x004c50a0)
+int32_t _rpMaterialListFindMaterialIndex(const RpMaterialList *list, const RpMaterial *material)
+{
+    for (int32_t i = 0; i < list->numMaterials; i++) {
+        if (list->materials[i] == material) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+/* Bytes the mesh header takes in a stream chunk (the chunk size the size callbacks report). */
+BMX_ADDR(0x004c4ea0)
+int32_t _rpMeshSize(const RpMeshHeader *mesh)
+{
+    return (int32_t)(0xc + mesh->totalIndices * 4 + mesh->numMeshes * 8U);
+}
+
+/*
+ * Writes the mesh header (flags, number of meshes, total indices) and for every mesh its index count and
+ * the index of its material in the owner's material list (0 when it is not in it), then its indices as
+ * 32-bit words. The second argument is unused. Returns the stream, NULL when a write failed.
+ */
+BMX_ADDR(0x004c4bc0)
+RwStream *_rpMeshWrite(const RpMeshHeader *mesh, void *owner, RwStream *stream,
+                       const RpMaterialList *materials)
+{
+    (void)owner;
+    uint32_t header[3];
+    header[0] = mesh->flags;
+    header[1] = mesh->numMeshes;
+    header[2] = mesh->totalIndices;
+    if (RwStreamWriteInt32(stream, header, 0xc) == NULL) {
+        return NULL;
+    }
+    const RpMesh *entry = (const RpMesh *)(mesh + 1);
+    for (uint32_t n = mesh->numMeshes; n != 0; n--, entry++) {
+        int32_t pair[2];
+        pair[0] = (int32_t)entry->numIndices;
+        pair[1] = _rpMaterialListFindMaterialIndex(materials, entry->material);
+        if (pair[1] < 0) {
+            pair[1] = 0;
+        }
+        if (RwStreamWriteInt32(stream, pair, 8) == NULL) {
+            return NULL;
+        }
+        const uint16_t *index = entry->indices;
+        for (uint32_t i = entry->numIndices; i != 0; i--) {
+            uint32_t word = *index++;
+            if (RwStreamWriteInt32(stream, &word, 4) == NULL) {
+                return NULL;
+            }
+        }
+    }
+    return stream;
+}
+
+/*
+ * Reads a mesh header written by _rpMeshWrite into one block (header, the meshes, then all indices as
+ * 16-bit values) and stamps it with the next serial number of the mesh module. The block is not freed
+ * when the stream runs dry. The second argument is unused. NULL on failure.
+ */
+BMX_ADDR(0x004c4d00)
+RpMeshHeader *_rpMeshRead(RwStream *stream, void *owner, const RpMaterialList *materials)
+{
+    (void)owner;
+    uint32_t header[3];
+    if (RwStreamReadInt32(stream, header, 0xc) == NULL) {
+        return NULL;
+    }
+    RpMeshHeader *mesh = RwEngineInstance->memoryFuncs.rwmalloc(header[2] * 2 + 0x10 + header[1] * 0x10);
+    if (mesh == NULL) {
+        return NULL;
+    }
+    mesh->flags = header[0];
+    mesh->numMeshes = (uint16_t)header[1];
+    mesh->serialNum = *(uint16_t *)((uint8_t *)RwEngineInstance + rpMeshOffset);
+    mesh->firstMeshOffset = 0;
+    mesh->totalIndices = header[2];
+    (*(int16_t *)((uint8_t *)RwEngineInstance + rpMeshOffset))++;
+    RpMesh *entry = (RpMesh *)(mesh + 1);
+    uint16_t *index = (uint16_t *)(entry + header[1]);
+    for (uint32_t n = mesh->numMeshes; n != 0; n--, entry++) {
+        int32_t pair[2];
+        if (RwStreamReadInt32(stream, pair, 8) == NULL) {
+            return NULL;
+        }
+        entry->numIndices = (uint32_t)pair[0];
+        RpMaterial *material = _rpMaterialListGetMaterial(materials, pair[1]);
+        entry->indices = index;
+        entry->material = material;
+        for (uint32_t i = entry->numIndices; i != 0; i--) {
+            uint32_t word;
+            if (RwStreamReadInt32(stream, &word, 4) == NULL) {
+                return NULL;
+            }
+            *index++ = (uint16_t)word;
+        }
+    }
+    return mesh;
+}
+
+/* Stream callbacks of the geometry's mesh: the mesh at +0x40, the materials at +0x10. */
+BMX_ADDR(0x004b8cc0)
+RwStream *writeGeometryMesh(RwStream *stream, int32_t length, const void *geometry, int32_t offset,
+                            int32_t size)
+{
+    (void)length;
+    (void)offset;
+    (void)size;
+    const RpGeometry *g = geometry;
+    return _rpMeshWrite(g->mesh, (void *)(uintptr_t)geometry, stream, &g->matList);
+}
+
+BMX_ADDR(0x004b8d00)
+RwStream *readGeometryMesh(RwStream *stream, int32_t length, void *geometry, int32_t offset, int32_t size)
+{
+    (void)length;
+    (void)offset;
+    (void)size;
+    RpGeometry *g = geometry;
+    g->mesh = _rpMeshRead(stream, g, &g->matList);
+    return g->mesh != NULL ? stream : NULL;
+}
+
+BMX_ADDR(0x004b8d40)
+int32_t sizeGeometryMesh(const void *geometry, int32_t offset, int32_t size)
+{
+    (void)offset;
+    (void)size;
+    return _rpMeshSize(((const RpGeometry *)geometry)->mesh);
+}
+
+/* The same for a world sector: the mesh at +0x58, the materials of the world the sector is in. */
+BMX_ADDR(0x004b8d60)
+RwStream *writeSectorMesh(RwStream *stream, int32_t length, const void *sector, int32_t offset, int32_t size)
+{
+    (void)length;
+    (void)offset;
+    (void)size;
+    RpWorld *world = rpWorldSectorGetWorld((RpWorldSector *)(uintptr_t)sector);
+    return _rpMeshWrite(((const RpWorldSector *)sector)->mesh, world, stream, &world->matList);
+}
+
+BMX_ADDR(0x004b8da0)
+RwStream *readSectorMesh(RwStream *stream, int32_t length, void *sector, int32_t offset, int32_t size)
+{
+    (void)length;
+    (void)offset;
+    (void)size;
+    RpWorldSector *s = sector;
+    RpWorld *world = rpWorldSectorGetWorld(s);
+    s->mesh = _rpMeshRead(stream, world, &world->matList);
+    return s->mesh != NULL ? stream : NULL;
+}
+
+BMX_ADDR(0x004b8de0)
+int32_t sizeSectorMesh(const void *sector, int32_t offset, int32_t size)
+{
+    (void)offset;
+    (void)size;
+    return _rpMeshSize(((const RpWorldSector *)sector)->mesh);
 }

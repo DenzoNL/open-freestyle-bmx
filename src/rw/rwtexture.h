@@ -256,4 +256,12 @@ __attribute__((regparm(3))) int BMPImageSetSpan(RwImage *image, int32_t row, con
                                                 int32_t reserved0, int32_t reserved1, int32_t reserved2,
                                                 int32_t srcDepth, int32_t flags);
 
+/* Default read callback of the texture module and the image/raster glue next to it (rw/texture.c). */
+void *rwTextureDefaultRead(const char *name, const char *maskName);
+RwImage *RwImageSetFromRaster(RwImage *image, RwRaster *raster);
+RwImage *RwImageFindRasterFormat(RwImage *image, int32_t flags, int32_t *width, int32_t *height,
+                                 int32_t *depth, uint32_t *format);
+int _rwpathisabsolute(const char *path);
+int rwImageFormatSucceed(void);
+
 #endif

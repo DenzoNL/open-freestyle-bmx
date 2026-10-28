@@ -230,4 +230,51 @@ __attribute__((regparm(2))) RwMatrix *RwMatrixInvertGeneral(RwMatrix *out, const
 void *WorldObjectOpen(void *engine, int32_t offset);
 void *WorldObjectClose(void *engine);
 
+/* ---- LOD atomic plugin (rw/plugins.c) ---------------------------------------------------------------- */
+
+struct RwStream;
+#define rpLodFreeList ORIG_VAR(0x0069737c, RwFreeList *, rpLodFreeList)
+
+/*
+ * What the plugin keeps for an atomic (a pointer in the atomic at rpLodAtomicOffset, from a free list of 0x40
+ * byte entries): up to ten geometries by distance, the one in use, and the atomic's own render callback while
+ * the plugin's replaces it. `select` returns the level for an atomic (-1: keep the current one).
+ */
+typedef int32_t(BMX_CDECL *RpLodSelectCallBack)(RpAtomic *atomic);
+
+typedef struct RpLodAtomicData {
+    int32_t hooked;                     /* 0x00 1 while the atomic's render callback is the plugin's */
+    RpAtomicRenderCallBack savedRender; /* 0x04 */
+    RpLodSelectCallBack select;         /* 0x08 */
+    float range;                        /* 0x0c */
+    float scale;                        /* 0x10 distance multiplier of the default select callback */
+    int32_t current;                    /* 0x14 */
+    RpGeometry *levels[10];             /* 0x18 */
+} RpLodAtomicData;
+
+_Static_assert(sizeof(RpLodAtomicData) == 0x40, "RpLodAtomicData layout");
+
+int32_t rpLodAtomicSelectLevel(RpAtomic *atomic);
+__attribute__((regparm(2))) RpAtomic *rpLodAtomicApply(RpAtomic *atomic, RpLodAtomicData *lod);
+RpAtomic *rpLodAtomicRender(RpAtomic *atomic);
+__attribute__((regparm(2))) void rpLodAtomicHook(RpAtomic *atomic, RpLodAtomicData *lod);
+__attribute__((regparm(2))) void rpLodAtomicUnhook(RpAtomic *atomic, RpLodAtomicData *lod);
+RpLodAtomicData *rpLodAtomicDataInit(RpLodAtomicData *lod);
+RpLodAtomicData *rpLodAtomicDataCreate(void);
+__attribute__((regparm(2))) RpLodAtomicData *rpLodAtomicDataCopy(RpLodAtomicData *dst, RpLodAtomicData *src);
+__attribute__((regparm(1))) void rpLodAtomicDataDestroy(RpLodAtomicData *lod);
+void *LODAtomicCallBackOpen(void *engine, int32_t offset);
+void *LODAtomicCallBackClose(void *engine);
+void *LODAtomicCallBackConstructor(void *atomic, int32_t offset);
+void *LODAtomicCallBackDestructor(void *atomic, int32_t offset);
+void *LODAtomicCallBackCopy(void *dst, const void *src, int32_t offset);
+void *LODAtomicCallBackReadChunk(struct RwStream *stream, int32_t length, void *atomic, int32_t offset,
+                                 int32_t size);
+void *LODAtomicCallBackWriteChunk(struct RwStream *stream, int32_t length, const void *atomic, int32_t offset,
+                                  int32_t size);
+int32_t LODAtomicCallBackGetChunkSize(const void *atomic, int32_t offset, int32_t size);
+void *rwPngMalloc(void *png, size_t size);
+void rwPngFree(void *png, void *block);
+uint32_t rwPngRead(void *png, void *buffer, uint32_t length);
+
 #endif

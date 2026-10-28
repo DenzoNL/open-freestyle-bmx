@@ -68,6 +68,21 @@ int RpLightDestroy(RpLight *light)
     return 1;
 }
 
+/* The free list callback of _rpLightClose: destroys a light that is still alive (data unused); 1. */
+BMX_ADDR(0x004c2370)
+int rpLightFreeListDestroyCB(void *light, void *data)
+{
+    (void)data;
+    return RpLightDestroy(light);
+}
+
+/* The sync callback of lights: only returns the object. */
+BMX_ADDR(0x004c2510)
+void *rpLightSyncCallback(void *light)
+{
+    return light;
+}
+
 /* Sets the radius and lets the frame know its object changed. Returns the light. */
 BMX_ADDR(0x004c2530)
 RpLight *RpLightSetRadius(RpLight *light, float radius)
@@ -193,6 +208,16 @@ RpLight *rpLightVisitOnce(RpLight *light, RpLightVisit *visit)
             visit->callback(visit->context, light, visit->block, visit->tail, visit->extra);
         }
         light->lightFrame = frame;
+    }
+    return light;
+}
+
+/* The same without the once per frame check: calls the visitor's callback for an enabled light. */
+BMX_ADDR(0x004b17c0)
+RpLight *rpLightVisitEnabled(RpLight *light, RpLightVisit *visit)
+{
+    if ((light->object.object.flags & 1) != 0) {
+        visit->callback(visit->context, light, visit->block, visit->tail, visit->extra);
     }
     return light;
 }

@@ -1558,3 +1558,89 @@ void *_rwImageOpen(void *engine, int32_t offset)
     }
     return engine;
 }
+
+/* ---- default texture read callback, image/raster glue ---------------------------------------------------
+ */
+
+/* The two readers the default read callback chooses from (still original code): the one that builds the mip
+ * levels of the texture (0x4e1b50) and the one for a texture without (0x4e1470). */
+ORIG_FN(0x004e1b50, void *, rwTextureReadMipmapped, (const char *name, const char *maskName));
+ORIG_FN(0x004e1470, void *, rwTextureReadPlain, (const char *name, const char *maskName));
+
+/*
+ * The texture module's default read callback. A find callback set by the application (+0x18) means the
+ * mipmapped reader, otherwise the plain one unless mipmapping is on (+0x1c).
+ */
+BMX_ADDR(0x004e1410)
+void *rwTextureDefaultRead(const char *name, const char *maskName)
+{
+    if (textureGlobals()->findCallBack == NULL) {
+        return rwTextureReadMipmapped(name, maskName);
+    }
+    if (textureGlobals()->mipmapping == 0) {
+        return rwTextureReadPlain(name, maskName);
+    }
+    return rwTextureReadMipmapped(name, maskName);
+}
+
+/* Entry 6 and 9 of the engine's standard functions: raster to image, and the raster format for an image. */
+enum { rwSTANDARDRASTERGETIMAGE = 6, rwSTANDARDIMAGEFINDRASTERFORMAT = 9 };
+
+/* Copies the raster into the image (through the device); an image of a raster with the alpha bit (private
+ * flag 1) gets flag 2. Returns the image, NULL when the device failed. */
+BMX_ADDR(0x004e7f20)
+RwImage *RwImageSetFromRaster(RwImage *image, RwRaster *raster)
+{
+    typedef int(BMX_CDECL * Fn)(RwImage *, RwRaster *, int32_t);
+    if (((Fn)(uintptr_t)RwEngineInstance->stdFunc[rwSTANDARDRASTERGETIMAGE])(image, raster, 0) == 0) {
+        return NULL;
+    }
+    if ((raster->privateFlags & 1) != 0) {
+        image->flags |= 2;
+    }
+    return image;
+}
+
+/*
+ * Asks the device which raster the image would become: width, height, depth and the format word (raster
+ * format with the type byte). Returns the image, NULL when the device cannot.
+ */
+BMX_ADDR(0x004e7fc0)
+RwImage *RwImageFindRasterFormat(RwImage *image, int32_t flags, int32_t *width, int32_t *height,
+                                 int32_t *depth, uint32_t *format)
+{
+    typedef int(BMX_CDECL * Fn)(RwRaster *, RwImage *, int32_t);
+    RwRaster info;
+    if (((Fn)(uintptr_t)RwEngineInstance->stdFunc[rwSTANDARDIMAGEFINDRASTERFORMAT])(&info, image, flags) ==
+        0) {
+        return NULL;
+    }
+    *format = RwRasterGetFormat(&info) | info.type;
+    *width = info.width;
+    *height = info.height;
+    *depth = info.depth;
+    return image;
+}
+
+/* Does the path start with a backslash or a drive letter and a colon? */
+BMX_ADDR(0x004f2ec0)
+int _rwpathisabsolute(const char *path)
+{
+    const signed char first = (signed char)path[0];
+    if (first == 0x5c) { /* backslash */
+        return 1;
+    }
+    if ((first >= 'A' && first <= 'Z') || (first >= 'a' && first <= 'z')) {
+        if (path[1] == ':') {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* An image format callback that does nothing and succeeds. */
+BMX_ADDR(0x004e003c)
+int rwImageFormatSucceed(void)
+{
+    return 1;
+}

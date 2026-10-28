@@ -162,6 +162,10 @@ New first trap after the CRT layer (2026-10-28): `_rwFreeListAllocReal` (0x4dbc3
 from `_rwPluginRegistryAddPlugin` (0x4e88d0). `malloc` and the stdio table are no longer traps. A
 `BMX_TRAP_SKIP` survey shows no further CRT trap before the fake return value faults.
 
+Second pointer-only batch (2026-10-28: world plugin callbacks, mesh stream, LOD atomic plugin, clump/light module
+callbacks, default texture read callback; 2664 hook jumps): the first trap is unchanged, `0x4eac90`, because the
+driver's attach routine runs before any of these callbacks.
+
 First trap after the pointer-only RenderWare functions (2026-10-28): `0x4eac90`, entry 0 of the core extension table at
 0x69bee0 (`rwCoreExtGetFuncs()[0]`, called by `CorePluginAttach` through `rwCoreExtPluginAttach`). It belongs to the
 Direct3D driver (classified `lib/d3d7driver` in data/functions-rw.csv), so this is where the SDL3 driver has to plug

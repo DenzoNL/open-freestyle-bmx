@@ -10,6 +10,7 @@
  * callers. RpPVSCreate's camera set-up (0x4ce6d0, x87 argument) is replaced by a naked stub.
  */
 #include "dt_rw.h"
+#include "dt_zmem.h"
 #include "rw/rwworld.h"
 
 enum {
@@ -996,6 +997,397 @@ static void setup_pvs_create(DtCtx *c)
     rwtEnd();
 }
 
+/* ---- the register-argument bodies, atomics, extension callbacks and the sector's world --------------------
+ * (rw/world.c: 0x4b76c0..0x4b9d50)
+ */
+
+#define ORIG_FREELIST_CREATE DT_ORIG(0x004dba90, RwFreeList *(*)(int32_t, int32_t, int32_t))
+
+#define REG2(addr, ret, ta, tb) ((ret(__attribute__((regparm(2))) *)(ta, tb))(uintptr_t)(addr))
+#define REG1(addr, ret, ta)     ((ret(__attribute__((regparm(1))) *)(ta))(uintptr_t)(addr))
+
+static RpWorld *addCameraOrig(RpWorld *w, RwCamera *camera)
+{
+    return REG2(0x004b81f8, RpWorld *, RpWorld *, RwCamera *)(w, camera);
+}
+
+static RpWorld *addCameraImpl(RpWorld *w, RwCamera *camera)
+{
+    return rpWorldAddCameraBody(w, camera);
+}
+
+static RpWorld *addClumpOrig(RpWorld *w, RpClump *clump)
+{
+    return REG2(0x004b86a8, RpWorld *, RpWorld *, RpClump *)(w, clump);
+}
+
+static RpWorld *addClumpImpl(RpWorld *w, RpClump *clump)
+{
+    return rpWorldAddClumpBody(w, clump);
+}
+
+static RpWorld *addLightOrig(RpWorld *w, RpLight *light)
+{
+    return REG2(0x004b8af8, RpWorld *, RpWorld *, RpLight *)(w, light);
+}
+
+static RpWorld *addLightImpl(RpWorld *w, RpLight *light)
+{
+    return rpWorldAddLightBody(w, light);
+}
+
+static RpWorld *addAtomicOrig(RpWorld *w, RpAtomic *atomic)
+{
+    return REG2(0x004b82b8, RpWorld *, RpWorld *, RpAtomic *)(w, atomic);
+}
+
+static RpWorld *addAtomicImpl(RpWorld *w, RpAtomic *atomic)
+{
+    return rpWorldAddAtomicBody(w, atomic);
+}
+
+static RpWorld *removeAtomicOrig(RpWorld *w, RpAtomic *atomic)
+{
+    return REG2(0x004b82f8, RpWorld *, RpWorld *, RpAtomic *)(w, atomic);
+}
+
+static RpWorld *removeAtomicImpl(RpWorld *w, RpAtomic *atomic)
+{
+    return rpWorldRemoveAtomicBody(w, atomic);
+}
+
+static int atomicTiesOrig(RpAtomic *atomic)
+{
+    REG1(0x004b78b0, void, RpAtomic *)(atomic);
+    return 0;
+}
+
+static int atomicTiesImpl(RpAtomic *atomic)
+{
+    rpAtomicTiesDestroy(atomic);
+    return 0;
+}
+
+static int lightTiesOrig(RpLight *light)
+{
+    REG1(0x004b7b40, void, RpLight *)(light);
+    return 0;
+}
+
+static int lightTiesImpl(RpLight *light)
+{
+    rpLightTiesDestroy(light);
+    return 0;
+}
+
+enum { kAtomicWorld = 0x74, kAtomicBytes = 0x90 };
+
+/* An atomic with a frame (or none), a cached render entry (or none) and ties with sectors; some ties lack an
+ * end. */
+static RpAtomic *mkAtomic(void)
+{
+    rpWorldAtomicOffset = kAtomicWorld;
+    RpAtomic *a = dt_alloc(kAtomicBytes);
+    a->object.object.type = 1;
+    a->object.object.parent = dt_u32() % 3 == 0 ? NULL : mkFrame();
+    a->object.sync = (void *)(uintptr_t)(dt_u32() & ~3U);
+    a->stamp = (uint8_t)dt_u32();
+    a->repEntry = dt_u32() % 2 == 0 ? NULL : (RwResEntry *)dt_alloc(0x18);
+    uint16_t spare = (uint16_t)dt_u32();
+    __builtin_memcpy(a->pad64, &spare, 2);
+    listInit(&a->llWorldSectorsInAtomic);
+    for (int n = dt_range(0, 3); n > 0; n--) {
+        RpTie *tie = dt_alloc(sizeof(RpTie));
+        tie->apAtom = dt_u32() % 4 == 0 ? NULL : a;
+        tie->worldSector = dt_u32() % 4 == 0 ? NULL : (RpWorldSector *)dt_alloc(8);
+        RwLLLink *other = dt_alloc(sizeof(RwLLLink));
+        listInit(other);
+        listAddTail(other, &tie->lAtomicInWorldSector);
+        listAddTail(&a->llWorldSectorsInAtomic, &tie->lWorldSectorInAtomic);
+    }
+    *(void **)((uint8_t *)a + kAtomicWorld) = dt_u32() % 2 ? NULL : mkWorld();
+    *(uint32_t *)((uint8_t *)a + kAtomicWorld + 4) = dt_u32() & ~3U;
+    return a;
+}
+
+static void setup_add_camera_body(DtCtx *c)
+{
+    worldEnv(c, 0);
+    stubFrames();
+    DT_ARG_PTR(c, 0, mkWorld());
+    DT_ARG_PTR(c, 1, mkCamera(NULL, 0));
+    rwtEnd();
+}
+
+static void setup_add_clump_body(DtCtx *c)
+{
+    setup_add_clump(c);
+}
+
+static void setup_atomic_world(DtCtx *c)
+{
+    worldEnv(c, 0);
+    stubFrames();
+    dt_stub(0x004dc380, NULL, (void *)stFreeRes);
+    DT_ARG_PTR(c, 0, mkWorld());
+    DT_ARG_PTR(c, 1, mkAtomic());
+    rwtEnd();
+}
+
+/* The RpClumpForAllAtomics callbacks get the atomic first and the world second. */
+static void setup_atomic_callback(DtCtx *c)
+{
+    setup_atomic_world(c);
+    const uint32_t world = c->args[0];
+    c->args[0] = c->args[1];
+    c->args[1] = world;
+}
+
+static void setup_atomic_ties(DtCtx *c)
+{
+    worldEnv(c, 0);
+    DT_ARG_PTR(c, 0, mkAtomic());
+    rwtEnd();
+}
+
+static void setup_light_ties(DtCtx *c)
+{
+    worldEnv(c, 0);
+    RpLight *l = mkLight(NULL, lightType());
+    for (int i = dt_range(0, 3); i > 0; i--) {
+        RpWorldSector *s = mkLeaf(-1);
+        RpLightTie *tie = dt_alloc(sizeof(RpLightTie));
+        tie->light = l;
+        tie->worldSector = s;
+        listAddTail(&s->lightsInWorldSector, &tie->lightInWorldSector);
+        listAddTail(&l->sectors, &tie->worldSectorInLight);
+    }
+    DT_ARG_PTR(c, 0, l);
+    rwtEnd();
+}
+
+static void setup_atomic_ext_init(DtCtx *c)
+{
+    RwGlobals *g = worldEnv(c, 0);
+    *(uint16_t *)((uint8_t *)g + 8) = (uint16_t)dt_u32();
+    DT_ARG_PTR(c, 0, mkAtomic());
+    rwtEnd();
+}
+
+static void setup_clump_copy(DtCtx *c)
+{
+    worldEnv(c, 0);
+    clumpStubs();
+    RpWorld *w = mkWorld();
+    RpClump *src = mkClump(dt_u32() % 3 == 0 ? NULL : w);
+    RpClump *dst = mkClump(dt_u32() % 5 == 0 ? mkWorld() : NULL);
+    DT_ARG_PTR(c, 0, dst);
+    DT_ARG_PTR(c, 1, src);
+    rwtEnd();
+}
+
+static void setup_light_ext_init(DtCtx *c)
+{
+    worldEnv(c, 0);
+    RpLight *l = mkLight(NULL, lightType());
+    l->object.sync = (void *)(uintptr_t)(dt_u32() & ~3U);
+    DT_ARG_PTR(c, 0, l);
+    rwtEnd();
+}
+
+static void setup_light_copy(DtCtx *c)
+{
+    worldEnv(c, 0);
+    stubFrames();
+    RpLight *src = mkLight(dt_u32() % 3 == 0 ? NULL : mkWorld(), lightType());
+    RpLight *dst = mkLight(NULL, lightType());
+    DT_ARG_PTR(c, 0, dst);
+    DT_ARG_PTR(c, 1, src);
+    rwtEnd();
+}
+
+static RwCamera *BMX_CDECL cbCamUpdate(RwCamera *camera)
+{
+    rwtLog(0xca70);
+    rwtLogPtr(camera);
+    return dt_u32() % 4 == 0 ? NULL : camera;
+}
+
+/* A camera whose plugin data holds saved callbacks: callable ones when `callable`, else random addresses. */
+static RwCamera *mkExtCamera(RpWorld *world, int callable)
+{
+    RwCamera *cam = mkCamera(world, dt_range(0, 3));
+    RpWorldCameraData *data = (RpWorldCameraData *)((uint8_t *)cam + kCameraData);
+    data->beginUpdate = callable ? cbCamUpdate : (RwCameraUpdateFunc)(uintptr_t)(dt_u32() & ~3U);
+    data->endUpdate = callable ? cbCamUpdate : (RwCameraUpdateFunc)(uintptr_t)(dt_u32() & ~3U);
+    data->sync = (void *)(uintptr_t)(dt_u32() & ~3U);
+    cam->beginUpdate = (RwCameraUpdateFunc)(uintptr_t)(dt_u32() & ~3U);
+    cam->endUpdate = (RwCameraUpdateFunc)(uintptr_t)(dt_u32() & ~3U);
+    cam->object.sync = (void *)(uintptr_t)(dt_u32() & ~3U);
+    return cam;
+}
+
+static void setup_camera_ext(DtCtx *c)
+{
+    worldEnv(c, 0);
+    DT_ARG_PTR(c, 0, mkExtCamera(dt_u32() % 2 ? NULL : mkWorld(), 0));
+    rwtEnd();
+}
+
+static void setup_camera_copy(DtCtx *c)
+{
+    worldEnv(c, 0);
+    stubFrames();
+    DT_ARG_PTR(c, 0, mkExtCamera(NULL, 0));
+    DT_ARG_PTR(c, 1, mkExtCamera(dt_u32() % 3 == 0 ? NULL : mkWorld(), 0));
+    rwtEnd();
+}
+
+static void setup_camera_update(DtCtx *c)
+{
+    RwGlobals *g = worldEnv(c, 0);
+    g->curWorld = dt_u32() % 2 ? mkWorld() : NULL;
+    g->renderFrame = (uint16_t)(dt_u32() % 4 == 0 ? 0xffff : dt_u32());
+    DT_ARG_PTR(c, 0, mkExtCamera(mkWorld(), 1));
+    rwtEnd();
+}
+
+static void setup_tie_close(DtCtx *c)
+{
+    RwGlobals *g = worldEnv(c, 0);
+    rwFreeListHead.next = rwFreeListHead.prev = &rwFreeListHead;
+    RpTieGlobals *ties = (RpTieGlobals *)((uint8_t *)g + kTieOffset);
+    ties->tieFreeList = dt_u32() % 3 == 0 ? NULL : ORIG_FREELIST_CREATE(0x18, 4, 0);
+    ties->lightTieFreeList = dt_u32() % 3 == 0 ? NULL : ORIG_FREELIST_CREATE(0x18, 4, 0);
+    *(int32_t *)(uintptr_t)0x00676734 = dt_range(1, 3); /* rpTieModuleCount */
+    DT_ARG_PTR(c, 0, dt_alloc(16));
+    rwtEnd();
+}
+
+#define MATERIAL_OFFSET_VAR (*(int32_t *)(uintptr_t)0x00676750)
+#define MATERIAL_COUNT_VAR  (*(int32_t *)(uintptr_t)0x00676754)
+
+static void setup_material_open(DtCtx *c)
+{
+    worldEnv(c, 0);
+    rwFreeListHead.next = rwFreeListHead.prev = &rwFreeListHead;
+    MATERIAL_COUNT_VAR = dt_range(0, 2);
+    DT_ARG_PTR(c, 0, dt_alloc(16));
+    DT_ARG_INT(c, 1, 0x300 + 4 * dt_range(0, 30));
+    gRwtMallocFailAt = dt_u32() % 3 == 0 ? dt_range(1, 3) : 0;
+    gRwtEntryFailAt = dt_u32() % 4 == 0 ? 1 : 0;
+    rwtEnd();
+}
+
+static void setup_material_close(DtCtx *c)
+{
+    RwGlobals *g = worldEnv(c, 0);
+    rwFreeListHead.next = rwFreeListHead.prev = &rwFreeListHead;
+    MATERIAL_OFFSET_VAR = 0x300 + 4 * dt_range(0, 30);
+    MATERIAL_COUNT_VAR = dt_range(1, 3);
+    *(RwFreeList **)((uint8_t *)g + MATERIAL_OFFSET_VAR) =
+        dt_u32() % 3 == 0 ? NULL : ORIG_FREELIST_CREATE(0x18, 5, 0);
+    DT_ARG_PTR(c, 0, dt_alloc(16));
+    rwtEnd();
+}
+
+static void setup_material_ptr(DtCtx *c)
+{
+    worldEnv(c, 0);
+    DT_ARG_PTR(c, 0, mkMaterial());
+    rwtEnd();
+}
+
+static void setup_sector_ptr(DtCtx *c)
+{
+    worldEnv(c, 0);
+    DT_ARG_PTR(c, 0, mkLeaf(-1));
+    rwtEnd();
+}
+
+static void *BMX_CDECL cbSectorRender(RpWorldSector *sector)
+{
+    rwtLog(0x5ec7);
+    rwtLogPtr(sector);
+    return dt_u32() % 2 ? sector : NULL;
+}
+
+static void setup_sector_render(DtCtx *c)
+{
+    RwGlobals *g = worldEnv(c, 0);
+    RpWorld *w = mkWorld();
+    w->renderCallBack = cbSectorRender;
+    g->curWorld = w;
+    DT_ARG_PTR(c, 0, mkLeaf(-1));
+    rwtEnd();
+}
+
+static void setup_sector_find(DtCtx *c)
+{
+    worldEnv(c, 0);
+    void *sector = dt_alloc(8);
+    uint32_t *search = dt_alloc(8);
+    search[0] = (uint32_t)(uintptr_t)(dt_u32() % 2 ? sector : dt_alloc(8));
+    search[1] = dt_u32() % 2;
+    DT_ARG_PTR(c, 0, sector);
+    DT_ARG_PTR(c, 1, search);
+    rwtEnd();
+}
+
+static void collectLeaves(RpSector *s, RpWorldSector **out, int *n)
+{
+    if (s->type < 0) {
+        if (*n < 40) {
+            out[(*n)++] = (RpWorldSector *)s;
+        }
+        return;
+    }
+    collectLeaves(((RpPlaneSector *)s)->leftSubTree, out, n);
+    collectLeaves(((RpPlaneSector *)s)->rightSubTree, out, n);
+}
+
+/* A list of 0..3 worlds, each one block (sectors inside it) or a BSP tree; the sector is one of their leaves,
+ * an address inside a block, or unrelated. */
+static void setup_sector_world(DtCtx *c)
+{
+    RwGlobals *g = worldEnv(c, 1);
+    RpWorldGlobals *globals = (RpWorldGlobals *)((uint8_t *)g + kWorldGlobalsOffset);
+    RpWorldSector *leaves[40];
+    int numLeaves = 0;
+    uint8_t *inside = NULL;
+    for (int n = dt_range(0, 3); n > 0; n--) {
+        RpWorldListEntry *e = dt_alloc(sizeof(RpWorldListEntry));
+        e->world = mkWorld();
+        if (dt_u32() % 2 == 0) {
+            e->world->object.privateFlags = (uint8_t)(1 | dt_u32());
+            e->size = (uint32_t)dt_range(0x90, 0x400);
+            inside = (uint8_t *)e->world + dt_range(0, (int32_t)e->size + 0x40);
+        } else {
+            e->world->object.privateFlags = (uint8_t)(dt_u32() & ~1U);
+            e->world->rootSector = mkTree(dt_range(0, 3));
+            collectLeaves(e->world->rootSector, leaves, &numLeaves);
+        }
+        listAddTail(&globals->worlds, &e->link);
+    }
+    void *sector = dt_alloc(8);
+    switch (dt_u32() % 3) {
+    case 0:
+        if (numLeaves > 0) {
+            sector = leaves[dt_u32() % (uint32_t)numLeaves];
+        }
+        break;
+    case 1:
+        if (inside != NULL) {
+            sector = inside;
+        }
+        break;
+    default:
+        break;
+    }
+    DT_ARG_PTR(c, 0, sector);
+    rwtEnd();
+}
+
 DT_CASES(rwworld_cases) = {
     {"RpWorldAddCamera", 0x004b81f0, RpWorldAddCamera, 2, DT_RET_INT, setup_add_camera, 100, 0},
     {"RpWorldRemoveCamera", 0x004b8240, RpWorldRemoveCamera, 2, DT_RET_INT, setup_remove_camera, 150, 0},
@@ -1039,4 +1431,45 @@ DT_CASES(rwworld_cases) = {
     {"RpPVSStatisticsGet", 0x004cc670, RpPVSStatisticsGet, 3, DT_RET_INT, setup_pvs_stats, 60, 0},
     {"rpPVSCountSectors", 0x004cef40, rpPVSCountSectors, 1, DT_RET_INT, setup_pvs_count, 100, 0},
     {"RpPVSCreate", 0x004ce960, RpPVSCreate, 7, DT_RET_INT, setup_pvs_create, 300, 0},
+    {"rpWorldAddCameraBody", (uint32_t)(uintptr_t)addCameraOrig, addCameraImpl, 2, DT_RET_INT,
+     setup_add_camera_body, 100, 0},
+    {"rpWorldAddClumpBody", (uint32_t)(uintptr_t)addClumpOrig, addClumpImpl, 2, DT_RET_INT,
+     setup_add_clump_body, 150, 0},
+    {"rpWorldAddLightBody", (uint32_t)(uintptr_t)addLightOrig, addLightImpl, 2, DT_RET_INT, setup_add_light,
+     150, 0},
+    {"rpWorldAddAtomicBody", (uint32_t)(uintptr_t)addAtomicOrig, addAtomicImpl, 2, DT_RET_INT,
+     setup_atomic_world, 150, 0},
+    {"rpWorldRemoveAtomicBody", (uint32_t)(uintptr_t)removeAtomicOrig, removeAtomicImpl, 2, DT_RET_INT,
+     setup_atomic_world, 300, 0},
+    {"rpWorldAddAtomicCallback", 0x004b8680, rpWorldAddAtomicCallback, 2, DT_RET_INT, setup_atomic_callback,
+     100, 0},
+    {"rpWorldRemoveAtomicCallback", 0x004b8750, rpWorldRemoveAtomicCallback, 2, DT_RET_INT,
+     setup_atomic_callback, 200, 0},
+    {"rpAtomicTiesDestroy", (uint32_t)(uintptr_t)atomicTiesOrig, atomicTiesImpl, 1, DT_RET_INT,
+     setup_atomic_ties, 200, 0},
+    {"rpLightTiesDestroy", (uint32_t)(uintptr_t)lightTiesOrig, lightTiesImpl, 1, DT_RET_INT, setup_light_ties,
+     150, 0},
+    {"WorldInitAtomicExt", 0x004b9040, WorldInitAtomicExt, 1, DT_RET_INT, setup_atomic_ext_init, 100, 0},
+    {"WorldDeInitAtomicExt", 0x004b9010, WorldDeInitAtomicExt, 1, DT_RET_INT, setup_atomic_ties, 200, 0},
+    {"WorldCopyAtomicExt", 0x004b7b00, WorldCopyAtomicExt, 1, DT_RET_INT, setup_atomic_ties, 20, 0},
+    {"WorldCopyClumpExt", 0x004b7b10, WorldCopyClumpExt, 2, DT_RET_INT, setup_clump_copy, 150, 0},
+    {"WorldInitLightExt", 0x004b8fc0, WorldInitLightExt, 1, DT_RET_INT, setup_light_ext_init, 60, 0},
+    {"WorldDeInitLightExt", 0x004b8fa0, WorldDeInitLightExt, 1, DT_RET_INT, setup_light_ties, 150, 0},
+    {"WorldCopyLightExt", 0x004b7e50, WorldCopyLightExt, 2, DT_RET_INT, setup_light_copy, 100, 0},
+    {"WorldInitCameraExt", 0x004b90c0, WorldInitCameraExt, 1, DT_RET_INT, setup_camera_ext, 60, 0},
+    {"WorldDeInitCameraExt", 0x004b9080, WorldDeInitCameraExt, 1, DT_RET_INT, setup_camera_ext, 100, 0},
+    {"WorldCopyCameraExt", 0x004b77a0, WorldCopyCameraExt, 2, DT_RET_INT, setup_camera_copy, 100, 0},
+    {"WorldCameraBeginUpdate", 0x004b76c0, WorldCameraBeginUpdate, 1, DT_RET_INT, setup_camera_update, 100,
+     0},
+    {"WorldCameraEndUpdate", 0x004b7700, WorldCameraEndUpdate, 1, DT_RET_INT, setup_camera_update, 100, 0},
+    {"_rpTieClose", 0x004b7650, _rpTieClose, 1, DT_RET_INT, setup_tie_close, 60, 0},
+    {"_rpMaterialOpen", 0x004b9150, _rpMaterialOpen, 2, DT_RET_INT, setup_material_open, 60, 0},
+    {"_rpMaterialClose", 0x004b91b0, _rpMaterialClose, 1, DT_RET_INT, setup_material_close, 60, 0},
+    {"RpMaterialGetColor", 0x004b9330, RpMaterialGetColor, 1, DT_RET_INT, setup_material_ptr, 10, 0},
+    {"RpWorldSectorGetBBox", 0x004c2240, RpWorldSectorGetBBox, 1, DT_RET_INT, setup_sector_ptr, 10, 0},
+    {"rpWorldSectorRenderCurrent", 0x004c21e0, rpWorldSectorRenderCurrent, 1, DT_RET_INT, setup_sector_render,
+     30, 0},
+    {"rpWorldSectorFindCallback", 0x004b9d30, rpWorldSectorFindCallback, 2, DT_RET_INT, setup_sector_find, 40,
+     0},
+    {"rpWorldSectorGetWorld", 0x004b9d50, rpWorldSectorGetWorld, 1, DT_RET_INT, setup_sector_world, 400, 0},
 };

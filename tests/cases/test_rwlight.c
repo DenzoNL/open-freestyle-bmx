@@ -76,6 +76,13 @@ static void setup_destroy(DtCtx *c)
     rwtEnd();
 }
 
+/* The free list callback form: the light and the (unused) data word. */
+static void setup_destroy_callback(DtCtx *c)
+{
+    setup_destroy(c);
+    DT_ARG_PTR(c, 1, dt_alloc(8));
+}
+
 static void setup_radius(DtCtx *c)
 {
     texEnv(c);
@@ -158,6 +165,9 @@ static void setup_ext_init(DtCtx *c)
 DT_CASES(rwlight_cases) = {
     {"RpLightCreate", 0x004c2400, RpLightCreate, 1, DT_RET_INT, setup_create, 150, 0},
     {"RpLightDestroy", 0x004c24c0, RpLightDestroy, 1, DT_RET_INT, setup_destroy, 100, 0},
+    {"rpLightFreeListDestroyCB", 0x004c2370, rpLightFreeListDestroyCB, 2, DT_RET_INT, setup_destroy_callback,
+     100, 0},
+    {"rpLightSyncCallback", 0x004c2510, rpLightSyncCallback, 1, DT_RET_INT, setup_light, 10, 0},
     {"RpLightSetRadius", 0x004c2530, RpLightSetRadius, 2, DT_RET_INT, setup_radius, 150, 0},
     {"RpLightGetColor", 0x004c2560, RpLightGetColor, 1, DT_RET_INT, setup_light, 30, 0},
     {"RpLightSetColor", 0x004c2570, RpLightSetColor, 2, DT_RET_INT, setup_color, 600, 0},

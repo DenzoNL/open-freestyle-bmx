@@ -1020,6 +1020,46 @@ int RpGeometryDestroy(RpGeometry *geometry)
     return 1;
 }
 
+/* Bytes of the geometry's chunk: the struct (counts, pre-lit colours, texture coordinates, triangles), the
+ * morph targets, the material list and the plugins. 0 with an error without the geometry module or geometry.
+ */
+BMX_ADDR(0x004b6230)
+int32_t RpGeometryStreamGetSize(const RpGeometry *geometry)
+{
+    if (rpGeometryModuleCount == 0) {
+        rpReport(rwERR_NOTOPEN);
+        return 0;
+    }
+    if (geometry == NULL) {
+        rpReport(rwERR_NULLP);
+        return 0;
+    }
+    const int32_t numVertices = geometry->numVertices;
+    int32_t size = 0x1c;
+    if (numVertices != 0) {
+        if ((geometry->flags & rpGEOMETRYPRELIT) != 0) {
+            size = numVertices * 4 + 0x1c;
+        }
+        if ((geometry->flags & rpGEOMETRYTEXTURED) != 0) {
+            size += numVertices * 8;
+        }
+        size += geometry->numTriangles * 8;
+    }
+    const RpMorphTarget *target = geometry->morphTarget;
+    for (int32_t i = 0; i < geometry->numMorphTargets; i++, target++) {
+        size += 0x18;
+        if (target->verts != NULL) {
+            size += numVertices * 12;
+        }
+        if (target->normals != NULL) {
+            size += numVertices * 12;
+        }
+    }
+    const int32_t materials = _rpMaterialListStreamGetSize(&geometry->matList);
+    const int32_t plugins = _rwPluginRegistryGetSize(&rpGeometryRegistry, geometry);
+    return size + 0xc + materials + 0xc + 0xc + plugins;
+}
+
 /* Reads a geometry chunk: struct, (pre-lit colours, texture coordinates, triangles), morph targets,
  * materials. */
 BMX_ADDR(0x004b68e0)
@@ -2910,9 +2950,25 @@ void *rpClumpDefaultCallback(void *clump)
     return clump;
 }
 
+/* Releases a clump that is still alive when the module closes (EAX = clump); 1. */
+BMX_ADDR(0x004b21e4)
+__attribute__((regparm(1))) int rpClumpEntryDestroy(RpClump *clump)
+{
+    clumpRelease(clump);
+    return 1;
+}
+
+/* The free list callback that calls it. */
+BMX_ADDR(0x004b1060)
+int rpClumpFreeListDestroyCB(void *clump, void *data)
+{
+    (void)data;
+    return rpClumpEntryDestroy(clump);
+}
+
 /*
- * Clump module close: releases the clump pipeline, destroys the clumps and atomics still alive (the clump
- * callback at 0x4b1060 is still original code) and both free lists.
+ * Clump module close: releases the clump pipeline, destroys the clumps and atomics still alive and both free
+ * lists.
  */
 BMX_ADDR(0x004b1080)
 void *_rpClumpClose(void *engine)

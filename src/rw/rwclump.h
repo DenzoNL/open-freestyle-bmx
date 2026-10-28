@@ -118,6 +118,8 @@ RpAtomic *RpAtomicSetGeometry(RpAtomic *atomic, RpGeometry *geometry, uint32_t f
 __attribute__((regparm(1))) void rpAtomicUpdateBoundingSphere(RpAtomic *atomic);
 RpAtomic *rpAtomicSyncCallback(RpAtomic *atomic);
 RpAtomic *rpAtomicRenderCallback(RpAtomic *atomic);
+__attribute__((regparm(1))) int rpClumpEntryDestroy(RpClump *clump);
+int rpClumpFreeListDestroyCB(void *clump, void *data);
 void rpAtomicFreeListDestroyCB(void *atomic, void *data);
 void *rpClumpDefaultCallback(void *clump);
 void *_rpClumpClose(void *engine);
@@ -150,6 +152,7 @@ int RpGeometryDestroy(RpGeometry *geometry);
 uint32_t RpGeometryGetFlags(const RpGeometry *geometry);
 RpGeometry *RpGeometrySetFlags(RpGeometry *geometry, uint32_t flags);
 RpGeometry *RpGeometryStreamRead(RwStream *stream);
+int32_t RpGeometryStreamGetSize(const RpGeometry *geometry);
 
 /* ---- materials and material lists ------------------------------------------------------------------- */
 
