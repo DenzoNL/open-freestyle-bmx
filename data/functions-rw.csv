@@ -488,10 +488,9 @@ addr,size,file,confidence,name,status
 004cc0f0,119,rw/world.c,closure,FUN_004cc0f0,ported
 004cc1f0,122,rw/world.c,closure,FUN_004cc1f0,orig
 004cc270,77,rw/world.c,closure,FUN_004cc270,ported
-004cc2c0,4,rw/world.c,closure,FUN_004cc2c0,ported
 004cc2c4,56,rw/world.c,closure,FUN_004cc2c4,orig
 004cc300,18,rw/world.c,closure,FUN_004cc300,orig
-004cc320,4,rw/world.c,closure,FUN_004cc320,ported
+004cc320,4,rw/core.c,closure,FUN_004cc320,orig
 004cc324,154,rw/world.c,closure,FUN_004cc324,orig
 004cc3c0,269,rw/world.c,closure,FUN_004cc3c0,orig
 004cc4e0,34,rw/world.c,closure,FUN_004cc4e0,orig

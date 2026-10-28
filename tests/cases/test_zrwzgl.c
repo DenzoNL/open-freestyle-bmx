@@ -13,6 +13,7 @@
 #include "dt_zmem.h"
 
 #include "compat/crt.h"
+#include "rw/rwworld.h"
 #include "zge/com/zglrw/zrwzgl.h"
 #include "zge/zdebug.h"
 
@@ -668,7 +669,7 @@ static void stubFrame(void)
     dt_stub(0x004cc270, NULL, (void *)sLightBegin);
     dt_stub(0x004cc510, NULL, (void *)sLightMatrix);
     dt_stub(0x004cc670, NULL, (void *)sLightParams);
-    dt_stub(0x004cc2c0, NULL, (void *)sLightEnd);
+    dt_stub(0x004cc2c0, (void *)RpPVSUnhook, (void *)sLightEnd);
     dt_stub(0x004db820, NULL, (void *)sRenderState);
 }
 

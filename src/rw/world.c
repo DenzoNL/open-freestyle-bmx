@@ -1155,9 +1155,9 @@ RpWorld *RpPVSHook(RpWorld *world)
 /*
  * Puts the world's own render callback back. The original is a four byte stub that loads the argument into
  * EAX and falls into this. Its jmp overwrites the first byte of the body 0x4cc2c4, which PVSWorldDestructor
- * (0x4cc710, original) still calls directly: allowlisted in gen_hooks.py until that caller is ported.
+ * (0x4cc710, original) still calls directly: not hooked until that caller is ported (gen_hooks.py checks
+ * this); ported callers call this function.
  */
-BMX_ADDR(0x004cc2c0)
 RpWorld *RpPVSUnhook(RpWorld *world)
 {
     if (world != NULL) {
@@ -1171,8 +1171,7 @@ RpWorld *RpPVSUnhook(RpWorld *world)
 }
 
 /* Frees the PVS data of the world and of its sectors. Stub at 0x4cc320 and tail ported as one, like above;
- * allowlisted in gen_hooks.py until 0x4cc850 (original, calls the body 0x4cc324) is ported. */
-BMX_ADDR(0x004cc320)
+ * not hooked until 0x4cc850 (original, calls the body 0x4cc324) is ported. */
 RpWorld *RpPVSUnload(RpWorld *world)
 {
     if (world != NULL) {

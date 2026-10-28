@@ -35,15 +35,12 @@ def main():
     # that original callers call directly).
     import csv
 
-    # Known overlaps, to remove once the original callers of the bodies (0x4cc710 -> 0x4cc2c4, 0x4cc850 -> 0x4cc324)
-    # are ported and the bodies can be folded like 0x4b21e4.
-    allowed = {0x4CC2C4, 0x4CC324}
     for table in ("functions.csv", "functions-rw.csv"):
         path = Path(src).parent / "data" / table
         if path.exists():
             for row in csv.DictReader(path.open()):
                 b = int(row["addr"], 16)
-                if row["status"] == "orig" and b not in allowed and any(b - d in hooks for d in range(1, 5)):
+                if row["status"] == "orig" and any(b - d in hooks for d in range(1, 5)):
                     sys.exit(f"{table}: {b:#x} (orig) starts inside the 5 byte jmp of a hook just before it")
     lines = ['#include "hook/hook.h"', ""]
     lines += [f"void {name}(void);" for name in sorted(set(hooks.values()))]

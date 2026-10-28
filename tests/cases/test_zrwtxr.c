@@ -8,6 +8,7 @@
 #include "dt.h"
 #include "dt_ngif.h"
 #include "dt_zmem.h"
+#include "rw/rwworld.h"
 #include "zge/com/zglrw/zrwtxr.h"
 #include "zge/zfile.h"
 #include "zge/zlist.h"
@@ -664,7 +665,7 @@ static void env(const DtCtx *c)
     dt_stub(0x483f10, NULL, (void *)stubDefaultDevice);
     dt_stub(0x483d30, NULL, (void *)stubDeviceControl);
     dt_stub(0x4cc640, NULL, (void *)stubPvsReady);
-    dt_stub(0x4cc320, NULL, (void *)stubPvsUnload);
+    dt_stub(0x4cc320, (void *)RpPVSUnload, (void *)stubPvsUnload);
     dt_stub(0x4ba9c0, NULL, (void *)stubWorldDestroy);
     dt_stub(0x4bb080, NULL, (void *)stubWorldCreate);
     dt_stub(0x4ba050, NULL, (void *)stubWorldOrigin);

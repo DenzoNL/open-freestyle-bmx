@@ -6,6 +6,7 @@
 #include "dt.h"
 #include "dt_s5.h"
 #include "dt_zmem.h"
+#include "rw/rwworld.h"
 #include "zge/com/zglrw/zrwcam.h"
 #include "zge/com/zglrw/zrwmodelcreate.h"
 #include "zge/com/zglrw/zrwtxr.h"
@@ -548,7 +549,7 @@ static void worldStubs(void)
     S5_ON(0x48ab10, sSetBounds);
     S5_ON(0x4ba9c0, sWorldDestroy);
     S5_ON(0x4cc640, sPvsReady);
-    S5_ON(0x4cc320, sPvsUnload);
+    dt_stub(0x4cc320, (void *)RpPVSUnload, (void *)sPvsUnload);
     S5_ON(0x4dc6e0, sResources);
     s5SetRet(0x48c260, (uint32_t)(uintptr_t)handle());
     s5SetRet(0x4cc640, dt_u32() % 2);
