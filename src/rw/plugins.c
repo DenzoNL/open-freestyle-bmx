@@ -738,6 +738,269 @@ void *WorldObjectClose(void *engine)
     return engine;
 }
 
+/* ---- animation plugin: sequences of a clump --------------------------------------------------------- */
+
+/* A sequence of one frame: keyframes of 0xc bytes, the time at +8. */
+typedef struct RpAnimFrameSequence {
+    uint32_t pad00;
+    const char *name; /* 0x04 */
+    uint8_t pad08[0xc];
+    int32_t numKeys; /* 0x14 */
+    uint8_t *keys;   /* 0x18 */
+} RpAnimFrameSequence;
+
+typedef struct RpAnimFrameLink {
+    RpAnimFrameSequence *sequence;
+    struct RpAnimFrameLink *next;
+} RpAnimFrameLink;
+
+/* What the plugin keeps per frame (the pointer at RwFrame + rpAnimFrameOffset): two lists of sequences. */
+typedef struct RpAnimFrameData {
+    uint32_t pad00;
+    RpAnimFrameLink *listA; /* 0x04 */
+    uint32_t pad08;
+    RpAnimFrameLink *listB; /* 0x0c */
+} RpAnimFrameData;
+
+/* A frame's sequence in play: the sequence, its keys and a cursor (0xc bytes, malloc'd). */
+typedef struct RpAnimInstance {
+    RpAnimFrameSequence *sequence;
+    uint8_t *keys;
+    int32_t current;
+} RpAnimInstance;
+
+/* One animated frame of a clump sequence (0x3c bytes, 0x4fc4f0). 0x5029e0 frees the instances (from +4). */
+typedef struct RpAnimNode {
+    RwFrame *frame;          /* 0x00 */
+    int32_t state;           /* 0x04 */
+    uint8_t pad08[0x28];     /* 0x08 */
+    RpAnimInstance *a;       /* 0x30 from the frame's list A */
+    RpAnimInstance *b;       /* 0x34 from list B */
+    struct RpAnimNode *next; /* 0x38 */
+} RpAnimNode;
+
+/* A named sequence of a clump (0x24 bytes): the nodes of the frames that have it and its play callback. */
+typedef struct RpAnimClumpSequence {
+    char *name;                       /* 0x00 */
+    float duration;                   /* 0x04 the longest of the frames' key time sums */
+    int32_t pad08;                    /* 0x08 */
+    int32_t pad0c;                    /* 0x0c */
+    int32_t pad10;                    /* 0x10 */
+    RpAnimNode *nodes;                /* 0x14 */
+    void *callBack;                   /* 0x18 */
+    void *data;                       /* 0x1c */
+    struct RpAnimClumpSequence *next; /* 0x20 */
+} RpAnimClumpSequence;
+
+/* The plugin's data in a clump (at rpAnimClumpOffset): the frames, and two sequence lists behind a head. */
+typedef struct RpAnimClumpData {
+    int32_t numSequences;           /* 0x00 */
+    RwFrameList frameList;          /* 0x04 */
+    RpAnimClumpSequence *sequences; /* 0x0c head element, the new ones go after it */
+    RpAnimClumpSequence *others;    /* 0x10 */
+} RpAnimClumpData;
+
+_Static_assert(sizeof(RpAnimNode) == 0x3c, "RpAnimNode layout");
+_Static_assert(sizeof(RpAnimClumpSequence) == 0x24, "RpAnimClumpSequence layout");
+
+/* The walk's data for the children of the clump's frame (0x4fc540 appends their nodes). */
+typedef struct RpAnimNodeSearch {
+    RpAnimNode *nodes;
+    const char *name;
+} RpAnimNodeSearch;
+
+ORIG_FN(0x004fc4f0, RpAnimNode *, rpAnimNodeCreate, (void));
+ORIG_FN(0x005029e0, void *, rpAnimInterpolatorDeinit, (void *interpolator));
+#define CB_ANIM_FIND_NODES   RW_CB(RwObjectCallBack, 0x004fc540)
+#define CB_ANIM_DEFAULT_PLAY 0x00502990
+#define rpAnimDurationStart  ORIG_VAR(0x0069c63c, float, rpAnimDurationStart)
+#define rpAnimSumStartA      ORIG_VAR(0x0069c640, float, rpAnimSumStartA)
+#define rpAnimSumStartB      ORIG_VAR(0x0069c644, float, rpAnimSumStartB)
+
+static int animStrcmp(const char *a, const char *b)
+{
+    return ((int(BMX_CDECL *)(const char *, const char *))RwEngineInstance->stringFuncs.rwstrcmp)(a, b);
+}
+
+static void *animMalloc(size_t size)
+{
+    return RwEngineInstance->memoryFuncs.rwmalloc(size);
+}
+
+static RpAnimFrameSequence *animFindSequence(const RpAnimFrameLink *link, const char *name)
+{
+    for (; link != NULL; link = link->next) {
+        if (animStrcmp(link->sequence->name, name) == 0) {
+            return link->sequence;
+        }
+    }
+    return NULL;
+}
+
+/* An instance of the sequence for a node (NULL without memory). */
+static RpAnimInstance *animInstance(RpAnimFrameSequence *sequence)
+{
+    RpAnimInstance *instance = animMalloc(sizeof *instance);
+    if (instance == NULL) {
+        return NULL;
+    }
+    instance->current = 0;
+    instance->keys = NULL;
+    instance->sequence = NULL;
+    instance->sequence = sequence;
+    instance->current = 0;
+    instance->keys = sequence->keys;
+    return instance;
+}
+
+static void animNodeFree(RpAnimNode *node)
+{
+    rpAnimInterpolatorDeinit(&node->state);
+    RwEngineInstance->memoryFuncs.rwfree(node);
+}
+
+/* max(start, the sums of key times (from sumStart) of the matching sequences in the list), in double. */
+static double animLongest(const RpAnimFrameLink *link, const char *name, double longest, float sumStart)
+{
+    for (; link != NULL; link = link->next) {
+        if (animStrcmp(link->sequence->name, name) != 0) {
+            continue;
+        }
+        double sum = sumStart;
+        const RpAnimFrameSequence *sequence = link->sequence;
+        for (int32_t i = 0; i < sequence->numKeys; i++) {
+            float time;
+            memcpy(&time, sequence->keys + i * 0xc + 8, sizeof time);
+            sum += time;
+        }
+        if (sum > longest) {
+            longest = sum;
+        }
+    }
+    return longest;
+}
+
+/*
+ * Adds the sequence `name` to the clump (WorldCopyClumpExt copies a clump's sequences with it): fails when
+ * the clump has it already or has no frame. Collects a node for the clump's frame and (0x4fc540) every frame
+ * below it that has a sequence of that name, then puts a new clump sequence after the head of the clump's
+ * list (callBack NULL: the default player), its duration the longest sum of key times. NULL on failure
+ * (without memory the nodes and the sequence leak, as in the original).
+ */
+BMX_ADDR(0x004fc7fc)
+__attribute__((regparm(3))) RpClump *rpAnimClumpAddSequence(RpClump *clump, const char *name, void *callBack,
+                                                            uint32_t unused0, uint32_t unused1,
+                                                            uint32_t unused2, void *data)
+{
+    (void)unused0;
+    (void)unused1;
+    (void)unused2;
+    RpAnimClumpData *anim = (RpAnimClumpData *)((uint8_t *)clump + rpAnimClumpOffset);
+    for (const RpAnimClumpSequence *s = anim->others; s != NULL; s = s->next) {
+        if (animStrcmp(s->name, name) == 0) {
+            return NULL;
+        }
+    }
+    for (const RpAnimClumpSequence *s = anim->sequences; s != NULL; s = s->next) {
+        if (animStrcmp(s->name, name) == 0) {
+            return NULL;
+        }
+    }
+    RwFrame *frame = clump->object.parent;
+    if (frame == NULL) {
+        return NULL;
+    }
+    if (anim->frameList.frames == NULL && _rwFrameListInitialize(&anim->frameList, frame) == NULL) {
+        return NULL;
+    }
+    RpAnimNodeSearch search;
+    search.name = name;
+    search.nodes = NULL;
+    const RpAnimFrameData *frameData = *(RpAnimFrameData **)((uint8_t *)frame + rpAnimFrameOffset);
+    int walk = 1;
+    if (frameData != NULL) {
+        RpAnimFrameSequence *a = animFindSequence(frameData->listA, name);
+        RpAnimFrameSequence *b = animFindSequence(frameData->listB, name);
+        if (a != NULL || b != NULL) {
+            RpAnimNode *node = rpAnimNodeCreate();
+            walk = 0;
+            if (node != NULL) {
+                node->frame = frame;
+                int ok = 1;
+                if (a != NULL) {
+                    node->a = animInstance(a);
+                    ok = node->a != NULL;
+                }
+                if (ok && b != NULL) {
+                    node->b = animInstance(b);
+                    ok = node->b != NULL;
+                    if (ok) {
+                        node->state = 2;
+                    }
+                }
+                if (ok) {
+                    node->state = 3;
+                    node->next = search.nodes;
+                    search.nodes = node;
+                    node->frame = frame;
+                    walk = 1;
+                } else {
+                    animNodeFree(node);
+                }
+            }
+        }
+    }
+    if (walk) {
+        RwFrameForAllChildren(frame, CB_ANIM_FIND_NODES, &search);
+    }
+    if (search.nodes == NULL) {
+        return NULL;
+    }
+    RpAnimClumpSequence *sequence = animMalloc(sizeof *sequence);
+    if (sequence != NULL) {
+        char *copy = NULL;
+        if (name != NULL) {
+            const size_t length =
+                ((size_t(BMX_CDECL *)(const char *))RwEngineInstance->stringFuncs.rwstrlen)(name);
+            copy = animMalloc(length + 1);
+            if (copy != NULL) {
+                RwEngineInstance->stringFuncs.rwstrcpy(copy, name);
+            }
+        }
+        if (copy == NULL) {
+            sequence = NULL;
+        } else {
+            sequence->name = copy;
+            sequence->pad10 = 0;
+            sequence->nodes = NULL;
+            sequence->callBack = NULL;
+            sequence->data = NULL;
+            sequence->next = NULL;
+            sequence->pad08 = 0;
+            sequence->duration = 0.0F;
+            sequence->pad0c = 1;
+        }
+    }
+    if (sequence == NULL) {
+        animNodeFree(search.nodes);
+        return NULL;
+    }
+    sequence->nodes = search.nodes;
+    sequence->callBack = callBack != NULL ? callBack : RW_CB(void *, CB_ANIM_DEFAULT_PLAY);
+    sequence->data = data;
+    anim->numSequences++;
+    double longest = rpAnimDurationStart;
+    sequence->next = anim->sequences->next;
+    anim->sequences->next = sequence;
+    for (const RpAnimNode *node = search.nodes; node != NULL; node = node->next) {
+        const RpAnimFrameData *nodeData = *(RpAnimFrameData **)((uint8_t *)node->frame + rpAnimFrameOffset);
+        longest = animLongest(nodeData->listA, name, longest, rpAnimSumStartA);
+        longest = animLongest(nodeData->listB, name, longest, rpAnimSumStartB);
+    }
+    sequence->duration = (float)longest;
+    return clump;
+}
+
 /* ---- LOD atomic plugin (id 0x112): the per-atomic data, its render hook and its stream callbacks ------- */
 
 static RpLodAtomicData **lodSlot(const void *object, int32_t offset)

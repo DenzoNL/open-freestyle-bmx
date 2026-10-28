@@ -5,6 +5,7 @@
  */
 #include "dt.h"
 #include "dt_rw.h"
+#include "rw/rwclump.h"
 #include "rw/rwcore.h"
 #include "rw/rwplugins.h"
 
@@ -613,7 +614,226 @@ static void setup_invert_general(DtCtx *c)
     invert_setup(c, dt_u32() % 3);
 }
 
+/* ---- animation plugin: adding a sequence to a clump --------------------------------------------------- */
+
+enum { kAnimClumpOffset = 0x40, kAnimClumpBytes = 0x60, kAnimNames = 4 };
+
+static const char *gAnimNames[kAnimNames]; /* in the DLL heap: the same pointers on both sides */
+
+static int BMX_CDECL animStrcmpStub(const char *a, const char *b)
+{
+    rwtLog(0x51ddf0);
+    rwtLogPtr(a);
+    rwtLogPtr(b);
+    while (*a != 0 && *a == *b) {
+        a++;
+        b++;
+    }
+    return (int)(uint8_t)*a - (int)(uint8_t)*b;
+}
+
+static size_t BMX_CDECL animStrlenStub(const char *s)
+{
+    rwtLog(0x4a8c20);
+    rwtLogPtr(s);
+    size_t n = 0;
+    while (s[n] != 0) {
+        n++;
+    }
+    return n;
+}
+
+static char *BMX_CDECL animStrcpyStub(char *dst, const char *src)
+{
+    rwtLog(0x4a8ca0);
+    rwtLogPtr(dst);
+    rwtLogPtr(src);
+    char *d = dst;
+    while ((*d++ = *src++) != 0) {
+    }
+    return dst;
+}
+
+static int gAnimNodeCalls, gAnimNodeFailAt;
+
+/* 0x4fc4f0: a zeroed node (as 0x502a30 leaves it), failing at the n-th call. */
+static void *BMX_CDECL animNodeCreateStub(void)
+{
+    rwtLog(0x4fc4f0);
+    gAnimNodeCalls++;
+    if (gAnimNodeFailAt != 0 && gAnimNodeCalls == gAnimNodeFailAt) {
+        return NULL;
+    }
+    return dt_alloc(0x3c);
+}
+
+static void *BMX_CDECL animInterpDeinitStub(void *interpolator)
+{
+    rwtLog(0x5029e0);
+    rwtLogPtr(interpolator);
+    rwtLogWords((const uint8_t *)interpolator + 0x2c, 2);
+    return interpolator;
+}
+
+/* A sequence of a frame: a name from the pool, keyframes of 0xc bytes with the time at +8. */
+static void *animFrameSequence(void)
+{
+    uint8_t *seq = dt_alloc(0x20);
+    *(const char **)(seq + 4) = gAnimNames[dt_range(0, kAnimNames - 1)];
+    const int32_t n = dt_u32() % 8 == 0 ? -dt_range(0, 2) : dt_range(0, 5);
+    *(int32_t *)(seq + 0x14) = n;
+    uint8_t *keys = dt_alloc(6 * 0xc);
+    for (int i = 0; i < 6; i++) {
+        const float t = dt_u32() % 10 == 0 ? dt_float(-1e6F, 1e6F) : dt_float_edgy(-2.0F, 10.0F);
+        __builtin_memcpy(keys + i * 0xc + 8, &t, 4);
+        *(uint32_t *)(keys + i * 0xc) = dt_u32();
+    }
+    *(uint8_t **)(seq + 0x18) = keys;
+    return seq;
+}
+
+/* A list of {sequence, next} links (0..3 of them). */
+static void *animFrameList(void)
+{
+    void *head = NULL;
+    const int n = dt_range(0, 3);
+    for (int i = 0; i < n; i++) {
+        void **link = (void **)dt_alloc(8);
+        link[0] = animFrameSequence();
+        link[1] = head;
+        head = (void *)link;
+    }
+    return head;
+}
+
+/* A frame with the plugin's data (two lists of sequences) or, now and then, none. */
+static RwFrame *animFrame(int withData)
+{
+    RwFrame *frame = dt_alloc(sizeof(RwFrame) + 8);
+    void **data = NULL;
+    if (withData) {
+        data = (void **)dt_alloc(0x10);
+        data[1] = animFrameList();
+        data[3] = animFrameList();
+    }
+    *(void ***)((uint8_t *)frame + sizeof(RwFrame)) = data;
+    return frame;
+}
+
+/* RwFrameForAllChildren with 0x4fc540: logs, and puts nodes of animated child frames on the search list. */
+static RwFrame *BMX_CDECL animForAllChildrenStub(RwFrame *frame, RwObjectCallBack callback, void *data)
+{
+    rwtLog(0x4d2eb0);
+    rwtLogPtr(frame);
+    rwtLog((uint32_t)(uintptr_t)callback);
+    rwtLogPtr(data);
+    void **search = (void **)data;
+    rwtLogPtr(search[0]);
+    rwtLogPtr(search[1]);
+    const int n = dt_range(0, 2);
+    for (int i = 0; i < n; i++) {
+        uint8_t *node = dt_alloc(0x3c);
+        *(RwFrame **)node = animFrame(1);
+        *(int32_t *)(node + 4) = 3;
+        *(void **)(node + 0x38) = search[0];
+        search[0] = node;
+    }
+    return frame;
+}
+
+static RwFrameList *BMX_CDECL animFrameListStub(RwFrameList *list, RwFrame *root)
+{
+    rwtLog(0x4e96d0);
+    rwtLogPtr(list);
+    rwtLogPtr(root);
+    if (dt_u32() % 4 == 0) {
+        return NULL;
+    }
+    list->frames = (RwFrame **)dt_alloc(8);
+    list->numFrames = 1;
+    return list;
+}
+
+/* A clump sequence (0x24 bytes) with a name from the pool, chained to `next`. */
+static uint8_t *animClumpSequence(void *next)
+{
+    uint8_t *seq = dt_alloc(0x24);
+    *(const char **)seq = gAnimNames[dt_range(0, kAnimNames - 1)];
+    *(void **)(seq + 0x20) = next;
+    return seq;
+}
+
+typedef RpClump *(__attribute__((regparm(3))) * AnimAddFn)(RpClump *, const char *, void *, uint32_t,
+                                                           uint32_t, uint32_t, void *);
+
+static RpClump *anim_add_orig(RpClump *clump, const char *name, void *callBack, void *data)
+{
+    return ((AnimAddFn)(uintptr_t)0x004fc7fc)(clump, name, callBack, 0, 0, 0, data);
+}
+
+static RpClump *anim_add_impl(RpClump *clump, const char *name, void *callBack, void *data)
+{
+    return rpAnimClumpAddSequence(clump, name, callBack, 0, 0, 0, data);
+}
+
+/*
+ * A clump with the plugin's data (a head sequence and maybe more, maybe a second list, a frame list or none)
+ * and a frame that has or lacks the sequence; the children walk adds 0..2 more nodes. Failures of the node,
+ * instance, sequence and name allocations, the frame list, a clump without a frame, names already present.
+ */
+static void setup_anim_add(DtCtx *c)
+{
+    dt_seed(c);
+    RwGlobals *g = rwtEnv();
+    g->stringFuncs.rwstrcmp = (void *)animStrcmpStub;
+    g->stringFuncs.rwstrlen = (void *)animStrlenStub;
+    g->stringFuncs.rwstrcpy = animStrcpyStub;
+    static const char *const kNames[kAnimNames] = {"walk", "run", "jump", "idle"};
+    for (int i = 0; i < kAnimNames; i++) {
+        char *s = dt_alloc(8);
+        __builtin_memcpy(s, kNames[i], __builtin_strlen(kNames[i]) + 1);
+        gAnimNames[i] = s;
+    }
+    rpAnimClumpOffset = kAnimClumpOffset;
+    rpAnimFrameOffset = (int32_t)sizeof(RwFrame);
+    dt_stub(0x004fc4f0, NULL, (void *)animNodeCreateStub);
+    dt_stub(0x005029e0, NULL, (void *)animInterpDeinitStub);
+    dt_stub(0x004d2eb0, NULL, (void *)animForAllChildrenStub);
+    dt_stub(0x004e96d0, NULL, (void *)animFrameListStub);
+    RpClump *clump = dt_alloc(kAnimClumpBytes);
+    uint8_t *ext = (uint8_t *)clump + kAnimClumpOffset;
+    *(int32_t *)ext = dt_range(0, 5);
+    *(void **)(ext + 4) = dt_u32() % 3 == 0 ? NULL : dt_alloc(8);
+    void *rest = NULL;
+    for (int i = dt_range(0, 2); i > 0; i--) {
+        rest = animClumpSequence(rest);
+    }
+    *(void **)(ext + 0xc) = animClumpSequence(rest);
+    rest = NULL;
+    for (int i = dt_range(0, 2); i > 0; i--) {
+        rest = animClumpSequence(rest);
+    }
+    *(void **)(ext + 0x10) = rest;
+    clump->object.parent = dt_u32() % 10 == 0 ? NULL : animFrame(dt_u32() % 5 != 0);
+    gAnimNodeCalls = 0;
+    gAnimNodeFailAt = dt_u32() % 8 == 0 ? 1 : 0;
+    const char *name = gAnimNames[dt_range(0, kAnimNames - 1)];
+    if (dt_u32() % 6 == 0) {
+        char *other = dt_alloc(8);
+        __builtin_memcpy(other, "kick", 5);
+        name = other;
+    }
+    rwtEnd();
+    gRwtMallocFailAt = dt_u32() % 5 == 0 ? dt_range(1, 5) : 0;
+    DT_ARG_PTR(c, 0, clump);
+    DT_ARG_PTR(c, 1, name);
+    DT_ARG_PTR(c, 2, dt_u32() % 2 == 0 ? NULL : (void *)(uintptr_t)0x12345678);
+    DT_ARG_PTR(c, 3, dt_alloc(4));
+}
+
 DT_CASES(rwplugins_cases) = {
+    {"rpAnimClumpAddSequence", (uint32_t)(uintptr_t)anim_add_orig, anim_add_impl, 4, DT_RET_INT,
+     setup_anim_add, 1500, 0},
     {"RpAtomicRegisterPlugin", 0x004b3190, RpAtomicRegisterPlugin, 5, DT_RET_INT, setup_atomic_register, 150,
      0},
     {"RpClumpRegisterPlugin", 0x004b31e0, RpClumpRegisterPlugin, 5, DT_RET_INT, setup_clump_register, 150, 0},

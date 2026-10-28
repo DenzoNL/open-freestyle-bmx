@@ -26,6 +26,9 @@ label contains "D3D". Their closure (direct calls, plus the pointers the driver 
 camera/raster plugin constructors), minus everything the non-driver roots reach, goes to file
 `lib/d3d7driver`, group rw/driver, status `skip`.
 
+Reclassified ranges (RECLASS): render-only code to `lib/d3d7driver`, CRT duplicates to `lib/crt`, and code the game
+never reaches (checked by an in-game breakpoint trace) to `lib/unreached`.
+
 Skipped functions (status `skip`, file `lib/crt`, `lib/libpng` or `lib/zlib`) are not ported, because
 the replacement uses the platform CRT or a real image decoder:
   - CRT: the statically linked MSVC CRT sits in two blocks, 0x4a4a80..0x4b0000 (malloc/heap, stdio,
@@ -126,6 +129,11 @@ RECLASS = [
     # The CRT layer already implements these string helpers the engine's string table points at.
     (0x4EE1D0, 0x4EE300, "lib/crt", "rwstricmp, rwstrupr, rwstrlwr, rwstrchr, rwstrrchr (crt.c)"),
     (0x4E8290, 0x4E82D0, "lib/crt", "rwfexist (crt.c)"),
+    # Tri-strip generator behind _rpMeshGenerate (0x4c4a30, ported; it calls 0x4c6490/0x4c7560 only for geometry
+    # flagged rpGEOMETRYTRISTRIP). Never reached in game: an in-game breakpoint trace (2026-10-28, boot, menus, level
+    # load and riding) hit _rpMeshGenerate but none of 0x4c60a0..0x4c8870. bmxnative's trap handler names them if a
+    # later run does reach them.
+    (0x4C60A0, 0x4C8BA0, "lib/unreached", "tri-strip generator (not called by the game, in-game trace)"),
 ]
 
 

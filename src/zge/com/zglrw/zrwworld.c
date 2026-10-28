@@ -30,7 +30,6 @@ void zrwShowRaster(int vsync);
 void zrwDbgPrintDirect(const char *text, int x, int y);
 
 typedef void *(BMX_CDECL *ZrwForAllFn)(void *item, void *arg);
-ORIG_FN(0x004bb080, void *, RpWorldCreate, (const float *bbox));
 ORIG_FN(0x00492eb0, uint8_t *, zrwGetCurrentCamera, (void));
 ORIG_FN(0x00492f00, int, zrwcamBegin, (void *camera));
 ORIG_FN(0x00492fe0, int, zrwcamEnd, (void));
@@ -381,7 +380,7 @@ int zrwCreateWorld(void)
     }
     memset(&gZrwWorldReady, 0, 0xac);
     gZrwWorldMaterials = zlistCreate(0x100);
-    world = RpWorldCreate(box);
+    world = RpWorldCreate((const RwBBox *)box);
     if (world == NULL) {
         return 0;
     }
@@ -410,7 +409,7 @@ int zrwWorldShutdown(void)
                 RpWorldDestroy(gZrwWorld);
                 gZrwWorld = NULL;
             }
-            world = RpWorldCreate(box);
+            world = RpWorldCreate((const RwBBox *)box);
             if (world != NULL) {
                 gZrwWorld = world;
                 setWorldBounds(world);

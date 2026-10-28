@@ -113,6 +113,13 @@ RpWorldSector *_rpCollSectorTrianglesSphere(RpIntersection *intersection, RpWorl
                                             RpCollisionQuery *query);
 RpWorldSector *_rpCollSectorTrianglesBox(RpIntersection *intersection, RpWorldSector *sector,
                                          RpCollisionQuery *query);
+RpWorldSector *_rpCollSectorTrianglesLine(RpIntersection *intersection, RpWorldSector *sector,
+                                          RpCollisionQuery *query);
+/* Line (start, unit direction, length) against the triangle a, b, c: 1 and the hit as a fraction of the
+ * length in *distance. EAX = start, EDX = direction, ECX = a, b / c / distance in the 5th to 7th stack slots,
+ * the length in ST0 (popped) (asm entry). */
+int32_t _rpCollLineTriangleIntersect(uint32_t unused0, uint32_t unused1, uint32_t unused2, uint32_t unused3,
+                                     const RwV3d *b, const RwV3d *c, float *distance);
 
 /* World walkers for one volume type (EAX = world, EDX = volume, ECX = user callback). */
 __attribute__((regparm(3))) RpWorld *_rpCollWorldAtomicsPoint(RpWorld *world, const RwV3d *point,

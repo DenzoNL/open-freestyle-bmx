@@ -8,9 +8,7 @@
 #include "compat/crt.h"
 #include "rw/rwcollision.h"
 
-/* The line tests of one world sector (against its triangles / the atomics in it); not ported yet. */
-ORIG_FN(0x004be560, RpWorldSector *, _rpCollSectorTrianglesLine,
-        (RpIntersection * intersection, RpWorldSector *sector, RpCollisionQuery *query));
+/* The line test of the atomics in one world sector; not ported yet. */
 ORIG_FN(0x004bdde0, RpWorldSector *, _rpCollSectorAtomicsLine,
         (RpIntersection * intersection, RpWorldSector *sector, RpCollisionQuery *query));
 
@@ -1255,6 +1253,153 @@ RpWorldSector *_rpCollSectorTrianglesBox(RpIntersection *intersection, RpWorldSe
                                    &matrix);
 }
 
+/*
+ * Line against a triangle (Moeller-Trumbore with a unit direction): 1 when the line from `start` along `dir`
+ * meets the triangle a, b, c within `length`, with the hit in *distance as a fraction of the length.
+ * *distance gets the unscaled distance already when that is in front of the start but beyond the length.
+ */
+__attribute__((used, noinline)) static int32_t rpCollLineTriangleImpl(const RwV3d *start, const RwV3d *dir,
+                                                                      const RwV3d *a, const RwV3d *b,
+                                                                      const RwV3d *c, float *distance,
+                                                                      double length)
+{
+    const double e2y = (double)c->y - a->y, e2x = (double)c->x - a->x, e2z = (double)c->z - a->z;
+    const double e1z = (double)b->z - a->z, e1y = (double)b->y - a->y, e1x = (double)b->x - a->x;
+    const double pz = dir->x * e2y - dir->y * e2x;
+    const double py = e2x * dir->z - dir->x * e2z;
+    const double px = e2z * dir->y - e2y * dir->z;
+    const double det = ((pz * e1z) + (py * e1y)) + (px * e1x);
+    if (0x1.0c6f7ap-20 >= det) {
+        return 0;
+    }
+    const double tz = (double)start->z - a->z, ty = (double)start->y - a->y, tx = (double)start->x - a->x;
+    const double u = ((pz * tz) + (py * ty)) + (px * tx);
+    if (0.0 > u || u > det) {
+        return 0;
+    }
+    const double qz = tx * e1y - ty * e1x;
+    const double qy = e1x * tz - tx * e1z;
+    const double qx = e1z * ty - tz * e1y;
+    const double v = dir->x * qx + (dir->z * qz + dir->y * qy);
+    if (0.0 > v || v + u > det) {
+        return 0;
+    }
+    const double t = ((e2z * qz) + (qy * e2y)) + (qx * e2x);
+    const double limit = det * length;
+    *distance = (float)t;
+    if (0.0 > t || t > limit) {
+        return 0;
+    }
+    *distance = (float)(t / limit);
+    return 1;
+}
+
+/* The original's entry: EAX = start, EDX = dir, ECX = a, b / c / distance 0x10 / 0x14 / 0x18 bytes above the
+ * return address's slot and the length in ST0 (popped). */
+BMX_ADDR(0x004beab0)
+__attribute__((naked)) int32_t _rpCollLineTriangleIntersect(uint32_t unused0, uint32_t unused1,
+                                                            uint32_t unused2, uint32_t unused3,
+                                                            const RwV3d *b, const RwV3d *c, float *distance)
+{
+    __asm__ volatile("subl $8, %esp\n\t"
+                     "fstpl (%esp)\n\t"
+                     "pushl 0x24(%esp)\n\t"
+                     "pushl 0x24(%esp)\n\t"
+                     "pushl 0x24(%esp)\n\t"
+                     "pushl %ecx\n\t"
+                     "pushl %edx\n\t"
+                     "pushl %eax\n\t"
+                     "call _rpCollLineTriangleImpl\n\t"
+                     "addl $32, %esp\n\t"
+                     "ret");
+}
+
+/*
+ * Line against the sector's triangles: walks the polygon split tree with the line clipped to the sector
+ * (query->t.line), cut again where it crosses a split plane (the far part waits on the stack with the node on
+ * that side), and tests each polygon reached against the whole line of the intersection. Degenerate triangles
+ * are skipped; the callback gets the unit normal and the hit as a fraction of the line's length.
+ */
+BMX_ADDR(0x004be560)
+RpWorldSector *_rpCollSectorTrianglesLine(RpIntersection *intersection, RpWorldSector *sector,
+                                          RpCollisionQuery *query)
+{
+    const uint8_t *tree = sector->colSectorRoot;
+    if (tree == NULL) {
+        return sector;
+    }
+    const RwLine *line = &intersection->t.line;
+    RwV3d dir;
+    dir.x = (float)((double)line->end.x - line->start.x);
+    dir.y = (float)((double)line->end.y - line->start.y);
+    dir.z = (float)((double)line->end.z - line->start.z);
+    const double length = RwV3dNormalize(&dir, &dir);
+    int32_t stack[kCollTreeStackDepth];
+    RwLine lines[kCollTreeStackDepth];
+    int32_t top = 0;
+    int32_t node = 1;
+    stack[0] = 0; /* the root's pop (a leaf root) reads them, then the walk ends */
+    lines[0] = query->t.line;
+    RwLine cur = query->t.line;
+    do {
+        const uint8_t *entry = tree + node * 3;
+        uint32_t count = entry[0];
+        int32_t index = entry[2];
+        if ((count & 0x80) != 0) {
+            const int32_t axis = (int32_t)(count >> 3) & 0xc;
+            const float split = rwAxis(&sector->vertices[entry[1]], axis);
+            const float d0 = (float)((double)rwAxis(&cur.start, axis) - split);
+            const float d1 = (float)((double)rwAxis(&cur.end, axis) - split);
+            count &= 0x1f;
+            if (((rwBits(d0) ^ rwBits(d1)) & INT32_MIN) != 0) {
+                RwV3d p;
+                rpCollLinePoint(&p, &cur, rpCollRatio(d0, d1));
+                top++;
+                stack[top] = rwBits(d0) < 0 ? node * 2 + 1 : node * 2;
+                lines[top].start = p;
+                lines[top].end = cur.end;
+                cur.end = p;
+            }
+            node = rwBits(d0) < 0 ? node * 2 : node * 2 + 1;
+        } else {
+            node = stack[top];
+            cur = lines[top];
+            top--;
+        }
+        for (uint32_t i = 0; i < count; i++, index++) {
+            const RpPolygon *polygon = &sector->polygons[index];
+            RwV3d *a = &sector->vertices[polygon->vertIndex[0]];
+            RwV3d *b = &sector->vertices[polygon->vertIndex[1]];
+            RwV3d *c = &sector->vertices[polygon->vertIndex[2]];
+            RpCollisionTriangle triangle;
+            triangle.normal.y = (float)rpCollCross(b->z, a->z, c->x, a->x, b->x, a->x, c->z, a->z);
+            triangle.normal.x = (float)rpCollCross(c->z, a->z, b->y, a->y, b->z, a->z, c->y, a->y);
+            const double nz = rpCollCross(c->y, a->y, b->x, a->x, c->x, a->x, b->y, a->y);
+            triangle.normal.z = (float)nz;
+            const double length2 = (nz * nz + rwMul(triangle.normal.y, triangle.normal.y)) +
+                                   rwMul(triangle.normal.x, triangle.normal.x);
+            if (0.0 >= length2) {
+                continue;
+            }
+            float distance;
+            if (!rpCollLineTriangleImpl(&line->start, &dir, a, b, c, &distance, length)) {
+                continue;
+            }
+            const double scale = _rwFastInvSqrt(rwBits((float)length2));
+            triangle.normal.z = (float)(triangle.normal.z * scale);
+            triangle.normal.y = (float)(triangle.normal.y * scale);
+            triangle.normal.x = (float)(scale * triangle.normal.x);
+            rpCollFillTriangle(&triangle, index, a, b, c);
+            const RpIntersectionCallBackWorldTriangle callBack =
+                (RpIntersectionCallBackWorldTriangle)query->callBack;
+            if (callBack(intersection, sector, &triangle, distance, query->data) == NULL) {
+                return NULL;
+            }
+        }
+    } while (top >= 0);
+    return sector;
+}
+
 /* ---- one atomic's triangles ------------------------------------------------------------------------- */
 
 /*
@@ -1367,39 +1512,16 @@ _rpCollAtomicTrianglesLine(RpAtomic *atomic, const RwLine *line,
         if (0.0 >= length2) {
             continue;
         }
-        const double e2y = (double)v2->y - v0->y, e2x = (double)v2->x - v0->x, e2z = (double)v2->z - v0->z;
-        const double e1z = (double)v1->z - v0->z, e1y = (double)v1->y - v0->y, e1x = (double)v1->x - v0->x;
-        const double pz = dir.x * e2y - dir.y * e2x;
-        const double py = e2x * dir.z - dir.x * e2z;
-        const double px = e2z * dir.y - e2y * dir.z;
-        const double det = ((pz * e1z) + (py * e1y)) + (px * e1x);
-        if (0x1.0c6f7ap-20 >= det) {
+        float ratio;
+        if (!rpCollLineTriangleImpl(&start, &dir, v0, v1, v2, &ratio, length)) {
             continue;
         }
-        const double tz = (double)start.z - v0->z, ty = (double)start.y - v0->y, tx = (double)start.x - v0->x;
-        const double u = ((pz * tz) + (py * ty)) + (px * tx);
-        if (0.0 > u || u > det) {
-            continue;
-        }
-        const double qz = tx * e1y - ty * e1x;
-        const double qy = e1x * tz - tx * e1z;
-        const double qx = e1z * ty - tz * e1y;
-        const double v = dir.x * qx + (dir.z * qz + dir.y * qy);
-        if (0.0 > v || v + u > det) {
-            continue;
-        }
-        const double limit = length * det;
-        const double t = ((e2z * qz) + (qy * e2y)) + (qx * e2x);
-        if (0.0 > t || t > limit) {
-            continue;
-        }
-        const double ratio = t / limit;
         const double scale = _rwFastInvSqrt(rwBits((float)length2));
         hit.normal.z = (float)(hit.normal.z * scale);
         hit.normal.y = (float)(hit.normal.y * scale);
         hit.normal.x = (float)(scale * hit.normal.x);
         rpCollFillTriangle(&hit, index, corner[0], corner[1], corner[2]);
-        if (callBack(intersection, &hit, (float)ratio, data) == NULL) {
+        if (callBack(intersection, &hit, ratio, data) == NULL) {
             return atomic;
         }
     }

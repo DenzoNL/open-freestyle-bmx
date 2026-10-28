@@ -229,6 +229,12 @@ __attribute__((regparm(2))) RwMatrix *RwMatrixInvertGeneral(RwMatrix *out, const
 /* The animation plugin's engine module (rw/plugins.c). */
 void *WorldObjectOpen(void *engine, int32_t offset);
 void *WorldObjectClose(void *engine);
+/* Adds the sequence `name` of the clump's frames to the clump (EAX = clump, EDX = name, ECX = play callback
+ * or NULL, the data in the 4th stack slot). NULL when it exists already, no frame has it, or out of memory.
+ */
+__attribute__((regparm(3))) RpClump *rpAnimClumpAddSequence(RpClump *clump, const char *name, void *callBack,
+                                                            uint32_t unused0, uint32_t unused1,
+                                                            uint32_t unused2, void *data);
 
 /* ---- LOD atomic plugin (rw/plugins.c) ---------------------------------------------------------------- */
 

@@ -11,6 +11,7 @@
  */
 #include "dt_rw.h"
 #include "dt_zmem.h"
+#include "rw/rwclump.h"
 #include "rw/rwworld.h"
 
 enum {
@@ -1517,7 +1518,178 @@ static void setup_sector_world(DtCtx *c)
     rwtEnd();
 }
 
+/* ---- creating a world --------------------------------------------------------------------------------- */
+
+static int gMeshCalls, gMeshFailAt; /* the n-th mesh builder call (create or generate) fails; 0 never */
+static RpWorld *gNewWorld;          /* the world being created, between its and its sector's plugin init */
+
+static int meshFails(void)
+{
+    gMeshCalls++;
+    return gMeshFailAt != 0 && gMeshCalls == gMeshFailAt;
+}
+
+static RpBuildMesh *BMX_CDECL stBuildMeshCreate(uint32_t numTriangles)
+{
+    rwtLog(0x4c4750);
+    rwtLog(numTriangles);
+    /* a count with bit 15 set shows a sign extension; it fails so the loop does not run 32k times */
+    return meshFails() || numTriangles >= 0x8000 ? NULL : dt_alloc(0x10);
+}
+
+static RpBuildMesh *BMX_CDECL stBuildMeshAdd(RpBuildMesh *build, RpMaterial *material, uint32_t v0,
+                                             uint32_t v1, uint32_t v2)
+{
+    rwtLog(0x4c48c0);
+    rwtLogPtr(build);
+    rwtLogPtr(material);
+    rwtLog(v0);
+    rwtLog(v1);
+    rwtLog(v2);
+    return build;
+}
+
+static RpMeshHeader *BMX_CDECL stMeshGenerate(RpBuildMesh *build, uint32_t flags)
+{
+    rwtLog(0x4c4a30);
+    rwtLogPtr(build);
+    rwtLog(flags);
+    return meshFails() ? NULL : dt_alloc(0x10);
+}
+
+static int BMX_CDECL stBuildMeshDestroy(RpBuildMesh *build)
+{
+    rwtLog(0x4c4830);
+    rwtLogPtr(build);
+    return 1;
+}
+
+__attribute__((regparm(1))) static int stWorldDestroyBody(RpWorld *world)
+{
+    rwtLog(0x4ba9c4);
+    rwtLogPtr(world);
+    rwtLog(world->stamp);
+    return 1;
+}
+
+/* A leaf the "plugin" puts polygons into (u16 counts, with bit 15 set now and then). */
+static void fillLeaf(RpWorldSector *s)
+{
+    s->matListWindowBase = (uint16_t)dt_range(0, 8);
+    const int n = dt_u32() % 12 == 0 ? 0x8000 + dt_range(0, 3) : dt_range(0, 5);
+    s->numPolygons = (uint16_t)n;
+    s->polygons = dt_alloc(4 * 6);
+    /* dt_u32, not dt_fill: these run during the call, and the harness serves dt_fill outside its snapshot */
+    for (int i = 0; i < 6; i++) {
+        const uint32_t r = dt_u32();
+        s->polygons[i].matIndex = (uint8_t)(r & 0x0f);
+        s->polygons[i].vertIndex[0] = (uint8_t)(r >> 8);
+        s->polygons[i].vertIndex[1] = (uint8_t)(r >> 16);
+        s->polygons[i].vertIndex[2] = (uint8_t)(r >> 24);
+    }
+    s->mesh = dt_u32() % 5 == 0 ? dt_alloc(8) : NULL;
+}
+
+/*
+ * _rwPluginRegistryInitObject: logs, and acts as the plugins' constructors would: the world's flags and
+ * materials, then polygons in the new sector and now and then a BSP of plane sectors around it.
+ */
+static void *BMX_CDECL stInitObject(RwPluginRegistry *registry, void *object)
+{
+    rwtLog(0x4e8af0);
+    rwtLogPtr(registry);
+    rwtLogPtr(object);
+    if (registry == &rpWorldRegistry) {
+        RpWorld *world = object;
+        rwtLogWords(world, 0x74 / 4);
+        world->object.flags = (uint8_t)dt_u32();
+        world->matList.materials = (RpMaterial **)dt_alloc(32 * sizeof(void *));
+        for (int i = 0; i < 32; i++) {
+            world->matList.materials[i] = (RpMaterial *)(uintptr_t)dt_u32();
+        }
+        gNewWorld = world;
+    } else {
+        RpWorldSector *sector = object;
+        rwtLogWords(sector, 0x5c / 4);
+        if (dt_u32() % 4 != 0) {
+            fillLeaf(sector);
+        }
+        if (gNewWorld != NULL && dt_u32() % 3 == 0) {
+            RpPlaneSector *top = dt_alloc(kSectorBytes);
+            RpPlaneSector *inner = dt_alloc(kSectorBytes);
+            RpWorldSector *a = dt_alloc(kSectorBytes), *b = dt_alloc(kSectorBytes);
+            a->type = b->type = -1;
+            fillLeaf(a);
+            fillLeaf(b);
+            top->type = inner->type = 0;
+            inner->leftSubTree = (RpSector *)a;
+            inner->rightSubTree = (RpSector *)sector;
+            top->leftSubTree = dt_u32() % 2 == 0 ? (RpSector *)inner : (RpSector *)b;
+            top->rightSubTree = top->leftSubTree == (RpSector *)inner ? (RpSector *)b : (RpSector *)inner;
+            gNewWorld->rootSector = (RpSector *)top;
+        }
+        gNewWorld = NULL;
+    }
+    return registry;
+}
+
+/* The engine's square root table (as in the collision tests) for RwV3dLength. */
+static void sqrtTable(RwGlobals *g)
+{
+    uint32_t *table = dt_alloc(4096 * 4);
+    for (uint32_t i = 0; i < 4096; i++) {
+        const uint32_t bits = 0x3f000000U + (i << 12) + 0x800;
+        float f;
+        __builtin_memcpy(&f, &bits, 4);
+        const float s = __builtin_sqrtf(f);
+        uint32_t sb;
+        __builtin_memcpy(&sb, &s, 4);
+        table[i] = sb - ((bits & 0x7f800000U) >> 1);
+    }
+    *(uint32_t **)((uint8_t *)g + kRwtSqrtOffset) = table;
+}
+
+/*
+ * RpWorldCreate on a random box (edge values, inverted and huge boxes), with failures of the world and sector
+ * allocations, the list entry and the mesh builder, and the module closed now and then.
+ */
+static void setup_world_create(DtCtx *c)
+{
+    RwGlobals *g = worldEnv(c, 1);
+    sqrtTable(g);
+    rpWorldRegistry.sizeOfStruct = kWorldBytes;
+    rpWorldSectorRegistry.sizeOfStruct = kSectorBytes;
+    rpWorldDefaultSurfaceProps.ambient = dt_float(0.0F, 1.0F);
+    rpWorldDefaultSurfaceProps.specular = dt_float(0.0F, 1.0F);
+    rpWorldDefaultSurfaceProps.diffuse = dt_float(0.0F, 1.0F);
+    dt_stub(0x004e8af0, NULL, (void *)stInitObject);
+    dt_stub(0x004c4750, NULL, (void *)stBuildMeshCreate);
+    dt_stub(0x004c48c0, NULL, (void *)stBuildMeshAdd);
+    dt_stub(0x004c4a30, NULL, (void *)stMeshGenerate);
+    dt_stub(0x004c4830, NULL, (void *)stBuildMeshDestroy);
+    dt_stub(0x004ba9c4, NULL, (void *)stWorldDestroyBody);
+    RwBBox *box = dt_alloc(sizeof *box);
+    const float scale = dt_u32() % 6 == 0 ? 1e30F : (dt_u32() % 4 == 0 ? 1e-3F : 500.0F);
+    box->sup.x = dt_float_edgy(-scale, scale);
+    box->sup.y = dt_float_edgy(-scale, scale);
+    box->sup.z = dt_float_edgy(-scale, scale);
+    box->inf.x = dt_float_edgy(-scale, scale);
+    box->inf.y = dt_float_edgy(-scale, scale);
+    box->inf.z = dt_float_edgy(-scale, scale);
+    if (dt_u32() % 8 == 0) {
+        box->inf = box->sup;
+    }
+    gMeshCalls = 0;
+    gMeshFailAt = dt_u32() % 4 == 0 ? dt_range(1, 6) : 0;
+    gNewWorld = NULL;
+    rwtEnd();
+    gRwtMallocFailAt = dt_u32() % 8 == 0 ? dt_range(1, 2) : 0;
+    gRwtEntryFailAt = dt_u32() % 8 == 0 ? 1 : 0;
+    DT_ARG_PTR(c, 0, dt_u32() % 16 == 0 ? NULL : box);
+}
+
 DT_CASES(rwworld_cases) = {
+    {"RpWorldCreate", 0x004bb080, RpWorldCreate, 1, DT_RET_INT, setup_world_create, 1500, 0},
     {"RpWorldAddCamera", 0x004b81f0, RpWorldAddCamera, 2, DT_RET_INT, setup_add_camera, 100, 0},
     {"RpWorldRemoveCamera", 0x004b8240, RpWorldRemoveCamera, 2, DT_RET_INT, setup_remove_camera, 150, 0},
     {"RwCameraGetWorld", 0x004b82a0, RwCameraGetWorld, 1, DT_RET_INT, setup_camera_world, 30, 0},

@@ -112,9 +112,9 @@ callees outside the slice) and also lists the `skip` library callees. Ported RW 
 with `BMX_ADDR` annotations like the game code; `progress.py` recognises them and `CMakeLists.txt` builds
 `src/rw/*.c`. Rerun `rwmap.py` after porting: ported rows keep their file and status.
 
-Known gaps: the 305 `orig` rows the pointer pass added (97 KB) are sorted below; 171 `orig` rows (49 KB) are left
-(2026-10-28, after the x87 batch: RwMatrixTransform, the camera clip planes, the BSP line and sphere walks and
-rpBspStreamRead).
+Known gaps: the 305 `orig` rows the pointer pass added (97 KB) are sorted below; 167 `orig` rows (44 KB) are left
+(2026-10-28, after the x87 batches: RwMatrixTransform, the camera clip planes, the BSP line and sphere walks,
+rpBspStreamRead, then RpWorldCreate, the sector line-triangle test and the anim plugin's add-sequence).
 
 ## Classification of the pointer-only functions (2026-10-28)
 
@@ -135,6 +135,10 @@ Moved to `lib/d3d7driver` (`skip`, 50 rows, 33.3 KB) and to `lib/crt` (6 rows, 0
 | 0x4f9c90, 0x4f9db0 | 2 / 0.5 KB | Block averages for the D3D3 raster standards (data at 0x567290). |
 | 0x4ee1d0..0x4ee300, 0x4e8290 | 6 / 0.3 KB | `lib/crt`: rwstricmp/rwstrupr/rwstrlwr/rwstrchr/rwstrrchr and rwfexist, already implemented in src/native/crt.c. |
 
+Tri-strip generator 0x4c60a0..0x4c8870 (9 functions, 10 KB) -> `lib/unreached`: `_rpMeshGenerate` (ported) calls it only
+for geometry flagged rpGEOMETRYTRISTRIP, and an in-game breakpoint trace of the original (2026-10-28: boot, menus, level
+load, riding) hit `_rpMeshGenerate` but none of the nine. If bmxnative ever traps in that range, port it after all.
+
 Kept as `orig` although only render code calls them (unsure): `RwResourcesAllocateResEntry`/`RwResourcesUseResEntry`
 (0x4dc460, 0x4dc680, public arena API the SDL3 instancing will use), `RpMaterialGetColor` (0x4b9330) and
 `RpWorldSectorGetBBox` (0x4c2240) (accessors). Two bodies behind 4 byte stubs are folded into the ported stub function
@@ -144,18 +148,20 @@ Remaining to port, per file:
 
 | File | Rows | Bytes | Notes |
 |---|---|---|---|
-| rw/world.c | 34 | 7.2 KB | camera/light sync (0x4b7730, 0x4b7bb0, 0x4b7e80 with x87), PVS plugin callbacks (0x4cc..), WorldOpen/Close, frustum sector walk 0x4ba360/0x4ba430, RpWorldCreate **Opus** |
-| rw/clump.c | 17 | 14.7 KB | RpBuildMesh and tristrip code 0x4c5bd0..0x4c8870 (about 12 KB, no x87), RpGeometryStreamWrite 0x4b6350 |
+| rw/world.c | 31 | 3.4 KB | camera/light sync (0x4b7730, 0x4b7bb0, 0x4b7e80 with x87), PVS plugin callbacks (0x4cc..), WorldOpen/Close, frustum sector walk 0x4ba360/0x4ba430 |
+| rw/clump.c | 8 | 3.9 KB | RpBuildMesh 0x4c5bd0/0x4c5e10, RpGeometryStreamWrite 0x4b6350, 0x4b77..0x4b7e80 |
 | rw/texture.c | 24 | 13.2 KB | texture readers 0x4e1470/0x4e1b50/0x4e0b10, default mipmap generator 0x4e1140, RwImageRead/ApplyMask/FindFileType/path walk 0x4e3c08..0x4e53c0, BMP writer 0x4e7860.. |
-| rw/engine.c | 40 | 7.8 KB | anim plugin 0x4fbb30..0x502a40 (clump/frame data, stream callbacks), resource entries |
-| rw/plugins.c | 27 | 4.1 KB | bone plugin 0x502b00..0x505830, skin helpers 0x4fbf30..0x4ff960 |
+| rw/engine.c | 38 | 6.4 KB | anim plugin 0x4fbb30..0x502a40 (clump/frame data, stream callbacks), resource entries. The anim rows belong in plugins.c next to RpAnimPluginAttach and its engine module (0x4fc7fc moved there when ported); move the rest when they are ported |
+| rw/plugins.c | 28 | 4.2 KB | bone plugin 0x502b00..0x505830, skin helpers 0x4fbf30..0x4ff960, anim node helpers 0x4fc540 (frame walk), 0x5029e0 |
 | rw/camera.c | 8 | 1.7 KB | view matrices 0x4ddd40/0x4de2a0 (x87), CameraSync/BeginUpdate/EndUpdate |
 | rw/stream.c | 20 | 0.6 KB | stream plugin vtable stubs 0x4e32f2..0x4e335f |
 | rw/math.c | 1 | 0.1 KB | `_rwMatrixClose` |
 
-Opus (1 KB or more with heavy x87): 0x4bb080 RpWorldCreate (1737 bytes), 0x4be560 collision sector triangles by
-line (1330), 0x4fc7fc anim clump data copy (1360, 22 x87 instructions, borderline). Large without x87 (Sonnet, slow):
-0x4c6490, 0x4c69d0, 0x4c7560, 0x4c7a80 (mesh building), 0x4b6350, 0x4e1470, 0x4e1b50, 0x4e3eb8, 0x4e4c50.
+Opus batch done (2026-10-28): RpWorldCreate 0x4bb080 (rw/world.c), the sector line-triangle walk 0x4be560 with its
+Moeller-Trumbore kernel 0x4beab0 (EAX/EDX/ECX, stack slots 4..6 and the length in ST0; both moved to rw/collision.c,
+where the other per-sector tests are) and rpAnimClumpAddSequence 0x4fc7fc (WorldCopyClumpExt's callee, moved from
+engine.c to rw/plugins.c). Large without x87 (Sonnet, slow):
+0x4b6350, 0x4e1470, 0x4e1b50, 0x4e3eb8, 0x4e4c50.
 
 x87 porting notes from that batch: Ghidra prints `FMUL ST5` both for `ST0 = ST0 * ST5` and for `ST5 = ST5 * ST0`;
 decode register forms from the bytes (D8 vs DC/DE) or with capstone. LLVM treats the sign of a NaN as unspecified:
@@ -164,6 +170,10 @@ flips the sign of a NaN that the x87 keeps (and the sign bits feed the frustum p
 and line walk ports subtract through an empty `asm` that hides the subtrahend, and read the constant factors from
 the exe's data as the original does. Where two different NaNs meet, the x87 keeps the larger significand and SSE the
 first operand; the tests of these functions use no NaN inputs (infinities, which generate NaNs, are in).
+
+Test pitfall: stubs that run during the call under test may draw from `dt_u32()` (DLL state, part of the snapshot both
+sides start from) but not from `dt_fill()`, which the harness serves from its own state: the two sides then get
+different bytes and every iteration diverges.
 
 ## Known issues
 

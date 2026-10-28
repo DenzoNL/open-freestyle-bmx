@@ -212,6 +212,8 @@ void *_rpBinaryWorldClose(void *engine);
 void *_rpMaterialListOpen(void *engine);
 void *_rpMaterialListClose(void *engine);
 #define rpWorldGlobalsOffset ORIG_VAR(0x00676760, int32_t, rpWorldGlobalsOffset)
+/* The surface properties a new world starts with. */
+#define rpWorldDefaultSurfaceProps ORIG_VAR(0x00676768, RwSurfaceProperties, rpWorldDefaultSurfaceProps)
 
 /* ---- intersections (the walks of the BSP) ----------------------------------------------------------- */
 
@@ -334,6 +336,8 @@ RpWorld *RpWorldForAllWorldSectors(RpWorld *world, RwObjectCallBack callback, vo
  */
 ORIG_FN(0x004ba9c0, int, RpWorldDestroy, (RpWorld * world));
 __attribute__((regparm(1))) int rpWorldDestroyBody(RpWorld *world);
+/* An empty world of one sector for the box (NULL and an error when out of memory or a mesh fails). */
+RpWorld *RpWorldCreate(const RwBBox *boundingBox);
 /* EAX = sector: frees what a sector tree owns / only releases its ties and plugin data. */
 __attribute__((regparm(1))) void rpSectorTreeDestroy(RpSector *sector);
 __attribute__((regparm(1))) void rpSectorTreeDeinit(RpSector *sector);

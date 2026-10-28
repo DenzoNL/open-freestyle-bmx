@@ -582,6 +582,78 @@ static void setup_sector_triangles_box(DtCtx *c)
     sector_setup(c, rpINTERSECTBOX, collWorldTriangleCb);
 }
 
+/* A point a fraction f along the line. */
+static void collAlong(RwV3d *out, const RwLine *line, float f)
+{
+    out->x = line->start.x + (line->end.x - line->start.x) * f;
+    out->y = line->start.y + (line->end.y - line->start.y) * f;
+    out->z = line->start.z + (line->end.z - line->start.z) * f;
+}
+
+/*
+ * Line against one sector's triangles: often a line through a polygon of the sector (both ways round), now
+ * and then a zero length line or one starting on a vertex. The query's line is a part of the intersection's
+ * (the BSP walk's clipping), sometimes starting exactly on a split vertex so a plane distance is 0.
+ */
+static void setup_sector_triangles_line(DtCtx *c)
+{
+    collEnv(c);
+    CollWorld w;
+    collWorld(&w);
+    collCallbacks();
+    RpWorldSector *sector = w.sectors[dt_range(0, w.numSectors - 1)];
+    RpIntersection *is = collIntersection(&w, rpINTERSECTLINE);
+    RwLine *line = &is->t.line;
+    switch (dt_u32() % 8) {
+    case 0:
+    case 1:
+    case 2:
+        if (sector->numPolygons > 0) {
+            const RpPolygon *p = &sector->polygons[dt_range(0, sector->numPolygons - 1)];
+            const RwV3d *a = &sector->vertices[p->vertIndex[0]], *b = &sector->vertices[p->vertIndex[1]],
+                        *t = &sector->vertices[p->vertIndex[2]];
+            const float u = dt_float(-0.1f, 0.7f), v = dt_float(-0.1f, 0.7f);
+            RwV3d g;
+            g.x = a->x + u * (b->x - a->x) + v * (t->x - a->x);
+            g.y = a->y + u * (b->y - a->y) + v * (t->y - a->y);
+            g.z = a->z + u * (b->z - a->z) + v * (t->z - a->z);
+            collNear(&line->start, &g, 15.0f);
+            line->end.x = g.x + (g.x - line->start.x) * dt_float(0.1f, 2.0f);
+            line->end.y = g.y + (g.y - line->start.y) * dt_float(0.1f, 2.0f);
+            line->end.z = g.z + (g.z - line->start.z) * dt_float(0.1f, 2.0f);
+        }
+        break;
+    case 3:
+        line->end = line->start;
+        break;
+    case 4:
+        line->start = sector->vertices[dt_range(0, sector->numVertices - 1)];
+        break;
+    default:
+        break;
+    }
+    RpCollisionQuery *query = dt_alloc(sizeof *query);
+    dt_fill(query, sizeof *query);
+    query->callBack = collWorldTriangleCb;
+    query->data = dt_alloc(4);
+    query->t.line = *line;
+    if (dt_u32() % 3 != 0) {
+        collAlong(&query->t.line.start, line, dt_u32() % 4 == 0 ? 0.0f : dt_float(0.0f, 0.5f));
+        collAlong(&query->t.line.end, line, dt_u32() % 4 == 0 ? 1.0f : dt_float(0.5f, 1.0f));
+    }
+    if (dt_u32() % 8 == 0) {
+        query->t.line.start = sector->vertices[dt_range(0, sector->numVertices - 1)];
+    }
+    if (dt_u32() % 8 == 0) {
+        const RwLine swapped = {query->t.line.end, query->t.line.start};
+        query->t.line = swapped;
+    }
+    DT_ARG_PTR(c, 0, is);
+    DT_ARG_PTR(c, 1, sector);
+    DT_ARG_PTR(c, 2, query);
+    rwtEnd();
+}
+
 /* ---- register convention walkers, through thunks ------------------------------------------------------- */
 
 typedef uint32_t(__attribute__((regparm(3))) * CollWalkFn)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t,
@@ -827,6 +899,96 @@ static void setup_check_point(DtCtx *c)
     rwtEnd();
 }
 
+/* line_tri: EAX = start, EDX = dir, ECX = a, b / c / distance in stack slots 4..6, length in ST0. */
+static int32_t line_tri_call(uint32_t target, const RwV3d *start, const RwV3d *dir, const RwV3d *a,
+                             const RwV3d *b, const RwV3d *t, float *distance, const double *length)
+{
+    const uint32_t slots[3] = {(uint32_t)(uintptr_t)b, (uint32_t)(uintptr_t)t, (uint32_t)(uintptr_t)distance};
+    uint32_t eax = (uint32_t)(uintptr_t)start, edx = (uint32_t)(uintptr_t)dir, ecx = (uint32_t)(uintptr_t)a;
+    __asm__ volatile("pushl 8(%3)\n\t"
+                     "pushl 4(%3)\n\t"
+                     "pushl (%3)\n\t"
+                     "subl $16, %%esp\n\t"
+                     "fldl (%4)\n\t"
+                     "call *%5\n\t"
+                     "addl $28, %%esp"
+                     : "+a"(eax), "+d"(edx), "+c"(ecx)
+                     : "r"(slots), "r"(length), "r"(target)
+                     : "memory", "cc", "st");
+    return (int32_t)eax;
+}
+
+static int32_t line_tri_orig(const RwV3d *start, const RwV3d *dir, const RwV3d *a, const RwV3d *b,
+                             const RwV3d *t, float *distance, const double *length)
+{
+    return line_tri_call(0x004beab0, start, dir, a, b, t, distance, length);
+}
+
+static int32_t line_tri_impl(const RwV3d *start, const RwV3d *dir, const RwV3d *a, const RwV3d *b,
+                             const RwV3d *t, float *distance, const double *length)
+{
+    return line_tri_call((uint32_t)(uintptr_t)_rpCollLineTriangleIntersect, start, dir, a, b, t, distance,
+                         length);
+}
+
+/*
+ * A line (unit direction from the maths tables, length) and a triangle near it: often a line through the
+ * triangle from either side, with the end just short of or past it; degenerate triangles, a zero direction.
+ */
+static void setup_line_tri(DtCtx *c)
+{
+    collEnv(c);
+    RwV3d *v[3];
+    for (int i = 0; i < 3; i++) {
+        v[i] = dt_alloc(sizeof(RwV3d));
+        collPoint(v[i]);
+    }
+    collNear(v[1], v[0], 10.0f);
+    collNear(v[2], v[0], 10.0f);
+    if (dt_u32() % 10 == 0) {
+        *v[2] = *v[1];
+    }
+    RwV3d *start = dt_alloc(sizeof *start);
+    RwV3d end;
+    RwV3d g;
+    const float u = dt_float(-0.2f, 0.8f), w = dt_float(-0.2f, 0.8f);
+    g.x = v[0]->x + u * (v[1]->x - v[0]->x) + w * (v[2]->x - v[0]->x);
+    g.y = v[0]->y + u * (v[1]->y - v[0]->y) + w * (v[2]->y - v[0]->y);
+    g.z = v[0]->z + u * (v[1]->z - v[0]->z) + w * (v[2]->z - v[0]->z);
+    collNear(start, &g, 20.0f);
+    if (dt_u32() % 8 == 0) {
+        *start = *v[dt_range(0, 2)];
+    }
+    const float beyond = dt_u32() % 4 == 0 ? dt_float(-0.3f, 0.0f) : dt_float(0.0f, 2.0f);
+    end.x = g.x + (g.x - start->x) * beyond;
+    end.y = g.y + (g.y - start->y) * beyond;
+    end.z = g.z + (g.z - start->z) * beyond;
+    RwV3d *dir = dt_alloc(sizeof *dir);
+    dir->x = end.x - start->x;
+    dir->y = end.y - start->y;
+    dir->z = end.z - start->z;
+    double *length = dt_alloc(8);
+    if (dt_u32() % 16 == 0) {
+        dir->x = dir->y = dir->z = 0.0f;
+        *length = 0.0;
+    } else {
+        *length = RwV3dNormalize(dir, dir);
+        if (dt_u32() % 8 == 0) {
+            *length = dt_u32() % 2 == 0 ? 0.0 : (double)dt_float(0.0f, 100.0f);
+        }
+    }
+    float *distance = dt_alloc(4);
+    dt_fill(distance, 4);
+    DT_ARG_PTR(c, 0, start);
+    DT_ARG_PTR(c, 1, dir);
+    DT_ARG_PTR(c, 2, v[0]);
+    DT_ARG_PTR(c, 3, v[1]);
+    DT_ARG_PTR(c, 4, v[2]);
+    DT_ARG_PTR(c, 5, distance);
+    DT_ARG_PTR(c, 6, length);
+    rwtEnd();
+}
+
 static int32_t check_line_orig(const RwV3d *p1, const RwV3d *p2, uint32_t outcodes)
 {
     return ((int32_t(__attribute__((regparm(3))) *)(const RwV3d *, const RwV3d *, uint32_t))(
@@ -1043,6 +1205,10 @@ DT_CASES(rwcollision_cases) = {
      setup_sphere_tri, 3000, 0},
     {"_rpCollSectorTrianglesBox", 0x004bfb20, _rpCollSectorTrianglesBox, 3, DT_RET_INT,
      setup_sector_triangles_box, 800, 0},
+    {"_rpCollSectorTrianglesLine", 0x004be560, _rpCollSectorTrianglesLine, 3, DT_RET_INT,
+     setup_sector_triangles_line, 3000, 0},
+    {"_rpCollLineTriangleIntersect", (uint32_t)(uintptr_t)line_tri_orig, line_tri_impl, 7, DT_RET_INT,
+     setup_line_tri, 3000, 0},
     {"_rpCollTriangleBoxIntersect", (uint32_t)(uintptr_t)box_tri_orig, box_tri_impl, 7, DT_RET_INT,
      setup_box_tri, 3000, 0},
     {"_rpCollWorldTrianglesLine", (uint32_t)(uintptr_t)_rpCollWorldTrianglesLine_orig,

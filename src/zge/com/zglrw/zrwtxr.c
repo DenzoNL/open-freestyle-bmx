@@ -26,7 +26,6 @@ static const char kZrwTxrFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwTxr.c";
 /* RenderWare library calls (statically linked in the exe, not ported). */
 /* The image writers registered next to the readers, and worlds (RpWorld) with their PVS. */
 ORIG_FN(0x004e7eb0, int, rwBmpImageWrite, (void *image, void *name));
-ORIG_FN(0x004bb080, void *, RpWorldCreate, (const float *bbox));
 
 /* Other modules: the camera (pcinput.c), the world callbacks, the RAM disk file hook (zprofile.c), materials.
  */
@@ -83,7 +82,7 @@ int zrwWorldReset(void)
         RpWorldDestroy(gZrwWorld);
         gZrwWorld = NULL;
     }
-    world = RpWorldCreate(box);
+    world = RpWorldCreate((const RwBBox *)box);
     if (world == NULL) {
         return 0;
     }

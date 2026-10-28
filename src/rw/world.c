@@ -635,6 +635,165 @@ __attribute__((regparm(1))) int rpWorldDestroyBody(RpWorld *world)
     return 1;
 }
 
+/* ---- creation ---------------------------------------------------------------------------------------- */
+
+#define CB_WORLD_RENDER RW_CB(RpWorldSectorCallBackRender, 0x004bc360)
+
+static void listInit(RwLLLink *head)
+{
+    head->next = head;
+    head->prev = head;
+}
+
+/*
+ * Builds the render mesh of every sector without one (the original's own copy of the loop in
+ * _rpWorldGenerateSectorMeshes, with unsigned polygon counts). 0 when a mesh could not be built.
+ */
+static int worldCreateMeshes(RpWorld *world)
+{
+    RpSector *stack[64];
+    int32_t top = 0;
+    stack[0] = NULL;
+    RpSector *node = world->rootSector;
+    do {
+        if (node->type < 0) {
+            RpWorldSector *sector = (RpWorldSector *)node;
+            RpMaterial **materials = world->matList.materials + sector->matListWindowBase;
+            if (sector->mesh == NULL) {
+                RpBuildMesh *build = RpBuildMeshCreate(sector->numPolygons);
+                if (build == NULL) {
+                    return 0;
+                }
+                for (int32_t i = 0; i < (int32_t)sector->numPolygons; i++) {
+                    const RpPolygon *polygon = &sector->polygons[i];
+                    _rpBuildMeshAddTriangle(build, materials[polygon->matIndex], polygon->vertIndex[0],
+                                            polygon->vertIndex[1], polygon->vertIndex[2]);
+                }
+                RpMeshHeader *mesh = _rpMeshGenerate(build, (world->object.flags & 1) != 0 ? 1 : 0);
+                if (mesh == NULL) {
+                    RpBuildMeshDestroy(build);
+                    return 0;
+                }
+                sector->mesh = mesh;
+            }
+            node = stack[top--];
+        } else {
+            const RpPlaneSector *plane = (const RpPlaneSector *)node;
+            node = plane->leftSubTree;
+            stack[++top] = plane->rightSubTree;
+        }
+    } while (top >= 0);
+    return 1;
+}
+
+/*
+ * Creates an empty world of one sector for the box: no polygons, default surface properties and render
+ * callback, entered in the engine's list of worlds. The world origin is (|sup - inf| - inf) per axis (the
+ * length of the diagonal minus the box's inf corner), and the box of the world and its sector is the origin
+ * plus the given box. The accessors the original inlines (RpWorldSetFlags and the like) re-check the module
+ * count and the world, which cannot fail here.
+ */
+BMX_ADDR(0x004bb080)
+RpWorld *RpWorldCreate(const RwBBox *boundingBox)
+{
+    if (rpWorldModuleCount == 0) {
+        reportError(kWorldPluginId, rwERR_NOTOPEN);
+        return NULL;
+    }
+    if (boundingBox == NULL) {
+        reportError(kWorldPluginId, rwERR_NULLP);
+        return NULL;
+    }
+    RpWorld *world = RwEngineInstance->memoryFuncs.rwmalloc((size_t)rpWorldRegistry.sizeOfStruct);
+    if (world == NULL) {
+        RwError error;
+        error.pluginID = kWorldPluginId;
+        error.errorCode = _rwerror(rwERR_NOMEM, rpWorldRegistry.sizeOfStruct);
+        RwErrorSet(&error);
+        return NULL;
+    }
+    world->object.parent = NULL;
+    world->object.privateFlags = 0;
+    world->object.flags = 0;
+    world->object.subType = 0;
+    world->object.type = 7;
+    _rpMaterialListInitialize(&world->matList);
+    world->stamp = 0;
+    world->flags = 2;
+    world->stamp++;
+    world->object.flags = 0;
+    world->stamp++;
+    RpWorldSector *sector =
+        RwEngineInstance->memoryFuncs.rwmalloc((size_t)rpWorldSectorRegistry.sizeOfStruct);
+    if (sector == NULL) {
+        RwError error;
+        error.pluginID = kWorldPluginId;
+        error.errorCode = _rwerror(rwERR_NOMEM, 4); /* sic: 4, not the sector size */
+        RwErrorSet(&error);
+        RwEngineInstance->memoryFuncs.rwfree(world);
+        return NULL;
+    }
+    sector->texCoords = NULL;
+    sector->normals = NULL;
+    sector->polygons = NULL;
+    sector->vertices = NULL;
+    sector->preLitLum = NULL;
+    sector->numPolygons = 0;
+    sector->numVertices = 0;
+    sector->mesh = NULL;
+    sector->repEntry = NULL;
+    sector->colSectorRoot = NULL;
+    listInit(&sector->lightsInWorldSector);
+    listInit(&sector->noCollAtomicsInWorldSector);
+    listInit(&sector->collAtomicsInWorldSector);
+    sector->type = -1;
+    world->rootSector = (RpSector *)sector;
+
+    const RwBBox *box = boundingBox;
+    RwV3d size;
+    size.x = (float)((double)box->sup.x - box->inf.x);
+    size.y = (float)((double)box->sup.y - box->inf.y);
+    size.z = (float)((double)box->sup.z - box->inf.z);
+    const double length = RwV3dLength((const ZVec3 *)&size);
+    const double originX = length - box->inf.x;
+    world->worldOrigin.x = (float)originX;
+    world->worldOrigin.y = (float)(length - box->inf.y);
+    world->worldOrigin.z = (float)(length - box->inf.z);
+    sector->boundingBox.inf.x = (float)(originX + box->inf.x);
+    sector->boundingBox.inf.y = (float)((double)world->worldOrigin.y + box->inf.y);
+    sector->boundingBox.inf.z = (float)((double)world->worldOrigin.z + box->inf.z);
+    sector->boundingBox.sup.x = (float)((double)world->worldOrigin.x + box->sup.x);
+    sector->boundingBox.sup.y = (float)((double)world->worldOrigin.y + box->sup.y);
+    sector->boundingBox.sup.z = (float)((double)world->worldOrigin.z + box->sup.z);
+    world->boundingBox = sector->boundingBox;
+
+    listInit(&world->clumpList);
+    world->currentClumpLink = &world->clumpList;
+    world->numClumpsInWorld = 0;
+    world->surfaceProps = rpWorldDefaultSurfaceProps;
+    world->stamp++;
+    listInit(&world->lightList);
+    listInit(&world->directionalLightList);
+    world->renderCallBack = CB_WORLD_RENDER;
+    world->stamp++;
+
+    RpWorldGlobals *globals = worldGlobals();
+    const int32_t worldSize = rpWorldRegistry.sizeOfStruct;
+    RpWorldListEntry *entry = RwEngineInstance->freeListAlloc(globals->entryFreeList);
+    if (entry != NULL) {
+        entry->size = (uint32_t)worldSize;
+        entry->world = world;
+        linkFirst(&globals->worlds, &entry->link);
+    }
+    _rwPluginRegistryInitObject(&rpWorldRegistry, world);
+    _rwPluginRegistryInitObject(&rpWorldSectorRegistry, sector);
+    if (!worldCreateMeshes(world)) {
+        rpWorldDestroyBody(world);
+        return NULL;
+    }
+    return world;
+}
+
 /* ---- walking the BSP --------------------------------------------------------------------------------- */
 
 /* ---- the line walk ----------------------------------------------------------------------------------- */
