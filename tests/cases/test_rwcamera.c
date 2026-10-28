@@ -4,6 +4,7 @@
  * routines the charset calls are stubs that behave like the real ones (they hand out objects, log their
  * arguments and can fail).
  *
+ * CameraBuildPerspClipPlanes / CameraBuildParallelClipPlanes (EAX = camera) are called through asm wrappers.
  * CameraUpdateZShiftScale (EAX = camera) and RtCharsetSetColors (EAX, EDX, ECX) take register arguments and
  * are exercised through the setters, RwCameraCreate and RtCharsetCreate. RwCameraClone (0x4ce6d0) takes the
  * far clip distance on the x87 stack and stays original code.
@@ -518,7 +519,115 @@ static void setup_pvs_camera(DtCtx *c)
     rwtEnd();
 }
 
+/* ---- clip planes (EAX = camera) ------------------------------------------------------------------------ */
+
+static void clip_call(uint32_t target, RwCamera *camera)
+{
+    uint32_t eax = (uint32_t)(uintptr_t)camera;
+    __asm__ volatile("call *%1"
+                     : "+a"(eax)
+                     : "r"(target)
+                     : "memory", "cc", "ecx", "edx", "st", "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5",
+                       "xmm6", "xmm7");
+}
+
+static void persp_orig(RwCamera *camera)
+{
+    clip_call(0x004dd4d0, camera);
+}
+
+static void persp_impl(RwCamera *camera)
+{
+    clip_call((uint32_t)(uintptr_t)CameraBuildPerspClipPlanes, camera);
+}
+
+static void parallel_orig(RwCamera *camera)
+{
+    clip_call(0x004ddeb0, camera);
+}
+
+static void parallel_impl(RwCamera *camera)
+{
+    clip_call((uint32_t)(uintptr_t)CameraBuildParallelClipPlanes, camera);
+}
+
+/* The vector transform behind the V3d module: an affine map with the matrix's own rows (logged). */
+static RwV3d *BMX_CDECL stub_transform_points(RwV3d *out, const RwV3d *in, int32_t count, const RwMatrix *m)
+{
+    rwtLog(0x4d3a00);
+    rwtLogPtr(out);
+    rwtLogPtr(in);
+    rwtLog((uint32_t)count);
+    rwtLogPtr(m);
+    for (int32_t i = 0; i < count; i++) {
+        const RwV3d v = in[i];
+        out[i].x = v.x * m->right.x + v.y * m->up.x + v.z * m->at.x + m->pos.x;
+        out[i].y = v.x * m->right.y + v.y * m->up.y + v.z * m->at.y + m->pos.y;
+        out[i].z = v.x * m->right.z + v.y * m->up.z + v.z * m->at.z + m->pos.z;
+    }
+    return out;
+}
+
+/*
+ * A float: mostly moderate, now and then an edge value (zero, denormal, huge, infinite) or a tiny one. No NaN
+ * inputs: where two different NaNs meet, the x87 keeps the one with the larger significand and SSE the first
+ * operand, which plain C cannot follow (NaNs the arithmetic itself generates are the same on both).
+ */
+static float clip_float(float lo, float hi)
+{
+    static const uint32_t edges[] = {0x00000000, 0x80000000, 0x00000001, 0x7f7fffff,
+                                     0x7f800000, 0xff800000, 0x3f800000, 0xbf800000};
+    const uint32_t r = dt_u32() % 16;
+    if (r == 0) {
+        float f;
+        const uint32_t bits = edges[dt_u32() % (sizeof edges / sizeof edges[0])];
+        __builtin_memcpy(&f, &bits, 4);
+        return f;
+    }
+    if (r == 1) {
+        return dt_float(-1e-20f, 1e-20f);
+    }
+    return dt_float_edgy(lo, hi);
+}
+
+/* A camera with a frame: rotation-like or random LTM, random window, offset and clip distances. */
+static void setup_clip_planes(DtCtx *c)
+{
+    camera_env(c);
+    RwV3dModule *v3d = (RwV3dModule *)((uint8_t *)RwEngineInstance + rwFastSqrtOffset);
+    v3d->transformPoints = stub_transform_points;
+    uint32_t *invSqrt = dt_alloc(4096 * 4); /* table entries are finite (mathEnv's random ones can be NaN) */
+    for (int i = 0; i < 4096; i++) {
+        invSqrt[i] = (dt_u32() & 0x007fffffu) | 0x3f000000u;
+    }
+    v3d->invSqrtTable = invSqrt;
+    RwCamera *camera = dt_alloc(sizeof(RwCamera));
+    dt_fill(camera, sizeof(RwCamera));
+    RwFrame *frame = dt_alloc(sizeof(RwFrame));
+    dt_fill(frame, sizeof(RwFrame));
+    float *f = (float *)&frame->ltm;
+    const float range = dt_u32() % 4 == 0 ? 1e6f : 1.0f;
+    for (int i = 0; i < 16; i++) {
+        if (i % 4 != 3) {
+            f[i] = i >= 12 ? clip_float(-500.0f, 500.0f) : clip_float(-range, range);
+        }
+    }
+    camera->object.object.parent = frame;
+    camera->viewWindow.x = clip_float(0.0f, 2.0f);
+    camera->viewWindow.y = clip_float(0.0f, 2.0f);
+    camera->viewOffset.x = dt_u32() % 3 == 0 ? 0.0f : clip_float(-1.0f, 1.0f);
+    camera->viewOffset.y = dt_u32() % 3 == 0 ? 0.0f : clip_float(-1.0f, 1.0f);
+    camera->nearPlane = clip_float(0.0f, 5.0f);
+    camera->farPlane = clip_float(0.0f, 5000.0f);
+    DT_ARG_PTR(c, 0, camera);
+    rwtEnd();
+}
+
 DT_CASES(rwcamera_cases) = {
+    {"CameraBuildPerspClipPlanes", (uint32_t)(uintptr_t)persp_orig, persp_impl, 1, DT_RET_VOID,
+     setup_clip_planes, 2000, 0},
+    {"CameraBuildParallelClipPlanes", (uint32_t)(uintptr_t)parallel_orig, parallel_impl, 1, DT_RET_VOID,
+     setup_clip_planes, 1000, 0},
     {"rtCharsetPrintText", (uint32_t)(uintptr_t)text_orig, text_impl, 4, DT_RET_INT, setup_print_text, 800,
      0},
     {"rwPvsCameraCreate", (uint32_t)(uintptr_t)pvs_camera_orig, pvs_camera_impl, 4, DT_RET_VOID,

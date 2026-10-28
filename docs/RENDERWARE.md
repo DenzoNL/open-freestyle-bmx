@@ -112,8 +112,9 @@ callees outside the slice) and also lists the `skip` library callees. Ported RW 
 with `BMX_ADDR` annotations like the game code; `progress.py` recognises them and `CMakeLists.txt` builds
 `src/rw/*.c`. Rerun `rwmap.py` after porting: ported rows keep their file and status.
 
-Known gaps: the 305 `orig` rows the pointer pass added (97 KB) are sorted below; 70 of the remaining 249 are ported,
-177 (57 KB) are left.
+Known gaps: the 305 `orig` rows the pointer pass added (97 KB) are sorted below; 171 `orig` rows (49 KB) are left
+(2026-10-28, after the x87 batch: RwMatrixTransform, the camera clip planes, the BSP line and sphere walks and
+rpBspStreamRead).
 
 ## Classification of the pointer-only functions (2026-10-28)
 
@@ -139,30 +140,39 @@ Kept as `orig` although only render code calls them (unsure): `RwResourcesAlloca
 `RpWorldSectorGetBBox` (0x4c2240) (accessors). Two bodies behind 4 byte stubs are folded into the ported stub function
 (`FOLDED` in rwmap.py, `skip`): 0x4c24c4 (RpLightDestroy) and 0x4b5ab4 (RpGeometryDestroy).
 
-Remaining to port (after the 70 ported in this pass), per file:
+Remaining to port, per file:
 
 | File | Rows | Bytes | Notes |
 |---|---|---|---|
 | rw/world.c | 34 | 7.2 KB | camera/light sync (0x4b7730, 0x4b7bb0, 0x4b7e80 with x87), PVS plugin callbacks (0x4cc..), WorldOpen/Close, frustum sector walk 0x4ba360/0x4ba430, RpWorldCreate **Opus** |
-| rw/clump.c | 18 | 15.6 KB | RpBuildMesh and tristrip code 0x4c5bd0..0x4c8870 (about 12 KB, no x87), RpGeometryStreamWrite 0x4b6350 |
+| rw/clump.c | 17 | 14.7 KB | RpBuildMesh and tristrip code 0x4c5bd0..0x4c8870 (about 12 KB, no x87), RpGeometryStreamWrite 0x4b6350 |
 | rw/texture.c | 24 | 13.2 KB | texture readers 0x4e1470/0x4e1b50/0x4e0b10, default mipmap generator 0x4e1140, RwImageRead/ApplyMask/FindFileType/path walk 0x4e3c08..0x4e53c0, BMP writer 0x4e7860.. |
 | rw/engine.c | 40 | 7.8 KB | anim plugin 0x4fbb30..0x502a40 (clump/frame data, stream callbacks), resource entries |
 | rw/plugins.c | 27 | 4.1 KB | bone plugin 0x502b00..0x505830, skin helpers 0x4fbf30..0x4ff960 |
-| rw/camera.c | 10 | 4.8 KB | clip planes and view matrices 0x4dd4d0..0x4de2a0 (x87), CameraSync/BeginUpdate/EndUpdate |
+| rw/camera.c | 8 | 1.7 KB | view matrices 0x4ddd40/0x4de2a0 (x87), CameraSync/BeginUpdate/EndUpdate |
 | rw/stream.c | 20 | 0.6 KB | stream plugin vtable stubs 0x4e32f2..0x4e335f |
-| rw/collision.c | 2 | 2.4 KB | 0x4bcd90 (x87), 0x4bda80 (x87) |
-| rw/math.c | 2 | 1.2 KB | RwMatrixTransform 0x4d16f0, `_rwMatrixClose` |
+| rw/math.c | 1 | 0.1 KB | `_rwMatrixClose` |
 
-Opus (1 KB or more with heavy x87): 0x4bb080 RpWorldCreate (1737 bytes), 0x4bcd90 line walk of the BSP (1563),
-0x4be560 collision sector triangles by line (1330), 0x4dd4d0 CameraBuildPerspClipPlanes (2152), 0x4fc7fc anim clump
-data copy (1360, 22 x87 instructions, borderline). Large without x87 (Sonnet, slow): 0x4c6490, 0x4c69d0, 0x4c7560,
-0x4c7a80 (mesh building), 0x4b6350, 0x4e1470, 0x4e1b50, 0x4e3eb8, 0x4e4c50, 0x4d16f0.
+Opus (1 KB or more with heavy x87): 0x4bb080 RpWorldCreate (1737 bytes), 0x4be560 collision sector triangles by
+line (1330), 0x4fc7fc anim clump data copy (1360, 22 x87 instructions, borderline). Large without x87 (Sonnet, slow):
+0x4c6490, 0x4c69d0, 0x4c7560, 0x4c7a80 (mesh building), 0x4b6350, 0x4e1470, 0x4e1b50, 0x4e3eb8, 0x4e4c50.
+
+x87 porting notes from that batch: Ghidra prints `FMUL ST5` both for `ST0 = ST0 * ST5` and for `ST5 = ST5 * ST0`;
+decode register forms from the bytes (D8 vs DC/DE) or with capstone. LLVM treats the sign of a NaN as unspecified:
+it rewrites `a - b * k` as `a + b * -k` and packs pairs of subtractions into vector adds of negated operands, which
+flips the sign of a NaN that the x87 keeps (and the sign bits feed the frustum planes' `closest` bytes). The camera
+and line walk ports subtract through an empty `asm` that hides the subtrahend, and read the constant factors from
+the exe's data as the original does. Where two different NaNs meet, the x87 keeps the larger significand and SSE the
+first operand; the tests of these functions use no NaN inputs (infinities, which generate NaNs, are in).
 
 ## Known issues
 
-- `rpBspStreamRead` (0x4c36a0): the port diverges from the original for BSP trees with nested plane
-  sectors (real levels have them). It is disabled (`#if 0` in `src/rw/clump.c`, no `BMX_ADDR`), and
-  `RpWorldStreamRead` calls the original through the `ORIG_FN_REGPARM` in `src/rw/rwclump.h`.
+None open. Resolved: `rpBspStreamRead` (0x4c36a0) was disabled for "diverging on nested plane sectors". The port was
+equivalent to the original; the divergence came from the test fixture. Its random stream script desynchronised the
+reader (a failed scripted `RwStreamRead` does not advance the script, and the sector reader only checks the prelight
+read against 0), so sector counts became garbage, both sides ran out of the emulator's instruction budget, and the
+budget cut them off at different points. `RpWorldStreamRead_nested` in tests/cases/test_rwworldstream.c now writes a
+well-formed tree (up to 8 planes, 4 levels deep, format bit 0x40000000 set at random) and the port is hooked again.
 
 ## Next
 

@@ -5,7 +5,7 @@
  * The register-argument helpers (RwFrameRemoveChild, rwFrameSetRoot, rwFrameSyncLTM) are exercised through
  * their standard-ABI callers (RwFrameDestroy, RwFrameDestroyHierarchy, RwFrameGetLTM).
  * An invalid combine type crashes the original (it dereferences the null matrix it just returned), so the
- * Scale / Translate error paths are not run.
+ * Scale / Translate / Transform error paths are not run.
  */
 #include "dt.h"
 #include "dt_rwmath.h"
@@ -167,6 +167,21 @@ static void setup_matrix_scale(DtCtx *c)
 static void setup_matrix_translate(DtCtx *c)
 {
     matrix_op_setup(c, 2, 0);
+}
+
+/* RwMatrixTransform: two random matrices (sometimes the same one), either may carry the identity bit. */
+static void setup_matrix_transform(DtCtx *c)
+{
+    dt_seed(c);
+    mathEnv();
+    RwMatrix *m = dt_alloc(sizeof *m);
+    RwMatrix *t = dt_alloc(sizeof *t);
+    mathFillMatrix(m);
+    mathFillMatrix(t);
+    DT_ARG_PTR(c, 0, m);
+    DT_ARG_PTR(c, 1, dt_u32() % 10 == 0 ? m : t);
+    DT_ARG_INT(c, 2, dt_range(0, 2));
+    rwtEnd();
 }
 
 static void setup_matrix_invert(DtCtx *c)
@@ -426,6 +441,7 @@ DT_CASES(rwmath_cases) = {
      DT_RET_INT, setup_rotate_omcs, 1500, 0},
     {"RwMatrixRotate", 0x004d1040, RwMatrixRotate, 4, DT_RET_INT, setup_matrix_rotate, 1500, 0},
     {"RwMatrixInvert", 0x004d1340, RwMatrixInvert, 2, DT_RET_INT, setup_matrix_invert, 400, 0},
+    {"RwMatrixTransform", 0x004d16f0, RwMatrixTransform, 3, DT_RET_INT, setup_matrix_transform, 800, 0},
     {"RwMatrixScale", 0x004d1400, RwMatrixScale, 3, DT_RET_INT, setup_matrix_scale, 600, 0},
     {"RwMatrixTranslate", 0x004d15a0, RwMatrixTranslate, 3, DT_RET_INT, setup_matrix_translate, 800, 0},
     {"RwMatrixDestroy", 0x004d1fb0, RwMatrixDestroy, 1, DT_RET_INT, setup_matrix_destroy, 20, 0},

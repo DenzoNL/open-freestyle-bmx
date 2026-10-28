@@ -178,6 +178,45 @@ RwMatrix *RwMatrixTranslate(RwMatrix *matrix, const RwV3d *translation, RwOpComb
     return matrix;
 }
 
+/*
+ * Combines a transformation into the matrix: replace it (keeping its flags), apply the transformation first
+ * (pre-concatenation) or last (post-concatenation). An identity operand turns the product into a copy of the
+ * other one; otherwise it goes through the module's multiply routine. The matrix keeps its own flags minus
+ * the identity and type bits, and its version byte goes up (twice when combined).
+ */
+BMX_ADDR(0x004d16f0)
+RwMatrix *RwMatrixTransform(RwMatrix *matrix, const RwMatrix *transform, RwOpCombineType combine)
+{
+    if (combine == rwCOMBINEREPLACE) {
+        const uint32_t flags = matrix->flags;
+        *matrix = *transform;
+        matrix->flags = flags;
+    } else if (combine == rwCOMBINEPRECONCAT || combine == rwCOMBINEPOSTCONCAT) {
+        const RwMatrix *first = combine == rwCOMBINEPRECONCAT ? transform : matrix;
+        const RwMatrix *second = combine == rwCOMBINEPRECONCAT ? matrix : transform;
+        const uint32_t identity = rwMatrixModule()->flagMask & rwMATRIXINTERNALIDENTITY;
+        RwMatrix result;
+        if ((first->flags & identity) != 0) {
+            result = *second;
+        } else if ((second->flags & identity) != 0) {
+            result = *first;
+        } else {
+            typedef void(BMX_CDECL * MultiplyFunc)(RwMatrix * out, const RwMatrix *a, const RwMatrix *b);
+            ((MultiplyFunc)rwMatrixModule()->multiply)(&result, first, second);
+        }
+        ((uint8_t *)&result.pad1)[0]++;
+        const uint32_t flags = matrix->flags;
+        *matrix = result;
+        matrix->flags = flags & 0xfffdfffc;
+    } else {
+        /* The original goes on to touch the (now null) matrix and crashes; here it returns. */
+        rwReportError(rwERR_INVALIDSIZE, "Invalid combination type specified");
+        return NULL;
+    }
+    ((uint8_t *)&matrix->pad1)[0]++;
+    return matrix;
+}
+
 /* Inverse of a matrix: a copy for the identity, else by the orthonormal or the general routine. */
 BMX_ADDR(0x004d1340)
 RwMatrix *RwMatrixInvert(RwMatrix *out, const RwMatrix *in)

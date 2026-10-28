@@ -2608,15 +2608,8 @@ __attribute__((regparm(3))) RpWorldSector *rpSectorStreamRead(RwStream *stream, 
     return NULL;
 }
 
-/*
- * Reads a plane chunk and, recursively, its children (EAX = stream, EDX = block cursor, ECX = world).
- *
- * Known issue (docs/RENDERWARE.md): this port diverges from the original for trees with nested plane
- * sectors, which real levels have. Until the difference is found it stays out of the build and unhooked:
- * its callers use the original through the ORIG_FN_REGPARM in rwclump.h. To re-enable, drop that
- * declaration, put the BMX_ADDR annotation (0x4c36a0) back and remove the #if 0.
- */
-#if 0
+/* Reads a plane chunk and, recursively, its children (EAX = stream, EDX = block cursor, ECX = world). */
+BMX_ADDR(0x004c36a0)
 __attribute__((regparm(3))) RpPlaneSector *rpBspStreamRead(RwStream *stream, uint8_t **cursor, int32_t world,
                                                            int32_t pad0, int32_t pad1, int32_t pad2,
                                                            uint32_t flags)
@@ -2702,7 +2695,6 @@ __attribute__((regparm(3))) RpPlaneSector *rpBspStreamRead(RwStream *stream, uin
     node->rightSubTree = child;
     return child != NULL ? node : NULL;
 }
-#endif
 
 /* Writes a world chunk: struct (counts, scaled inverse origin, surface properties), materials, the tree,
  * plugin data. */

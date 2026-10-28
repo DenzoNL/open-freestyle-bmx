@@ -54,6 +54,7 @@ RwMatrix *RwMatrixRotate(RwMatrix *matrix, const RwV3d *axis, float angle, RwOpC
  * the float sine as the fourth stack word (asm entry; NULL for a bad combine type). */
 RwMatrix *RwMatrixRotateOneMinusCosineSine(uint32_t unused0, uint32_t unused1, uint32_t unused2, float sine);
 RwMatrix *RwMatrixScale(RwMatrix *matrix, const RwV3d *scale, RwOpCombineType combine);
+RwMatrix *RwMatrixTransform(RwMatrix *matrix, const RwMatrix *transform, RwOpCombineType combine);
 RwMatrix *RwMatrixTranslate(RwMatrix *matrix, const RwV3d *translation, RwOpCombineType combine);
 RwMatrix *RwMatrixInvert(RwMatrix *out, const RwMatrix *in);
 

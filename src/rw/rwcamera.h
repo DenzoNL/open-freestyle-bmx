@@ -26,6 +26,17 @@ typedef struct RwV2d {
     float x, y;
 } RwV2d;
 
+/* A clip plane of the view frustum: unit normal (pointing out), distance from the origin along it, and per
+ * axis 1 when the normal component is not negative (sign bit clear), else 0. */
+typedef struct RwFrustumPlane {
+    ZVec3 normal;       /* 0x00 */
+    float distance;     /* 0x0c */
+    uint8_t closest[3]; /* 0x10 x, y, z */
+    uint8_t pad13;      /* 0x13 */
+} RwFrustumPlane;
+
+_Static_assert(sizeof(RwFrustumPlane) == 0x14, "RwFrustumPlane layout");
+
 /* RwCamera: an object with a frame, a view matrix, two rasters, the view window and the clip planes. */
 struct RwCamera {
     RwObjectHasFrame object;        /* 0x00 type 4; sync callback at 0x10 */
@@ -45,6 +56,11 @@ struct RwCamera {
     float zShift;                   /* 0x90 */
     uint8_t pad94[2];               /* 0x94 */
     uint8_t version;                /* 0x96 bumped whenever a setting changes */
+    uint8_t pad97;                  /* 0x97 */
+    /* 0x98 far, near, left, top, right, bottom (CameraSync rebuilds them in world space) */
+    RwFrustumPlane frustumPlanes[6];
+    float frustumBoundBox[6]; /* 0x110 RwBBox of the corners (sup, inf) */
+    ZVec3 frustumCorners[8];  /* 0x128 near corners 0..3, far corners 4..7 */
 };
 
 _Static_assert(offsetof(RwCamera, projection) == 0x14, "RwCamera layout");
@@ -54,6 +70,9 @@ _Static_assert(offsetof(RwCamera, viewWindow) == 0x68, "RwCamera layout");
 _Static_assert(offsetof(RwCamera, nearPlane) == 0x80, "RwCamera layout");
 _Static_assert(offsetof(RwCamera, zShift) == 0x90, "RwCamera layout");
 _Static_assert(offsetof(RwCamera, version) == 0x96, "RwCamera layout");
+_Static_assert(offsetof(RwCamera, frustumPlanes) == 0x98, "RwCamera layout");
+_Static_assert(offsetof(RwCamera, frustumCorners) == 0x128, "RwCamera layout");
+_Static_assert(sizeof(RwCamera) == 0x188, "RwCamera layout");
 
 #define rwCameraOffset ORIG_VAR(0x00676d10, int32_t, rwCameraOffset)
 
@@ -83,6 +102,10 @@ RwCamera *RwCameraEndUpdate(RwCamera *camera);
 RwCamera *RwCameraGetCurrentCamera(void);
 RwCamera *RwCameraClear(RwCamera *camera, const void *color, int32_t flags);
 float RwIm2DGetFarScreenZ(void);
+
+/* Rebuild the frustum corners and clip planes in world space from the camera's frame (EAX = camera). */
+__attribute__((regparm(1))) void CameraBuildPerspClipPlanes(RwCamera *camera);
+__attribute__((regparm(1))) void CameraBuildParallelClipPlanes(RwCamera *camera);
 
 /* Recomputes zScale and zShift from the clip planes and the device's screen z range (EAX = camera). */
 __attribute__((regparm(1))) void CameraUpdateZShiftScale(RwCamera *camera);

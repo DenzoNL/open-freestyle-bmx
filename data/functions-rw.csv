@@ -360,9 +360,9 @@ addr,size,file,confidence,name,status
 004bc570,185,rw/collision.c,closure,FUN_004bc570,ported
 004bc630,283,rw/collision.c,closure,FUN_004bc630,ported
 004bc750,1585,rw/collision.c,closure,FUN_004bc750,ported
-004bcd90,1563,rw/collision.c,closure,FUN_004bcd90,orig
+004bcd90,1563,rw/world.c,closure,FUN_004bcd90,ported
 004bd400,1586,rw/collision.c,closure,FUN_004bd400,ported
-004bda80,799,rw/collision.c,closure,FUN_004bda80,orig
+004bda80,799,rw/world.c,closure,FUN_004bda80,ported
 004bdde0,539,rw/world.c,closure,FUN_004bdde0,orig
 004be000,341,rw/collision.c,closure,FUN_004be000,ported
 004be160,225,rw/collision.c,closure,FUN_004be160,ported
@@ -420,7 +420,7 @@ addr,size,file,confidence,name,status
 004c2f50,1343,rw/clump.c,closure,FUN_004c2f50,ported
 004c3490,93,rw/clump.c,closure,FUN_004c3490,ported
 004c34f0,423,rw/clump.c,closure,FUN_004c34f0,ported
-004c36a0,961,rw/clump.c,closure,FUN_004c36a0,orig
+004c36a0,961,rw/clump.c,closure,FUN_004c36a0,ported
 004c3ae0,875,rw/clump.c,closure,FUN_004c3ae0,ported
 004c3e60,1442,rw/clump.c,closure,FUN_004c3e60,ported
 004c46a0,12,rw/plugins.c,closure,FUN_004c46a0,ported
@@ -558,7 +558,7 @@ addr,size,file,confidence,name,status
 004d1340,183,rw/math.c,label,RwMatrixInvert,ported
 004d1400,409,rw/math.c,label,RwMatrixScale,ported
 004d15a0,331,rw/math.c,label,RwMatrixTranslate,ported
-004d16f0,1172,rw/math.c,label,RwMatrixTransform,orig
+004d16f0,1172,rw/math.c,label,RwMatrixTransform,ported
 004d1fb0,43,rw/math.c,closure,FUN_004d1fb0,ported
 004d1fe0,87,rw/math.c,label,RwMatrixCreate,ported
 004d2040,61,rw/math.c,label,_rwMatrixClose,orig
@@ -703,9 +703,9 @@ addr,size,file,confidence,name,status
 004dd270,75,lib/d3d7driver,label,RwRasterRegisterPlugin,skip
 004dd430,87,rw/camera.c,label,_rwCameraOpen,ported
 004dd490,61,rw/texture.c,label,_rwCameraClose,orig
-004dd4d0,2152,rw/camera.c,label,CameraBuildPerspClipPlanes,orig
+004dd4d0,2152,rw/camera.c,label,CameraBuildPerspClipPlanes,ported
 004ddd40,353,rw/camera.c,label,CameraBuildPerspViewMatrix,orig
-004ddeb0,1005,rw/camera.c,label,CameraBuildParallelClipPlanes,orig
+004ddeb0,1005,rw/camera.c,label,CameraBuildParallelClipPlanes,ported
 004de2a0,343,rw/camera.c,label,CameraBuildParallelViewMatrix,orig
 004de400,104,rw/camera.c,label,CameraSync,orig
 004de480,163,rw/camera.c,label,CameraUpdateZShiftScale,ported

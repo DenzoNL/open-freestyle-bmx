@@ -1,4 +1,5 @@
 /* RenderWare 3.1 camera: creation, clip planes and view window, and the calls that reach the device. */
+#include "compat/crt.h"
 #include "rw/rwcamera.h"
 #include "rw/rwmath.h"
 
@@ -33,6 +34,272 @@ __attribute__((regparm(1))) void CameraUpdateZShiftScale(RwCamera *camera)
     const double scale = (top - bottom) / (farValue - nearValue);
     camera->zScale = (float)scale;
     camera->zShift = (float)(top - farValue * scale);
+}
+
+/*
+ * The perspective corners step by twice the window along right and up: x, y, z for right, then for up. The
+ * original reads these factors (all 2.0f) from its data; reading them here too keeps the compiler from
+ * rewriting a - b * 2 as a + b * -2, which flips the sign of a NaN.
+ */
+typedef float RwClipCornerSteps[6];
+#define rwPerspCornerSteps ORIG_VAR(0x0069bc70, RwClipCornerSteps, rwPerspCornerSteps)
+
+/* x87 helpers: products and negations of floats are exact in a double (as on the x87 at 53 bits). */
+static double camMul(float a, float b)
+{
+    return (double)a * (double)b;
+}
+
+/* a - b with b opaque to the optimiser: it may not rewrite the subtraction as a + -b or push the negation
+ * into b's product, which flips the sign of a NaN b (the x87 keeps it). */
+static double camSub(double a, double b)
+{
+    __asm__("" : "+x"(b));
+    return a - b;
+}
+
+static float camNeg(float a)
+{
+    return (float)-(double)a;
+}
+
+/* 1 when the float's sign bit is clear, else 0 (the original shifts the bits right by 31 and adds 1). */
+static uint8_t camNotNegative(float f)
+{
+    uint32_t bits;
+    memcpy(&bits, &f, sizeof bits);
+    return (uint8_t)((bits >> 31) ^ 1u);
+}
+
+static void camSetClosest(RwFrustumPlane *plane)
+{
+    plane->closest[0] = camNotNegative(plane->normal.x);
+    plane->closest[1] = camNotNegative(plane->normal.y);
+    plane->closest[2] = camNotNegative(plane->normal.z);
+}
+
+/* The negation of a plane through a corner: normal = -source normal, distance = corner . normal. */
+static void camOppositePlane(RwFrustumPlane *plane, const RwFrustumPlane *source, const ZVec3 *corner)
+{
+    plane->normal.y = camNeg(source->normal.y);
+    const double y = camMul(corner->y, plane->normal.y);
+    const double z = (double)corner->z * -(double)source->normal.z;
+    plane->normal.z = camNeg(source->normal.z);
+    plane->normal.x = camNeg(source->normal.x);
+    plane->distance = (float)((z + y) + camMul(corner->x, plane->normal.x));
+}
+
+static int32_t camFloatBits(float f)
+{
+    int32_t bits;
+    memcpy(&bits, &f, sizeof bits);
+    return bits;
+}
+
+/*
+ * Perspective camera: the four near and four far corners of the frustum in world space (the view window
+ * spans the frame's right and up vectors at distance 1 along at, shifted by the view offset), then the far
+ * and near planes along at and the four side planes from cross products of corner differences, normalised
+ * with the table based 1 / sqrt. Values are kept as doubles where the original keeps them on the x87 stack.
+ */
+BMX_ADDR(0x004dd4d0)
+__attribute__((regparm(1))) void CameraBuildPerspClipPlanes(RwCamera *camera)
+{
+    /* No vectorising: packed code turns a - b into a + -b, which flips the sign of a NaN b. */
+#pragma clang fp exceptions(strict)
+    const RwFrame *frame = (const RwFrame *)camera->object.object.parent;
+    const RwMatrix *ltm = &frame->ltm;
+    ZVec3 *corner = camera->frustumCorners;
+    /* corner directions: at +- right * window.x +- up * window.y */
+    const double rightX = camMul(camera->viewWindow.x, ltm->right.x);
+    const double upX = camMul(camera->viewWindow.y, ltm->up.x);
+    const double x0 = upX + ((double)ltm->at.x + rightX);
+    const double x1 = camSub(x0, rightX * (double)rwPerspCornerSteps[0]);
+    const double x2 = camSub(x1, (double)rwPerspCornerSteps[3] * upX);
+    const double x3 = rightX * (double)rwPerspCornerSteps[0] + x2;
+    const double rightY = camMul(ltm->right.y, camera->viewWindow.x);
+    const double rightZ = camMul(ltm->right.z, camera->viewWindow.x);
+    const double upY = camMul(ltm->up.y, camera->viewWindow.y);
+    const double upZ = camMul(ltm->up.z, camera->viewWindow.y);
+    const double offsetUpZ = camMul(ltm->up.z, camera->viewOffset.y);
+    const double offsetUpY = camMul(ltm->up.y, camera->viewOffset.y);
+    const double offsetUpX = camMul(ltm->up.x, camera->viewOffset.y);
+    const double y0 = ((double)ltm->at.y + rightY) + upY;
+    const double z0 = ((double)ltm->at.z + rightZ) + upZ;
+    corner[3].x = (float)x3;
+    corner[2].x = (float)x2;
+    const double y1 = camSub(y0, rightY * (double)rwPerspCornerSteps[1]);
+    const double y2 = camSub(y1, upY * (double)rwPerspCornerSteps[4]);
+    corner[1].y = (float)y1;
+    corner[2].y = (float)y2;
+    corner[3].y = (float)(rightY * (double)rwPerspCornerSteps[1] + y2);
+    corner[0].y = (float)y0;
+    corner[0].z = (float)z0;
+    const double z1 = camSub(z0, rightZ * (double)rwPerspCornerSteps[2]);
+    const double z2 = camSub(z1, upZ * (double)rwPerspCornerSteps[5]);
+    corner[1].z = (float)z1;
+    corner[1].x = (float)x1;
+    corner[0].x = (float)x0;
+    corner[2].z = (float)z2;
+    corner[3].z = (float)(rightZ * (double)rwPerspCornerSteps[2] + z2);
+    /* the eye: position - right * offset.x + up * offset.y */
+    const double offsetX = -(double)camera->viewOffset.x;
+    const double eyeX = (double)ltm->right.x * offsetX + offsetUpX;
+    const double eyeY = (double)ltm->right.y * offsetX + offsetUpY;
+    const double eyeZ = offsetX * (double)ltm->right.z + offsetUpZ;
+    for (int i = 0; i < 4; i++) {
+        ZVec3 *nearCorner = &corner[i];
+        ZVec3 *farCorner = &corner[i + 4];
+        const double dx = camSub(nearCorner->x, eyeX);
+        nearCorner->x = (float)((double)ltm->pos.x + eyeX);
+        const double dy = camSub(nearCorner->y, eyeY);
+        nearCorner->y = (float)(eyeY + (double)ltm->pos.y);
+        const double dz = camSub(nearCorner->z, eyeZ);
+        nearCorner->z = (float)((double)ltm->pos.z + eyeZ);
+        nearCorner->x = (float)((double)nearCorner->x + (double)camera->nearPlane * dx);
+        nearCorner->y = (float)((double)nearCorner->y + (double)camera->nearPlane * dy);
+        nearCorner->z = (float)((double)nearCorner->z + (double)camera->nearPlane * dz);
+        farCorner->x = (float)(eyeX + (double)ltm->pos.x);
+        farCorner->y = (float)(eyeY + (double)ltm->pos.y);
+        farCorner->z = (float)((double)ltm->pos.z + eyeZ);
+        farCorner->x = (float)((double)farCorner->x + dx * (double)camera->farPlane);
+        farCorner->y = (float)((double)farCorner->y + dy * (double)camera->farPlane);
+        farCorner->z = (float)((double)farCorner->z + dz * (double)camera->farPlane);
+    }
+    RwFrustumPlane *plane = camera->frustumPlanes;
+    /* far plane: normal = at, through far corner 0; near plane: the opposite, through near corner 0 */
+    plane[0].normal = ltm->at;
+    const double farZ = camMul(ltm->at.z, corner[4].z);
+    const double farY = camMul(ltm->at.y, corner[4].y);
+    const double farX = camMul(ltm->at.x, corner[4].x);
+    camOppositePlane(&plane[1], &plane[0], &corner[0]);
+    plane[0].distance = (float)((farZ + farY) + farX);
+    /* left: (c6 - c5) x (c1 - c5) and so on, unnormalised first */
+    const double ax = (double)corner[6].x - (double)corner[5].x;
+    const double az = (double)corner[1].z - (double)corner[5].z;
+    const double bz = (double)corner[6].z - (double)corner[5].z;
+    const double bx = (double)corner[1].x - (double)corner[5].x;
+    plane[2].normal.y = (float)camSub(ax * az, bz * bx);
+    const double yy2 = camMul(plane[2].normal.y, plane[2].normal.y);
+    const double ay = (double)corner[1].y - (double)corner[5].y;
+    const double by = (double)corner[6].y - (double)corner[5].y;
+    plane[2].normal.x = (float)camSub(bz * ay, az * by);
+    const double nz2 = camSub(bx * by, ax * ay);
+    plane[2].normal.z = (float)nz2;
+    const double len2 = (yy2 + nz2 * nz2) + camMul(plane[2].normal.x, plane[2].normal.x);
+    const double scale2 = _rwFastInvSqrt(camFloatBits((float)len2));
+    /* top: (c1 - c5) x (c4 - c5) */
+    const double cz = (double)corner[4].z - (double)corner[5].z;
+    const double cx = (double)corner[4].x - (double)corner[5].x;
+    const double cy = (double)corner[4].y - (double)corner[5].y;
+    plane[3].normal.y = (float)camSub(bx * cz, az * cx);
+    const double nz3 = camSub(cx * ay, bx * cy);
+    const double yy3 = camMul(plane[3].normal.y, plane[3].normal.y);
+    plane[2].normal.x = (float)((double)plane[2].normal.x * scale2);
+    plane[3].normal.z = (float)nz3;
+    const double sum3 = nz3 * nz3 + yy3;
+    const double nx3 = camSub(cy * az, cz * ay);
+    plane[2].normal.y = (float)((double)plane[2].normal.y * scale2);
+    plane[3].normal.x = (float)nx3;
+    const double xx3 = camMul(plane[3].normal.x, plane[3].normal.x);
+    const double unitZ2 = scale2 * (double)plane[2].normal.z;
+    plane[2].normal.z = (float)unitZ2;
+    const double len3 = sum3 + xx3;
+    plane[2].distance = (float)(camMul(plane[2].normal.x, corner[1].x) +
+                                (unitZ2 * (double)corner[1].z + camMul(corner[1].y, plane[2].normal.y)));
+    const double scale3 = _rwFastInvSqrt(camFloatBits((float)len3));
+    /* right: (c4 - c7) x (c3 - c7) */
+    const double dx = (double)corner[4].x - (double)corner[7].x;
+    const double ez = (double)corner[3].z - (double)corner[7].z;
+    const double dz = (double)corner[4].z - (double)corner[7].z;
+    const double ex = (double)corner[3].x - (double)corner[7].x;
+    const double dy = (double)corner[4].y - (double)corner[7].y;
+    plane[4].normal.y = (float)camSub(dx * ez, dz * ex);
+    const double ey = (double)corner[3].y - (double)corner[7].y;
+    const double yy4 = camMul(plane[4].normal.y, plane[4].normal.y);
+    const double nz4 = camSub(ex * dy, dx * ey);
+    plane[3].normal.x = (float)((double)plane[3].normal.x * scale3);
+    plane[4].normal.z = (float)nz4;
+    const double sum4 = nz4 * nz4 + yy4;
+    const double nx4 = camSub(dz * ey, ez * dy);
+    plane[3].normal.y = (float)((double)plane[3].normal.y * scale3);
+    plane[4].normal.x = (float)nx4;
+    const double xx4 = camMul(plane[4].normal.x, plane[4].normal.x);
+    const double unitZ3 = scale3 * (double)plane[3].normal.z;
+    const double len4 = sum4 + xx4;
+    const double y3 = camMul(plane[3].normal.y, corner[1].y);
+    plane[3].normal.z = (float)unitZ3;
+    plane[3].distance = (float)(camMul(plane[3].normal.x, corner[1].x) + (unitZ3 * (double)corner[1].z + y3));
+    const double scale4 = _rwFastInvSqrt(camFloatBits((float)len4));
+    /* bottom: (c3 - c7) x (c6 - c7) */
+    const double fz = (double)corner[6].z - (double)corner[7].z;
+    const double fx = (double)corner[6].x - (double)corner[7].x;
+    const double fy = (double)corner[6].y - (double)corner[7].y;
+    plane[5].normal.y = (float)camSub(ex * fz, ez * fx);
+    const double nz5 = camSub(fx * ey, ex * fy);
+    const double yy5 = camMul(plane[5].normal.y, plane[5].normal.y);
+    plane[4].normal.x = (float)((double)plane[4].normal.x * scale4);
+    plane[5].normal.z = (float)nz5;
+    const double sum5 = nz5 * nz5 + yy5;
+    const double nx5 = camSub(fy * ez, fz * ey);
+    plane[4].normal.y = (float)((double)plane[4].normal.y * scale4);
+    plane[5].normal.x = (float)nx5;
+    const double xx5 = camMul(plane[5].normal.x, plane[5].normal.x);
+    const double unitZ4 = scale4 * (double)plane[4].normal.z;
+    plane[4].normal.z = (float)unitZ4;
+    const double len5 = sum5 + xx5;
+    plane[4].distance = (float)(camMul(plane[4].normal.x, corner[3].x) +
+                                (unitZ4 * (double)corner[3].z + camMul(corner[3].y, plane[4].normal.y)));
+    const double scale5 = _rwFastInvSqrt(camFloatBits((float)len5));
+    plane[5].normal.y = (float)((double)plane[5].normal.y * scale5);
+    const double unitZ5 = (double)plane[5].normal.z * scale5;
+    const double y5 = camMul(corner[3].y, plane[5].normal.y);
+    plane[5].normal.z = (float)unitZ5;
+    plane[5].normal.x = (float)(scale5 * (double)plane[5].normal.x);
+    plane[5].distance = (float)(((double)corner[3].z * unitZ5 + y5) + camMul(corner[3].x, plane[5].normal.x));
+    for (int i = 0; i < 6; i++) {
+        camSetClosest(&plane[i]);
+    }
+}
+
+/*
+ * Parallel camera: the corners are the view window at the near and far distances, transformed by the frame's
+ * LTM; the far, right and top planes take the LTM's at, right and up vectors, the near, left and bottom
+ * planes their negations.
+ */
+BMX_ADDR(0x004ddeb0)
+__attribute__((regparm(1))) void CameraBuildParallelClipPlanes(RwCamera *camera)
+{
+    const RwFrame *frame = (const RwFrame *)camera->object.object.parent;
+    ZVec3 *corner = camera->frustumCorners;
+    const float negY = camNeg(camera->viewWindow.y);
+    const float negX = camNeg(camera->viewWindow.x);
+    corner[7].y = corner[6].y = corner[3].y = corner[2].y = negY;
+    corner[6].x = corner[5].x = corner[2].x = corner[1].x = negX;
+    corner[5].z = corner[7].z = corner[6].z = corner[4].z = camera->farPlane;
+    corner[1].z = corner[3].z = corner[2].z = corner[0].z = camera->nearPlane;
+    corner[1].y = corner[5].y = corner[4].y = corner[0].y = camera->viewWindow.y;
+    corner[3].x = corner[7].x = corner[4].x = corner[0].x = camera->viewWindow.x;
+    RwV3dTransformPoints(corner, corner, 8, &frame->ltm);
+    RwFrustumPlane *plane = camera->frustumPlanes;
+    plane[0].normal = frame->ltm.at;
+    plane[0].distance =
+        (float)(camMul(plane[0].normal.x, corner[4].x) +
+                (camMul(corner[4].y, plane[0].normal.y) + camMul(corner[4].z, plane[0].normal.z)));
+    plane[4].normal = frame->ltm.right;
+    plane[4].distance =
+        (float)(camMul(corner[3].x, plane[4].normal.x) +
+                (camMul(corner[3].y, plane[4].normal.y) + camMul(corner[3].z, plane[4].normal.z)));
+    plane[3].normal = frame->ltm.up;
+    plane[3].distance =
+        (float)((camMul(corner[1].y, plane[3].normal.y) + camMul(corner[1].z, plane[3].normal.z)) +
+                camMul(corner[1].x, plane[3].normal.x));
+    camOppositePlane(&plane[1], &plane[0], &corner[0]);
+    camOppositePlane(&plane[2], &plane[4], &corner[1]);
+    camOppositePlane(&plane[5], &plane[3], &corner[3]);
+    for (int i = 0; i < 6; i++) {
+        camSetClosest(&plane[i]);
+    }
 }
 
 /* The far z of the 2D immediate mode as the device reports it (returned on the x87 stack). */

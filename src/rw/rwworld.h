@@ -339,6 +339,16 @@ __attribute__((regparm(1))) void rpSectorTreeDestroy(RpSector *sector);
 __attribute__((regparm(1))) void rpSectorTreeDeinit(RpSector *sector);
 
 /* Calls the callback for every sector the intersection touches (line and ray walks are still original). */
+/* EAX = world, EDX = intersection (a line / a sphere), ECX = callback; the callback's copy of the
+ * intersection and its data are the 4th and 5th stack words. */
+__attribute__((regparm(3))) RpWorld *
+rpWorldForAllSectorsIntersectingLine(RpWorld *world, RpIntersection *intersection,
+                                     RpIntersectionCallBackWorldSector callback, int32_t unused0,
+                                     int32_t unused1, int32_t unused2, RpIntersection *again, void *data);
+__attribute__((regparm(3))) RpWorld *
+rpWorldForAllSectorsIntersectingSphere(RpWorld *world, RpIntersection *intersection,
+                                       RpIntersectionCallBackWorldSector callback, int32_t unused0,
+                                       int32_t unused1, int32_t unused2, RpIntersection *again, void *data);
 RpWorld *_rpWorldForAllSectorsIntersecting(RpWorld *world, RpIntersection *intersection,
                                            RpIntersectionCallBackWorldSector callback, void *data);
 

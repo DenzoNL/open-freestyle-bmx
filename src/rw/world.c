@@ -10,17 +10,6 @@
 #include "rw/rwclump.h"
 
 /*
- * The line and ray walks of the BSP (the same intersection structure is passed twice: in EDX and again on
- * the stack, where the original reads it). Excluded from the port for now.
- */
-ORIG_FN_REGPARM(3, 0x004bcd90, void, rpWorldForAllSectorsIntersectingLine,
-                (RpWorld * world, RpIntersection *intersection, RpIntersectionCallBackWorldSector callback,
-                 int32_t unused0, int32_t unused1, int32_t unused2, RpIntersection *again, void *data));
-ORIG_FN_REGPARM(3, 0x004bda80, void, rpWorldForAllSectorsIntersectingRay,
-                (RpWorld * world, RpIntersection *intersection, RpIntersectionCallBackWorldSector callback,
-                 int32_t unused0, int32_t unused1, int32_t unused2, RpIntersection *again, void *data));
-
-/*
  * The camera set-up of the PVS generation (0x4ce6d0, original code of the camera group): EAX = world, EDX =
  * raster, ECX = z raster and the far clip plane on the x87 stack (popped by the callee). It creates the
  * camera and image the generation renders with (rpPVSCamera, rpPVSImage).
@@ -648,12 +637,247 @@ __attribute__((regparm(1))) int rpWorldDestroyBody(RpWorld *world)
 
 /* ---- walking the BSP --------------------------------------------------------------------------------- */
 
+/* ---- the line walk ----------------------------------------------------------------------------------- */
+
+static int32_t floatBits(float f)
+{
+    int32_t bits;
+    __builtin_memcpy(&bits, &f, 4);
+    return bits;
+}
+
+/* Whether two floats have the same sign bit. */
+static int sameSign(float a, float b)
+{
+    return ((floatBits(a) ^ floatBits(b)) & (int32_t)0x80000000) == 0;
+}
+
+/* a - b with b opaque to the optimiser, so the subtraction is not rewritten as a + -b (which flips the sign
+ * of a NaN b; the x87 keeps it). */
+static double subtractOpaque(double a, double b)
+{
+    __asm__("" : "+x"(b));
+    return a - b;
+}
+
+/* The point where the line crosses a plane, from the signed distances of its ends: start - (end - start) * t
+ * with t = startDistance / (endDistance - startDistance), each coordinate rounded to a float. */
+static RwV3d lineSplit(const RwLine *line, float startDistance, float endDistance)
+{
+    const double t = (double)startDistance / ((double)endDistance - (double)startDistance);
+    RwV3d point;
+    point.x = (float)subtractOpaque(line->start.x, ((double)line->end.x - (double)line->start.x) * t);
+    point.y = (float)subtractOpaque(line->start.y, ((double)line->end.y - (double)line->start.y) * t);
+    point.z = (float)subtractOpaque(line->start.z, ((double)line->end.z - (double)line->start.z) * t);
+    return point;
+}
+
+/* The distance of a line end from a plane value along the plane's axis, rounded to a float. */
+static float planeDistance(const RwV3d *end, int32_t axisOffset, float value)
+{
+    float coordinate;
+    __builtin_memcpy(&coordinate, (const uint8_t *)end + axisOffset, 4);
+    return (float)((double)coordinate - (double)value);
+}
+
+/*
+ * Calls the callback for the world sectors a line passes through, clipping the line at the planes. The
+ * distances of both ends from the left and right values decide (by their bits, so -0 counts as negative):
+ * a line entirely on one side goes down that side; a line inside the overlap of both values goes down both
+ * (the side of the start first); otherwise the line is cut where it crosses the value(s) it straddles, the
+ * part beyond each cut going to the other child. The callback gets the stack copy of the intersection; a
+ * NULL result stops the walk. Returns the world.
+ */
+BMX_ADDR(0x004bcd90)
+__attribute__((regparm(3))) RpWorld *
+rpWorldForAllSectorsIntersectingLine(RpWorld *world, RpIntersection *intersection,
+                                     RpIntersectionCallBackWorldSector callback, int32_t unused0,
+                                     int32_t unused1, int32_t unused2, RpIntersection *again, void *data)
+{
+    (void)unused0;
+    (void)unused1;
+    (void)unused2;
+    RwLine line = intersection->t.line;
+    RpSector *nodes[64];
+    RwLine lines[64];
+    int32_t top = 0;
+    RpSector *node = world->rootSector;
+    for (;;) {
+        if (node->type < 0) {
+            if (callback(again, (RpWorldSector *)node, data) == NULL) {
+                return world;
+            }
+            if (top == 0) {
+                return world;
+            }
+            node = nodes[top];
+            line = lines[top];
+            top--;
+            continue;
+        }
+        const RpPlaneSector *plane = (const RpPlaneSector *)node;
+        const float startRight = planeDistance(&line.start, plane->type, plane->rightValue);
+        const float startLeft = planeDistance(&line.start, plane->type, plane->leftValue);
+        const float endLeft = planeDistance(&line.end, plane->type, plane->leftValue);
+        const float endRight = planeDistance(&line.end, plane->type, plane->rightValue);
+        if (floatBits(startRight) < 0 && floatBits(endRight) < 0) {
+            node = plane->leftSubTree;
+            continue;
+        }
+        if (floatBits(startLeft) > 0 && floatBits(endLeft) > 0) {
+            node = plane->rightSubTree;
+            continue;
+        }
+        top++;
+        if (sameSign(startLeft, endLeft) && sameSign(startRight, endRight)) {
+            lines[top] = line;
+            if (floatBits(startLeft) >= floatBits(endLeft)) {
+                nodes[top] = plane->leftSubTree;
+                node = plane->rightSubTree;
+            } else {
+                nodes[top] = plane->rightSubTree;
+                node = plane->leftSubTree;
+            }
+        } else if (!sameSign(startLeft, endLeft) && floatBits(startRight) > 0 && floatBits(endRight) > 0) {
+            const RwV3d cut = lineSplit(&line, startLeft, endLeft);
+            if (floatBits(startLeft) < 0) {
+                nodes[top] = plane->rightSubTree;
+                lines[top] = line;
+                line.end = cut;
+                node = plane->leftSubTree;
+            } else {
+                nodes[top] = plane->leftSubTree;
+                lines[top].start = cut;
+                lines[top].end = line.end;
+                node = plane->rightSubTree;
+            }
+        } else if (!sameSign(startRight, endRight) && floatBits(startLeft) < 0 && floatBits(endLeft) < 0) {
+            const RwV3d cut = lineSplit(&line, startRight, endRight);
+            if (floatBits(startRight) < 0) {
+                nodes[top] = plane->rightSubTree;
+                lines[top].start = cut;
+                lines[top].end = line.end;
+                node = plane->leftSubTree;
+            } else {
+                nodes[top] = plane->leftSubTree;
+                lines[top] = line;
+                line.end = cut;
+                node = plane->rightSubTree;
+            }
+        } else if (floatBits(startLeft) < 0) {
+            nodes[top] = plane->rightSubTree;
+            lines[top].start = lineSplit(&line, startRight, endRight);
+            lines[top].end = line.end;
+            line.end = lineSplit(&line, startLeft, endLeft);
+            node = plane->leftSubTree;
+        } else {
+            nodes[top] = plane->leftSubTree;
+            lines[top].start = lineSplit(&line, startLeft, endLeft);
+            lines[top].end = line.end;
+            line.end = lineSplit(&line, startRight, endRight);
+            node = plane->rightSubTree;
+        }
+    }
+}
+
+/* ---- the sphere walk --------------------------------------------------------------------------------- */
+
+/* The sphere walk's limits (all 0.0f in the exe's data): smallest radius, squared radius and distance. */
+#define rpSphereMinRadius   ORIG_VAR(0x0069b328, float, rpSphereMinRadius)
+#define rpSphereMinRadiusSq ORIG_VAR(0x0069b330, float, rpSphereMinRadiusSq)
+#define rpSphereMinDistance ORIG_VAR(0x0069b334, float, rpSphereMinDistance)
+
+/* A node to visit later with the bounding box of its space. */
+typedef struct RpSectorBox {
+    RpSector *node;
+    RwBBox box;
+} RpSectorBox;
+
+/* The larger of two squared distances, compared by their bits as signed integers like the original. */
+static float largerSquare(float a, float b)
+{
+    int32_t aBits;
+    int32_t bBits;
+    __builtin_memcpy(&aBits, &a, 4);
+    __builtin_memcpy(&bBits, &b, 4);
+    return aBits > bBits ? a : b;
+}
+
+/* The squared distance of v from the farther face of [inf, sup] along one axis (each square a float). */
+static float farFaceSquare(float inf, float sup, float v)
+{
+    const double toInf = (double)inf - (double)v;
+    const double toSup = (double)sup - (double)v;
+    return largerSquare((float)(toInf * toInf), (float)(toSup * toSup));
+}
+
+/*
+ * Calls the callback for the world sectors a sphere may touch, walking the BSP with the box of each node's
+ * space (the left child's box ends at the plane's left value, the right child's starts at its right value).
+ * The node test compares the squared radius and the squared distance to the box's farthest corner against
+ * the limits above, both 0, so only a NaN distance ends a branch. The callback gets the stack copy of the
+ * intersection; a NULL result stops the walk. Returns the world (NULL for a negative radius).
+ */
+BMX_ADDR(0x004bda80)
+__attribute__((regparm(3))) RpWorld *
+rpWorldForAllSectorsIntersectingSphere(RpWorld *world, RpIntersection *intersection,
+                                       RpIntersectionCallBackWorldSector callback, int32_t unused0,
+                                       int32_t unused1, int32_t unused2, RpIntersection *again, void *data)
+{
+    (void)unused0;
+    (void)unused1;
+    (void)unused2;
+    const RwSphere *sphere = &intersection->t.sphere;
+    if ((double)rpSphereMinRadius > (double)sphere->radius) {
+        RwError error;
+        error.pluginID = kWorldPluginId;
+        error.errorCode = _rwerror(rwERR_INVALIDSIZE, "Negative Sphere radius");
+        RwErrorSet(&error);
+        return NULL;
+    }
+    const float radiusSquared = (float)((double)sphere->radius * (double)sphere->radius);
+    int32_t radiusSquaredBits;
+    __builtin_memcpy(&radiusSquaredBits, &radiusSquared, 4);
+    const double radiusSq = radiusSquaredBits < 0 ? 0.0 : (double)radiusSquared;
+    RpSectorBox stack[64];
+    int32_t top = 0;
+    RpSector *node = world->rootSector;
+    RwBBox box = world->boundingBox;
+    for (;;) {
+        const float dx = farFaceSquare(box.inf.x, box.sup.x, sphere->center.x);
+        const float dy = farFaceSquare(box.inf.y, box.sup.y, sphere->center.y);
+        const float dz = farFaceSquare(box.inf.z, box.sup.z, sphere->center.z);
+        const double distanceSq = ((double)dx + (double)dy) + (double)dz;
+        if (!((double)rpSphereMinRadiusSq > radiusSq) && distanceSq >= (double)rpSphereMinDistance) {
+            if (node->type >= 0) {
+                const RpPlaneSector *plane = (const RpPlaneSector *)node;
+                top++;
+                stack[top].node = plane->rightSubTree;
+                stack[top].box = box;
+                __builtin_memcpy((uint8_t *)&stack[top].box.inf + plane->type, &plane->rightValue, 4);
+                __builtin_memcpy((uint8_t *)&box.sup + plane->type, &plane->leftValue, 4);
+                node = plane->leftSubTree;
+                continue;
+            }
+            if (callback(again, (RpWorldSector *)node, data) == NULL) {
+                return world;
+            }
+        }
+        if (top == 0) {
+            return world;
+        }
+        node = stack[top].node;
+        box = stack[top].box;
+        top--;
+    }
+}
+
 /*
  * Calls the callback for the world sectors an intersection touches. A point walks the tree (both children
  * where they overlap), an atomic visits the sectors it is tied to (keeping a marker in the list so the
- * callback may remove the current tie); lines and rays are the original's. The callback's result only matters
- * for atomics. Anything else is error 1. A point's coordinates are compared as integers, like the plane
- * values.
+ * callback may remove the current tie); lines and spheres go through the walks above. The callback's result
+ * only matters for atomics. Anything else is error 1. A point's coordinates are compared as integers, like
+ * the plane values.
  */
 BMX_ADDR(0x004c1cf0)
 RpWorld *_rpWorldForAllSectorsIntersecting(RpWorld *world, RpIntersection *intersection,
@@ -695,7 +919,7 @@ RpWorld *_rpWorldForAllSectorsIntersecting(RpWorld *world, RpIntersection *inter
         rpWorldForAllSectorsIntersectingLine(world, intersection, callback, 0, 0, 0, intersection, data);
         return world;
     case rpINTERSECTSPHERE:
-        rpWorldForAllSectorsIntersectingRay(world, intersection, callback, 0, 0, 0, intersection, data);
+        rpWorldForAllSectorsIntersectingSphere(world, intersection, callback, 0, 0, 0, intersection, data);
         return world;
     case rpINTERSECTATOMIC: {
         RwLLLink *head = atomicSectorList(intersection->t.object);

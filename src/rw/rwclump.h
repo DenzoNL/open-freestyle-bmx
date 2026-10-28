@@ -242,13 +242,9 @@ __attribute__((regparm(3))) RpPlaneSector *rpBspStreamWrite(const RpPlaneSector 
 __attribute__((regparm(3))) RpWorldSector *rpSectorStreamRead(RwStream *stream, uint8_t **cursor,
                                                               int32_t world, int32_t pad0, int32_t pad1,
                                                               int32_t pad2, uint32_t flags);
-/*
- * Known issue: the port of rpBspStreamRead (0x4c36a0) diverges from the original for trees with nested
- * plane sectors (real levels have them), so it is disabled (`#if 0` in rw/clump.c) and the original runs.
- */
-ORIG_FN_REGPARM(3, 0x004c36a0, RpPlaneSector *, rpBspStreamRead,
-                (RwStream * stream, uint8_t **cursor, int32_t world, int32_t pad0, int32_t pad1, int32_t pad2,
-                 uint32_t flags));
+__attribute__((regparm(3))) RpPlaneSector *rpBspStreamRead(RwStream *stream, uint8_t **cursor, int32_t world,
+                                                           int32_t pad0, int32_t pad1, int32_t pad2,
+                                                           uint32_t flags);
 RpWorld *RpWorldStreamWrite(RpWorld *world, RwStream *stream);
 RpWorld *RpWorldStreamRead(RwStream *stream);
 

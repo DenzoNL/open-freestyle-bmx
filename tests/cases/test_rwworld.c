@@ -774,7 +774,7 @@ static void *BMX_CDECL cbIsect(RpIntersection *isect, RpWorldSector *sector, voi
     return gCbStopAt != 0 && gCbCalls >= gCbStopAt ? NULL : (void *)1;
 }
 
-/* The line and ray walks stay original code; stubs with the register convention they are called with. */
+/* Stubs of the line and sphere walks with the register convention they are called with. */
 __attribute__((regparm(3))) static void *stLineWalk(RpWorld *world, RpIntersection *isect,
                                                     RpIntersectionCallBackWorldSector cb, int32_t a,
                                                     int32_t b, int32_t d, RpIntersection *again, void *data)
@@ -832,6 +832,135 @@ static void setup_intersect(DtCtx *c)
         }
         DT_ARG_PTR(c, 2, stPvsView);
     }
+    rwtEnd();
+}
+
+/* ---- the sphere walk (EAX = world, EDX = intersection, ECX = callback) -------------------------------- */
+
+typedef RpWorld *(__attribute__((regparm(3))) * SphereWalkFunc)(RpWorld *world, RpIntersection *intersection,
+                                                                RpIntersectionCallBackWorldSector callback,
+                                                                int32_t a, int32_t b, int32_t d,
+                                                                RpIntersection *again, void *data);
+
+static RpWorld *sphere_walk_orig(RpWorld *w, RpIntersection *i, RpIntersectionCallBackWorldSector cb,
+                                 void *data)
+{
+    return ((SphereWalkFunc)0x004bda80)(w, i, cb, 0, 0, 0, i, data);
+}
+
+static RpWorld *sphere_walk_impl(RpWorld *w, RpIntersection *i, RpIntersectionCallBackWorldSector cb,
+                                 void *data)
+{
+    return rpWorldForAllSectorsIntersectingSphere(w, i, cb, 0, 0, 0, i, data);
+}
+
+/* A coordinate: moderate mostly, now and then 0, a denormal, a huge or an infinite value (no NaN: where two
+ * NaNs meet the x87 and SSE keep different ones). */
+static float walkFloat(void)
+{
+    static const uint32_t edges[] = {0x00000000, 0x80000000, 0x00000001, 0x7f7fffff, 0x7f800000, 0xff800000};
+    if (dt_u32() % 12 == 0) {
+        float f;
+        __builtin_memcpy(&f, &edges[dt_u32() % (sizeof edges / sizeof edges[0])], 4);
+        return f;
+    }
+    return dt_float_edgy(-100.0F, 100.0F);
+}
+
+static RpWorld *line_walk_orig(RpWorld *w, RpIntersection *i, RpIntersectionCallBackWorldSector cb,
+                               void *data)
+{
+    return ((SphereWalkFunc)0x004bcd90)(w, i, cb, 0, 0, 0, i, data);
+}
+
+static RpWorld *line_walk_impl(RpWorld *w, RpIntersection *i, RpIntersectionCallBackWorldSector cb,
+                               void *data)
+{
+    return rpWorldForAllSectorsIntersectingLine(w, i, cb, 0, 0, 0, i, data);
+}
+
+/* A BSP with float plane values. */
+static RpSector *mkFloatTree(int depth)
+{
+    if (depth == 0 || dt_u32() % 4 == 0) {
+        return (RpSector *)mkLeaf(-1);
+    }
+    RpPlaneSector *p = dt_alloc(kSectorBytes);
+    p->type = 4 * dt_range(0, 2);
+    p->value = walkFloat();
+    p->leftValue = dt_u32() % 3 == 0 ? p->value : walkFloat();
+    p->rightValue = dt_u32() % 3 == 0 ? p->value : walkFloat();
+    p->leftSubTree = mkFloatTree(depth - 1);
+    p->rightSubTree = mkFloatTree(depth - 1);
+    return (RpSector *)p;
+}
+
+static void *BMX_CDECL cbSphere(RpIntersection *isect, RpWorldSector *sector, void *data)
+{
+    rwtLog(0x5e5e);
+    rwtLogPtr(isect);
+    rwtLogPtr(sector);
+    rwtLogPtr(data);
+    gCbCalls++;
+    return gCbStopAt != 0 && gCbCalls >= gCbStopAt ? NULL : (void *)1;
+}
+
+static void setup_sphere_walk(DtCtx *c)
+{
+    worldEnv(c, 0);
+    gCbCalls = 0;
+    gCbStopAt = dt_u32() % 3 == 0 ? dt_range(1, 6) : 0;
+    RpWorld *w = mkWorld();
+    w->rootSector = mkFloatTree(dt_range(0, 6));
+    float *box = (float *)&w->boundingBox;
+    for (int i = 0; i < 6; i++) {
+        box[i] = walkFloat();
+    }
+    RpIntersection *isect = dt_alloc(sizeof(RpIntersection));
+    isect->type = rpINTERSECTSPHERE;
+    isect->t.sphere.center.x = walkFloat();
+    isect->t.sphere.center.y = walkFloat();
+    isect->t.sphere.center.z = walkFloat();
+    isect->t.sphere.radius = dt_u32() % 8 == 0 ? -walkFloat() : walkFloat();
+    /* the limits are exe data (0.0f): vary them to reach both sides of every test */
+    if (dt_u32() % 2 == 0) {
+        ORIG_VAR(0x0069b328, float, rpSphereMinRadius) = dt_float(-1.0F, 1.0F);
+        ORIG_VAR(0x0069b330, float, rpSphereMinRadiusSq) = dt_float(0.0F, 2000.0F);
+        ORIG_VAR(0x0069b334, float, rpSphereMinDistance) = dt_float(0.0F, 40000.0F);
+    }
+    DT_ARG_PTR(c, 0, w);
+    DT_ARG_PTR(c, 1, isect);
+    DT_ARG_PTR(c, 2, cbSphere);
+    DT_ARG_PTR(c, 3, dt_alloc(8));
+    rwtEnd();
+}
+
+/* The line walk: a line through a float BSP (sometimes axis aligned, or with an end on a plane value). */
+static void setup_line_walk(DtCtx *c)
+{
+    worldEnv(c, 0);
+    gCbCalls = 0;
+    gCbStopAt = dt_u32() % 3 == 0 ? dt_range(1, 8) : 0;
+    RpWorld *w = mkWorld();
+    w->rootSector = mkFloatTree(dt_range(0, 7));
+    RpIntersection *isect = dt_alloc(sizeof(RpIntersection));
+    isect->type = rpINTERSECTLINE;
+    float *ends = (float *)&isect->t.line;
+    for (int i = 0; i < 6; i++) {
+        ends[i] = walkFloat();
+    }
+    if (dt_u32() % 4 == 0) {
+        const int axis = dt_range(0, 2);
+        ends[3 + axis] = ends[axis];
+    }
+    if (dt_u32() % 4 == 0 && w->rootSector->type >= 0) {
+        const RpPlaneSector *root = (const RpPlaneSector *)w->rootSector;
+        ends[(dt_u32() % 2) * 3 + root->type / 4] = dt_u32() % 2 ? root->leftValue : root->rightValue;
+    }
+    DT_ARG_PTR(c, 0, w);
+    DT_ARG_PTR(c, 1, isect);
+    DT_ARG_PTR(c, 2, cbSphere);
+    DT_ARG_PTR(c, 3, dt_alloc(8));
     rwtEnd();
 }
 
@@ -1419,6 +1548,10 @@ DT_CASES(rwworld_cases) = {
      setup_for_all_sectors_world, 200, 0},
     /* RpWorldDestroy's stub at 0x4ba9c0 falls into the body at 0x4ba9c4 (and the sector trees) */
     {"rpWorldDestroyBody", 0x004ba9c0, testWorldDestroy, 1, DT_RET_INT, setup_destroy, 300, 0},
+    {"rpWorldForAllSectorsIntersectingLine", (uint32_t)(uintptr_t)line_walk_orig, line_walk_impl, 4,
+     DT_RET_INT, setup_line_walk, 3000, 0},
+    {"rpWorldForAllSectorsIntersectingSphere", (uint32_t)(uintptr_t)sphere_walk_orig, sphere_walk_impl, 4,
+     DT_RET_INT, setup_sphere_walk, 2000, 0},
     {"_rpWorldForAllSectorsIntersecting", 0x004c1cf0, _rpWorldForAllSectorsIntersecting, 4, DT_RET_INT,
      setup_intersect, 400, 0},
     {"RpPVSSetProgressCallBack", 0x004cc0f0, RpPVSSetProgressCallBack, 2, DT_RET_INT, setup_pvs_progress, 100,

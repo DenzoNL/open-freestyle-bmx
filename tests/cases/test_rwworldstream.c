@@ -278,7 +278,76 @@ static RpMaterialList *BMX_CDECL stWorldMatListRead(void *stream, RpMaterialList
     return list;
 }
 
-static void setup_world_read(DtCtx *c)
+/* Writes a well-formed tree into the stream script from dword gStreamDword on: planes (6 dwords: type, value,
+ * left is a sector, right is a sector, left value, right value) and sectors (11 dwords, small vertex and
+ * polygon counts, no collision tree, then the per-vertex arrays the world format (dword 12) asks for), at
+ * most 8 planes so the block (30 planes, 30 sectors) holds it. */
+static int gStreamDword, gTreePlanes;
+
+static void clPut(uint32_t value)
+{
+    const int at = (gStreamDword++ * 4) % kClStreamBytes;
+    for (int i = 0; i < 4; i++) {
+        gClStream[at + i] = (uint8_t)(value >> (i * 8));
+    }
+}
+
+static void clPutFloat(float value)
+{
+    union {
+        float f;
+        uint32_t u;
+    } bits = {value};
+    clPut(bits.u);
+}
+
+static void clPutSector(void)
+{
+    const uint32_t numPolygons = (uint32_t)dt_range(0, 2);
+    const uint32_t numVertices = (uint32_t)dt_range(0, 2);
+    clPut((uint32_t)dt_range(0, 1));
+    clPut(numPolygons);
+    clPut(numVertices);
+    for (int i = 0; i < 6; i++) {
+        clPutFloat(dt_float_edgy(-50.0f, 50.0f));
+    }
+    clPut(0); /* no collision tree */
+    clPut(dt_u32());
+    const uint32_t format = gClStream[12 * 4];
+    const uint32_t perVertex = 3 + ((format & 0x10) != 0) + ((format & 8) != 0) + ((format & 4) != 0) * 2;
+    for (uint32_t i = 0; i < numVertices * perVertex; i++) { /* vertices, normals, prelight, uvs */
+        clPut(dt_u32());
+    }
+    for (uint32_t i = 0; i < numPolygons; i++) { /* material 0..3, vertex indices 0 */
+        clPut(dt_u32() % 4);
+    }
+}
+
+static void clPutPlane(int depth)
+{
+    gTreePlanes++;
+    const int leftPlane = depth > 0 && gTreePlanes < 8 && dt_u32() % 3 != 0;
+    const int rightPlane = depth > 0 && gTreePlanes < 8 && dt_u32() % 3 != 0;
+    clPut((uint32_t)dt_range(0, 2) * 4);
+    clPutFloat(dt_float_edgy(-50.0f, 50.0f));
+    clPut(leftPlane ? 0 : (uint32_t)dt_range(1, 3));
+    clPut(rightPlane ? 0 : 1);
+    clPutFloat(dt_float_edgy(-50.0f, 50.0f));
+    clPutFloat(dt_float_edgy(-50.0f, 50.0f));
+    if (leftPlane) {
+        clPutPlane(depth - 1);
+    } else {
+        clPutSector();
+    }
+    if (rightPlane) {
+        clPutPlane(depth - 1);
+    } else {
+        clPutSector();
+    }
+}
+
+/* nested: plane nodes may have plane children (the stream decides), as in real levels */
+static void worldReadSetup(DtCtx *c, int nested)
 {
     clEnv(c);
     clRegistryStubs();
@@ -294,9 +363,18 @@ static void setup_world_read(DtCtx *c)
     }
     gClStream[0] = (uint8_t)(dt_u32() % 2);         /* the root is a sector */
     gClStream[12 * 4] = (uint8_t)(dt_u32() & 0x1e); /* format flags (no strips) */
-    gClStream[15 * 4] =
-        1; /* a plane root has sector children: nested planes are left untested (see report) */
-    gClStream[16 * 4] = 1;
+    if (nested) {
+        gClStream[0] = 0;
+        gClStream[12 * 4 + 3] =
+            (uint8_t)(dt_u32() % 2 ? 0x40 : 0); /* plane nodes keep their own left/right values */
+        gStreamDword = 13;
+        gTreePlanes = 0;
+        clPutPlane(3);
+        gClStreamFailAt = 0; /* a failed read does not advance the script, and the prelight read ignores it */
+    } else {
+        gClStream[15 * 4] = 1; /* a plane root with sector children */
+        gClStream[16 * 4] = 1;
+    }
     gClStream[7 * 4] = 60; /* triangles, vertices, planes, sectors, collision bytes: */
     gClStream[8 * 4] = 60; /* generous, so the reader stays inside its block */
     gClStream[9 * 4] = 30;
@@ -324,6 +402,16 @@ static void setup_world_read(DtCtx *c)
     rwtEnd();
 }
 
+static void setup_world_read(DtCtx *c)
+{
+    worldReadSetup(c, 0);
+}
+
+static void setup_world_read_nested(DtCtx *c)
+{
+    worldReadSetup(c, 1);
+}
+
 DT_CASES(rwworldstream_cases) = {
     {"rpWorldRegister", 0x004b9ed0, rpWorldRegister, 2, DT_RET_VOID, setup_world_register, 60, 0},
     {"rpWorldUnregister", 0x004b9f60, rpWorldUnregister, 1, DT_RET_VOID, setup_world_unregister, 100, 0},
@@ -342,4 +430,6 @@ DT_CASES(rwworldstream_cases) = {
      setup_generate_meshes, 300, 0},
     {"RpWorldStreamWrite", 0x004c3ae0, RpWorldStreamWrite, 2, DT_RET_INT, setup_world_write, 500, 0},
     {"RpWorldStreamRead", 0x004c3e60, RpWorldStreamRead, 1, DT_RET_INT, setup_world_read, 1500, 0},
+    {"RpWorldStreamRead_nested", 0x004c3e60, RpWorldStreamRead, 1, DT_RET_INT, setup_world_read_nested, 1500,
+     0},
 };
