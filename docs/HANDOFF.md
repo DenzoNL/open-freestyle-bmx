@@ -24,9 +24,11 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   (cut at RW's device interface, CPU vertex lighting ported faithfully, offline-compiled shaders, render at the
   game's mode resolution, RGBA8 textures with CPU copies, original device dialog for now, screenshot diffs).
 - SDL3 driver step 1 done 2026-10-29 (src/driver/): `bmxnative.exe Scene.Txt -r640.480.16` runs the menu loop with
-  clear + present in an SDL3 GPU window (300 frames, no trap). Next blockers (docs/NATIVE.md "First traps with the SDL3
-  driver skeleton"): the PNG reader (lib/libpng is `skip`, reached after ~30 s of menu) needs a replacement decoder;
-  the x87 precision/RwMatrixMultiply switch in camera begin update (SDL3-DRIVER.md open points); then step 2.
+  clear + present in an SDL3 GPU window (300 frames, no trap).
+- PNG reader done 2026-10-29 (src/png/, docs/NATIVE.md "PNG reader instead of libpng"): replaces libpng in the native
+  exe, byte-identical to libpng 1.0.5 on 112 files (all game PNGs + synthetic set) via `BMX_PNG_CHECK`. Next blocker:
+  the D3D driver's Im3D code, 0x4ea960 from rwIm3DPipelinePush (0x4e85b0), i.e. SDL3 driver step 2/3. The x87
+  RwMatrixMultiply routine 0x54b038 runs as kept original code for now (stopgap, SDL3-DRIVER.md open points).
 - Golden traces: record sessions with `bmxtrace.orig` (docs/TRACING.md) if not done yet.
 
 ## Machine setup

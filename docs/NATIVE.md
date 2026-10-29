@@ -88,6 +88,7 @@ Environment (dev aids):
 | `BMX_QUIT_FRAMES=N` | exit after N shown frames (`RwRasterShowRaster`) |
 | `BMX_SHOT=<file.bmp>`, `BMX_SHOT_FRAME=N` | save the shown camera raster of frame N (default 1) as a BMP (GPU readback) |
 | `BMX_DRIVER_TRACE=1` | log every SDL3 driver entry with its first arguments |
+| `BMX_PNG_CHECK=1` or `=<folder>` | compare our PNG reader with the original libpng on every PNG read (and on every `*.png` in the folder), see "PNG reader" |
 | `SDL_GPU_DRIVER=vulkan` | SDL's own: pick the GPU backend (default here: direct3d12) |
 
 Output goes to stderr and to `bmxnative.log` next to the exe. Note: a desktop capture (BitBlt / CopyFromScreen) of
@@ -99,7 +100,9 @@ Sources: `src/native/loader.c` (hash check, image, imports, jumps), `trap.c` (ex
 The game objects are compiled with `BMX_HOOK=1`, `-ffreestanding -fno-builtin` and the hook build's SSE2 flags; the
 loader is hosted C. The driver (object library `bmx_driver`) is hosted C with `BMX_HOOK=1` (RW globals at their
 original addresses) and is never part of the hook DLL. It is not in build/hook's compile database, so `tools/check.sh`
-leaves it out of clang-tidy; tidy it with `clang-tidy -p build/native32 src/driver/*.c` (clang-tidy 21).
+leaves it out of clang-tidy; tidy it with `clang-tidy -p build/native32 src/driver/*.c` (clang-tidy 21). The same holds for
+the PNG reader in `src/png/` (object library `bmx_png`, freestanding, see "PNG reader instead of libpng") and
+`src/native/pngcheck.c`: `clang-tidy -p build/native32 src/png/*.c src/native/pngcheck.c`.
 
 ### Loader additions for the driver step (2026-10-29)
 
@@ -234,6 +237,91 @@ png_read_info+0x1bb0) before the faked return value faults in RtPNGImageRead: th
 a replacement decoder before a survey can go on. No unported driver entry was reached in those menu frames: no Im3D
 or pipeline call, no raster render; the Im2D entries are reached but are no-ops in the original too. RenderStateSet/Get
 are step 1 stubs that keep the values (153k sets in 1860 frames).
+
+### PNG reader instead of libpng (src/png, 2026-10-29)
+
+`RtPNGImageRead` (rw/texture.c) calls libpng 1.0.5, which the original links statically (lib/libpng and lib/zlib in
+functions-rw.csv: `skip`, third-party code we do not port). In the native exe our own reader takes its place:
+`src/png/png.c` implements the 16 libpng entry points RtPNGImageRead calls plus `png_error` (0x507050, which the read
+callback `rwPngRead` calls on a short read), and the loader writes `bmxPngJumps` after the driver jumps, the same
+mechanism as the SDL3 driver (no `BMX_ADDR`: the hook DLL keeps the original libpng). Own directory because it is
+neither ported game/RW code nor native-exe glue: freestanding C (compiled like the game objects, object library
+`bmx_png`) that only talks to RenderWare through the callbacks libpng gets, so it can later move into the test DLL or
+another platform build unchanged.
+
+- Same contract as libpng: the png struct starts with the MSVC `jmp_buf` RtPNGImageRead fills with `_setjmp3`;
+  read function / io pointer sit at 0x50 / 0x54 (rwPngRead reads its RwStream there); every error (bad signature,
+  CRC of a critical chunk, corrupt or truncated deflate data, Adler-32, short read) longjmps there through the CRT's
+  `_longjmp` 0x51e084 (in the native exe our `bmxCrtLongjmp`, crtasm.S, which restores EBP/EBX/EDI/ESI/ESP/EIP;
+  no SEH unwinding is needed because only plain C frames lie between). Data only through the read callback, memory
+  only through the malloc / free callbacks of `png_create_read_struct_2` (the engine's memory interface).
+- Transforms as libpng 1.0.5 applies them for what RtPNGImageRead requests: strip_16 (high byte), packing (palette
+  1/2/4 bit: one index per byte), gray_1_2_4_to_8 (`PNG_EXPAND`: scaled to 0..255, i.e. 0x11/0x55/0xff steps, one
+  byte per pixel; RtPNGImageRead still makes a depth-4 image with a grey identity palette and those 0..255 values in
+  it, like the original), gray_to_rgb (GA -> RGBA), filler 0xff after (RGB -> RGBX), RGBA as is,
+  PLTE / tRNS getters (tRNS pointer NULL for non-palette images, like libpng). Adam7: pixels are written to their
+  final positions pass by pass, row by row, which leaves the same bytes as libpng's `png_combine_row` masks.
+- Inflate: our own, in the structure of Mark Adler's puff.c (zlib licence; canonical Huffman decoded bit by bit),
+  about 300 lines. All IDAT chunks are read and inflated in `png_read_image`, `png_read_end` reads the rest up to
+  IEND. Data past the image in the zlib stream is ignored (libpng: a warning).
+- Differences on corrupt input only: unknown filter type is an error (libpng 1.0.5 warns and zeroes the row);
+  ancillary chunks with a bad CRC are dropped silently (libpng warns, then drops them). Packed or 16-bit output and
+  palette expansion are not implemented (RtPNGImageRead never asks for them): `png_error`.
+
+**The game's PNGs** are not loose files: 111 PNG images are embedded in the `.ZMD`/`.zmd` model files under
+`assets/` (bike and rider textures), 22 distinct ones, all 8-bit RGBA (colour type 6), not interlaced, no tRNS.
+
+**Verification** (`BMX_PNG_CHECK`, src/native/pngcheck.c): the loader then also keeps the original's libpng/zlib code
+(0x506e40..0x51ce10, up to the next ported function; zlib code past the last labelled function is reached) instead of int3 and remembers the five entry bytes of each replaced function; RtPNGImageRead's
+entry goes to a checker that runs the ported RtPNGImageRead once with the original libpng and once with ours and
+compares width, height, depth, stride, every pixel byte the reader writes (`width` bytes per row for depths 4/8,
+`4 * width` for 32, capped at the stride; the rest of a row is uninitialised heap in both) and the palette. The game
+itself reads its PNGs from memory (the model files' embedded copies) through file functions it swaps into the engine
+while a texture loads, and such a "file" cannot be opened twice; so its own reads (`PNGImageRead` 0x497a30, which
+calls the ported RtPNGImageRead directly) only run through our reader and are logged, and the comparison runs on
+`BMX_PNG_CHECK=<folder>`: at the first PNG read every `*.png` in that folder is checked, with `_rwFSOpen`'s stdio
+functions put back for the duration. `tools/png_cases.py <folder>`
+writes the synthetic set: every colour type / bit depth (gray 1/2/4/8/16, RGB 8/16, palette 1/2/4/8, GA 8/16, RGBA
+8/16), plain and Adam7, at 1x1, 13x7 and 33x17, random pixels and filter types, palettes with and without tRNS
+(and RGB tRNS), stored / fixed / dynamic deflate blocks, IDAT split over several chunks, ancillary chunks before
+and after the data. No tRNS on grey images: RtPNGImageRead then dereferences libpng's NULL tRNS pointer (crashes
+the original too). Files named `bad_*` (truncated, bad IHDR CRC) run only through our reader, which must longjmp
+and make RtPNGImageRead return NULL: libpng's default error handler `fprintf`s to MSVC's `stderr`, which our CRT
+layer cannot take. The oracle harness was not used: RtPNGImageRead's port calls libpng through fixed addresses, so a
+port-side run with our reader would need code patching in the write-protected Unicorn code range; the in-exe check
+runs the very same ported RtPNGImageRead against the very same original libpng code instead.
+
+Result (2026-10-29): folder with the 90 synthetic files, the 22 PNGs extracted from the game's model files and the 2
+corrupt ones: **112 identical to libpng 1.0.5, 0 mismatches**, both corrupt files rejected (RtPNGImageRead returns
+NULL after the longjmp). In the same run the game read 20 PNGs with our reader (DUST01..16, TIRE, PEDAL..., 32x32 and
+64x64 RGBA) before the next trap. Reproduce:
+
+```
+py -I tools/png_cases.py <folder>          # synthetic set; add the PNGs extracted from assets/*.zmd if wanted
+cd <game folder> && BMX_PNG_CHECK='<folder, Windows path>' BMX_NO_MOVIES=1 BMX_MUTE=1 <repo>/build/native32/bmxnative.exe Scene.Txt -r640.480.16
+grep pngcheck <repo>/build/native32/bmxnative.log
+```
+
+### First trap after the PNG reader (2026-10-29)
+
+Two more `.text` pieces are kept as original code (kTextKeep in loader.c), both found on the way:
+
+- `RpWorldDestroy` 0x4ba9c0, the 4-byte stub (`mov eax, [esp+4]`) that falls into the ported body at 0x4ba9c4: it
+  is int3 otherwise and trapped from `ThisFoundChunk` (0x4966e0) when a level's world is replaced.
+- **Stopgap, to review:** 0x54b038..0x54b114, the core's x87 matrix multiply in `_rwcseg` that the driver's camera
+  begin update installs as RwMatrixMultiply's routine (SDL3-DRIVER.md open points). It is self-contained (no calls).
+  Without it the first trap is 0x54b038 itself, called from RwMatrixMultiply (0x4d04f0). Porting it (or modelling
+  the precision switch) replaces this.
+
+`BMX_NO_MOVIES=1 BMX_MUTE=1 BMX_QUIT_FRAMES=4000 bmxnative.exe Scene.Txt -r640.480.16` then loads the bike and rider
+textures with our PNG reader and stops at the D3D driver's Im3D code:
+
+```
+TRAP: unported code reached at 004ea960  RwTextureRegisterPluginStream+0xc80   (lib/d3d7driver, FUN_004ea960)
+  caller (return address at esp): 0075d7af  in port of _rpWorldPipelineOpen+0xb0 [0x4e85b0]   (rwIm3DPipelinePush, rw/im.c)
+```
+
+That is the SDL3 driver's step 2/3 territory (Im3D / pipelines).
 
 ### Open points from the CRT layer (2026-10-28)
 

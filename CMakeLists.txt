@@ -62,8 +62,15 @@ if(BMX_NATIVE32)
   target_compile_definitions(bmx_driver PRIVATE BMX_HOOK=1)
   target_compile_options(bmx_driver PRIVATE ${BMX_WARNINGS} -Wno-sign-compare)
   target_link_libraries(bmx_driver PRIVATE SDL3::SDL3)
+  # Our PNG reader in place of libpng 1.0.5 (src/png): native exe only, the hook DLL keeps the original.
+  # Freestanding like the game objects (all memory and input through libpng's callbacks).
+  file(GLOB BMX_PNG_SOURCES CONFIGURE_DEPENDS src/png/*.c)
+  add_library(bmx_png OBJECT ${BMX_PNG_SOURCES})
+  target_include_directories(bmx_png PRIVATE src)
+  target_compile_definitions(bmx_png PRIVATE BMX_HOOK=1)
+  target_compile_options(bmx_png PRIVATE ${BMX_WARNINGS} -ffreestanding -fno-builtin -fno-stack-protector)
   add_executable(bmxnative $<TARGET_OBJECTS:bmx_range> ${BMX_CRT_STARTFILES} $<TARGET_OBJECTS:bmx_game>
-    $<TARGET_OBJECTS:bmx_driver> ${BMX_NATIVE_SOURCES} src/native/crtasm.S ${CMAKE_BINARY_DIR}/hooks_table.c)
+    $<TARGET_OBJECTS:bmx_driver> $<TARGET_OBJECTS:bmx_png> ${BMX_NATIVE_SOURCES} src/native/crtasm.S ${CMAKE_BINARY_DIR}/hooks_table.c)
   target_link_options(bmxnative PRIVATE -nostartfiles)
   target_include_directories(bmxnative PRIVATE src)
   target_compile_definitions(bmxnative PRIVATE _WIN32_WINNT=0x0A00 BMX_SOURCE_DIR="${CMAKE_SOURCE_DIR}" BMX_WORK_DIR="${BMX_WORK_DIR}")

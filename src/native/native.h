@@ -20,6 +20,14 @@ int bmxLoadImage(const char *exePath);
 /* Write a jump from every reachable original CRT entry point to our C runtime layer (src/native/crt.c). */
 void bmxCrtInstall(void);
 
+/*
+ * BMX_PNG_CHECK (src/native/pngcheck.c): keep the original libpng / zlib code (copied from the exe's code
+ * section starting at codeStart) and remember its entry bytes; after our jumps are written, arm the checker
+ * that compares both readers on every RtPNGImageRead call.
+ */
+void bmxPngCheckInstall(const uint8_t *code, uint32_t codeStart);
+void bmxPngCheckArm(void);
+
 /* Install the vectored exception handler that reports int3 traps. */
 void bmxTrapInstall(void);
 

@@ -12,6 +12,7 @@
 #include "driver/driver.h"
 #include "hook/hook.h"
 #include "native/native.h"
+#include "png/png.h"
 
 /* Same value as tools/known_exe.txt. */
 static const char kKnownSha256[] = "97aa9077501f264a1f96fc2ff1ff8d4326be094dd98f2a647c913de9d60d09a2";
@@ -134,6 +135,12 @@ static const struct {
     /* Data the linker put into .text: dinput.lib's object tables of c_dfDIJoystick (0x2c entries at 0x4afc60)
      * and c_dfDIKeyboard (0x100 entries at 0x4aff20), which the data formats in .rdata point at. */
     {0x004afc60, 0x004b0f20},
+    /* RpWorldDestroy: a four byte stub (`mov eax, [esp+4]`) that falls into the ported body's jump at
+     * 0x4ba9c4 (rpWorldDestroyBody, rw/world.c). */
+    {0x004ba9c0, 0x004ba9c4},
+    /* Stopgap until the x87 precision switch is modelled (docs/SDL3-DRIVER.md, open points): the core's x87
+     * RwMatrixMultiply routine in _rwcseg that camera begin update installs. Self-contained (no calls). */
+    {0x0054b038, 0x0054b114},
 };
 
 static void writeJump(uint32_t from, const void *to)
@@ -156,6 +163,7 @@ int bmxLoadImage(const char *exePath)
     uint32_t iatLo, iatHi;
     DWORD oldProt;
     int thunks = 0;
+    const int pngCheck = getenv("BMX_PNG_CHECK") != NULL;
 
     if (!file) {
         bmxLog("cannot read %s (run from the game folder)\n", exePath);
@@ -192,6 +200,9 @@ int bmxLoadImage(const char *exePath)
             const uint32_t start = kBmxImageBase + sec[i].VirtualAddress;
 
             memset(dst, 0xCC, vsize);
+            if (pngCheck && kBmxPngCodeStart >= start && kBmxPngCodeEnd <= start + raw) {
+                bmxPngCheckInstall(file + sec[i].PointerToRawData, start);
+            }
             for (size_t k = 0; k < sizeof kTextKeep / sizeof kTextKeep[0]; k++) {
                 if (kTextKeep[k].start >= start && kTextKeep[k].end <= start + raw) {
                     memcpy((void *)(uintptr_t)kTextKeep[k].start,
@@ -247,6 +258,14 @@ int bmxLoadImage(const char *exePath)
         writeJump(bmxDriverJumps[i].orig, bmxDriverJumps[i].impl);
     }
     bmxLog("driver: %u jumps\n", (unsigned)bmxDriverJumpCount);
+    /* Our PNG reader replaces libpng's entry points the same way (src/png). */
+    for (uint32_t i = 0; i < bmxPngJumpCount; i++) {
+        writeJump(bmxPngJumps[i].orig, bmxPngJumps[i].impl);
+    }
+    bmxLog("png: %u jumps\n", (unsigned)bmxPngJumpCount);
+    if (pngCheck) {
+        bmxPngCheckArm();
+    }
     bmxCrtInstall();
     FlushInstructionCache(GetCurrentProcess(), NULL, 0);
     free(file);

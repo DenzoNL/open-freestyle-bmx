@@ -125,7 +125,9 @@ DirectSound -> SDL3 audio, the quit prompt's DirectDraw GDI flip.
    - Open points found: the original's camera begin update also switches the x87 to 24-bit precision with round-down
      (_rwcseg 0x54b000, restored by 0x54b02e at end update) and routes RwMatrixMultiply to the x87 routine 0x54b038 for
      good. Our ported code runs SSE2, so float results of code that runs inside a camera update, and every
-     RwMatrixMultiply after the first update, are not modelled yet; 0x54b038 is int3 and traps when first called.
+     RwMatrixMultiply after the first update, are not modelled yet. 0x54b038 trapped when first called; since
+     2026-10-29 the native loader keeps that routine (0x54b038..0x54b114, self-contained x87 code) as original code
+     as a stopgap (docs/NATIVE.md "First trap after the PNG reader").
 2. Im2D + raster render: menus and text (the frontend is mostly Im2D).
 3. Instancing pipelines (D2) + world/atomic rendering: levels.
 4. Screenshot diff harness against the original (D7).
