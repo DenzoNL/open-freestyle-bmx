@@ -146,6 +146,8 @@ static int gRwtCtorCalls, gRwtCtorFailAt;
 static int gRwtCallbackFails; /* bit n: the n-th stream callback call fails */
 static int gRwtCallbackCalls;
 
+/* The macros below define functions: their names can't be parenthesised. */
+// NOLINTBEGIN(bugprone-macro-parentheses)
 #define RWT_CTOR(name, id)                                                                                   \
     RWT_FN void *BMX_CDECL name(void *object, int32_t offset, int32_t size)                                  \
     {                                                                                                        \
@@ -205,6 +207,7 @@ static int gRwtCallbackCalls;
         rwtLog((uint32_t)size);                                                                              \
         return (offset % 5 == 0) ? 0 : (offset % 7 == 0 ? -3 : size + offset % 11);                          \
     }
+// NOLINTEND(bugprone-macro-parentheses)
 
 RWT_CTOR(rwtCtorA, 0xc0a)
 RWT_CTOR(rwtCtorB, 0xc0b)

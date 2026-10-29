@@ -1060,6 +1060,119 @@ int32_t RpGeometryStreamGetSize(const RpGeometry *geometry)
     return size + 0xc + materials + 0xc + 0xc + plugins;
 }
 
+/* Bytes of the geometry's struct chunk (RpGeometryStreamGetSize without the material list and plugins). */
+static uint32_t geometryStructSize(const RpGeometry *geometry)
+{
+    const uint32_t numVertices = (uint32_t)geometry->numVertices;
+    uint32_t size = 0x1c;
+    if (numVertices != 0) {
+        if ((geometry->flags & rpGEOMETRYPRELIT) != 0) {
+            size = numVertices * 4 + 0x1c;
+        }
+        if ((geometry->flags & rpGEOMETRYTEXTURED) != 0) {
+            size += numVertices * 8;
+        }
+        size += (uint32_t)geometry->numTriangles * 8;
+    }
+    const RpMorphTarget *target = geometry->morphTarget;
+    for (int32_t i = 0; i < geometry->numMorphTargets; i++, target++) {
+        size += 0x18;
+        if (target->verts != NULL) {
+            size += numVertices * 12;
+        }
+        if (target->normals != NULL) {
+            size += numVertices * 12;
+        }
+    }
+    return size;
+}
+
+/* Writes a geometry chunk (the inverse of RpGeometryStreamRead). The original's second module check
+ * and the null checks inside the struct block are dead code and left out. */
+BMX_ADDR(0x004b6350)
+RpGeometry *RpGeometryStreamWrite(RpGeometry *geometry, RwStream *stream)
+{
+    if (rpGeometryModuleCount == 0) {
+        rpReport(rwERR_NOTOPEN);
+        return NULL;
+    }
+    if (geometry == NULL || stream == NULL) {
+        rpReport(rwERR_NULLP);
+        return NULL;
+    }
+    const int32_t materials = _rpMaterialListStreamGetSize(&geometry->matList);
+    const int32_t plugins = _rwPluginRegistryGetSize(&rpGeometryRegistry, geometry);
+    const uint32_t total =
+        geometryStructSize(geometry) + 0xc + (uint32_t)materials + 0x18 + (uint32_t)plugins;
+    if (_rwStreamWriteVersionedChunkHeader(stream, 0xf, (int32_t)total, 0x303) == NULL) {
+        return NULL;
+    }
+    if (_rwStreamWriteVersionedChunkHeader(stream, 1, (int32_t)geometryStructSize(geometry), 0x303) == NULL) {
+        return NULL;
+    }
+    uint32_t header[7];
+    header[0] = geometry->flags;
+    header[1] = (uint32_t)geometry->numTriangles;
+    header[2] = (uint32_t)geometry->numVertices;
+    header[3] = (uint32_t)geometry->numMorphTargets;
+    __builtin_memcpy(&header[4], &geometry->surfaceProps, 0xc);
+    RwMemNative16(&header[4], 0xc);
+    RwMemLittleEndian32(header, 0x1c);
+    if (RwStreamWrite(stream, header, 0x1c) == NULL) {
+        return NULL;
+    }
+    const uint32_t numVertices = (uint32_t)geometry->numVertices;
+    if (numVertices != 0) {
+        if ((geometry->flags & rpGEOMETRYPRELIT) != 0 &&
+            RwStreamWrite(stream, geometry->preLitLum, numVertices * 4) == NULL) {
+            return NULL;
+        }
+        if ((geometry->flags & rpGEOMETRYTEXTURED) != 0 &&
+            RwStreamWriteReal(stream, geometry->texCoords, numVertices * 8) == NULL) {
+            return NULL;
+        }
+        if (geometry->numTriangles != 0) {
+            const uint16_t *raw = (const uint16_t *)geometry->triangles;
+            uint32_t remaining = (uint32_t)geometry->numTriangles;
+            do {
+                uint32_t pair[2];
+                pair[0] = (uint32_t)raw[0] << 16 | raw[1];
+                pair[1] = (uint32_t)raw[2] << 16 | raw[3];
+                raw += 4;
+                RwMemLittleEndian32(pair, 8);
+                if (RwStreamWrite(stream, pair, 8) == NULL) {
+                    return NULL;
+                }
+            } while (--remaining != 0);
+        }
+    }
+    for (int32_t i = 0; i < geometry->numMorphTargets; i++) {
+        const RpMorphTarget *target = &geometry->morphTarget[i];
+        uint32_t chunk[6];
+        __builtin_memcpy(chunk, &target->boundingSphere, 0x10);
+        chunk[4] = target->verts != NULL ? 1 : 0;
+        chunk[5] = target->normals != NULL ? 1 : 0;
+        RwMemNative16(chunk, 0x10);
+        RwMemLittleEndian32(chunk, 0x18);
+        if (RwStreamWrite(stream, chunk, 0x18) == NULL) {
+            return NULL;
+        }
+        if (chunk[4] != 0 && RwStreamWriteReal(stream, target->verts, numVertices * 12) == NULL) {
+            return NULL;
+        }
+        if (chunk[5] != 0 && RwStreamWriteReal(stream, target->normals, numVertices * 12) == NULL) {
+            return NULL;
+        }
+    }
+    if (_rpMaterialListStreamWrite(&geometry->matList, stream) == NULL) {
+        return NULL;
+    }
+    if (_rwPluginRegistryWriteDataChunks(&rpGeometryRegistry, stream, geometry) == NULL) {
+        return NULL;
+    }
+    return geometry;
+}
+
 /* Reads a geometry chunk: struct, (pre-lit colours, texture coordinates, triangles), morph targets,
  * materials. */
 BMX_ADDR(0x004b68e0)

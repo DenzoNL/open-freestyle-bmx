@@ -54,6 +54,8 @@ _Static_assert(offsetof(RwIm3DGlobals, stack) == 0x10, "RwIm3DGlobals layout");
 
 enum { rwRENDERSTATESHADEMODE = 5, rwSHADEMODEGOURAUD = 2 };
 
+/* Also declared in rwcore.h. */
+// NOLINTNEXTLINE(readability-redundant-declaration)
 int RwRenderStateGet(int32_t state, void *value);
 int RwIm3DRenderPrimitive(int32_t primType);
 int RwIm3DRenderLine(int32_t from, int32_t to);

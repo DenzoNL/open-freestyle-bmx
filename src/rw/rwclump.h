@@ -102,6 +102,8 @@ typedef struct RwClumpCloneData {
 RpAtomic *rwClumpCountAtomic(RpAtomic *atomic, int32_t *count);
 int32_t RpClumpGetNumAtomics(RpClump *clump);
 RpClump *RpClumpRender(RpClump *clump);
+/* Also declared in rwmath.h. */
+// NOLINTNEXTLINE(readability-redundant-declaration)
 RpClump *RpClumpForAllAtomics(RpClump *clump, RwObjectCallBack callback, void *data);
 __attribute__((regparm(1))) int RpAtomicDestroy(RpAtomic *atomic);
 __attribute__((regparm(1))) RpAtomic *RpAtomicClone(RpAtomic *source);
@@ -153,6 +155,7 @@ uint32_t RpGeometryGetFlags(const RpGeometry *geometry);
 RpGeometry *RpGeometrySetFlags(RpGeometry *geometry, uint32_t flags);
 RpGeometry *RpGeometryStreamRead(RwStream *stream);
 int32_t RpGeometryStreamGetSize(const RpGeometry *geometry);
+RpGeometry *RpGeometryStreamWrite(RpGeometry *geometry, RwStream *stream);
 
 /* ---- materials and material lists ------------------------------------------------------------------- */
 

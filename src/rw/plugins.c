@@ -8,9 +8,6 @@
 #include "rw/rwclump.h"
 #include "rw/rwmath.h"
 
-/* Callees in other RenderWare groups (clump), still original code. */
-ORIG_FN(0x004b6350, RpGeometry *, RpGeometryStreamWrite, (RpGeometry * geometry, RwStream *stream));
-
 /* The error record the RpWorld module (plugin id 2) reports. */
 static void rpReportError(int32_t code)
 {

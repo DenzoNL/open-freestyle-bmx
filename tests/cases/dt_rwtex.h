@@ -156,8 +156,6 @@ TEX_FN int texStd(int index, void *out, void *in, int32_t flags)
         break;
     }
     case rwSTANDARDRASTERLOCK:
-        *(void **)out = gTexPalette;
-        break;
     case rwSTANDARDRASTERLOCKPALETTE:
         *(void **)out = gTexPalette;
         break;

@@ -118,10 +118,10 @@ typedef struct RwTextureGlobals {
     RwTextureCallBackRead readCallBack; /* 0x14 */
     RwTextureCallBackFind findCallBack; /* 0x18 */
     int32_t mipmapping;                 /* 0x1c */
-    void *field20;                      /* 0x20 block freed on close (never set here) */
-    uint16_t field24;                   /* 0x24 */
+    void *field20;                      /* 0x20 file name buffer of the texture readers, freed on close */
+    uint16_t field24;                   /* 0x24 its size (16 bits) */
     uint8_t pad26[2];                   /* 0x26 */
-    void *defaultFind; /* 0x28 the default find callback (0x4e1140), never called through here */
+    void *defaultFind; /* 0x28 the mipmap generator (0x4e1140), called by the mipmapped reader */
 } RwTextureGlobals;
 
 _Static_assert(sizeof(RwTextureGlobals) == 0x2c, "RwTextureGlobals layout");
@@ -311,5 +311,18 @@ RwImage *RwImageFindRasterFormat(RwImage *image, int32_t flags, int32_t *width, 
                                  int32_t *depth, uint32_t *format);
 int _rwpathisabsolute(const char *path);
 int rwImageFormatSucceed(void);
+
+/* Texture readers, mip level generator and image file reading (rw/texture.c). */
+/* EAX = name, EDX = mask name, ECX = width; height is the fourth stack word (three unread words before it).
+ */
+__attribute__((regparm(3))) RwImage *rwTextureReadImage(const char *name, const char *maskName, int32_t width,
+                                                        int32_t unused0, int32_t unused1, int32_t unused2,
+                                                        int32_t height);
+void *rwTextureReadPlain(const char *name, const char *maskName);
+void *rwTextureReadMipmapped(const char *name, const char *maskName);
+RwRaster *rwRasterGenerateMipmaps(RwRaster *raster, RwImage *image);
+/* EAX = image, EDX = mask. */
+__attribute__((regparm(2))) RwImage *RwImageApplyMask(RwImage *image, RwImage *mask);
+RwImage *RwImageRead(const char *name, const char *maskName);
 
 #endif

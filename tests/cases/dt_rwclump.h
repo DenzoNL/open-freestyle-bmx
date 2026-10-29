@@ -512,7 +512,7 @@ CL_FN void clMaterialList(RpMaterialList *list, int n)
 {
     list->space = n + dt_range(0, 3);
     list->numMaterials = n;
-    list->materials = dt_alloc((uint32_t)(list->space + 1) * 4 + 0x40);
+    list->materials = (RpMaterial **)dt_alloc((uint32_t)(list->space + 1) * 4 + 0x40);
     for (int i = 0; i < n; i++) {
         list->materials[i] = i > 0 && dt_u32() % 3 == 0 ? list->materials[dt_range(0, i - 1)] : clMaterial();
     }

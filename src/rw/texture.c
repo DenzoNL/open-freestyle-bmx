@@ -1647,13 +1647,9 @@ void *_rwImageClose(void *engine)
 /* ---- default texture read callback, image/raster glue ---------------------------------------------------
  */
 
-/* The two readers the default read callback chooses from (still original code): the one that builds the mip
- * levels of the texture (0x4e1b50) and the one for a texture without (0x4e1470). */
-ORIG_FN(0x004e1b50, void *, rwTextureReadMipmapped, (const char *name, const char *maskName));
-ORIG_FN(0x004e1470, void *, rwTextureReadPlain, (const char *name, const char *maskName));
-
 /*
- * The texture module's default read callback. A find callback set by the application (+0x18) means the
+ * The texture module's default read callback (readers: rwTextureReadMipmapped 0x4e1b50, rwTextureReadPlain
+ * 0x4e1470 at the end of the file). A find callback set by the application (+0x18) means the
  * mipmapped reader, otherwise the plain one unless mipmapping is on (+0x1c).
  */
 BMX_ADDR(0x004e1410)
@@ -2219,4 +2215,669 @@ __attribute__((regparm(2))) int rwImageBoxShrink(const RwImage *source, RwImage 
         sourceRow += blockSkip;
     }
     return 1;
+}
+
+/* ---- texture readers, mip level generator, image file reading and masks ------------------------------- */
+
+/*
+ * The colour quantiser and image resampler (lib/d3d7driver, never ported: the SDL3 driver offers 32 bit
+ * rasters of any size). The state is a small block on the caller's stack.
+ */
+ORIG_FN(0x004f25d0, void, rwQuantResample, (RwImage * dest, RwImage *source));
+ORIG_FN(0x004f2070, int, rwQuantOpen, (void *state));
+ORIG_FN(0x004ef4e0, void, rwQuantHistogram, (void *state, RwImage *image));
+ORIG_FN(0x004f0da0, void, rwQuantBuildPalette, (uint8_t *palette, int32_t count, void *state));
+ORIG_FN(0x004f19e0, void, rwQuantMapPixels,
+        (uint8_t *pixels, int32_t stride, int32_t depth, void *state, RwImage *image));
+ORIG_FN(0x004f1f90, void, rwQuantClose, (void *state));
+/* Converts the mip levels of a paletted raster (EAX = image, EDX = raster; the result is not used). */
+ORIG_FN_REGPARM(2, 0x004e0160, void, rwRasterMipmapPaletted, (RwImage * image, RwRaster *raster));
+
+/* The exe's empty string and the "m" that separates a texture name from its mip level digit. */
+#define rwEmptyString ORIG_VAR(0x0056bd44, char, rwEmptyString)
+#define rwMipSuffix   ORIG_VAR(0x0069bda0, char, rwMipSuffix)
+
+static char *rwStrcat(char *dst, const char *src)
+{
+    return ((char *(BMX_CDECL *)(char *, const char *))RwEngineInstance->stringFuncs.rwstrcat)(dst, src);
+}
+
+static char *rwStrrchr(const char *s, int c)
+{
+    return ((char *(BMX_CDECL *)(const char *, int))RwEngineInstance->stringFuncs.rwstrrchr)(s, c);
+}
+
+static void *rwMalloc(int32_t size)
+{
+    return RwEngineInstance->memoryFuncs.rwmalloc((size_t)size);
+}
+
+static void rwFree(void *block)
+{
+    RwEngineInstance->memoryFuncs.rwfree(block);
+}
+
+/*
+ * The texture module's file name buffer (RwTextureGlobals.field20) made at least `need` bytes: malloc the
+ * first time, realloc after. The size is kept in 16 bits and compared signed, so a buffer of 32 KB or more
+ * is made again on every call. NULL, with an out of memory error, when the allocation fails.
+ */
+static char *textureNameBuffer(int32_t need)
+{
+    if ((int16_t)textureGlobals()->field24 < need) {
+        void *block;
+        if (textureGlobals()->field20 == NULL) {
+            block = rwMalloc(need);
+        } else {
+            block =
+                RwEngineInstance->memoryFuncs.rwrealloc(textureGlobals()->field20, (size_t)(uint32_t)need);
+        }
+        if (block == NULL) {
+            reportNoMemory(need);
+            return NULL;
+        }
+        textureGlobals()->field20 = block;
+        textureGlobals()->field24 = (uint16_t)need;
+    }
+    return textureGlobals()->field20;
+}
+
+/*
+ * Reads the image `name` (and its mask) from the search path: the names are copied into the module's buffer
+ * with the extension of the first existing file appended, the mask name behind the image name.
+ */
+static RwImage *textureReadImageFile(const char *name, const char *maskName)
+{
+    const int hasMask = maskName != NULL && *maskName != 0;
+    int32_t need = (int32_t)rwStrlen(name) + 10;
+    if (hasMask) {
+        need = need + (int32_t)rwStrlen(maskName) + 10;
+    }
+    need *= 2;
+    char *buffer = textureNameBuffer(need);
+    if (buffer == NULL) {
+        return NULL;
+    }
+    const char *extension = RwImageFindFileType(name);
+    rwStrcpy(buffer, name);
+    if (extension != NULL) {
+        rwStrcat(buffer, extension);
+    }
+    char *maskBuffer = NULL;
+    if (hasMask) {
+        const char *maskExtension = RwImageFindFileType(maskName);
+        maskBuffer = buffer + rwStrlen(name) + 10;
+        rwStrcpy(maskBuffer, maskName);
+        if (maskExtension != NULL) {
+            rwStrcat(maskBuffer, maskExtension);
+        }
+    }
+    return RwImageRead(buffer, maskBuffer);
+}
+
+/*
+ * Brings an image to width x height: to 32 bit first (the copy resizes), resampled by the quantiser's
+ * resampler, then back to the original depth through a palette. Every image is destroyed on failure
+ * (NULL), the source image on success.
+ */
+static RwImage *imageResizeTo(RwImage *image, int32_t width, int32_t height)
+{
+    const int32_t depth = RwImageGetDepth(image);
+    RwImage *source = image;
+    if (depth != 0x20) {
+        const int32_t sourceWidth = RwImageGetWidth(image);
+        const int32_t sourceHeight = RwImageGetHeight(image);
+        source = RwImageCreate(sourceWidth, sourceHeight, 0x20);
+        if (source == NULL) {
+            RwImageDestroy(image);
+            return NULL;
+        }
+        if (RwImageAllocatePixels(source) == NULL) {
+            RwImageDestroy(source);
+            RwImageDestroy(image);
+            return NULL;
+        }
+        RwImageResize(source, image);
+        RwImageDestroy(image);
+    }
+    RwImage *scaled = RwImageCreate(width, height, 0x20);
+    if (scaled == NULL) {
+        RwImageDestroy(source);
+        return NULL;
+    }
+    if (RwImageAllocatePixels(scaled) == NULL) {
+        RwImageDestroy(scaled);
+        RwImageDestroy(source);
+        return NULL;
+    }
+    rwQuantResample(scaled, source);
+    RwImageDestroy(source);
+    if (depth == 0x20) {
+        return scaled;
+    }
+    const int32_t scaledWidth = RwImageGetWidth(scaled);
+    const int32_t scaledHeight = RwImageGetHeight(scaled);
+    RwImage *paletted = RwImageCreate(scaledWidth, scaledHeight, depth);
+    if (paletted == NULL) {
+        RwImageDestroy(scaled);
+        return NULL;
+    }
+    if (RwImageAllocatePixels(paletted) == NULL) {
+        RwImageDestroy(paletted);
+        RwImageDestroy(scaled);
+        return NULL;
+    }
+    uint8_t quantizer[16];
+    if (rwQuantOpen(quantizer) == 0) {
+        RwImageDestroy(paletted);
+        RwImageDestroy(scaled);
+        return NULL;
+    }
+    rwQuantHistogram(quantizer, scaled);
+    uint8_t *palette = RwImageGetPalette(paletted);
+    rwQuantBuildPalette(palette, 1 << depth, quantizer);
+    uint8_t *pixels = RwImageGetPixels(paletted);
+    const int32_t pixelDepth = RwImageGetDepth(paletted);
+    rwQuantMapPixels(pixels, paletted->stride, pixelDepth, quantizer, scaled);
+    rwQuantClose(quantizer);
+    RwImageDestroy(scaled);
+    return paletted;
+}
+
+/*
+ * Reads the image of a texture (and its mask) and, when a size is given and differs, resizes it; the gamma
+ * table is applied. EAX = name, EDX = mask name, ECX = width, the fourth stack word is the height (the three
+ * before it are not read).
+ */
+BMX_ADDR(0x004e0b10)
+__attribute__((regparm(3))) RwImage *rwTextureReadImage(const char *name, const char *maskName, int32_t width,
+                                                        int32_t unused0, int32_t unused1, int32_t unused2,
+                                                        int32_t height)
+{
+    (void)unused0;
+    (void)unused1;
+    (void)unused2;
+    RwImage *image = textureReadImageFile(name, maskName);
+    if (image == NULL) {
+        return NULL;
+    }
+    if (width > 0 && height > 0 && (RwImageGetWidth(image) != width || RwImageGetHeight(image) != height)) {
+        image = imageResizeTo(image, width, height);
+        if (image == NULL) {
+            return NULL;
+        }
+    }
+    RwImageGammaCorrect(image);
+    return image;
+}
+
+/* Replaces the texture's mask name by a copy; the old one is freed first, a failed copy leaves it NULL. */
+static void textureSetMaskName(RwTexture *texture, const char *mask)
+{
+    if (texture->mask != NULL) {
+        rwFree(texture->mask);
+    }
+    texture->stamp++;
+    texture->mask = rwMalloc((int32_t)rwStrlen(mask) + 1);
+    if (texture->mask == NULL) {
+        reportNoMemory((int32_t)rwStrlen(mask) + 1);
+    } else {
+        rwStrcpy(texture->mask, mask);
+    }
+}
+
+/* Names the new texture and its mask (the empty string without one). */
+static void textureSetNames(RwTexture *texture, const char *name, const char *maskName)
+{
+    RwTextureSetName(texture, name);
+    textureSetMaskName(texture, maskName != NULL ? maskName : &rwEmptyString);
+}
+
+/* Mip level digits: "0123456789abcdefghijklmnopqrstuvwxyz". A level outside 0..36 gives an empty suffix. */
+static char mipDigit(int32_t level)
+{
+    static const char kDigits[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+    const uint8_t byte = (uint8_t)level; /* the original tests the level as a signed byte in 0..0x24 */
+    return byte <= 0x24 ? kDigits[byte] : 0;
+}
+
+/*
+ * Reads a texture without the mipmap generator: the base image and then one image per further mip level of
+ * the raster, named name + "m" + level digit (the first level is the name itself).
+ */
+BMX_ADDR(0x004e1470)
+void *rwTextureReadPlain(const char *name, const char *maskName)
+{
+    RwImage *image = rwTextureReadImage(name, maskName, 0, 0, 0, 0, 0);
+    if (image == NULL) {
+        return NULL;
+    }
+    uint32_t flags = 4;
+    if (textureGlobals()->findCallBack != NULL) {
+        flags = 0x8004;
+        if (textureGlobals()->mipmapping != 0) {
+            flags = 0x9004;
+        }
+    }
+    int32_t width, height, depth;
+    uint32_t format;
+    if (RwImageFindRasterFormat(image, (int32_t)flags, &width, &height, &depth, &format) == NULL) {
+        RwImageDestroy(image);
+        reportError((int32_t)0x8000000c);
+        return NULL;
+    }
+    if ((format & 0x8000) == 0 || (format & 0x1000) != 0) {
+        RwImageDestroy(image);
+        return NULL;
+    }
+    if (width != RwImageGetWidth(image) || height != RwImageGetHeight(image)) {
+        RwImageDestroy(image);
+        image = rwTextureReadImage(name, maskName, width, 0, 0, 0, height);
+        if (image == NULL) {
+            return NULL;
+        }
+    }
+    RwRaster *raster = RwRasterCreate(width, height, depth, (int32_t)format);
+    if (raster == NULL) {
+        RwImageDestroy(image);
+        return NULL;
+    }
+    if (RwRasterSetFromImage(raster, image) == NULL) {
+        RwRasterDestroy(raster);
+        RwImageDestroy(image);
+        return NULL;
+    }
+    RwImageDestroy(image);
+    char *nameBuffer = rwMalloc((int32_t)rwStrlen(name) + 3);
+    if (nameBuffer == NULL) {
+        RwRasterDestroy(raster);
+        return NULL;
+    }
+    char *maskBuffer = NULL;
+    if (maskName != NULL && *maskName != 0) {
+        maskBuffer = rwMalloc((int32_t)rwStrlen(maskName) + 3);
+        if (maskBuffer == NULL) {
+            rwFree(nameBuffer);
+            RwRasterDestroy(raster);
+            return NULL;
+        }
+    }
+    char digit[2] = {0, 0};
+    int32_t level = 1;
+    if (RwRasterLock(raster, 1, 5) != NULL) {
+        do {
+            rwStrcpy(nameBuffer, name);
+            rwStrcat(nameBuffer, &rwMipSuffix);
+            digit[0] = mipDigit(level);
+            rwStrcat(nameBuffer, digit);
+            if (maskBuffer != NULL) {
+                rwStrcpy(maskBuffer, maskName);
+                rwStrcat(maskBuffer, &rwMipSuffix);
+                digit[0] = mipDigit(level);
+                rwStrcat(maskBuffer, digit);
+            }
+            const int32_t levelWidth = RwRasterGetWidth(raster);
+            const int32_t levelHeight = RwRasterGetHeight(raster);
+            RwImage *levelImage =
+                rwTextureReadImage(nameBuffer, maskBuffer, levelWidth, 0, 0, 0, levelHeight);
+            if (levelImage == NULL) {
+                if (maskBuffer != NULL) {
+                    rwFree(maskBuffer);
+                }
+                rwFree(nameBuffer);
+                RwRasterDestroy(raster);
+                return NULL;
+            }
+            if (RwRasterSetFromImage(raster, levelImage) == NULL) {
+                RwImageDestroy(levelImage);
+                if (maskBuffer != NULL) {
+                    rwFree(maskBuffer);
+                }
+                rwFree(nameBuffer);
+                RwRasterDestroy(raster);
+                return NULL;
+            }
+            RwImageDestroy(levelImage);
+            RwRasterUnlock(raster);
+            level++;
+        } while (RwRasterLock(raster, (uint8_t)level, 5) != NULL);
+    }
+    RwTexture *texture = RwTextureCreate(raster);
+    if (texture == NULL) {
+        if (maskBuffer != NULL) {
+            rwFree(maskBuffer);
+        }
+        rwFree(nameBuffer);
+        RwRasterDestroy(raster);
+        return NULL;
+    }
+    textureSetNames(texture, name, maskName);
+    if (maskBuffer != NULL) {
+        rwFree(maskBuffer);
+    }
+    rwFree(nameBuffer);
+    return texture;
+}
+
+/*
+ * Reads a texture whose mip levels are made by the module's mipmap generator (the callback at +0x28): the
+ * image is brought to the size the device wants for the raster, put into the raster, and the generator
+ * builds the levels when the raster format asks for it.
+ */
+BMX_ADDR(0x004e1b50)
+void *rwTextureReadMipmapped(const char *name, const char *maskName)
+{
+    RwImage *image = textureReadImageFile(name, maskName);
+    if (image == NULL) {
+        return NULL;
+    }
+    uint32_t flags = 4;
+    if (textureGlobals()->findCallBack != NULL) {
+        flags = 0x8004;
+        if (textureGlobals()->mipmapping != 0) {
+            flags = 0x9004;
+        }
+    }
+    if ((flags & 0x1000) != 0 && textureGlobals()->defaultFind == NULL) {
+        flags &= 0xffff6fffu;
+        reportError((int32_t)0x80000016);
+    }
+    int32_t width, height, depth;
+    uint32_t format;
+    if (RwImageFindRasterFormat(image, (int32_t)flags, &width, &height, &depth, &format) == NULL) {
+        RwImageDestroy(image);
+        reportError((int32_t)0x8000000c);
+        return NULL;
+    }
+    if (RwImageGetWidth(image) != width || RwImageGetHeight(image) != height) {
+        image = imageResizeTo(image, width, height);
+        if (image == NULL) {
+            return NULL;
+        }
+    }
+    RwImageGammaCorrect(image);
+    RwRaster *raster = RwRasterCreate(width, height, depth, (int32_t)format);
+    if (raster == NULL) {
+        RwImageDestroy(image);
+        return NULL;
+    }
+    if ((format & 0x8000) == 0) {
+        if (RwRasterSetFromImage(raster, image) == NULL) {
+            RwRasterDestroy(raster);
+            RwImageDestroy(image);
+            return NULL;
+        }
+    } else if ((format & 0x1000) != 0) {
+        void *generator = textureGlobals()->defaultFind;
+        if (generator == NULL) {
+            reportError((int32_t)0x80000016);
+        } else {
+            ((void(BMX_CDECL *)(RwRaster *, RwImage *))(uintptr_t)generator)(raster, image);
+        }
+    }
+    RwImageDestroy(image);
+    RwTexture *texture = RwTextureCreate(raster);
+    if (texture == NULL) {
+        RwRasterDestroy(raster);
+        return NULL;
+    }
+    textureSetNames(texture, name, maskName);
+    return texture;
+}
+
+/*
+ * The default mipmap generator: fills the levels of a raster with the mip bit (0x80 in its format) from
+ * `image`, or from the raster's own level 0 when image is NULL, by box shrinking a 32 bit image level by
+ * level. A paletted source goes to the driver (rwRasterMipmapPaletted) and the result is 0. Returns the
+ * raster, NULL on failure or without the mip bit. The raster's format bit 0x10 is cleared while it works.
+ */
+BMX_ADDR(0x004e1140)
+RwRaster *rwRasterGenerateMipmaps(RwRaster *raster, RwImage *image)
+{
+    if ((raster->format & 0x80) == 0) {
+        return NULL;
+    }
+    const int32_t width = RwRasterGetWidth(raster);
+    const int32_t height = RwRasterGetHeight(raster);
+    (void)RwRasterGetDepth(raster);
+    RwImage *source = image;
+    uint8_t level = 0;
+    if (image == NULL) {
+        level = 1;
+        int32_t sourceDepth = 0x20;
+        if ((raster->format & 0x40) != 0) {
+            sourceDepth = 4;
+        } else if ((raster->format & 0x20) != 0) {
+            sourceDepth = 8;
+        }
+        source = RwImageCreate(width, height, sourceDepth);
+        if (source == NULL) {
+            return NULL;
+        }
+        if (RwImageAllocatePixels(source) == NULL) {
+            RwImageDestroy(source);
+            return NULL;
+        }
+        if (RwImageSetFromRaster(source, raster) == NULL) {
+            RwImageDestroy(source);
+            return NULL;
+        }
+    }
+    const int restoreFlag = (raster->format & 0x10) != 0;
+    raster->format &= 0xef;
+    RwRaster *result = raster;
+    if (source->depth < 0x20) {
+        rwRasterMipmapPaletted(source, raster);
+        result = NULL;
+    } else if (RwRasterLock(raster, level, 5) != NULL) {
+        do {
+            const int32_t levelWidth = RwRasterGetWidth(raster);
+            const int32_t levelHeight = RwRasterGetHeight(raster);
+            RwImage *shrunk = RwImageCreate(levelWidth, levelHeight, 0x20);
+            if (shrunk == NULL) {
+                RwRasterUnlock(raster);
+                if (image == NULL) {
+                    RwImageDestroy(source);
+                }
+                if (restoreFlag) {
+                    raster->format |= 0x10;
+                }
+                return NULL;
+            }
+            if (RwImageAllocatePixels(shrunk) == NULL) {
+                RwRasterUnlock(raster);
+                RwImageDestroy(shrunk);
+                if (image == NULL) {
+                    RwImageDestroy(source);
+                }
+                if (restoreFlag) {
+                    raster->format |= 0x10;
+                }
+                return NULL;
+            }
+            rwImageBoxShrink(source, shrunk);
+            if (RwRasterSetFromImage(raster, shrunk) == NULL) {
+                RwImageDestroy(shrunk);
+                if (image == NULL) {
+                    RwImageDestroy(source);
+                }
+                RwRasterUnlock(raster);
+                if (restoreFlag) {
+                    raster->format |= 0x10;
+                }
+                return NULL;
+            }
+            RwImageDestroy(shrunk);
+            RwRasterUnlock(raster);
+            level++;
+        } while (RwRasterLock(raster, level, 5) != NULL);
+    }
+    if (image == NULL) {
+        RwImageDestroy(source);
+    }
+    if (restoreFlag) {
+        raster->format |= 0x10;
+    }
+    return result;
+}
+
+/*
+ * Reads the alpha of `mask` into `image` (a paletted image becomes 32 bit first, through a temporary copy):
+ * every pixel's alpha is the mask's alpha, which for a paletted mask comes from its palette. NULL (with an
+ * error) for a depth other than 4, 8 or 32; NULL when memory runs out. EAX = image, EDX = mask.
+ */
+BMX_ADDR(0x004e3eb8)
+__attribute__((regparm(2))) RwImage *RwImageApplyMask(RwImage *image, RwImage *mask)
+{
+    const int32_t depth = image->depth;
+    if (depth == 4 || depth == 8) {
+        RwImage *copy = RwImageCreate(image->width, image->height, depth);
+        if (copy == NULL) {
+            return NULL;
+        }
+        if (RwImageAllocatePixels(copy) == NULL) {
+            RwImageDestroy(copy);
+            return NULL;
+        }
+        rwImageCopyPixels(copy, image);
+        if ((image->flags & rwIMAGEOWNSPIXELS) != 0) {
+            RwImageFreePixels(image);
+        }
+        image->depth = 0x20;
+        RwImageAllocatePixels(image);
+        rwImageCopyPixels(image, copy);
+        RwImageFreePixels(copy);
+        RwImageDestroy(copy);
+    } else if (depth != 0x20) {
+        reportError((int32_t)0x8000000c);
+        return NULL;
+    }
+    const uint8_t *maskRow = mask->pixels;
+    uint8_t *row = image->pixels;
+    for (int32_t y = 0; y < image->height; y++) {
+        if (mask->depth == 4 || mask->depth == 8) {
+            const uint8_t *index = maskRow;
+            uint8_t *pixel = row;
+            for (int32_t x = 0; x < image->width; x++) {
+                pixel[3] = mask->palette[*index * 4 + 3];
+                index++;
+                pixel += 4;
+            }
+        } else if (mask->depth == 0x20) {
+            const uint8_t *from = maskRow;
+            uint8_t *pixel = row;
+            for (int32_t x = 0; x < image->width; x++) {
+                pixel[3] = from[3];
+                pixel += 4;
+                from += 4;
+            }
+        }
+        maskRow += mask->stride;
+        row += image->stride;
+    }
+    image->stamp++;
+    return image;
+}
+
+/*
+ * Reads an image file through the reader registered for the extension of the last path component, trying
+ * every directory of the search path; NULL without an extension, a format or a file.
+ */
+static RwImage *imageReadByExtension(const char *name)
+{
+    const char *base = name;
+    const char *found = rwStrrchr(base, ':');
+    if (found != NULL) {
+        base = found;
+    }
+    found = rwStrrchr(base, '/');
+    if (found != NULL) {
+        base = found;
+    }
+    found = rwStrrchr(base, '\\');
+    if (found == NULL) {
+        found = base;
+    }
+    const char *extension = rwStrrchr(found, '.');
+    if (extension == NULL) {
+        return NULL;
+    }
+    for (RwImageFormat *format = imageGlobals()->formats; format != NULL; format = format->next) {
+        if (rwStrcmp(format->extension, extension) == 0 || rwStrcmp(format->extensionUpper, extension) == 0) {
+            if (format->read == NULL) {
+                return NULL;
+            }
+            RwImageAttempt attempt;
+            attempt.read = format->read;
+            attempt.image = NULL;
+            ImagePathForAllFullNames(name, 5, BMX_FNPTR(RwImagePathCallback, 0x004e47e0, ImageAttempRead), 0,
+                                     0, 0, &attempt);
+            return attempt.image;
+        }
+    }
+    return NULL;
+}
+
+/* A mask image's alpha becomes the largest of red, green and blue (palette entries, or every pixel). */
+static void imageMaskToAlpha(RwImage *mask)
+{
+    if (mask->depth == 4 || mask->depth == 8) {
+        uint8_t *entry = mask->palette;
+        for (int32_t i = 1 << mask->depth; i > 0; i--, entry += 4) {
+            uint8_t largest = entry[0];
+            if (entry[1] > largest) {
+                largest = entry[1];
+            }
+            if (entry[2] > largest) {
+                largest = entry[2];
+            }
+            entry[3] = largest;
+        }
+    } else if (mask->depth == 0x20) {
+        uint8_t *row = mask->pixels;
+        for (int32_t y = 0; y < mask->height; y++) {
+            for (int32_t x = 0; x < mask->width; x++) {
+                uint8_t *pixel = row + x * 4;
+                uint8_t largest = pixel[0];
+                if (pixel[1] > largest) {
+                    largest = pixel[1];
+                }
+                if (pixel[2] > largest) {
+                    largest = pixel[2];
+                }
+                pixel[3] = largest;
+            }
+            row += mask->stride;
+        }
+    }
+}
+
+/*
+ * Reads an image file and, with a mask name, a second file whose brightness becomes the image's alpha
+ * channel. NULL (everything destroyed) when a file cannot be read or the mask cannot be applied.
+ */
+BMX_ADDR(0x004e4c50)
+RwImage *RwImageRead(const char *name, const char *maskName)
+{
+    RwImage *image = imageReadByExtension(name);
+    if (image == NULL) {
+        return NULL;
+    }
+    if (maskName == NULL || *maskName == 0) {
+        return image;
+    }
+    RwImage *mask = imageReadByExtension(maskName);
+    if (mask == NULL) {
+        RwImageDestroy(image);
+        return NULL;
+    }
+    imageMaskToAlpha(mask);
+    mask->stamp++;
+    if (RwImageApplyMask(image, mask) == NULL) {
+        RwImageDestroy(image);
+        RwImageDestroy(mask);
+        return NULL;
+    }
+    RwImageDestroy(mask);
+    return image;
 }
