@@ -105,6 +105,8 @@ _rpCollWorldForAllLineSectors(RpWorld *world, const RwLine *line, RpSectorCallBa
                               RpIntersection *intersection, RpCollisionQuery *query);
 
 /* Per-sector tests (cdecl): NULL when the user callback stopped the query, else the sector. */
+RpWorldSector *_rpCollSectorAtomicsLine(RpIntersection *intersection, RpWorldSector *sector,
+                                        RpCollisionQuery *query);
 RpWorldSector *_rpCollSectorAtomicsSphere(RpIntersection *intersection, RpWorldSector *sector,
                                           RpCollisionQuery *query);
 RpWorldSector *_rpCollSectorAtomicsBox(RpIntersection *intersection, RpWorldSector *sector,

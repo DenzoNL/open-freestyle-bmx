@@ -55,6 +55,18 @@ static inline double bmxX87AsinScaled(int32_t n, double step, float scale)
     return r;
 }
 
+/* (float)atan2(sqrt((1 + c) * (1 - c)), c) by FSQRT and FPATAN: the angle of a cosine (the slerp set-up). */
+static inline float bmxX87AngleOfCosine(double c)
+{
+    float r;
+    __asm__("fldl %1\n\tfld1\n\tfadd %%st(1), %%st\n\tfld1\n\tfsub %%st(2), %%st\n\t"
+            "fmulp %%st, %%st(1)\n\tfsqrt\n\tfxch\n\tfpatan\n\tfstps %0"
+            : "=m"(r)
+            : "m"(c)
+            : "st", "st(1)", "st(2)");
+    return r;
+}
+
 /* (float)tan(a): FLD, FPTAN, drop the 1.0 it pushes, FSTP to float (the light cone angle). */
 static inline float bmxX87TanFloat(float a)
 {
@@ -132,6 +144,10 @@ static inline double bmxX87AsinScaled(int32_t n, double step, float scale)
 static inline float bmxX87TanFloat(float a)
 {
     return (float)tan((double)a);
+}
+static inline float bmxX87AngleOfCosine(double c)
+{
+    return (float)atan2(sqrt((1.0 + c) * (1.0 - c)), c);
 }
 static inline double bmxX87HalfPiScaled(int negative, float scale)
 {

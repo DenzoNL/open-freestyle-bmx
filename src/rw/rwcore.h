@@ -440,6 +440,10 @@ _Static_assert(sizeof(RwResEntry) == 0x18, "RwResEntry layout");
 _Static_assert(sizeof(RwResourcesGlobals) == 0x24, "RwResourcesGlobals layout");
 
 int RwResourcesFreeResEntry(RwResEntry *entry);
+typedef void(BMX_CDECL *RwResEntryDestroyNotify)(RwResEntry *entry);
+RwResEntry *RwResourcesAllocateResEntry(void *owner, RwResEntry **ownerRef, int32_t size,
+                                        RwResEntryDestroyNotify destroyNotify);
+RwResEntry *RwResourcesUseResEntry(RwResEntry *entry);
 void ResourcesInit(RwResourcesGlobals *resources);
 void _rwResourcesPurge(void);
 int RwResourcesSetArenaSize(int32_t size);

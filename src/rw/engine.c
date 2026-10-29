@@ -397,6 +397,74 @@ int RwResourcesSetArenaSize(int32_t size)
     return 1;
 }
 
+enum { rwERR_RESOURCEARENAFULL = 0x18 };
+
+/* Links the entry at the front of the arena's second list (the entries in use this frame). */
+static void resLinkFirst(RwResEntry *entry)
+{
+    RwLLLink *head = rwResources()->freeEntries;
+    entry->link.next = head->next;
+    entry->link.prev = head;
+    head->next->prev = &entry->link;
+    head->next = &entry->link;
+}
+
+/*
+ * A resource entry with `size` bytes after its 0x18 byte header for `owner` (*ownerRef points to it, the
+ * destroy notification is called when it is freed), at the front of the second list. While the arena would
+ * overflow, the oldest entries are freed: those of the first list, then those of the second (their sizes
+ * count as reused). A failed allocation sets an error and frees the next entry. With both lists empty:
+ * *ownerRef = NULL, error, NULL.
+ */
+BMX_ADDR(0x004dc460)
+RwResEntry *RwResourcesAllocateResEntry(void *owner, RwResEntry **ownerRef, int32_t size,
+                                        RwResEntryDestroyNotify destroyNotify)
+{
+    for (;;) {
+        if (size + rwResources()->currentSize <= rwResources()->maxSize) {
+            RwResEntry *entry = RwEngineInstance->memoryFuncs.rwmalloc((size_t)size + sizeof(RwResEntry));
+            if (entry != NULL) {
+                resLinkFirst(entry);
+                entry->destroyNotify = destroyNotify;
+                entry->ownerRef = ownerRef;
+                entry->size = size;
+                entry->owner = owner;
+                rwResources()->currentSize += size;
+                *ownerRef = entry;
+                return entry;
+            }
+            RwError error;
+            error.pluginID = 1;
+            error.errorCode = _rwerror(rwERR_NOMEM, size + (int32_t)sizeof(RwResEntry));
+            RwErrorSet(&error);
+        }
+        RwLLLink *link = rwResources()->usedEntries->prev;
+        if (link == rwResources()->usedEntries) {
+            link = rwResources()->freeEntries->prev;
+            if (link == rwResources()->freeEntries) {
+                *ownerRef = NULL;
+                RwError error;
+                error.pluginID = 1;
+                error.errorCode = _rwerror(rwERR_RESOURCEARENAFULL, size);
+                RwErrorSet(&error);
+                return NULL;
+            }
+            rwResources()->reusageSize += ((RwResEntry *)link)->size;
+        }
+        RwResourcesFreeResEntry((RwResEntry *)link);
+    }
+}
+
+/* Marks the entry as used: moves it to the front of the second list. */
+BMX_ADDR(0x004dc680)
+RwResEntry *RwResourcesUseResEntry(RwResEntry *entry)
+{
+    entry->link.prev->next = entry->link.next;
+    entry->link.next->prev = entry->link.prev;
+    resLinkFirst(entry);
+    return entry;
+}
+
 /* ---- render state and matrix helpers ---------------------------------------------------------------- */
 
 /* The near z of the 2D immediate mode, as the device reports it (the value is returned on the x87 stack). */

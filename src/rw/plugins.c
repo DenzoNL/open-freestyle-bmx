@@ -5,6 +5,8 @@
 #include "rw/rwplugins.h"
 
 #include "compat/crt.h"
+#include "compat/x87.h"
+#include "rw/rwanim.h"
 #include "rw/rwclump.h"
 #include "rw/rwmath.h"
 
@@ -774,13 +776,6 @@ RpClump *RpSkinClumpSetup(RpClump *clump)
     return clump;
 }
 
-/* The data the bone frame search callback of RpSkinClumpUpdate works with. */
-typedef struct RpSkinChildSearch {
-    uint32_t reserved;
-    RwMatrix *parentInverse;
-    uint32_t zero;
-} RpSkinChildSearch;
-
 /*
  * Poses the skinned geometry of a clump: the vertices (and normals) of morph target 0 are the rest pose
  * run through the matrices of their bones, then the target's and the atomic's bounding sphere are
@@ -870,6 +865,78 @@ int RpSkinClumpUpdate(RpClump *clump)
     return 1;
 }
 
+/* ---- bone plugin: matrices and the geometry chunk ------------------------------------------------------ */
+
+/*
+ * Frame walk of RpSkinClumpUpdate: the bone of a frame that is synced and has user data (not -1) gets the
+ * matrix inverse rest pose x LTM x the walk's matrix (flags: bit 0 cleared, bit 1 set), otherwise both flag
+ * bits are cleared; then the children. Frames without a bone pass the walk on unchanged.
+ */
+BMX_ADDR(0x00504340)
+void *rpBoneUpdateMatrices(void *frame, void *data)
+{
+    const RpSkinChildSearch *walk = data;
+    RpSkinBone *bone = rpBoneGet(frame);
+    if (bone == NULL) {
+        RwFrameForAllChildren(frame, RW_CB(RwObjectCallBack, 0x00504340), data);
+        return frame;
+    }
+    if (RwFrameDirty(frame) == 0 || RwFrameGetUserData(frame) == 0xffffffffU) {
+        bone->flags &= ~3U;
+    } else {
+        bone->matrix = bone->invRest;
+        RwMatrixTransform(&bone->matrix, RwFrameGetLTM(frame), rwCOMBINEPOSTCONCAT);
+        RwMatrixTransform(&bone->matrix, walk->parentInverse, rwCOMBINEPOSTCONCAT);
+        RwFrameUpdateObjects(frame);
+        bone->flags = (bone->flags & ~1U) | 2;
+    }
+    RpSkinChildSearch child;
+    child.reserved = 0;
+    child.parentInverse = walk->parentInverse;
+    child.zero = bone->flags;
+    RwFrameForAllChildren(frame, RW_CB(RwObjectCallBack, 0x00504340), &child);
+    return frame;
+}
+
+/*
+ * Reads the bone plugin's geometry chunk: blocks of three words (first vertex, count, frame key) until the
+ * chunk length is used up, each widened by an empty bone pointer, and the skin data that holds them (no rest
+ * pose yet). The stream, NULL on a failed read (the blocks leak) or without memory (error).
+ */
+BMX_ADDR(0x00505670)
+void *rpBoneGeometryRead(void *stream, int32_t length, void *geometry)
+{
+    const int32_t size = length / 3 * 4;
+    RpSkinBoneBlock *blocks = RwEngineInstance->memoryFuncs.rwmalloc((size_t)size);
+    if (blocks == NULL) {
+        RwError error;
+        error.pluginID = 0x10e;
+        error.errorCode = _rwerror(rwERR_NOMEM, size);
+        RwErrorSet(&error);
+        return NULL;
+    }
+    RpSkinBoneBlock *block = blocks;
+    for (int32_t read = 0; read < length; read += 12, block++) {
+        if (RwStreamReadInt32(stream, block, 12) == NULL) {
+            return NULL;
+        }
+        block->bone = NULL;
+    }
+    RpSkinGeometry *skin = RwEngineInstance->memoryFuncs.rwmalloc(sizeof *skin);
+    if (skin == NULL) {
+        RwEngineInstance->memoryFuncs.rwfree(blocks);
+        RwError error;
+        error.pluginID = 0x10e;
+        error.errorCode = _rwerror(rwERR_NOMEM, (int32_t)sizeof *skin);
+        RwErrorSet(&error);
+        return NULL;
+    }
+    *(RpSkinGeometry **)((uint8_t *)geometry + rpBoneGeometryOffset) = skin;
+    skin->blocks = blocks;
+    skin->origNormals = NULL;
+    skin->origVerts = NULL;
+    return stream;
+}
 /* ---- RwMatrixInvert helpers ------------------------------------------------------------------------- */
 
 /*
@@ -947,9 +1014,6 @@ __attribute__((regparm(2))) RwMatrix *RwMatrixInvertGeneral(RwMatrix *out, const
 
 /* ---- animation plugin: engine module ---------------------------------------------------------------- */
 
-#define rpAnimEngineOffset ORIG_VAR(0x00678280, int32_t, rpAnimEngineOffset)
-#define rpAnimModuleCount  ORIG_VAR(0x00678284, int32_t, rpAnimModuleCount)
-
 /* Engine part of the animation plugin: the free list (8 byte entries) is shared by all engine instances. */
 BMX_ADDR(0x004fcd50)
 void *WorldObjectOpen(void *engine, int32_t offset)
@@ -973,75 +1037,6 @@ void *WorldObjectClose(void *engine)
 }
 
 /* ---- animation plugin: sequences of a clump --------------------------------------------------------- */
-
-/* A sequence of one frame: keyframes of 0xc bytes, the time at +8. */
-typedef struct RpAnimFrameSequence {
-    uint32_t pad00;
-    const char *name; /* 0x04 */
-    uint8_t pad08[0xc];
-    int32_t numKeys; /* 0x14 */
-    uint8_t *keys;   /* 0x18 */
-} RpAnimFrameSequence;
-
-typedef struct RpAnimFrameLink {
-    RpAnimFrameSequence *sequence;
-    struct RpAnimFrameLink *next;
-} RpAnimFrameLink;
-
-/* What the plugin keeps per frame (the pointer at RwFrame + rpAnimFrameOffset): two lists of sequences. */
-typedef struct RpAnimFrameData {
-    uint32_t pad00;
-    RpAnimFrameLink *listA; /* 0x04 */
-    uint32_t pad08;
-    RpAnimFrameLink *listB; /* 0x0c */
-} RpAnimFrameData;
-
-/* A frame's sequence in play: the sequence, its keys and a cursor (0xc bytes, malloc'd). */
-typedef struct RpAnimInstance {
-    RpAnimFrameSequence *sequence;
-    uint8_t *keys;
-    int32_t current;
-} RpAnimInstance;
-
-/* One animated frame of a clump sequence (0x3c bytes, 0x4fc4f0). 0x5029e0 frees the instances (from +4). */
-typedef struct RpAnimNode {
-    RwFrame *frame;          /* 0x00 */
-    int32_t state;           /* 0x04 */
-    uint8_t pad08[0x28];     /* 0x08 */
-    RpAnimInstance *a;       /* 0x30 from the frame's list A */
-    RpAnimInstance *b;       /* 0x34 from list B */
-    struct RpAnimNode *next; /* 0x38 */
-} RpAnimNode;
-
-/* A named sequence of a clump (0x24 bytes): the nodes of the frames that have it and its play callback. */
-typedef struct RpAnimClumpSequence {
-    char *name;                       /* 0x00 */
-    float duration;                   /* 0x04 the longest of the frames' key time sums */
-    int32_t pad08;                    /* 0x08 */
-    int32_t pad0c;                    /* 0x0c */
-    int32_t pad10;                    /* 0x10 */
-    RpAnimNode *nodes;                /* 0x14 */
-    void *callBack;                   /* 0x18 */
-    void *data;                       /* 0x1c */
-    struct RpAnimClumpSequence *next; /* 0x20 */
-} RpAnimClumpSequence;
-
-/* The plugin's data in a clump (at rpAnimClumpOffset): the frames, and two sequence lists behind a head. */
-typedef struct RpAnimClumpData {
-    int32_t numSequences;           /* 0x00 */
-    RwFrameList frameList;          /* 0x04 */
-    RpAnimClumpSequence *sequences; /* 0x0c head element, the new ones go after it */
-    RpAnimClumpSequence *others;    /* 0x10 */
-} RpAnimClumpData;
-
-_Static_assert(sizeof(RpAnimNode) == 0x3c, "RpAnimNode layout");
-_Static_assert(sizeof(RpAnimClumpSequence) == 0x24, "RpAnimClumpSequence layout");
-
-/* The walk's data for the children of the clump's frame (0x4fc540 appends their nodes). */
-typedef struct RpAnimNodeSearch {
-    RpAnimNode *nodes;
-    const char *name;
-} RpAnimNodeSearch;
 
 /* The interpolator state of an animation node starts empty: state 0 and no instance blocks (+0x2c, +0x30). */
 BMX_ADDR(0x00502a30)
@@ -1068,19 +1063,12 @@ RpAnimNode *rpAnimNodeCreate(void)
     return node;
 }
 
-/* The anim plugin data of a frame (at rpAnimFrameOffset): the sequence lists, a word, and the user data. */
-typedef struct RpAnimFramePlugin {
-    struct RpAnimFrameData *data; /* 0x00 */
-    uint32_t reserved;            /* 0x04 */
-    uint32_t userData;            /* 0x08 -1 until set */
-} RpAnimFramePlugin;
-
 /* Frame constructor: no sequences, user data -1. */
 BMX_ADDR(0x004fbce0)
 void *rpAnimFrameInit(void *frame)
 {
     RpAnimFramePlugin *plugin = (RpAnimFramePlugin *)((uint8_t *)frame + rpAnimFrameOffset);
-    plugin->reserved = 0;
+    plugin->priority = 0;
     plugin->data = NULL;
     plugin->userData = 0xffffffffU;
     return frame;
@@ -1327,11 +1315,11 @@ static RpAnimInstance *animInstance(RpAnimFrameSequence *sequence)
     if (instance == NULL) {
         return NULL;
     }
-    instance->current = 0;
+    instance->time = 0.0F;
     instance->keys = NULL;
     instance->sequence = NULL;
     instance->sequence = sequence;
-    instance->current = 0;
+    instance->time = 0.0F;
     instance->keys = sequence->keys;
     return instance;
 }
@@ -1454,14 +1442,14 @@ __attribute__((regparm(3))) RpClump *rpAnimClumpAddSequence(RpClump *clump, cons
             sequence = NULL;
         } else {
             sequence->name = copy;
-            sequence->pad10 = 0;
+            sequence->priority = 0;
             sequence->nodes = NULL;
             sequence->callBack = NULL;
             sequence->data = NULL;
             sequence->next = NULL;
-            sequence->pad08 = 0;
+            sequence->time = 0.0F;
             sequence->duration = 0.0F;
-            sequence->pad0c = 1;
+            sequence->direction = 1;
         }
     }
     if (sequence == NULL) {
@@ -1484,6 +1472,1012 @@ __attribute__((regparm(3))) RpClump *rpAnimClumpAddSequence(RpClump *clump, cons
     return clump;
 }
 
+/* ---- animation plugin: frame sequences, streams and playback ------------------------------------------ */
+
+#define rpAnimHeadName ORIG_VAR(0x0069c6b0, const char, rpAnimHeadName)
+
+static RwFreeList *animLinkFreeList(void)
+{
+    return *(RwFreeList **)((uint8_t *)RwEngineInstance + rpAnimEngineOffset);
+}
+
+static RpAnimFramePlugin *animFramePlugin(const void *frame)
+{
+    return (RpAnimFramePlugin *)((uint8_t *)frame + rpAnimFrameOffset);
+}
+
+static void animFree(void *block)
+{
+    RwEngineInstance->memoryFuncs.rwfree(block);
+}
+
+static size_t animStrlen(const char *s)
+{
+    return ((size_t(BMX_CDECL *)(const char *))RwEngineInstance->stringFuncs.rwstrlen)(s);
+}
+
+/* a - b with b opaque to the optimiser (no rewrite as a + -b, which flips the sign of a NaN b). */
+static double animSub(double a, double b)
+{
+    __asm__("" : "+x"(b));
+    return a - b;
+}
+
+/* Frees the name, keyframes and keys of a frame sequence (not the sequence); returns it. */
+BMX_ADDR(0x00502a40)
+RpAnimFrameSequence *rpAnimSequenceDeinit(RpAnimFrameSequence *sequence)
+{
+    if (sequence->name != NULL) {
+        animFree(sequence->name);
+        sequence->name = NULL;
+    }
+    if (sequence->frames != NULL) {
+        animFree(sequence->frames);
+        sequence->frames = NULL;
+    }
+    sequence->numFrames = 0;
+    if (sequence->keys != NULL) {
+        animFree(sequence->keys);
+        sequence->keys = NULL;
+    }
+    sequence->numKeys = 0;
+    return sequence;
+}
+
+/*
+ * Sets up a frame sequence with one reference: a copy of the name, room for the keyframes of the type (other
+ * types leave the keyframe pointer as it was) and the keys. NULL on failure (without a name nothing is
+ * allocated; a later failure frees what the sequence has).
+ */
+BMX_ADDR(0x00502580)
+RpAnimFrameSequence *rpAnimSequenceInit(RpAnimFrameSequence *sequence, const char *name, int32_t type,
+                                        int32_t numFrames, int32_t numKeys)
+{
+    sequence->refCount = 1;
+    sequence->name = NULL;
+    if (name != NULL) {
+        sequence->name = animMalloc(animStrlen(name) + 1);
+        if (sequence->name != NULL) {
+            RwEngineInstance->stringFuncs.rwstrcpy(sequence->name, name);
+        }
+    }
+    if (sequence->name == NULL) {
+        return NULL;
+    }
+    if (type == 1) {
+        sequence->frames = animMalloc((size_t)numFrames * 12);
+    } else if (type == 2) {
+        sequence->frames = animMalloc((size_t)numFrames * 16);
+    }
+    if (sequence->frames == NULL) {
+        rpAnimSequenceDeinit(sequence);
+        return NULL;
+    }
+    sequence->numFrames = numFrames;
+    sequence->type = type;
+    sequence->keys = animMalloc((size_t)numKeys * 12);
+    if (sequence->keys == NULL) {
+        rpAnimSequenceDeinit(sequence);
+        return NULL;
+    }
+    sequence->numKeys = numKeys;
+    return sequence;
+}
+
+/* A new frame sequence (EAX = name, EDX = type, ECX = number of keyframes, the number of keys in the 4th
+ * stack slot); returned even when setting it up failed. NULL only without memory for the block. */
+BMX_ADDR(0x004fffdc)
+__attribute__((regparm(3))) RpAnimFrameSequence *rpAnimSequenceCreate(const char *name, int32_t type,
+                                                                      int32_t numFrames, uint32_t unused0,
+                                                                      uint32_t unused1, uint32_t unused2,
+                                                                      int32_t numKeys)
+{
+    (void)unused0;
+    (void)unused1;
+    (void)unused2;
+    RpAnimFrameSequence *sequence = animMalloc(sizeof *sequence);
+    if (sequence == NULL) {
+        return NULL;
+    }
+    rpAnimSequenceInit(sequence, name, type, numFrames, numKeys);
+    return sequence;
+}
+
+/* Drops a reference (EAX = sequence) and destroys the sequence with the last one; always 1. */
+BMX_ADDR(0x004fd244)
+__attribute__((regparm(1))) int rpAnimSequenceRelease(RpAnimFrameSequence *sequence)
+{
+    if (--sequence->refCount == 0) {
+        rpAnimSequenceDeinit(sequence);
+        animFree(sequence);
+    }
+    return 1;
+}
+
+/* Releases the sequences of both lists of a frame's data, gives the links back and frees it (EAX); 1. */
+BMX_ADDR(0x004fbbc0)
+__attribute__((regparm(1))) int rpAnimFrameDataDestroy(RpAnimFrameData *data)
+{
+    for (int list = 0; list < 2; list++) {
+        RpAnimFrameLink *link = list == 0 ? data->listA : data->listB;
+        while (link != NULL) {
+            RpAnimFrameLink *next = link->next;
+            rpAnimSequenceRelease(link->sequence);
+            RwEngineInstance->freeListFree(animLinkFreeList(), link);
+            link = next;
+        }
+    }
+    animFree(data);
+    return 1;
+}
+
+/* Frame destructor: frees the frame's sequences (and resets the user data to -1 when it had some). */
+BMX_ADDR(0x004fbd00)
+void *rpAnimFrameDeinit(void *frame)
+{
+    RpAnimFramePlugin *plugin = animFramePlugin(frame);
+    if (plugin->data != NULL) {
+        rpAnimFrameDataDestroy(plugin->data);
+        plugin->userData = 0xffffffffU;
+        plugin->priority = 0;
+        plugin->data = NULL;
+    }
+    animFramePlugin(frame)->data = NULL;
+    return frame;
+}
+
+/*
+ * Adds a sequence to the frame's list of its type (EAX = frame, EDX = sequence) unless the list has one of
+ * that name, taking a reference. Creates the frame's data on demand. The frame, or NULL for another type or
+ * without memory for the data (the link from the free list is not checked).
+ */
+BMX_ADDR(0x004fbdf8)
+__attribute__((regparm(2))) void *rpAnimFrameAddSequence(void *frame, RpAnimFrameSequence *sequence)
+{
+    RpAnimFrameData *data = animFramePlugin(frame)->data;
+    if (data == NULL) {
+        data = rpAnimFrameDataCreate();
+        if (data == NULL) {
+            return NULL;
+        }
+        animFramePlugin(frame)->data = data;
+    }
+    RpAnimFrameLink **list;
+    int32_t *count;
+    if (sequence->type == 1) {
+        list = &data->listA;
+        count = &data->numA;
+    } else if (sequence->type == 2) {
+        list = &data->listB;
+        count = &data->numB;
+    } else {
+        return NULL;
+    }
+    for (const RpAnimFrameLink *link = *list; link != NULL; link = link->next) {
+        if (animStrcmp(link->sequence->name, sequence->name) == 0) {
+            return frame;
+        }
+    }
+    RpAnimFrameLink *link = RwEngineInstance->freeListAlloc(animLinkFreeList());
+    link->sequence = sequence;
+    link->next = *list;
+    *list = link;
+    (*count)++;
+    sequence->refCount++;
+    return frame;
+}
+
+/* Frame copy: the destination shares the source's sequences (list B first) and takes its user data. */
+BMX_ADDR(0x004fbd50)
+void *rpAnimFrameCopy(void *destination, const void *source)
+{
+    const RpAnimFrameData *data = animFramePlugin(source)->data;
+    if (data == NULL) {
+        return destination;
+    }
+    RpAnimFrameData *copy = rpAnimFrameDataCreate();
+    if (copy == NULL) {
+        return NULL;
+    }
+    animFramePlugin(destination)->data = copy;
+    if (data->numB > 0) {
+        for (const RpAnimFrameLink *link = data->listB; link != NULL; link = link->next) {
+            rpAnimFrameAddSequence(destination, link->sequence);
+        }
+    }
+    if (data->numA > 0) {
+        for (const RpAnimFrameLink *link = data->listA; link != NULL; link = link->next) {
+            rpAnimFrameAddSequence(destination, link->sequence);
+        }
+    }
+    animFramePlugin(destination)->userData = animFramePlugin(source)->userData;
+    return destination;
+}
+
+/*
+ * Frame walk of rpAnimClumpAddSequence: a frame with a sequence of the searched name in list A or B gets a
+ * node (pushed onto the search's list) with instances of them, then its children are searched. Without memory
+ * the walk stops there (NULL; a half built node is freed).
+ */
+BMX_ADDR(0x004fc540)
+void *rpAnimClumpFindNodes(void *frame, void *search)
+{
+    RpAnimNodeSearch *s = search;
+    const RpAnimFrameData *data = animFramePlugin(frame)->data;
+    if (data != NULL) {
+        RpAnimFrameSequence *a = animFindSequence(data->listA, s->name);
+        RpAnimFrameSequence *b = animFindSequence(data->listB, s->name);
+        if (a != NULL || b != NULL) {
+            RpAnimNode *node = rpAnimNodeCreate();
+            if (node == NULL) {
+                return NULL;
+            }
+            node->frame = frame;
+            if (a != NULL) {
+                node->a = animInstance(a);
+                if (node->a == NULL) {
+                    animNodeFree(node);
+                    return NULL;
+                }
+            }
+            if (b != NULL) {
+                node->b = animInstance(b);
+                if (node->b == NULL) {
+                    animNodeFree(node);
+                    return NULL;
+                }
+                node->state = 2;
+            }
+            node->state = 3;
+            node->next = s->nodes;
+            s->nodes = node;
+            node->frame = frame;
+        }
+    }
+    RwFrameForAllChildren(frame, CB_ANIM_FIND_NODES, search);
+    return frame;
+}
+
+/* Frees a clump sequence's name and nodes, then the sequence. */
+static void animClumpSequenceFree(RpAnimClumpSequence *sequence)
+{
+    if (sequence->name != NULL) {
+        animFree(sequence->name);
+        sequence->name = NULL;
+    }
+    if (sequence->nodes != NULL) {
+        RpAnimNode *node = sequence->nodes;
+        while (node != NULL) {
+            RpAnimNode *next = node->next;
+            animNodeFree(node);
+            node = next;
+        }
+        sequence->nodes = NULL;
+    }
+    animFree(sequence);
+}
+
+/* An empty clump sequence named after the list heads (NULL without memory; the block leaks without a name).
+ */
+static RpAnimClumpSequence *animClumpHead(void)
+{
+    RpAnimClumpSequence *head = animMalloc(sizeof *head);
+    if (head == NULL) {
+        return NULL;
+    }
+    const char *name = &rpAnimHeadName;
+    char *copy = animMalloc(animStrlen(name) + 1);
+    if (copy == NULL) {
+        return NULL;
+    }
+    RwEngineInstance->stringFuncs.rwstrcpy(copy, name);
+    head->name = copy;
+    head->priority = 0;
+    head->nodes = NULL;
+    head->callBack = NULL;
+    head->data = NULL;
+    head->next = NULL;
+    head->time = 0.0F;
+    head->duration = 0.0F;
+    head->direction = 1;
+    return head;
+}
+
+/*
+ * The clump's animation data starts with the heads of its two sequence lists. NULL without memory; when the
+ * second head fails the original frees a sequence through a NULL pointer (and crashes).
+ */
+BMX_ADDR(0x005027c0)
+RpAnimClumpData *rpAnimClumpDataInit(RpAnimClumpData *data)
+{
+    data->frameList.frames = NULL;
+    data->frameList.numFrames = 0;
+    data->numSequences = 0;
+    data->sequences = animClumpHead();
+    if (data->sequences == NULL) {
+        return NULL;
+    }
+    data->others = animClumpHead();
+    if (data->others == NULL) {
+        RpAnimClumpSequence *volatile broken = data->others;
+        animClumpSequenceFree(broken);
+        return NULL;
+    }
+    return data;
+}
+
+/* Frees the sequences of both lists (heads included) and the frame list's array. */
+BMX_ADDR(0x005026a0)
+RpAnimClumpData *rpAnimClumpDataDeinit(RpAnimClumpData *data)
+{
+    for (RpAnimClumpSequence *s = data->sequences; s != NULL;) {
+        RpAnimClumpSequence *next = s->next;
+        animClumpSequenceFree(s);
+        s = next;
+    }
+    data->sequences = NULL;
+    for (RpAnimClumpSequence *s = data->others; s != NULL;) {
+        RpAnimClumpSequence *next = s->next;
+        animClumpSequenceFree(s);
+        s = next;
+    }
+    data->numSequences = 0;
+    data->others = NULL;
+    _rwFrameListDeinitialize(&data->frameList);
+    return data;
+}
+
+/* Clump constructor and destructor of the plugin. */
+BMX_ADDR(0x004fc740)
+void *rpAnimClumpInit(void *clump)
+{
+    rpAnimClumpDataInit((RpAnimClumpData *)((uint8_t *)clump + rpAnimClumpOffset));
+    return clump;
+}
+
+BMX_ADDR(0x004fc760)
+void *rpAnimClumpDeinit(void *clump)
+{
+    rpAnimClumpDataDeinit((RpAnimClumpData *)((uint8_t *)clump + rpAnimClumpOffset));
+    return clump;
+}
+
+/* ---- streams ---------------------------------------------------------------------------------------- */
+
+/*
+ * Reads a frame sequence: name (length word, at most 63 characters), type, keyframe and key counts, the
+ * keyframes as reals and the keys. NULL on a failed read or without memory (with some leaks, as the
+ * original). EAX = stream.
+ */
+BMX_ADDR(0x004fcf20)
+__attribute__((regparm(1))) RpAnimFrameSequence *rpAnimSequenceRead(RwStream *stream)
+{
+    int32_t length;
+    char raw[0x40];
+    char name[0x41];
+    if (RwStreamReadInt32(stream, &length, 4) == NULL || RwStreamRead(stream, raw, (uint32_t)length) == 0) {
+        return NULL;
+    }
+    for (int32_t i = 0; i < length; i++) {
+        name[i] = raw[i];
+    }
+    name[length] = '\0';
+    int32_t type;
+    int32_t numFrames;
+    int32_t numKeys;
+    if (RwStreamReadInt32(stream, &type, 4) == NULL || RwStreamReadInt32(stream, &numFrames, 4) == NULL ||
+        RwStreamReadInt32(stream, &numKeys, 4) == NULL) {
+        return NULL;
+    }
+    RpAnimFrameSequence *sequence = rpAnimSequenceCreate(name, type, numFrames, 0, 0, 0, numKeys);
+    if (sequence == NULL) {
+        return NULL;
+    }
+    if (type == 1) {
+        void *frames = sequence->frames;
+        if (RwStreamReadReal(stream, frames, (uint32_t)numFrames * 12) == NULL) {
+            animFree(frames);
+            return NULL;
+        }
+        if (frames == NULL) {
+            return NULL;
+        }
+    } else if (type == 2) {
+        void *frames = sequence->frames;
+        if (RwStreamReadReal(stream, frames, (uint32_t)numFrames * 16) == NULL || frames == NULL) {
+            return NULL;
+        }
+    }
+    RpAnimKey *keys = (RpAnimKey *)sequence->keys;
+    RpAnimKey *key = keys;
+    for (int32_t i = 0; i < numKeys; i++, key++) {
+        int32_t value;
+        if (RwStreamReadInt32(stream, &value, 4) == NULL) {
+            animFree(keys);
+            return NULL;
+        }
+        key->start = value;
+        if (RwStreamReadInt32(stream, &value, 4) == NULL) {
+            animFree(keys);
+            return NULL;
+        }
+        key->end = value;
+        float duration;
+        if (RwStreamReadReal(stream, &duration, 4) == NULL) {
+            animFree(keys);
+            return NULL;
+        }
+        key->duration = duration;
+    }
+    if (keys == NULL) {
+        return NULL;
+    }
+    return sequence;
+}
+
+/*
+ * The frame's animation chunk: the user data, a flag and, when set, the priority word and the sequences of
+ * the two lists, each added to the frame (and released by the reader). The stream, NULL on a failed read.
+ */
+BMX_ADDR(0x004fcdd0)
+void *rpAnimFrameChunkRead(void *stream, int32_t length, void *frame)
+{
+    (void)length;
+    RpAnimFramePlugin *plugin = animFramePlugin(frame);
+    if (RwStreamReadInt32(stream, &plugin->userData, 4) == NULL) {
+        return NULL;
+    }
+    int32_t flag;
+    if (RwStreamReadInt32(stream, &flag, 4) == NULL) {
+        return NULL;
+    }
+    if (flag == 0) {
+        return stream;
+    }
+    int32_t counts[2];
+    if (RwStreamReadInt32(stream, &plugin->priority, 4) == NULL ||
+        RwStreamReadInt32(stream, &counts[0], 4) == NULL ||
+        RwStreamReadInt32(stream, &counts[1], 4) == NULL) {
+        return NULL;
+    }
+    for (int list = 0; list < 2; list++) {
+        for (int32_t i = 0; i < counts[list]; i++) {
+            RpAnimFrameSequence *sequence = rpAnimSequenceRead(stream);
+            if (sequence == NULL) {
+                return NULL;
+            }
+            rpAnimFrameAddSequence(frame, sequence);
+            rpAnimSequenceRelease(sequence);
+        }
+    }
+    return stream;
+}
+
+/* Writes `count` keyframes (EAX = keyframes, EDX = count, ECX = stream, the byte count is stored through the
+ * 4th stack slot): 16 bytes each (rotations) or 12 (translations). NULL when the write fails. */
+BMX_ADDR(0x004fbb30)
+__attribute__((regparm(3))) void *rpAnimWriteRotations(const void *frames, int32_t count, RwStream *stream,
+                                                       uint32_t unused0, uint32_t unused1, uint32_t unused2,
+                                                       int32_t *size)
+{
+    (void)unused0;
+    (void)unused1;
+    (void)unused2;
+    *size = 0;
+    if (RwStreamWriteReal(stream, frames, (uint32_t)count * 16) == NULL) {
+        return NULL;
+    }
+    *size += count * 16;
+    return (void *)frames;
+}
+
+BMX_ADDR(0x004fbb70)
+__attribute__((regparm(3))) void *rpAnimWriteTranslations(const void *frames, int32_t count, RwStream *stream,
+                                                          uint32_t unused0, uint32_t unused1,
+                                                          uint32_t unused2, int32_t *size)
+{
+    (void)unused0;
+    (void)unused1;
+    (void)unused2;
+    *size = 0;
+    if (RwStreamWriteReal(stream, frames, (uint32_t)count * 12) == NULL) {
+        return NULL;
+    }
+    *size += count * 12;
+    return (void *)frames;
+}
+
+/* Writes a frame sequence as rpAnimSequenceRead reads it; *size gets the bytes written (EAX = sequence,
+ * EDX = stream, ECX = size). NULL when a write fails or the end of the keys is a NULL pointer. */
+BMX_ADDR(0x004fd400)
+__attribute__((regparm(3))) RpAnimFrameSequence *rpAnimSequenceWrite(RpAnimFrameSequence *sequence,
+                                                                     RwStream *stream, int32_t *size)
+{
+    *size = 0;
+    const char *name = sequence->name;
+    int32_t value = (int32_t)animStrlen(name) + 1;
+    int32_t written = 4;
+    if (RwStreamWriteInt32(stream, &value, 4) == NULL) {
+        return NULL;
+    }
+    *size += written;
+    written = value;
+    if (RwStreamWrite(stream, name, (uint32_t)value) == NULL) {
+        return NULL;
+    }
+    *size += written;
+    const int32_t words[3] = {sequence->type, sequence->numFrames, sequence->numKeys};
+    for (int i = 0; i < 3; i++) {
+        value = words[i];
+        written = 4;
+        if (RwStreamWriteInt32(stream, &value, 4) == NULL) {
+            return NULL;
+        }
+        *size += written;
+    }
+    if (words[0] == 1) {
+        if (rpAnimWriteTranslations(sequence->frames, words[1], stream, 0, 0, 0, &written) == NULL) {
+            return NULL;
+        }
+        *size += written;
+    } else if (words[0] == 2) {
+        if (rpAnimWriteRotations(sequence->frames, words[1], stream, 0, 0, 0, &written) == NULL) {
+            return NULL;
+        }
+        *size += written;
+    }
+    const RpAnimKey *key = (const RpAnimKey *)sequence->keys;
+    written = 0;
+    for (int32_t i = 0; i < words[2]; i++, key++) {
+        value = key->start;
+        if (RwStreamWriteInt32(stream, &value, 4) == NULL) {
+            return NULL;
+        }
+        written += 4;
+        value = key->end;
+        if (RwStreamWriteInt32(stream, &value, 4) == NULL) {
+            return NULL;
+        }
+        written += 4;
+        const float duration = key->duration;
+        if (RwStreamWriteReal(stream, &duration, 4) == NULL) {
+            return NULL;
+        }
+        written += 4;
+    }
+    if (key == NULL) {
+        return NULL;
+    }
+    *size += written;
+    return sequence;
+}
+
+/* Writes the frame's animation chunk as rpAnimFrameChunkRead reads it; the stream, NULL on a failed write. */
+BMX_ADDR(0x004fd280)
+void *rpAnimFrameChunkWrite(void *stream, int32_t length, const void *frame)
+{
+    (void)length;
+    const RpAnimFramePlugin *plugin = animFramePlugin(frame);
+    const RpAnimFrameData *data = plugin->data;
+    if (RwStreamWriteInt32(stream, &plugin->userData, 4) == NULL) {
+        return NULL;
+    }
+    const int32_t flag = data != NULL;
+    if (RwStreamWriteInt32(stream, &flag, 4) == NULL) {
+        return NULL;
+    }
+    if (flag == 0) {
+        return stream;
+    }
+    if (RwStreamWriteInt32(stream, &plugin->priority, 4) == NULL) {
+        return NULL;
+    }
+    const int32_t numA = data->numA;
+    if (RwStreamWriteInt32(stream, &numA, 4) == NULL) {
+        return NULL;
+    }
+    const int32_t numB = data->numB;
+    if (RwStreamWriteInt32(stream, &numB, 4) == NULL) {
+        return NULL;
+    }
+    int32_t size;
+    for (const RpAnimFrameLink *link = data->listA; link != NULL; link = link->next) {
+        if (rpAnimSequenceWrite(link->sequence, stream, &size) == NULL) {
+            return NULL;
+        }
+    }
+    for (const RpAnimFrameLink *link = data->listB; link != NULL; link = link->next) {
+        if (rpAnimSequenceWrite(link->sequence, stream, &size) == NULL) {
+            return NULL;
+        }
+    }
+    return stream;
+}
+
+/* ---- playback --------------------------------------------------------------------------------------- */
+
+/* Puts an instance at the start of its sequence (backward: at the last key) with the time t (EAX = instance,
+ * EDX = direction, ST0 = t). */
+__attribute__((used, noinline)) static RpAnimInstance *rpAnimInstanceResetImpl(RpAnimInstance *instance,
+                                                                               int32_t forward, double t)
+{
+    instance->time = (float)t;
+    const RpAnimFrameSequence *sequence = instance->sequence;
+    if (forward != 0) {
+        instance->keys = sequence->keys;
+    } else {
+        instance->keys = sequence->keys + sequence->numKeys * 12 - 12;
+    }
+    return instance;
+}
+
+BMX_ADDR(0x004fbf30)
+__attribute__((naked)) RpAnimInstance *rpAnimInstanceReset(void)
+{
+    __asm__ volatile("subl $8, %esp\n\t"
+                     "fstpl (%esp)\n\t"
+                     "pushl %edx\n\t"
+                     "pushl %eax\n\t"
+                     "call _rpAnimInstanceResetImpl\n\t"
+                     "addl $16, %esp\n\t"
+                     "ret");
+}
+
+/*
+ * Moves the instance's time on by dt and steps over the keys it passes (setting bit 1 of the flags): forward
+ * while the time reaches the key's duration, backward while it does not stay below it; at either end of the
+ * keys the time stops at the duration of the last key reached. Returns the position in the current key as a
+ * fraction of its duration (backward: from its end).
+ */
+static double animAdvance(RpAnimInstance *instance, double dt, int32_t forward, int32_t *flags)
+{
+    instance->time = (float)(dt + instance->time);
+    const RpAnimFrameSequence *sequence = instance->sequence;
+    const RpAnimKey *key = (const RpAnimKey *)instance->keys;
+    int32_t index = (int32_t)(((const uint8_t *)key - sequence->keys) / 12);
+    if (forward != 0) {
+        if (!((double)key->duration > (double)instance->time)) {
+            for (;;) {
+                if (index >= sequence->numKeys - 1) {
+                    instance->time = key->duration;
+                    break;
+                }
+                const double duration = key->duration;
+                key++;
+                index++;
+                instance->time = (float)animSub(instance->time, duration);
+                *flags |= 2;
+                instance->keys = (uint8_t *)key;
+                if (!((double)instance->time >= (double)key->duration)) {
+                    break;
+                }
+            }
+        }
+        return (double)instance->time / key->duration;
+    }
+    if (!((double)key->duration > (double)instance->time)) {
+        for (;;) {
+            if (index <= 0) {
+                instance->time = key->duration;
+                break;
+            }
+            instance->time = (float)animSub(instance->time, key->duration);
+            key--;
+            index--;
+            *flags |= 2;
+            instance->keys = (uint8_t *)key;
+            if ((double)key->duration > (double)instance->time) {
+                break;
+            }
+        }
+    }
+    return animSub(key->duration, instance->time) / key->duration;
+}
+
+/*
+ * Sets up the slerp cache from q0 to q1 (x, y, z, w): q1 is negated when the dot product is negative (the
+ * shorter way round); the cosine is clamped to [-1, 1] (1 below -1 and for NaN). The angle is
+ * atan2(sqrt((1 + c)(1 - c)), c); from c = 0.99999 on the blend is linear, else both quaternions are scaled
+ * by 1 / sin(angle).
+ */
+BMX_ADDR(0x0051ce10)
+void rpAnimSlerpCacheSetup(const float *q0, const float *q1, RpAnimSlerpCache *cache)
+{
+    cache->q0[3] = q0[3];
+    cache->q0[0] = q0[0];
+    cache->q0[1] = q0[1];
+    cache->q0[2] = q0[2];
+    const double dot =
+        (((double)q0[3] * q1[3] + (double)q0[2] * q1[2]) + (double)q1[1] * q0[1]) + (double)q1[0] * q0[0];
+    double c;
+    if (0.0 > dot) {
+        c = -1.0 <= dot ? -dot : 1.0;
+        cache->q1[3] = -q1[3];
+        cache->q1[0] = -q1[0];
+        cache->q1[1] = -q1[1];
+        cache->q1[2] = -q1[2];
+    } else {
+        c = 1.0 >= dot ? dot : 1.0;
+        cache->q1[3] = q1[3];
+        cache->q1[0] = q1[0];
+        cache->q1[1] = q1[1];
+        cache->q1[2] = q1[2];
+    }
+    cache->angle = bmxX87AngleOfCosine(c);
+    cache->linear = c >= 0x1.fffeb0p-1;
+    if (cache->linear != 0) {
+        return;
+    }
+    const double scale = 1.0 / bmxX87Fsin(cache->angle);
+    for (int i = 0; i < 4; i++) {
+        cache->q0[i] = (float)(cache->q0[i] * scale);
+        cache->q1[i] = (float)(cache->q1[i] * scale);
+    }
+}
+
+/* x87 FSIN of a value in a register. */
+static double animSin(double a)
+{
+    return bmxX87Fsin(a);
+}
+
+/*
+ * Rotation of a frame by its rotation instance (EAX = instance, EDX = interpolator state, ECX = frame,
+ * direction in the 4th stack slot, ST0 = dt): advances the instance, renews the slerp cache when the key
+ * changed, and sets the frame's matrix to the rotation of the keyframes' quaternions at the key's position
+ * (the first one up to 0, the second from 1, interpolated between), keeping the matrix's translation.
+ */
+__attribute__((used, noinline)) static RpAnimInstance *rpAnimRotationUpdateImpl(RpAnimInstance *instance,
+                                                                                RpAnimInterpolator *interp,
+                                                                                RwFrame *frame, double dt,
+                                                                                int32_t forward)
+{
+    interp->state |= 1;
+    const float (*frames)[4] = instance->sequence->frames;
+    const double t = animAdvance(instance, dt, forward, &interp->state);
+    const RpAnimKey *key = (const RpAnimKey *)instance->keys;
+    const float *q0 = frames[key->start];
+    const float *q1 = frames[key->end];
+    RwMatrix *m = RwFrameGetMatrix(frame);
+    const RwV3d position = m->pos;
+    if ((interp->state & 2) != 0) {
+        rpAnimSlerpCacheSetup(q0, q1, &interp->cache);
+        interp->state &= ~2;
+    }
+    double x;
+    double y;
+    double z;
+    double w;
+    if (!(t > 0.0)) {
+        x = q0[0];
+        y = q0[1];
+        z = q0[2];
+        w = q0[3];
+    } else if (!(t < 1.0)) {
+        x = q1[0];
+        y = q1[1];
+        z = q1[2];
+        w = q1[3];
+    } else {
+        const RpAnimSlerpCache *c = &interp->cache;
+        double s0 = animSub(1.0, t);
+        double s1 = t;
+        if (c->linear == 0) {
+            const float angle = c->angle;
+            s0 = animSin(angle * s0);
+            s1 = animSin(angle * t);
+        }
+        x = c->q1[0] * s1 + c->q0[0] * s0;
+        y = c->q1[1] * s1 + s0 * c->q0[1];
+        z = c->q1[2] * s1 + s0 * c->q0[2];
+        w = s0 * c->q0[3] + s1 * c->q1[3];
+    }
+    const double zz = z * z;
+    const double yy = y * y;
+    const double xx = x * x;
+    m->right.x = (float)animSub(1.0, (zz + yy) * 2.0);
+    m->up.y = (float)animSub(1.0, (zz + xx) * 2.0);
+    m->at.z = (float)animSub(1.0, (yy + xx) * 2.0);
+    const double zw = z * w;
+    const double xy = x * y;
+    const double xz = x * z;
+    const double yw = y * w;
+    m->pos.z = 0.0F;
+    m->pos.y = 0.0F;
+    m->pos.x = 0.0F;
+    m->right.y = (float)((zw + xy) * 2.0);
+    m->up.x = (float)(animSub(xy, zw) * 2.0);
+    m->at.x = (float)((yw + xz) * 2.0);
+    m->right.z = (float)(animSub(xz, yw) * 2.0);
+    const double xw = x * w;
+    const double yz = y * z;
+    m->up.z = (float)((xw + yz) * 2.0);
+    m->at.y = (float)(animSub(yz, xw) * 2.0);
+    RwMatrixUpdate(m);
+    m->flags = (m->flags | 3) & 0xfffdffffU;
+    RwFrameTranslate(frame, &position, rwCOMBINEPOSTCONCAT);
+    return instance;
+}
+
+BMX_ADDR(0x004fbf60)
+__attribute__((naked)) RpAnimInstance *rpAnimRotationUpdate(uint32_t unused0, uint32_t unused1,
+                                                            uint32_t unused2, int32_t forward)
+{
+    __asm__ volatile("pushl 0x10(%esp)\n\t"
+                     "subl $8, %esp\n\t"
+                     "fstpl (%esp)\n\t"
+                     "pushl %ecx\n\t"
+                     "pushl %edx\n\t"
+                     "pushl %eax\n\t"
+                     "call _rpAnimRotationUpdateImpl\n\t"
+                     "addl $24, %esp\n\t"
+                     "ret");
+}
+
+/*
+ * Moves a node's frame on by dt (EAX = interpolator state, EDX = frame, ECX = direction, ST0 = dt): the
+ * rotation instance first, then the translation instance, whose keyframes are interpolated linearly into the
+ * frame's matrix translation (replacing it).
+ */
+__attribute__((used, noinline)) static RpAnimInterpolator *
+rpAnimInterpolatorUpdateImpl(RpAnimInterpolator *interp, RwFrame *frame, int32_t forward, double dt)
+{
+    if (interp->b != NULL) {
+        rpAnimRotationUpdateImpl(interp->b, interp, frame, dt, forward);
+    }
+    RpAnimInstance *instance = interp->a;
+    if (instance == NULL) {
+        return interp;
+    }
+    interp->state |= 1;
+    const float (*frames)[3] = instance->sequence->frames;
+    const double t = animAdvance(instance, dt, forward, &interp->state);
+    const RpAnimKey *key = (const RpAnimKey *)instance->keys;
+    const float *v0 = frames[key->start];
+    const float *v1 = frames[key->end];
+    RwMatrix *m = RwFrameGetMatrix(frame);
+    const float dx = (float)animSub(v1[0], v0[0]);
+    const float dy = (float)animSub(v1[1], v0[1]);
+    const float dz = (float)animSub(v1[2], v0[2]);
+    const float tx = (float)(t * dx);
+    const float ty = (float)(t * dy);
+    const float tz = (float)(t * dz);
+    RwV3d translation;
+    translation.x = (float)((double)tx + v0[0]);
+    translation.y = (float)((double)ty + v0[1]);
+    translation.z = (float)((double)tz + v0[2]);
+    m->pos.x = 0.0F;
+    m->pos.y = 0.0F;
+    m->pos.z = 0.0F;
+    RwFrameTranslate(frame, &translation, rwCOMBINEPOSTCONCAT);
+    return interp;
+}
+
+BMX_ADDR(0x004fc2e0)
+__attribute__((naked)) RpAnimInterpolator *rpAnimInterpolatorUpdate(void)
+{
+    __asm__ volatile("subl $8, %esp\n\t"
+                     "fstpl (%esp)\n\t"
+                     "pushl %ecx\n\t"
+                     "pushl %edx\n\t"
+                     "pushl %eax\n\t"
+                     "call _rpAnimInterpolatorUpdateImpl\n\t"
+                     "addl $20, %esp\n\t"
+                     "ret");
+}
+
+#define rpAnimTimeOffset ORIG_VAR(0x0069c698, float, rpAnimTimeOffset)
+#define rpAnimStartStep  ORIG_VAR(0x0069c69c, float, rpAnimStartStep)
+
+typedef RpClump *(BMX_CDECL *RpAnimClumpSequenceCallBack)(RpClump *clump, RpAnimClumpSequence *sequence,
+                                                          float time, void *data);
+
+/*
+ * Starts the clump's sequence `name` at time t (EAX = clump, EDX = name, ECX = direction, ST0 = t, the
+ * priority in the 4th stack slot): moves it to the list of running sequences and resets the instances of its
+ * nodes. While the time is within the sequence, the frames whose priority it reaches take it over and are
+ * posed; past the end, the sequence goes back to the first list and its callback gets the time wrapped into
+ * the duration. NULL when the clump has no such sequence (or it runs already).
+ */
+__attribute__((used, noinline)) static RpClump *
+rpAnimClumpStartSequenceImpl(RpClump *clump, const char *name, int32_t forward, double t, int32_t priority)
+{
+    const int32_t offset = rpAnimClumpOffset;
+    RpAnimClumpData *anim = (RpAnimClumpData *)((uint8_t *)clump + offset);
+    RpAnimClumpSequence *prev = anim->sequences;
+    RpAnimClumpSequence *sequence = prev->next;
+    while (sequence != NULL && animStrcmp(sequence->name, name) != 0) {
+        prev = sequence;
+        sequence = sequence->next;
+    }
+    if (sequence == NULL) {
+        return NULL;
+    }
+    prev->next = sequence->next;
+    sequence->next = NULL;
+    sequence->priority = priority;
+    sequence->direction = forward;
+    sequence->next = anim->others->next;
+    anim->others->next = sequence;
+    sequence->time = (float)t;
+    for (RpAnimNode *node = sequence->nodes; node != NULL; node = node->next) {
+        node->state = 2;
+        if (node->a != NULL) {
+            rpAnimInstanceResetImpl(node->a, forward, t);
+        }
+        if (node->b != NULL) {
+            rpAnimInstanceResetImpl(node->b, forward, t);
+        }
+    }
+    const double time = (double)sequence->time + rpAnimTimeOffset;
+    sequence->time = (float)time;
+    if ((double)sequence->duration >= time) {
+        for (RpAnimNode *node = sequence->nodes; node != NULL; node = node->next) {
+            RpAnimFramePlugin *plugin = animFramePlugin(node->frame);
+            const int32_t direction = sequence->direction;
+            if (sequence->priority >= plugin->priority) {
+                plugin->priority = sequence->priority;
+                rpAnimInterpolatorUpdateImpl((RpAnimInterpolator *)&node->state, node->frame, direction,
+                                             rpAnimStartStep);
+            }
+        }
+        return clump;
+    }
+    RpAnimClumpSequence *before = anim->others;
+    RpAnimClumpSequence *found = before->next;
+    while (found != NULL && animStrcmp(found->name, sequence->name) != 0) {
+        before = found;
+        found = found->next;
+    }
+    if (found == NULL) {
+        return clump;
+    }
+    before->next = found->next;
+    found->next = NULL;
+    found->next = anim->sequences->next;
+    anim->sequences->next = found;
+    double wrapped = sequence->time;
+    if (!((double)sequence->duration >= wrapped)) {
+        do {
+            wrapped = animSub(wrapped, sequence->duration);
+            sequence->time = (float)wrapped;
+        } while (!((double)sequence->duration >= wrapped));
+    }
+    ((RpAnimClumpSequenceCallBack)sequence->callBack)(clump, sequence, (float)wrapped, sequence->data);
+    return clump;
+}
+
+BMX_ADDR(0x004ff960)
+__attribute__((naked)) RpClump *rpAnimClumpStartSequence(uint32_t unused0, uint32_t unused1, uint32_t unused2,
+                                                         int32_t priority)
+{
+    __asm__ volatile("pushl 0x10(%esp)\n\t"
+                     "subl $8, %esp\n\t"
+                     "fstpl (%esp)\n\t"
+                     "pushl %ecx\n\t"
+                     "pushl %edx\n\t"
+                     "pushl %eax\n\t"
+                     "call _rpAnimClumpStartSequenceImpl\n\t"
+                     "addl $24, %esp\n\t"
+                     "ret");
+}
+
+/* The default callback at the end of a sequence: starts it again (forward, same priority) at the time wrapped
+ * into its duration. */
+BMX_ADDR(0x00502990)
+RpClump *rpAnimClumpDefaultCallBack(RpClump *clump, RpAnimClumpSequence *sequence, float time, void *data)
+{
+    (void)data;
+    double t = time;
+    const double duration = sequence->duration;
+    if (!(duration >= t)) {
+        do {
+            t = animSub(t, duration);
+        } while (!(duration >= t));
+    }
+    rpAnimClumpStartSequenceImpl(clump, sequence->name, 1, t, sequence->priority);
+    return clump;
+}
 /* ---- LOD atomic plugin (id 0x112): the per-atomic data, its render hook and its stream callbacks ------- */
 
 static RpLodAtomicData **lodSlot(const void *object, int32_t offset)

@@ -1817,6 +1817,181 @@ static void setup_camera_sync(DtCtx *c)
     rwtEnd();
 }
 
+/* ---- the light sync and the camera's sector list ------------------------------------------------------- */
+
+static RwMatrix gSyncLtm;
+
+static RwMatrix *BMX_CDECL stSyncLtm(RwFrame *frame)
+{
+    rwtLog(0x4d2b10);
+    rwtLogPtr(frame);
+    return &gSyncLtm;
+}
+
+static void *BMX_CDECL cbLightSync(RpLight *light)
+{
+    rwtLog(0xca72);
+    rwtLogPtr(light);
+    return dt_u32() % 6 == 0 ? NULL : light;
+}
+
+/* A coordinate for the walks: mostly in the BSP's range, whole numbers half of the time (planes meet), now
+ * and then an edge value. */
+static float syncCoord(float lo, float hi)
+{
+    if (gBspIntegral) {
+        return (float)dt_range((int32_t)lo, (int32_t)hi);
+    }
+    return dt_u32() % 8 == 0 ? dt_float_edgy(lo, hi) : dt_float(lo, hi);
+}
+
+/* A light (local or not) with its old sync callback, in a world with a BSP (or none), at a random position.
+ */
+static void setup_light_sync(DtCtx *c)
+{
+    worldEnv(c, 0);
+    gBspIntegral = (int)(dt_u32() % 2);
+    RpWorld *world = dt_u32() % 6 == 0 ? NULL : mkWorld();
+    if (world != NULL) {
+        world->rootSector = mkBsp(dt_range(0, 5));
+    }
+    RpLight *light = mkLight(world, dt_u32() % 4 == 0 ? lightType() : 0x80 + (dt_u32() % 2));
+    *(void **)((uint8_t *)light + kLightWorld + 4) = (void *)cbLightSync;
+    light->radius = dt_u32() % 6 == 0 ? dt_float_edgy(-2.0F, 40.0F) : syncCoord(0.0F, 6.0F);
+    gSyncLtm.pos.x = syncCoord(-2.0F, 30.0F);
+    gSyncLtm.pos.y = syncCoord(-2.0F, 30.0F);
+    gSyncLtm.pos.z = syncCoord(-2.0F, 30.0F);
+    if (dt_u32() % 3 != 0) {
+        gSyncLtm.pos.x += 4.0F;
+        gSyncLtm.pos.y += 4.0F;
+        gSyncLtm.pos.z += 4.0F;
+    }
+    /* ties from an earlier sync, destroyed first */
+    for (int i = dt_range(0, 2); i > 0; i--) {
+        RpLightTie *tie = dt_alloc(sizeof *tie);
+        tie->light = light;
+        listAddTail(&light->sectors, &tie->worldSectorInLight);
+        listInit(&tie->lightInWorldSector);
+    }
+    dt_stub(0x004d2b10, NULL, (void *)stSyncLtm);
+    DT_ARG_PTR(c, 0, light);
+    rwtEnd();
+}
+
+enum {
+    kSyncCameraData = 0x130, /* behind the frustum planes and box of a real camera */
+    kSyncCameraBytes = 0x150,
+};
+
+static int gSyncReallocFails;
+
+static void *BMX_CDECL stSyncRealloc(void *block, size_t size)
+{
+    rwtLog(0x4a50d3);
+    rwtLogPtr(block);
+    rwtLog((uint32_t)size);
+    if (gSyncReallocFails) {
+        return NULL;
+    }
+    void *p = dt_alloc((uint32_t)size);
+    __builtin_memcpy(p, block, size - 200);
+    return p;
+}
+
+static RwFrame *BMX_CDECL stCameraFrame(const RwCamera *camera)
+{
+    rwtLog(0x4dea80);
+    rwtLogPtr(camera);
+    return camera->object.object.parent;
+}
+
+/* A BSP with sectors that carry random bounding boxes (the frustum tests read them). */
+static RpSector *mkBoxBsp(int depth)
+{
+    RpSector *node = mkBsp(depth);
+    if (node->type < 0) {
+        RpWorldSector *s = (RpWorldSector *)node;
+        float *box = (float *)&s->boundingBox;
+        for (int i = 0; i < 3; i++) {
+            box[i] = syncCoord(-10.0F, 40.0F);
+            box[3 + i] = syncCoord(-10.0F, 40.0F);
+        }
+    } else {
+        RpPlaneSector *p = (RpPlaneSector *)node;
+        if (gBspIntegral) {
+            p->value = (float)dt_range(0, 12);
+        }
+        p->leftSubTree = mkBoxBsp(depth - 1);
+        p->rightSubTree = mkBoxBsp(depth - 1);
+    }
+    return node;
+}
+
+/*
+ * A camera in a world (kind 2 or another) with frustum planes and box: the planes are random unit-ish normals
+ * with distances that cut through the sector boxes, so sectors fall on both sides. The sector array starts
+ * empty or with a few entries of room; growing it fails now and then.
+ */
+static void setup_camera_sectors(DtCtx *c)
+{
+    RwGlobals *g = worldEnv(c, 0);
+    rpWorldCameraOffset = kSyncCameraData;
+    g->memoryFuncs.rwrealloc = stSyncRealloc;
+    gSyncReallocFails = dt_u32() % 8 == 0;
+    gRwtMallocFailAt = dt_u32() % 8 == 0 ? 1 : 0;
+    gBspIntegral = (int)(dt_u32() % 2);
+    RpWorld *world = mkWorld();
+    world->flags = dt_u32() % 2 == 0 ? 2 : dt_u32() % 4;
+    world->rootSector = mkBoxBsp(dt_range(0, 6));
+    RwCamera *camera = dt_alloc(kSyncCameraBytes);
+    camera->object.object.type = 4;
+    camera->object.object.parent = mkFrame();
+    for (int i = 0; i < 6; i++) {
+        RwFrustumPlane *p = &camera->frustumPlanes[i];
+        p->normal.x = dt_float_edgy(-1.0F, 1.0F);
+        p->normal.y = dt_float_edgy(-1.0F, 1.0F);
+        p->normal.z = dt_float_edgy(-1.0F, 1.0F);
+        p->distance = dt_u32() % 3 == 0 ? dt_float(-100.0F, 100.0F) : dt_float(-20.0F, 20.0F);
+        if (dt_u32() % 3 != 0) {
+            p->distance = 500.0F; /* every sector inside */
+        }
+        for (int k = 0; k < 3; k++) {
+            p->closest[k] = (uint8_t)(dt_u32() % 2);
+        }
+        p->pad13 = (uint8_t)dt_u32();
+    }
+    for (int i = 0; i < 3; i++) {
+        const float a = syncCoord(-5.0F, 30.0F);
+        const float b = syncCoord(-5.0F, 30.0F);
+        camera->frustumBoundBox[i] = a > b ? a : b;
+        camera->frustumBoundBox[3 + i] = a > b ? b : a;
+    }
+    gSyncLtm.pos.x = syncCoord(-5.0F, 30.0F);
+    gSyncLtm.pos.y = syncCoord(-5.0F, 30.0F);
+    gSyncLtm.pos.z = syncCoord(-5.0F, 30.0F);
+    RpWorldCameraData *data = (RpWorldCameraData *)((uint8_t *)camera + kSyncCameraData);
+    data->world = world;
+    data->capacity = dt_range(0, 3);
+    data->numSectors = dt_range(0, 3);
+    data->sectors =
+        data->capacity == 0 && dt_u32() % 2 ? NULL : (RpWorldSector **)dt_alloc(3 * sizeof(void *));
+    dt_stub(0x004d2b10, NULL, (void *)stSyncLtm);
+    dt_stub(0x004dea80, NULL, (void *)stCameraFrame);
+    DT_ARG_PTR(c, 0, dt_u32() % 8 == 0 ? mkWorld() : world);
+    DT_ARG_PTR(c, 1, camera);
+    rwtEnd();
+}
+
+static RpWorld *cameraSectorsOrig(RpWorld *world, RwCamera *camera)
+{
+    return REG2(0x004b7e80, RpWorld *, RpWorld *, RwCamera *)(world, camera);
+}
+
+static RpWorld *cameraSectorsImpl(RpWorld *world, RwCamera *camera)
+{
+    return rpWorldCameraSyncSectors(world, camera);
+}
+
 /* ---- the PVS plugin's callbacks, constructors and stream chunks --------------------------------------- */
 
 static RpWorld *gFixWorld; /* the world rpWorldSectorGetWorld (0x4b9d50) is stubbed to find */
@@ -2473,6 +2648,9 @@ DT_CASES(rwworld_cases) = {
      0},
     {"WorldAtomicSync", 0x004b7ab0, WorldAtomicSync, 1, DT_RET_INT, setup_atomic_sync, 800, 0},
     {"WorldCameraSync", 0x004b7730, WorldCameraSync, 1, DT_RET_INT, setup_camera_sync, 300, 0},
+    {"WorldLightSync", 0x004b7bb0, WorldLightSync, 1, DT_RET_INT, setup_light_sync, 1500, 0},
+    {"rpWorldCameraSyncSectors", (uint32_t)(uintptr_t)cameraSectorsOrig, cameraSectorsImpl, 2, DT_RET_INT,
+     setup_camera_sectors, 1500, 0},
     {"RpWorldCreate", 0x004bb080, RpWorldCreate, 1, DT_RET_INT, setup_world_create, 1500, 0},
     {"RpWorldAddCamera", 0x004b81f0, RpWorldAddCamera, 2, DT_RET_INT, setup_add_camera, 100, 0},
     {"RpWorldRemoveCamera", 0x004b8240, RpWorldRemoveCamera, 2, DT_RET_INT, setup_remove_camera, 150, 0},

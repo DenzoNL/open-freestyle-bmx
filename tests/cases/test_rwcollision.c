@@ -567,6 +567,33 @@ static void setup_sector_atomics_sphere(DtCtx *c)
     sector_setup(c, rpINTERSECTSPHERE, collAtomicCb);
 }
 
+static const RpIntersection *gLineIs;
+static RwSphere gLineSphere;
+
+/* World spheres along the query's line (before its start, on it, past its end), some around the start. */
+static RwSphere *BMX_CDECL stLineSphere(RpAtomic *atomic)
+{
+    rwtLog(0x4b1280);
+    rwtLogPtr(atomic);
+    const RwLine *l = &gLineIs->t.line;
+    const float u = (float)(int32_t)(dt_u32() % 160) / 100.0f - 0.3f;
+    const float off = (float)(int32_t)(dt_u32() % 200) / 100.0f - 1.0f;
+    gLineSphere.center.x = l->start.x + (l->end.x - l->start.x) * u + off;
+    gLineSphere.center.y = l->start.y + (l->end.y - l->start.y) * u - off;
+    gLineSphere.center.z = l->start.z + (l->end.z - l->start.z) * u;
+    gLineSphere.radius = (float)(int32_t)(dt_u32() % 1000) / 100.0f;
+    return &gLineSphere;
+}
+
+static void setup_sector_atomics_line(DtCtx *c)
+{
+    sector_setup(c, rpINTERSECTLINE, collAtomicCb);
+    gLineIs = (const RpIntersection *)(uintptr_t)c->args[0];
+    if (dt_u32() % 4 != 0) {
+        dt_stub(0x004b1280, NULL, (void *)stLineSphere);
+    }
+}
+
 static void setup_sector_atomics_box(DtCtx *c)
 {
     sector_setup(c, rpINTERSECTBOX, collAtomicCb);
@@ -1191,6 +1218,8 @@ DT_CASES(rwcollision_cases) = {
      _rpCollWorldForAllLineSectors_impl, 5, DT_RET_INT, setup_line_sectors, 800, 0},
     {"_rpCollSectorAtomicsSphere", 0x004be000, _rpCollSectorAtomicsSphere, 3, DT_RET_INT,
      setup_sector_atomics_sphere, 500, 0},
+    {"_rpCollSectorAtomicsLine", 0x004bdde0, _rpCollSectorAtomicsLine, 3, DT_RET_INT,
+     setup_sector_atomics_line, 1500, 0},
     {"_rpCollWorldAtomicsPoint", (uint32_t)(uintptr_t)_rpCollWorldAtomicsPoint_orig,
      _rpCollWorldAtomicsPoint_impl, 5, DT_RET_INT, setup_walk_atomics_point, 400, 0},
     {"_rpCollWorldAtomicsLine", (uint32_t)(uintptr_t)_rpCollWorldAtomicsLine_orig,

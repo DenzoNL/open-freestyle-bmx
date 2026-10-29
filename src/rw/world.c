@@ -2158,8 +2158,101 @@ RpAtomic *WorldAtomicSync(RpAtomic *atomic)
     return atomic;
 }
 
-/* The camera's sector list sync (still original code: EAX = world, EDX = camera, x87). */
-ORIG_FN_REGPARM(2, 0x004b7e80, void, rpWorldCameraSyncSectors, (RpWorld * world, RwCamera *camera));
+static float worldAxis(const float *v, int32_t type)
+{
+    return *(const float *)((const uint8_t *)v + type);
+}
+
+/*
+ * Rebuilds the camera's list of world sectors in view (EAX = world, EDX = camera; returns the world). The BSP
+ * of the camera data's world is walked with the frustum's bounding box: a plane whose ranges the box overlaps
+ * on one side only sends the walk there (the differences are rounded to floats and tested by sign bit), else
+ * both subtrees are visited, the one on the camera's side of the plane first (last for worlds of kind 2;
+ * position and plane compared as integer bit patterns). The explicit stack has 64 entries. A sector is in
+ * view unless the corner of its bounding box nearest to a clip plane is outside it (distance > 0 as an
+ * integer). The array grows by 50 entries; without memory the error is set and the list keeps what it has.
+ */
+BMX_ADDR(0x004b7e80)
+__attribute__((regparm(2))) RpWorld *rpWorldCameraSyncSectors(RpWorld *world, RwCamera *camera)
+{
+    const int32_t offset = rpWorldCameraOffset;
+    RpWorldCameraData *data = (RpWorldCameraData *)((uint8_t *)camera + offset);
+    int32_t count = 0;
+    const RwMatrix *ltm = RwFrameGetLTM(RwCameraGetFrame(camera));
+    int32_t position[3];
+    __builtin_memcpy(position, &ltm->pos, sizeof position);
+    float inf[3];
+    float sup[3];
+    __builtin_memcpy(inf, &camera->frustumBoundBox[3], sizeof inf);
+    __builtin_memcpy(sup, &camera->frustumBoundBox[0], sizeof sup);
+    const int farFirst = world->flags == 2;
+    RpSector *stack[65] = {0};
+    int32_t top = 0;
+    RpSector *node = data->world->rootSector;
+    for (;;) {
+        const int32_t type = node->type;
+        if (type >= 0) {
+            const RpPlaneSector *plane = (const RpPlaneSector *)node;
+            const float left = (float)worldSub(worldAxis(inf, type), plane->leftValue);
+            const float right = (float)worldSub(plane->rightValue, worldAxis(sup, type));
+            if (floatBits(left) >= 0) {
+                node = plane->rightSubTree;
+                continue;
+            }
+            if (floatBits(right) >= 0) {
+                node = plane->leftSubTree;
+                continue;
+            }
+            const int beyond = *(const int32_t *)((const uint8_t *)position + type) > floatBits(plane->value);
+            if (farFirst ? beyond : !beyond) {
+                stack[++top] = plane->rightSubTree;
+                node = plane->leftSubTree;
+            } else {
+                stack[++top] = plane->leftSubTree;
+                node = plane->rightSubTree;
+            }
+            continue;
+        }
+        RpWorldSector *sector = (RpWorldSector *)node;
+        const float *corners = (const float *)&sector->boundingBox;
+        int32_t i = 0;
+        for (; i < 6; i++) {
+            const RwFrustumPlane *p = &camera->frustumPlanes[i];
+            const double sum = ((double)p->normal.z * corners[p->closest[2] * 3 + 2] +
+                                (double)p->normal.y * corners[p->closest[1] * 3 + 1]) +
+                               (double)p->normal.x * corners[p->closest[0] * 3];
+            if (floatBits((float)worldSub(sum, p->distance)) > 0) {
+                break;
+            }
+        }
+        if (i == 6) {
+            if (count >= data->capacity) {
+                const size_t size = (size_t)data->capacity * 4 + 200;
+                RpWorldSector **sectors =
+                    (RpWorldSector **)(data->sectors != NULL ? RwEngineInstance->memoryFuncs.rwrealloc(
+                                                                   (void *)data->sectors, size)
+                                                             : RwEngineInstance->memoryFuncs.rwmalloc(size));
+                if (sectors == NULL) {
+                    RwError error;
+                    error.pluginID = kWorldPluginId;
+                    error.errorCode = _rwerror(rwERR_NOMEM, size);
+                    RwErrorSet(&error);
+                    data->numSectors = count;
+                    return world;
+                }
+                data->sectors = sectors;
+                data->capacity += 50;
+            }
+            data->sectors[count++] = sector;
+        }
+        node = stack[top--];
+        if (top < 0) {
+            break;
+        }
+    }
+    data->numSectors = count;
+    return world;
+}
 
 enum { rwSTANDARDWORLDCAMERASYNC = 22 };
 
@@ -2199,6 +2292,101 @@ __attribute__((regparm(1))) void rpLightTiesDestroy(RpLight *light)
         linkOut(&tie->lightInWorldSector);
         RwEngineInstance->freeListFree(tieGlobals()->lightTieFreeList, tie);
     }
+}
+
+/*
+ * The light's sync callback (the world plugin's replacement): counts a change and runs the callback it
+ * replaced (on failure it sets an error and still returns the light). A local light (type >= 0x80) in a world
+ * with a frame is tied anew to the sectors of the box at its position -+ radius: a maximum with its sign bit
+ * set is an error (NULL), negative minimums become 0. The BSP walk is rpAtomicAddTies' (64 entry stack, bit
+ * pattern compares); each sector gets a tie from the light tie free list (not checked) in its light list and
+ * the light's list of sectors.
+ */
+BMX_ADDR(0x004b7bb0)
+RpLight *WorldLightSync(RpLight *light)
+{
+    const int32_t offset = rpWorldLightOffset;
+    light->stamp++;
+    if (((void *(BMX_CDECL *)(RpLight *))((void **)((uint8_t *)light + offset))[1])(light) == NULL) {
+        RwError error;
+        error.pluginID = kWorldPluginId;
+        error.errorCode = _rwerror(rwERR_NULLP);
+        RwErrorSet(&error);
+        return light;
+    }
+    if ((int32_t)RpLightGetType(light) < 0x80) {
+        return light;
+    }
+    RpWorld *world = *(RpWorld **)((uint8_t *)light + offset);
+    RwFrame *frame = RpLightGetFrame(light);
+    if (world == NULL || frame == NULL) {
+        return light;
+    }
+    const float radius = light->radius;
+    rpLightTiesDestroy(light);
+    const RwMatrix *ltm = RwFrameGetLTM(frame);
+    const float x = ltm->pos.x;
+    const float y = ltm->pos.y;
+    const float z = ltm->pos.z;
+    float bounds[6];
+    bounds[3] = (float)((double)radius + x);
+    bounds[5] = (float)((double)radius + z);
+    bounds[4] = (float)((double)radius + y);
+    if ((int32_t)((uint32_t)floatBits(bounds[3]) | (uint32_t)floatBits(bounds[5]) |
+                  (uint32_t)floatBits(bounds[4])) < 0) {
+        RwError error;
+        error.pluginID = kWorldPluginId;
+        error.errorCode = _rwerror(0);
+        RwErrorSet(&error);
+        return NULL;
+    }
+    bounds[0] = (float)worldSub((double)x, radius);
+    bounds[2] = (float)worldSub((double)z, radius);
+    bounds[1] = (float)worldSub((double)y, radius);
+    if ((int32_t)((uint32_t)floatBits(bounds[0]) | (uint32_t)floatBits(bounds[2]) |
+                  (uint32_t)floatBits(bounds[1])) < 0) {
+        for (int i = 0; i < 3; i++) {
+            if (floatBits(bounds[i]) < 0) {
+                bounds[i] = 0.0F;
+            }
+        }
+    }
+    RpSector *stack[65] = {0};
+    int32_t top = 0;
+    RpSector *node = world->rootSector;
+    for (;;) {
+        const int32_t type = node->type;
+        if (type >= 0) {
+            const RpPlaneSector *plane = (const RpPlaneSector *)node;
+            const int32_t low = floatBits(worldAxis(bounds, type));
+            const int32_t high = floatBits(worldAxis(bounds + 3, type));
+            if (low < floatBits(plane->leftValue)) {
+                node = plane->leftSubTree;
+                if (floatBits(plane->rightValue) >= high) {
+                    continue;
+                }
+                stack[++top] = plane->rightSubTree;
+                continue;
+            }
+            if (floatBits(plane->rightValue) < high) {
+                node = plane->rightSubTree;
+                continue;
+            }
+            node = stack[top--];
+        } else {
+            RpWorldSector *sector = (RpWorldSector *)node;
+            RpLightTie *tie = RwEngineInstance->freeListAlloc(tieGlobals()->lightTieFreeList);
+            tie->light = light;
+            tie->worldSector = sector;
+            linkFirst(&sector->lightsInWorldSector, &tie->lightInWorldSector);
+            linkFirst(&light->sectors, &tie->worldSectorInLight);
+            node = stack[top--];
+        }
+        if (top < 0) {
+            break;
+        }
+    }
+    return light;
 }
 
 /*

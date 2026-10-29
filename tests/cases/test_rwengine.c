@@ -301,6 +301,37 @@ static void setup_set_arena(DtCtx *c)
     rwtEnd();
 }
 
+/* A new entry for an owner: the arena full or not, with entries to evict or none, malloc failing now and
+ * then. */
+static void setup_alloc_res_entry(DtCtx *c)
+{
+    dt_seed(c);
+    resources_env(c, dt_u32() % 5 == 0 ? dt_range(1, 300) : 0);
+    gRwtMallocFailAt = dt_u32() % 4 == 0 ? dt_range(1, 3) : 0;
+    DT_ARG_PTR(c, 0, dt_alloc(4));
+    DT_ARG_PTR(c, 1, dt_alloc(4));
+    DT_ARG_INT(c, 2, dt_u32() % 8 == 0 ? 0 : dt_range(1, 450));
+    DT_ARG_PTR(c, 3, dt_u32() % 2 ? notify : NULL);
+    rwtEnd();
+}
+
+static void setup_use_res_entry(DtCtx *c)
+{
+    dt_seed(c);
+    resources_env(c, 0);
+    RwResourcesGlobals *res = rwtResources(RwEngineInstance);
+    RwLLLink *list = dt_u32() % 2 ? res->usedEntries : res->freeEntries;
+    if (list->next == list) {
+        int32_t total = 0;
+        RwResEntry *e = NULL;
+        make_entries(1, &total, &e);
+        DT_ARG_PTR(c, 0, e);
+    } else {
+        DT_ARG_PTR(c, 0, dt_u32() % 2 ? list->next : list->prev);
+    }
+    rwtEnd();
+}
+
 /* ---- render state and matrices ---------------------------------------------------------------------- */
 
 static void setup_near_z(DtCtx *c)
@@ -446,6 +477,10 @@ DT_CASES(rwengine_cases) = {
      0},
     {"_rwResourcesPurge", 0x004dc3f0, _rwResourcesPurge, 0, DT_RET_VOID, setup_purge, 150, 0},
     {"RwResourcesSetArenaSize", 0x004dc6e0, RwResourcesSetArenaSize, 1, DT_RET_INT, setup_set_arena, 250, 0},
+    {"RwResourcesAllocateResEntry", 0x004dc460, RwResourcesAllocateResEntry, 4, DT_RET_INT,
+     setup_alloc_res_entry, 800, 0},
+    {"RwResourcesUseResEntry", 0x004dc680, RwResourcesUseResEntry, 1, DT_RET_INT, setup_use_res_entry, 200,
+     0},
     {"RwIm2DGetNearScreenZ", 0x004db800, RwIm2DGetNearScreenZ, 0, DT_RET_FLOAT, setup_near_z, 60, 0},
     {"RwRenderStateSet", 0x004db820, RwRenderStateSet, 2, DT_RET_INT, setup_render_state, 100, 0},
     {"RwIm2DRenderPrimitive", 0x004db920, RwIm2DRenderPrimitive, 3, DT_RET_INT, setup_im2d, 60, 0},

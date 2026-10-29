@@ -8,10 +8,6 @@
 #include "compat/crt.h"
 #include "rw/rwcollision.h"
 
-/* The line test of the atomics in one world sector; not ported yet. */
-ORIG_FN(0x004bdde0, RpWorldSector *, _rpCollSectorAtomicsLine,
-        (RpIntersection * intersection, RpWorldSector *sector, RpCollisionQuery *query));
-
 enum {
     kCollStackDepth = 64,     /* BSP walks (no overflow check in the original) */
     kCollTreeStackDepth = 16, /* polygon split trees */
@@ -1083,6 +1079,73 @@ static int rpCollAtomicBoxTest(const RwSphere *s, const RpCollisionQuery *query,
     }
     *distance = 0.0f;
     return 1;
+}
+
+/* a - b with b opaque to the optimiser (no rewrite as a + -b, which flips the sign of a NaN b). */
+static double collSub(double a, double b)
+{
+    __asm__("" : "+x"(b));
+    return a - b;
+}
+
+/*
+ * Line against the bounding spheres of the atomics in the sector not visited yet by this query (the excluded
+ * atomic is not skipped here). The distance handed to the callback is the projection of the centre on the
+ * line as a fraction of its length; a line starting inside a sphere always hits it, else the projection must
+ * be in (0, 1] and the line close enough to the centre. The cursor link after the current tie lets callbacks
+ * unlink atomics. NULL when a callback stopped.
+ */
+BMX_ADDR(0x004bdde0)
+RpWorldSector *_rpCollSectorAtomicsLine(RpIntersection *intersection, RpWorldSector *sector,
+                                        RpCollisionQuery *query)
+{
+    const RwLine *line = &intersection->t.line;
+    RwV3d dir;
+    dir.x = (float)collSub(line->end.x, line->start.x);
+    dir.y = (float)collSub(line->end.y, line->start.y);
+    dir.z = (float)collSub(line->end.z, line->start.z);
+    const double recipLength = _rwV3dNormalize(&dir, &dir);
+    RwLLLink *head = &sector->collAtomicsInWorldSector;
+    RwLLLink *link = head->next;
+    while (link != head) {
+        RpAtomic *atomic = ((RpTie *)link)->apAtom;
+        RwLLLink cursor;
+        cursor.next = link->next;
+        cursor.prev = link;
+        link->next->prev = &cursor;
+        link->next = &cursor;
+        if (atomic != NULL && atomic->collisionTag != RwEngineInstance->lightFrame) {
+            atomic->collisionTag = RwEngineInstance->lightFrame;
+            const RwSphere *s = RpAtomicGetWorldBoundingSphere(atomic);
+            const double dz = collSub(s->center.z, line->start.z);
+            const double dy = collSub(s->center.y, line->start.y);
+            const double dx = collSub(s->center.x, line->start.x);
+            const double radius2 = rwMul(s->radius, s->radius);
+            const double distance2 = ((dz * dz) + (dy * dy)) + (dx * dx);
+            const double along = ((dz * dir.z) + (dy * dir.y)) + (dx * dir.x);
+            int hit = 0;
+            double distance = 0.0;
+            if (radius2 > distance2) {
+                hit = 1;
+                distance = along * recipLength;
+            } else if (along > 0.0) {
+                distance = along * recipLength;
+                hit = distance <= 1.0 && collSub(radius2, collSub(distance2, along * along)) >= 0.0;
+            }
+            if (hit) {
+                const RpIntersectionCallBackAtomic callBack = (RpIntersectionCallBackAtomic)query->callBack;
+                if (callBack(intersection, sector, atomic, (float)distance, query->data) == NULL) {
+                    cursor.prev->next = cursor.next;
+                    cursor.next->prev = cursor.prev;
+                    return NULL;
+                }
+            }
+        }
+        cursor.prev->next = cursor.next;
+        cursor.next->prev = cursor.prev;
+        link = cursor.next;
+    }
+    return sector;
 }
 
 BMX_ADDR(0x004be000)

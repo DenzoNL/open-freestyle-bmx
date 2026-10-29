@@ -442,6 +442,8 @@ __attribute__((regparm(1))) void rpLightTiesDestroy(RpLight *light);
 __attribute__((regparm(2))) void rpAtomicAddTies(RpWorld *world, RpAtomic *atomic);
 RpAtomic *WorldAtomicSync(RpAtomic *atomic);
 RwCamera *WorldCameraSync(RwCamera *camera);
+__attribute__((regparm(2))) RpWorld *rpWorldCameraSyncSectors(RpWorld *world, RwCamera *camera);
+RpLight *WorldLightSync(RpLight *light);
 void *WorldInitCameraExt(void *camera);
 void *WorldDeInitCameraExt(void *camera);
 void *WorldCopyCameraExt(void *camera, const void *source);
