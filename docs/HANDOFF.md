@@ -15,24 +15,13 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   workflow), not on push: run `tools/check.sh` locally before pushing. It has no assets, so
   the differential cases are skipped there and run locally.
 
-## Next up (2026-10-26)
+## Next up (2026-10-29)
 
-Hook-phase porting is done: 2118/2120 functions (WinMain and the EpicFail trap stay original on
-purpose). Full suite: every case passes at full iterations.
-
-1. **Trace smoke test on the Windows PC** (no Wine needed), following `docs/TRACING.md`:
-   - `git pull`, `cmake --build --preset hook`;
-   - copy `build/hook/dinput.dll` next to `NgBMX.exe` and create an empty `bmxtrace.orig` in the game
-     folder;
-   - start the game, ride for a minute, quit normally;
-   - `py -I tools/trace_dump.py <game folder>/bmxtrace-<n>.bin --frames 0:10`.
-
-   Good: thousands of frames, rider positions changing, pad button bits changing with input. Bad: no
-   file, or a crash at startup. The trace path has never run in a real process yet, so fix whatever
-   breaks in `src/hook/trace.c`.
-2. If that works, record real sessions (list in `docs/TRACING.md`) into `work/traces/`.
-3. Then: coverage of the 7 big `game.c` functions, the open items in `PLAN.md`, and planning the
-   platform flip (native build, SDL3 renderer replacing RenderWare).
+- Game: 2117/2120 (WinMain, the EpicFail trap and the 1-byte crtNop stay original on purpose).
+- RenderWare: 708/711 ported (the three 4-byte stubs stay original: a hook jmp would overlap the next
+  function). What remains is the D3D7 driver (`lib/d3d7driver`, never ported): replace it with the SDL3
+  driver at the device / standards / extension tables (docs/RENDERWARE.md "Next", docs/NATIVE.md).
+- Golden traces: record sessions with `bmxtrace.orig` (docs/TRACING.md) if not done yet.
 
 ## Machine setup
 
