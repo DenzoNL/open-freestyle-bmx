@@ -20,7 +20,9 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
 - Game: 2117/2120 (WinMain, the EpicFail trap and the 1-byte crtNop stay original on purpose).
 - RenderWare: 708/711 ported (the three 4-byte stubs stay original: a hook jmp would overlap the next
   function). What remains is the D3D7 driver (`lib/d3d7driver`, never ported): replace it with the SDL3
-  driver at the device / standards / extension tables (docs/RENDERWARE.md "Next", docs/NATIVE.md).
+  driver at the device / standards / extension tables. Design decided 2026-10-29: docs/SDL3-DRIVER.md
+  (cut at RW's device interface, CPU vertex lighting ported faithfully, offline-compiled shaders, render at the
+  game's mode resolution, RGBA8 textures with CPU copies, original device dialog for now, screenshot diffs).
 - Golden traces: record sessions with `bmxtrace.orig` (docs/TRACING.md) if not done yet.
 
 ## Machine setup
