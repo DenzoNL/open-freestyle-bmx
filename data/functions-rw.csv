@@ -750,7 +750,7 @@ addr,size,file,confidence,name,status
 004df380,405,rw/texture.c,label,_rwTextureClose,ported
 004df520,26,rw/texture.c,label,RwTextureSetReadCallBack,ported
 004df540,16,rw/texture.c,label,RwTextureGetReadCallBack,ported
-004df550,26,rw/texture.c,label,RwTextureSetFindCallBack ,ported
+004df550,26,rw/texture.c,label,RwTextureSetFindCallBack,ported
 004df570,16,rw/texture.c,label,RwTextureGetFindCallBack,ported
 004df580,26,rw/texture.c,label,RwTextureSetMipmapping,ported
 004df5a0,16,rw/clump.c,closure,FUN_004df5a0,ported
@@ -852,7 +852,7 @@ addr,size,file,confidence,name,status
 004e7b60,834,rw/texture.c,closure,FUN_004e7b60,ported
 004e7eb0,103,rw/texture.c,label,BMPImageWrite,ported
 004e7f20,66,rw/texture.c,closure,FUN_004e7f20,ported
-004e7f70,75,rw/texture.c,label,RwRasterSetFromImage ,ported
+004e7f70,75,rw/texture.c,label,RwRasterSetFromImage,ported
 004e7fc0,119,rw/texture.c,closure,FUN_004e7fc0,ported
 004e8280,11,rw/stream.c,label,RwOSGetFileInterface,ported
 004e8290,66,lib/crt,label,rwfexist,skip
