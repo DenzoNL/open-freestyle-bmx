@@ -124,6 +124,7 @@ __attribute__((regparm(1))) int rpClumpEntryDestroy(RpClump *clump);
 int rpClumpFreeListDestroyCB(void *clump, void *data);
 void rpAtomicFreeListDestroyCB(void *atomic, void *data);
 void *rpClumpDefaultCallback(void *clump);
+void *_rpClumpOpen(void *engine, int32_t offset);
 void *_rpClumpClose(void *engine);
 void *_rpGeometryOpen(void *engine, int32_t offset);
 void rpGeometryFreeListDestroyCB(void *geometry, void *data);

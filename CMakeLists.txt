@@ -48,8 +48,22 @@ if(BMX_NATIVE32)
       OUTPUT_STRIP_TRAILING_WHITESPACE)
     list(APPEND BMX_CRT_STARTFILES ${crtPath})
   endforeach()
+  # SDL3 for i686 mingw (the SDL3-<version>/i686-w64-mingw32 folder of the SDL release's mingw devel package).
+  file(GLOB BMX_SDL3_GUESS "$ENV{HOME}/tools/sdl3/SDL3-*/i686-w64-mingw32" "$ENV{USERPROFILE}/tools/sdl3/SDL3-*/i686-w64-mingw32")
+  list(SORT BMX_SDL3_GUESS)
+  list(POP_BACK BMX_SDL3_GUESS BMX_SDL3_GUESS_LAST)
+  set(BMX_SDL3_DIR "${BMX_SDL3_GUESS_LAST}" CACHE PATH "SDL3 i686-w64-mingw32 prefix (bin/SDL3.dll, lib/cmake/SDL3)")
+  find_package(SDL3 REQUIRED CONFIG PATHS "${BMX_SDL3_DIR}" NO_DEFAULT_PATH)
+  # The SDL3 render driver (src/driver): native exe only, the hook DLL keeps running the original D3D7 driver.
+  # Compiled like the game objects (BMX_HOOK: RW globals at their original addresses) but hosted.
+  file(GLOB BMX_DRIVER_SOURCES CONFIGURE_DEPENDS src/driver/*.c)
+  add_library(bmx_driver OBJECT ${BMX_DRIVER_SOURCES})
+  target_include_directories(bmx_driver PRIVATE src)
+  target_compile_definitions(bmx_driver PRIVATE BMX_HOOK=1)
+  target_compile_options(bmx_driver PRIVATE ${BMX_WARNINGS} -Wno-sign-compare)
+  target_link_libraries(bmx_driver PRIVATE SDL3::SDL3)
   add_executable(bmxnative $<TARGET_OBJECTS:bmx_range> ${BMX_CRT_STARTFILES} $<TARGET_OBJECTS:bmx_game>
-    ${BMX_NATIVE_SOURCES} src/native/crtasm.S ${CMAKE_BINARY_DIR}/hooks_table.c)
+    $<TARGET_OBJECTS:bmx_driver> ${BMX_NATIVE_SOURCES} src/native/crtasm.S ${CMAKE_BINARY_DIR}/hooks_table.c)
   target_link_options(bmxnative PRIVATE -nostartfiles)
   target_include_directories(bmxnative PRIVATE src)
   target_compile_definitions(bmxnative PRIVATE _WIN32_WINNT=0x0A00 BMX_SOURCE_DIR="${CMAKE_SOURCE_DIR}" BMX_WORK_DIR="${BMX_WORK_DIR}")
@@ -59,7 +73,10 @@ if(BMX_NATIVE32)
   # above 0x6b3000.
   target_link_options(bmxnative PRIVATE -Wl,--image-base=0x3f0000 -Wl,--section-alignment=0x10000
     -Wl,--disable-dynamicbase -Wl,--disable-high-entropy-va)
-  target_link_libraries(bmxnative PRIVATE bcrypt winmm)
+  target_link_libraries(bmxnative PRIVATE bcrypt winmm ole32 SDL3::SDL3)
+  # SDL3.dll next to the exe (copy it into the game folder with bmxnative.exe).
+  add_custom_command(TARGET bmxnative POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:bmxnative>)
 endif()
 
 if(BMX_HOOK)

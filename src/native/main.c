@@ -7,7 +7,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define COBJMACROS
 #include <windows.h>
+
+#include <initguid.h>
+
+#include <audiopolicy.h>
+#include <mmdeviceapi.h>
 
 #include "native/native.h"
 
@@ -106,6 +112,42 @@ static const char *skipProgramName(const char *cl)
     return cl;
 }
 
+/*
+ * Dev aid for automated runs (BMX_MUTE=1): mutes this process's audio session on the default output, so the
+ * game's waveOut / DirectSound output (movies, menu music) stays silent. COM is left initialised.
+ */
+static void muteProcess(void)
+{
+    IMMDeviceEnumerator *devices = NULL;
+    IMMDevice *device = NULL;
+    IAudioSessionManager *sessions = NULL;
+    ISimpleAudioVolume *volume = NULL;
+
+    if (FAILED(CoInitializeEx(NULL, COINIT_APARTMENTTHREADED)) ||
+        FAILED(CoCreateInstance(&CLSID_MMDeviceEnumerator, NULL, CLSCTX_ALL, &IID_IMMDeviceEnumerator,
+                                (void **)&devices)) ||
+        FAILED(IMMDeviceEnumerator_GetDefaultAudioEndpoint(devices, eRender, eConsole, &device)) ||
+        FAILED(IMMDevice_Activate(device, &IID_IAudioSessionManager, CLSCTX_ALL, NULL, (void **)&sessions)) ||
+        FAILED(IAudioSessionManager_GetSimpleAudioVolume(sessions, NULL, FALSE, &volume)) ||
+        FAILED(ISimpleAudioVolume_SetMute(volume, TRUE, NULL))) {
+        bmxLog("BMX_MUTE: could not mute the audio session\n");
+    } else {
+        bmxLog("BMX_MUTE: audio session muted\n");
+    }
+    if (volume) {
+        ISimpleAudioVolume_Release(volume);
+    }
+    if (sessions) {
+        IAudioSessionManager_Release(sessions);
+    }
+    if (device) {
+        IMMDevice_Release(device);
+    }
+    if (devices) {
+        IMMDeviceEnumerator_Release(devices);
+    }
+}
+
 static void initGlobals(void)
 {
     memset((void *)(uintptr_t)0x00697780, 0, 0x34);
@@ -135,6 +177,14 @@ int main(void)
 
     /* ---- WinMain ---- */
     initGlobals();
+    /* Dev aids: BMX_NO_MOVIES=1 sets the original's own movie skip switch (0x67288c, never set by the game);
+     * BMX_MUTE=1 silences the process. */
+    if (getenv("BMX_NO_MOVIES")) {
+        VAR(0x0067288c, int) = 1;
+    }
+    if (getenv("BMX_MUTE")) {
+        muteProcess();
+    }
     snprintf(cmd, sizeof cmd, "%s", skipProgramName(GetCommandLineA()));
     parseResolution(cmd);
 

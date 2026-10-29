@@ -66,17 +66,57 @@ trap; the trap report names the function. A short list of the first traps goes i
 export PATH="$HOME/tools/llvm-mingw-20261020-ucrt-x86_64/bin:$PATH"   # i686-w64-mingw32-clang
 cmake --preset native32 -DBMX_WORK_DIR=<repo>/work                    # work/ = labels.raw, for names in reports
 cmake --build build/native32 -j 2
-cd <game folder> && <repo>/build/native32/bmxnative.exe               # needs NgBMX.exe in the working dir
+cd <game folder> && <repo>/build/native32/bmxnative.exe Scene.Txt -r640.480.16   # needs NgBMX.exe in the working dir
 ```
 
-`BMX_TRAP_SKIP=N` logs the first N traps and fakes a `return 1` from each instead of stopping (a survey of
-what the init sequence needs; state is bogus after the first skip). Output goes to stderr and to
-`bmxnative.log` next to the exe. SDL3 is not used yet (the window is plain Win32, exactly as the original
-WinMain creates it), so `SDL3.dll` is not needed.
+SDL3 (the mingw devel package's `i686-w64-mingw32` folder) is found by the `native32` configure under
+`~/tools/sdl3/SDL3-*/i686-w64-mingw32` (`$HOME` or `%USERPROFILE%`), or set `-DBMX_SDL3_DIR=<that folder>`. The
+build copies `SDL3.dll` next to `bmxnative.exe`; nothing has to be copied into the game folder.
+
+Command line: like the original, the first word is the scene database (`Scene.Txt` by default) and `-r<w>.<h>.<depth>`
+skips the device dialog by picking the full screen mode with that height and depth. `-r...` alone would become the
+scene path (`zsceneLoadDatabase` fails with "Database not found:-r640"), so pass `Scene.Txt` first. Without `-r` the
+original's device dialog comes up (D6).
+
+Environment (dev aids):
+
+| Variable | Effect |
+|---|---|
+| `BMX_TRAP_SKIP=N` | log the first N traps and fake a `return 1` from each instead of stopping (a survey; state is bogus after the first skip) |
+| `BMX_NO_MOVIES=1` | sets the original's own movie skip switch (0x67288c, which the game never sets): no ACCLAIM/ZAXIS/INTRO.AVI |
+| `BMX_MUTE=1` | mutes this process's audio session (WASAPI) before the game opens waveOut / DirectSound |
+| `BMX_QUIT_FRAMES=N` | exit after N shown frames (`RwRasterShowRaster`) |
+| `BMX_SHOT=<file.bmp>`, `BMX_SHOT_FRAME=N` | save the shown camera raster of frame N (default 1) as a BMP (GPU readback) |
+| `BMX_DRIVER_TRACE=1` | log every SDL3 driver entry with its first arguments |
+| `SDL_GPU_DRIVER=vulkan` | SDL's own: pick the GPU backend (default here: direct3d12) |
+
+Output goes to stderr and to `bmxnative.log` next to the exe. Note: a desktop capture (BitBlt / CopyFromScreen) of
+the window shows black while the D3D12 swapchain is presented as an independent flip; `PrintWindow` with
+`PW_RENDERFULLCONTENT` sees the real content.
 
 Sources: `src/native/loader.c` (hash check, image, imports, jumps), `trap.c` (exception handler, names),
-`main.c` (WinMain's job), `range.S` (see below). The game objects are compiled with `BMX_HOOK=1`,
-`-ffreestanding -fno-builtin` and the hook build's SSE2 flags; the loader is hosted C.
+`main.c` (WinMain's job), `range.S` (see below), and the SDL3 render driver in `src/driver/` (docs/SDL3-DRIVER.md).
+The game objects are compiled with `BMX_HOOK=1`, `-ffreestanding -fno-builtin` and the hook build's SSE2 flags; the
+loader is hosted C. The driver (object library `bmx_driver`) is hosted C with `BMX_HOOK=1` (RW globals at their
+original addresses) and is never part of the hook DLL. It is not in build/hook's compile database, so `tools/check.sh`
+leaves it out of clang-tidy; tidy it with `clang-tidy -p build/native32 src/driver/*.c` (clang-tidy 21).
+
+### Loader additions for the driver step (2026-10-29)
+
+- **Driver jumps.** After the hook table, the loader writes `bmxDriverJumps` (src/driver/device.c): a jump from each
+  original D3D7 driver entry we implement to the SDL3 driver. The device, standards and core extension tables in the
+  copied data keep their original addresses; unimplemented driver functions stay int3 and are reported by name.
+- **Kept parts of .text.** Two ranges of the original's code section are copied instead of filled with int3: the
+  incremental linker's thunk table 0x401005..0x402617 (1130 `jmp <function>`; function pointers in the data point at
+  these, e.g. 0x401e4c) and 0x4afc60..0x4b0f20, the object tables of dinput.lib's `c_dfDIJoystick` /
+  `c_dfDIKeyboard` that the formats in .rdata point at (without them `SetDataFormat` fails).
+- **Import shim `AVISaveOptionsFree`.** zmovieClose frees each stream's lpFormat with the CRT, then passes the options
+  to `AVISaveOptionsFree`, which GlobalFrees it again. In the original that block is on MSVC6's own heap and the
+  second free fails harmlessly; with our CRT on the process heap it was fatal (0xC0000374 heap corruption). The shim
+  only clears lpFormat / lpParms.
+- **The game folder's dinput.dll** (the hook DLL, when installed there) is loaded by the import fill as `DINPUT.dll`
+  and patches the range too; bmxnative's own jumps are written after it, so they win. It still installs its crash
+  handler and trace in the native process. Not a problem so far, but worth knowing.
 
 ### Design change found while building: the exe owns the range
 
@@ -175,6 +215,25 @@ table (0x566fe4, `D3D3System` 0x4ee010, `rwD3D3Standards` 0x56701c). With `BMX_T
 ported code: free lists, the memory wrappers, every engine module open routine (error, vector, colour, matrix, frame,
 stream, camera, image, raster, texture, resources, Im3D, render pipeline), the world/mesh/geometry/light/sector
 modules and the animation engine module.
+
+### First traps with the SDL3 driver skeleton (2026-10-29)
+
+With the driver's step 1 (docs/SDL3-DRIVER.md) `bmxnative.exe Scene.Txt -r640.480.16` (with `BMX_NO_MOVIES=1
+BMX_MUTE=1`) gets through RwEngineInit/Open/Start, InitApp and into the frame loop: the main menu runs, each frame does
+camera begin update, clear (colour 0x00000000 in the menu, so the window shows black), end update and
+`RwRasterShowRaster`, presented through SDL3 GPU (direct3d12) into the game's own window. Nothing else is drawn yet:
+the menu's geometry goes through Im3D / the instancing pipelines, which are later steps.
+
+On the way, three non-driver traps were fixed: `_rpClumpOpen` (0x4b0f20, clump module open, missing from
+functions-rw.csv; ported in rw/clump.c with its ext caller 0x4c46b0 and oracle tests), the incremental-link thunks and
+dinput tables in .text, and the double free in the movie close (see "Loader additions" above).
+
+After ~1860 menu frames (about 30 s) the first trap is libpng: `png_create_read_struct`-area 0x5070d0 (labelled
+png_error+0x80), called from `RtPNGImageRead` (0x5068a0). `BMX_TRAP_SKIP` gets only one step further (0x508e40,
+png_read_info+0x1bb0) before the faked return value faults in RtPNGImageRead: the PNG reader (lib/libpng, `skip`) needs
+a replacement decoder before a survey can go on. No unported driver entry was reached in those menu frames: no Im3D
+or pipeline call, no raster render; the Im2D entries are reached but are no-ops in the original too. RenderStateSet/Get
+are step 1 stubs that keep the values (153k sets in 1860 frames).
 
 ### Open points from the CRT layer (2026-10-28)
 

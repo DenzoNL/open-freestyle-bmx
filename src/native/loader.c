@@ -9,6 +9,7 @@
 
 #include <bcrypt.h>
 
+#include "driver/driver.h"
 #include "hook/hook.h"
 #include "native/native.h"
 
@@ -49,7 +50,32 @@ static int sha256Hex(const uint8_t *data, size_t size, char out[65])
     return 0;
 }
 
-/* Fills every import slot with the real Windows function; reports the slot range for the thunk scan. */
+/*
+ * AVISaveOptionsFree (AVIFIL32): zmovieClose frees each stream's lpFormat with the CRT (zmemFree) and then
+ * hands the AVICOMPRESSOPTIONS to this function, which GlobalFrees lpFormat and lpParms and clears them. In
+ * the original the block comes from MSVC6's own heap and that GlobalFree fails harmlessly; with our CRT the
+ * block is the process heap's and the second free is fatal (heap corruption). Only the clearing remains.
+ */
+static LONG WINAPI shimAviSaveOptionsFree(int count, void **options)
+{
+    for (int i = 0; i < count; i++) {
+        uint8_t *const o = options[i];
+
+        memset(o + 0x18, 0, 4); /* lpFormat */
+        memset(o + 0x20, 0, 4); /* lpParms */
+    }
+    return 0;
+}
+
+static const struct {
+    const char *name;
+    FARPROC fn;
+} kImportShims[] = {
+    {"AVISaveOptionsFree", (FARPROC)(void *)shimAviSaveOptionsFree},
+};
+
+/* Fills every import slot with the real Windows function (or its shim); reports the slot range for the thunk
+ * scan. */
 static int fillImports(const IMAGE_NT_HEADERS32 *nt, uint32_t *iatLo, uint32_t *iatHi)
 {
     const IMAGE_DATA_DIRECTORY dir = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
@@ -75,8 +101,14 @@ static int fillImports(const IMAGE_NT_HEADERS32 *nt, uint32_t *iatLo, uint32_t *
             const int byOrdinal = (*names & 0x80000000u) != 0;
             const char *name = byOrdinal ? (const char *)(uintptr_t)(*names & 0xffff)
                                          : (const char *)(kBmxImageBase + *names + 2);
-            const FARPROC fn = GetProcAddress(dll, name);
+            FARPROC fn = GetProcAddress(dll, name);
             const uint32_t slot = (uint32_t)(uintptr_t)slots;
+
+            for (size_t s = 0; !byOrdinal && s < sizeof kImportShims / sizeof kImportShims[0]; s++) {
+                if (strcmp(name, kImportShims[s].name) == 0) {
+                    fn = kImportShims[s].fn;
+                }
+            }
 
             if (!fn) {
                 bmxLog("import: %s!%s not found\n", dllName, byOrdinal ? "(ordinal)" : name);
@@ -91,6 +123,18 @@ static int fillImports(const IMAGE_NT_HEADERS32 *nt, uint32_t *iatLo, uint32_t *
     bmxLog("imports: %d slots filled\n", count);
     return 0;
 }
+
+/* Parts of the original's .text that are kept as they are instead of int3 (start, end). */
+static const struct {
+    uint32_t start, end;
+} kTextKeep[] = {
+    /* The incremental linker's thunk table: 1130 `jmp <function>`. Function pointers in the data point at
+     * these thunks; the jump then lands on the function's own address (our port or a trap). */
+    {0x00401005, 0x00402617},
+    /* Data the linker put into .text: dinput.lib's object tables of c_dfDIJoystick (0x2c entries at 0x4afc60)
+     * and c_dfDIKeyboard (0x100 entries at 0x4aff20), which the data formats in .rdata point at. */
+    {0x004afc60, 0x004b0f20},
+};
 
 static void writeJump(uint32_t from, const void *to)
 {
@@ -145,7 +189,16 @@ int bmxLoadImage(const char *exePath)
         const int isCode = (sec[i].Characteristics & IMAGE_SCN_CNT_CODE) != 0;
 
         if (isCode) {
+            const uint32_t start = kBmxImageBase + sec[i].VirtualAddress;
+
             memset(dst, 0xCC, vsize);
+            for (size_t k = 0; k < sizeof kTextKeep / sizeof kTextKeep[0]; k++) {
+                if (kTextKeep[k].start >= start && kTextKeep[k].end <= start + raw) {
+                    memcpy((void *)(uintptr_t)kTextKeep[k].start,
+                           file + sec[i].PointerToRawData + (kTextKeep[k].start - start),
+                           kTextKeep[k].end - kTextKeep[k].start);
+                }
+            }
         } else {
             memcpy(dst, file + sec[i].PointerToRawData, raw);
         }
@@ -189,6 +242,11 @@ int bmxLoadImage(const char *exePath)
         writeJump(a, bmxHooks[i].impl);
     }
     bmxLog("hooks: %u jumps\n", (unsigned)bmxHookCount);
+    /* The SDL3 driver replaces the original's D3D7 driver entry points (native exe only, see src/driver). */
+    for (uint32_t i = 0; i < bmxDriverJumpCount; i++) {
+        writeJump(bmxDriverJumps[i].orig, bmxDriverJumps[i].impl);
+    }
+    bmxLog("driver: %u jumps\n", (unsigned)bmxDriverJumpCount);
     bmxCrtInstall();
     FlushInstructionCache(GetCurrentProcess(), NULL, 0);
     free(file);

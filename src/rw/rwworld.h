@@ -394,6 +394,7 @@ void *rpWorldLightObject(void *object, RpLightApplyFn apply);
 void *WorldOpen(void *engine, int32_t offset);
 void *WorldClose(void *engine);
 void *rpWorldDefaultRender(RpWorldSector *sector);
+int rpWorldExtCallSlot1(void *pipeline);
 int rpWorldExtCallSlot2(void *pipeline);
 
 /* The PVS plugin's callbacks (plugin constructors/destructors, stream chunks, sector walks). */

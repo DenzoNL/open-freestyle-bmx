@@ -3073,6 +3073,36 @@ int rpClumpFreeListDestroyCB(void *clump, void *data)
 }
 
 /*
+ * Clump module open: the atomic (0x14 per block) and clump (10 per block) free lists, the atomics' render
+ * pipeline with the world extension's entry 1 and the light hook at +0x10. NULL, with nothing left behind,
+ * when a part fails.
+ */
+BMX_ADDR(0x004b0f20)
+void *_rpClumpOpen(void *engine, int32_t offset)
+{
+    rpClumpModuleOffset = offset;
+    clumpGlobals()->atomicFreeList = RwFreeListCreate(rpAtomicRegistry.sizeOfStruct, 0x14, 0);
+    if (clumpGlobals()->atomicFreeList == NULL) {
+        return NULL;
+    }
+    clumpGlobals()->clumpFreeList = RwFreeListCreate(rpClumpRegistry.sizeOfStruct, 10, 0);
+    if (clumpGlobals()->clumpFreeList != NULL) {
+        clumpGlobals()->pipeline = _rpWorldPipelineOpen();
+        if (clumpGlobals()->pipeline != NULL) {
+            rpWorldExtCallSlot1(clumpGlobals()->pipeline);
+            rpClumpModuleCount++;
+            clumpGlobals()->pipeline->stage4 = RW_CB(void(BMX_CDECL *)(void *, void *), 0x004b1860);
+            return engine;
+        }
+        RwFreeListDestroy(clumpGlobals()->clumpFreeList);
+        clumpGlobals()->clumpFreeList = NULL;
+    }
+    RwFreeListDestroy(clumpGlobals()->atomicFreeList);
+    clumpGlobals()->atomicFreeList = NULL;
+    return NULL;
+}
+
+/*
  * Clump module close: releases the clump pipeline, destroys the clumps and atomics still alive and both free
  * lists.
  */

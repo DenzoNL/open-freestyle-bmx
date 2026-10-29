@@ -2567,10 +2567,18 @@ static int BMX_CDECL cbExtSlot2(void *pipeline)
     return (int)(dt_u32() & 0xffff);
 }
 
+static int BMX_CDECL cbExtSlot1(void *pipeline)
+{
+    rwtLog(0xe571);
+    rwtLogPtr(pipeline);
+    return (int)(dt_u32() & 0xffff);
+}
+
 static void **BMX_CDECL stExtFuncs(void)
 {
     static void *table[4];
     rwtLog(0x4c5ac0);
+    table[1] = (void *)cbExtSlot1;
     table[2] = (void *)cbExtSlot2;
     return table;
 }
@@ -2586,6 +2594,24 @@ static void setup_world_open(DtCtx *c)
     rpWorldDefaultSurfaceProps.ambient = dt_float_edgy(-5.0F, 5.0F);
     rpWorldDefaultSurfaceProps.specular = dt_float_edgy(-5.0F, 5.0F);
     rpWorldDefaultSurfaceProps.diffuse = dt_float_edgy(-5.0F, 5.0F);
+    DT_ARG_PTR(c, 0, dt_alloc(0x20));
+    DT_ARG_INT(c, 1, kWorldGlobalsOffset);
+    rwtEnd();
+}
+
+/* The clump module (rw/clump.c) opens the same way: two free lists, the pipeline, extension entry 1. */
+#define rpClumpModuleCountVar (*(int32_t *)(uintptr_t)0x00676714)
+
+static void setup_clump_open(DtCtx *c)
+{
+    worldEnv(c, 0);
+    dt_stub(0x004e8500, NULL, (void *)stPipelineOpen);
+    dt_stub(0x004dba90, NULL, (void *)stFreeListCreate);
+    dt_stub(0x004dbbc0, NULL, (void *)stFreeListDestroy);
+    dt_stub(0x004c5ac0, NULL, (void *)stExtFuncs);
+    rpClumpModuleCountVar = dt_range(0, 3);
+    rpAtomicRegistry.sizeOfStruct = dt_range(0x70, 0x200);
+    rpClumpRegistry.sizeOfStruct = dt_range(0x2c, 0x200);
     DT_ARG_PTR(c, 0, dt_alloc(0x20));
     DT_ARG_INT(c, 1, kWorldGlobalsOffset);
     rwtEnd();
@@ -2727,6 +2753,8 @@ DT_CASES(rwworld_cases) = {
     {"WorldOpen", 0x004bc090, WorldOpen, 2, DT_RET_INT, setup_world_open, 200, 0},
     {"WorldClose", 0x004bc020, WorldClose, 1, DT_RET_INT, setup_world_close, 100, 0},
     {"rpWorldDefaultRender", 0x004bc360, rpWorldDefaultRender, 1, DT_RET_INT, setup_default_render, 60, 0},
+    {"_rpClumpOpen", 0x004b0f20, _rpClumpOpen, 2, DT_RET_INT, setup_clump_open, 200, 0},
+    {"rpWorldExtCallSlot1", 0x004c46b0, rpWorldExtCallSlot1, 1, DT_RET_INT, setup_ext_slot2, 20, 0},
     {"rpWorldExtCallSlot2", 0x004c46d0, rpWorldExtCallSlot2, 1, DT_RET_INT, setup_ext_slot2, 20, 0},
     {"RpPVSCreate", 0x004ce960, RpPVSCreate, 7, DT_RET_INT, setup_pvs_create, 300, 0},
     {"rpWorldAddCameraBody", (uint32_t)(uintptr_t)addCameraOrig, addCameraImpl, 2, DT_RET_INT,

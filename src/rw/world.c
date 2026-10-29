@@ -1675,6 +1675,13 @@ void *_rpTieOpen(void *engine, int32_t offset)
     return engine;
 }
 
+/* Calls entry 1 of the world extension's function table (0x69b520) on the atomics' render pipeline. */
+BMX_ADDR(0x004c46b0)
+int rpWorldExtCallSlot1(void *pipeline)
+{
+    return ((int(BMX_CDECL *)(void *))rpWorldExtGetFuncs()[1])(pipeline);
+}
+
 /* Calls entry 2 of the world extension's function table (0x69b520) on the world's render pipeline. */
 BMX_ADDR(0x004c46d0)
 int rpWorldExtCallSlot2(void *pipeline)

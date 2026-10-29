@@ -197,6 +197,7 @@ addr,size,file,confidence,name,status
 004af94f,118,lib/crt,closure,FUN_004af94f,skip
 004afb20,6,lib/crt,closure,RtlUnwind,skip
 004afc60,9,lib/crt,closure,FUN_004afc60,skip
+004b0f20,309,rw/clump.c,closure,_rpClumpOpen,ported
 004b1060,16,rw/clump.c,closure,FUN_004b1060,ported
 004b1070,16,rw/clump.c,closure,FUN_004b1070,ported
 004b1080,208,rw/clump.c,label,_rpClumpClose,ported
@@ -424,6 +425,7 @@ addr,size,file,confidence,name,status
 004c3ae0,875,rw/clump.c,closure,FUN_004c3ae0,ported
 004c3e60,1442,rw/clump.c,closure,FUN_004c3e60,ported
 004c46a0,12,rw/plugins.c,closure,FUN_004c46a0,ported
+004c46b0,22,rw/world.c,closure,FUN_004c46b0,ported
 004c46d0,22,rw/world.c,closure,FUN_004c46d0,ported
 004c46f0,22,rw/light.c,closure,FUN_004c46f0,ported
 004c4710,40,rw/clump.c,label,_rpMeshOpen,ported

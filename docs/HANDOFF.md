@@ -23,6 +23,10 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   driver at the device / standards / extension tables. Design decided 2026-10-29: docs/SDL3-DRIVER.md
   (cut at RW's device interface, CPU vertex lighting ported faithfully, offline-compiled shaders, render at the
   game's mode resolution, RGBA8 textures with CPU copies, original device dialog for now, screenshot diffs).
+- SDL3 driver step 1 done 2026-10-29 (src/driver/): `bmxnative.exe Scene.Txt -r640.480.16` runs the menu loop with
+  clear + present in an SDL3 GPU window (300 frames, no trap). Next blockers (docs/NATIVE.md "First traps with the SDL3
+  driver skeleton"): the PNG reader (lib/libpng is `skip`, reached after ~30 s of menu) needs a replacement decoder;
+  the x87 precision/RwMatrixMultiply switch in camera begin update (SDL3-DRIVER.md open points); then step 2.
 - Golden traces: record sessions with `bmxtrace.orig` (docs/TRACING.md) if not done yet.
 
 ## Machine setup
