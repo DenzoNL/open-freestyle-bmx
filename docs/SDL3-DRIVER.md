@@ -1,6 +1,6 @@
 # SDL3 render driver for RenderWare (P4)
 
-Status 2026-10-29: decided. The user chose option A for D1..D7 (the recommendations below).
+Status 2026-10-30: decided; steps 1 and 2 done (the menu draws). The user chose option A for D1..D7 (the recommendations below).
 The game and RenderWare (708/711) are ported. What `bmxnative.exe` still lacks is RW's Direct3D 7 device driver (`lib/d3d7driver` in data/functions-rw.csv: 250 functions, 107 KB, never ported).
 The decisions below record the options that were considered; A is the chosen one in each.
 
@@ -95,7 +95,7 @@ DirectSound -> SDL3 audio, the quit prompt's DirectDraw GDI flip.
    - Implemented: system function (all requests the original handles), RwRasterRegisterPlugin, core extension entries
      0-3 and the 0x40e plugin ctor/dtor, camera plugin ctor/dtor, camera begin/end update, camera clear, show raster,
      raster create/destroy/lock/unlock/sub raster, set raster context, image find raster format, raster set from image,
-     texture set raster, render order hint, the null standard, the four Im2D device entries (no-ops, as in the original).
+     texture set raster, render order hint, the null standard, the four Im2D device entries of the static device table (no-ops in the original; but see step 2).
    - Stubs: RenderStateSet/Get keep the values (0 outside a camera update like the original; caps-based refusals and
      the GPU state come with step 2). Core extension entry 1 only sets z test/write (its Im3D camera state is step 3).
    - Still original addresses (trap when reached): the Im3D device entries and pipeline stages (0x4f69b0, 0x4f6050,
@@ -128,6 +128,81 @@ DirectSound -> SDL3 audio, the quit prompt's DirectDraw GDI flip.
      RwMatrixMultiply after the first update, are not modelled yet. 0x54b038 trapped when first called; since
      2026-10-29 the native loader keeps that routine (0x54b038..0x54b114, self-contained x87 code) as original code
      as a stopgap (docs/NATIVE.md "First trap after the PNG reader").
-2. Im2D + raster render: menus and text (the frontend is mostly Im2D).
-3. Instancing pipelines (D2) + world/atomic rendering: levels.
+2. Im2D + Im3D + render states: menus and text. **Done 2026-10-30**: the main menu draws (background, logo, rider
+   artwork, the menu wheel with its translucent items) as in the original; docs/NATIVE.md "Step 2: the menu draws".
+   - Correction to step 1: the D3D7 driver's Im2D entries are not no-ops. The device table's 0x4eb2c0..0x4eb2f0 are,
+     but the device start (0x4dafd0) replaces them in the engine's device with 0x4d8ea0 / 0x4d8c80 / 0x4d9920 /
+     0x4d9b00. Im3D draws through them too (its index lists end in RwIm2DRenderIndexedPrimitive).
+   - **Shared ports (D2-A), in src/rw with `BMX_ADDR`**, verified at 0 ULP in the oracle harness, so the hook DLL runs
+     them as well (against the original's globals; 0x696740.., 0x676bac.., 0x696900..):
+     - `rw/d3dim3d.c` (35 functions): the core extension's engine plugin 0x40e (ctor/dtor 0x4eaaa0/0x4eabd0, camera
+       begin 0x4eb150, render state hook 0x4eb120, pipeline stages 0x4f6b80), the Im3D transform stack, the
+       transform stage 0x4f97c0 (camera space, clip flags, TL vertices, vertex fog index), colours, texture
+       coordinates, culling, index lists and the four Im3D draw entries.
+     - `rw/d3dclip.c` (18, ported by a sub agent): the polygon/line plane clippers, the 12 edge interpolators
+       (perspective and parallel), the triangle and line clippers.
+     - `rw/d3dstate.c` (10): RwDevice render state set 0x4d7320/0x4d7328 and get 0x4d7c10 with the caps refusals and
+       the state cache, texture raster, blend, fog type/table states.
+     - `rw/d3dim2d.c` (17): the four Im2D entries and the alpha sort: translucent primitives (alpha primitive buffer
+       on, z test on) are copied with their state into a deferred list and drawn back to front at a flush (z test
+       off, the buffer state off, camera end update), merged per record like the original.
+   - **The cut**: every IDirect3DDevice7 call of those ports is one of five functions in rw/rwd3d.h
+     (`rwD3DDevSetRenderState`, `...SetTextureStageState`, `...SetTexture`, `...DrawPrimitive`,
+     `...DrawIndexedPrimitive`, Direct3D 7 arguments). src/hook/d3dcom.c forwards them through the original device's
+     vtable (hook DLL and tests: the tests give both sides a fake device whose methods log, so the D3D call
+     sequences are compared call for call); src/driver/draw.c implements them on SDL3 GPU.
+   - **src/driver/draw.c**: keeps the D3D render and stage-0 states, batches each frame's TL vertices and draws
+     (fans and strips become lists; pipelines cached by blend / z / cull / primitive class; samplers by filter and
+     address), uploads dirty textures (CPU copy converted to RGBA8, D5) and replays the batch in one render pass on
+     the camera raster at the camera's end update, before clears, at the present and before a texture with batched
+     draws changes. RGB write mask (targets keep alpha 1), depth clamp instead of clip. Shaders: src/driver/shaders/
+     tl.hlsl (vertex: screen pixels to clip space with D3D7's pixel centres, perspective through 1/rhw; fragment:
+     stage 0 select/modulate, specular add, vertex fog, alpha test).
+   - **Shaders (D3-A)**: SDL_shadercross has no Windows release (CI artifacts need a login), so tools/shaders.sh uses
+     DirectXShaderCompiler v1.9.2609 (2026-09-29 release, ~/tools/dxc-1.9.2609/bin/x64/dxc.exe): DXIL (stripped of
+     debug and reflection) and SPIR-V (`-spirv`, `[[vk::combinedImageSampler]]`), committed as
+     src/driver/shaders/tl_vs.h / tl_ps.h. **MSL is a gap** (needs SPIRV-Cross or shadercross on a machine that has
+     it); drvDrawStart refuses a GPU driver without DXIL or SPIR-V.
+   - Native glue: the register request stores the raster/camera plugin offsets, the memory functions and the engine
+     device where the ports read them (0x697364, 0x697368, 0x69734c, 0x676cdc); the start builds the caps block
+     (0x6968f0), runs the ported 0x4dafd0 and sets the initial states like 0x4d7ed0; the camera begin update sets
+     the x87 camera mode (below), the device context 0x697340 (the primary context 0x697320, so state sets work only
+     inside a camera update, as in the original), the fog range and the draw target; the end update flushes the
+     deferred list and the batch and restores the x87. The raster plugin data keeps the three fields the render
+     states read at the original's offsets (colour key +4, texture handle +0xc = the raster, format record +0x10
+     with the alpha flag).
+   - **Decisions taken in step 2, to review:**
+     - Ports shared with the hook DLL (`BMX_ADDR` in src/rw) for everything on the CPU, including the functions that
+       call Direct3D, with the D3D calls behind the five cut functions. Alternative was native-only ports without
+       oracle tests for the D3D-calling half.
+     - x87 model: inside a camera update the original runs the x87 at 24-bit precision, rounding down (0x54b000).
+       Ported float code of the driver calls `rwD3DRoundBegin/End`, which copies the x87 rounding mode into MXCSR,
+       and computes every intermediate in float (PC24 makes the x87 round each operation to single precision);
+       FISTP is `cvtss2si` in the current mode. Verified: the emulator honours PC/RC, the transform test fails
+       without the mirroring and passes with it. Known limit: x87 intermediates keep their 15-bit exponent, so
+       results that overflow or go denormal in single precision differ (test inputs stay in realistic ranges).
+       The native camera begin update now really switches the x87 to the camera mode (the kept original routine
+       0x54b038 runs in it, like in the original); game code ported to SSE2 still runs at nearest/double inside
+       the camera update (pre-existing open point).
+     - Caps of the native device: dither; all z compares, blends and alpha compares; flat/Gouraud colour and alpha;
+       vertex fog (FOGFLAT|FOGGOURAUD, as real cards of the time); perspective; filters nearest/linear only (no mip
+       filter caps, matching step 1's texture formats); address wrap/mirror/clamp (no border: SDL3 GPU has no border
+       colour). With these, 0x4d7ed0's choices are: alpha test GREATER 0 when blending, linear filtering.
+     - No colour-keyed textures (raster data +4 always 0); the colour key state is tracked but not drawn.
+     - Alpha test compares at 8-bit precision in the shader (the reference is a byte); fog colour from
+       D3DRENDERSTATE_FOGCOLOR blended by the specular alpha (vertex fog).
+     - D3D7's TL vertices are not clipped by z on the GPU (depth clamp); x/y clipping is the GPU's.
+   - Open points:
+     - Fog density 0x4d6590 (x87 exp tables with f2xm1/fscale) is still the original's (int3 in the native exe); the
+       game never sets that state. The camera begin update's exponential fog tables (fog types 2/3, also f2xm1) are
+       not built natively; the game uses fog type 1 (linear).
+     - Raster render (fast/scaled), raster clear rect, image from raster, RGB <-> pixel, palette lock/unlock, native
+       texture read/write/size: not reached by the menu, still trap.
+     - Culling winding through SDL3 GPU (D3DCULL_CW/CCW) is mapped but unverified: the driver sets D3DCULL_NONE and
+       nothing changes it in the menu.
+     - Screenshots compared by eye only (D7's diff harness is step 4). The final shader headers (DXIL stripped of
+       debug/reflection) were regenerated after the screenshot runs and have not been run in a window yet.
+3. Instancing pipelines (D2) + world/atomic rendering: levels. Next trap: 0x4c92d0 (one of the instancing pipelines)
+   from rwIm3DPipelineRun 0x4e8600, in the 4000 frame run, some time after frame 1500 (the menu itself draws
+   without it).
 4. Screenshot diff harness against the original (D7).

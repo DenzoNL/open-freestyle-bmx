@@ -323,6 +323,28 @@ TRAP: unported code reached at 004ea960  RwTextureRegisterPluginStream+0xc80   (
 
 That is the SDL3 driver's step 2/3 territory (Im3D / pipelines).
 
+### Step 2: the menu draws (2026-10-30)
+
+With the SDL3 driver's step 2 (docs/SDL3-DRIVER.md: the D3D7 driver's Im3D, clipper, render states and Im2D ported
+into src/rw with `BMX_ADDR`, the Direct3D calls on SDL3 GPU in src/driver/draw.c), `BMX_NO_MOVIES=1 BMX_MUTE=1
+bmxnative.exe Scene.Txt -r640.480.16` draws the main menu as the original does: background, logo, the rider and
+bike artwork, the menu wheel (PROQUEST highlighted, the other items translucent). `BMX_SHOT` of frames 300 and 1500
+(640x480) checked by eye; no pixel diff against the original yet (D7, step 4).
+
+The menu needs no instancing pipeline. Running on (`BMX_QUIT_FRAMES=4000`), the next trap is the first one of
+step 3:
+
+```
+TRAP: unported code reached at 004c92d0  _rpMaterialListFindMaterialIndex+0x4230   (lib/d3d7driver)
+  caller (return address at esp): 007343a7  in port of _rpWorldPipelineOpen+0x100 [0x4e8600]   (rwIm3DPipelineRun)
+```
+
+i.e. an atomic or world sector is rendered through its instancing pipeline (0x4c8ba0..0x4cb000).
+
+New in the loader's view: 0x4d7320 (8-byte entry falling into 0x4d7328) and the other driver entries ported in
+src/rw now get their jumps from the hook table; `bmxDriverJumps` lost the step 1 stand-ins (render state set/get,
+the core extension ctor/dtor/entries 1-3).
+
 ### Open points from the CRT layer (2026-10-28)
 
 - (Done) RW functions reached only through function pointers are now in data/functions-rw.csv: tools/rwmap.py

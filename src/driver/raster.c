@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "driver/driver.h"
+#include "rw/rwd3d.h"
 
 /* The driver's camera plugin data (0x20 bytes, like the original's). */
 typedef struct DrvCameraExt {
@@ -72,26 +73,90 @@ static struct SDL_GPUTexture *rasterTexture(RwRaster *raster)
     return ext->texture;
 }
 
+/* The original's x87 state switch (_rwcseg 0x54b000 / 0x54b02e): set once per camera update. */
+#define rwCameraFpuSet ORIG_VAR(0x006769a0, int32_t, rwCameraFpuSet)
+/* The camera being updated, and the render target the device calls draw to (the primary surface's context).
+ */
+#define rwD3DCurrentCamera  ORIG_VAR(0x00697348, RwCamera *, rwD3DCurrentCamera)
+#define rwD3DPrimaryContext ((uint8_t *)(uintptr_t)0x00697320)
+#define rwD3DFogRange       ORIG_VAR(0x0069b98c, float, rwD3DFogRange)
+
+static uint16_t savedFpuControl;
+
+/* 0x54b000: 24-bit precision, rounding down, for everything inside the camera update. */
+static void fpuCameraMode(void)
+{
+    uint16_t cw;
+    __asm__ volatile("fnstcw %0" : "=m"(savedFpuControl));
+    cw = (uint16_t)((savedFpuControl & 0xf0ff) | 0x0400);
+    __asm__ volatile("fldcw %0" ::"m"(cw));
+}
+
+/* 0x54b02e */
+static void fpuRestore(void)
+{
+    __asm__ volatile("fldcw %0" ::"m"(savedFpuControl));
+}
+
 /*
  * 0x4d45a0 (standard 1): RwCameraBeginUpdate's device part. Like the original it routes RwMatrixMultiply to
- * the core's x87 routine at 0x54b038 (_rwcseg) from the first camera update on.
+ * the core's x87 routine at 0x54b038 (_rwcseg), switches the x87 to the camera mode, makes the camera's
+ * raster the target of the device calls and sets the vertex fog range (fog plane to far plane). The
+ * exponential fog tables the original rebuilds when the far plane changes (fog types 2 and 3) are not built
+ * yet.
  */
 int drvCameraBeginUpdate(void *out, void *camera, int32_t in)
 {
     DRV_TRACE("drvCameraBeginUpdate", (uint32_t)(uintptr_t)out, (uint32_t)(uintptr_t)camera,
               (uint32_t)(uintptr_t)in);
     RwCamera *const cam = camera;
+    struct SDL_GPUTexture *color, *depth;
+    RwRaster *top;
+    uint32_t mxcsr;
 
     *(uint32_t *)((uint8_t *)RwEngineInstance + rwMatrixGlobalsOffset + 8) = 0x0054b038;
+    if (rwCameraFpuSet == 0) {
+        fpuCameraMode();
+        rwCameraFpuSet = 1;
+    }
+    rwD3DCurrentCamera = cam;
+    rwD3DContext = rwD3DPrimaryContext;
+    rwD3DFogStart = rwD3DBits(cam->fogPlane);
+    if (cam->farPlane != rwD3DFogEnd) {
+        rwD3DFogEnd = cam->farPlane;
+    }
+    mxcsr = rwD3DRoundBegin();
+    rwD3DFogScale = rwD3DFogRange / (cam->farPlane - cam->fogPlane);
+    rwD3DRoundEnd(mxcsr);
+    if (rwD3DState.fogType == 2 || rwD3DState.fogType == 3) {
+        rwD3DFogStart = 0;
+    }
     drvCurrentCamera = cam;
-    return rasterTexture(cam->frameBuffer) != NULL;
+    color = rasterTexture(cam->frameBuffer);
+    if (color == NULL) {
+        return 0;
+    }
+    depth = cam->zBuffer != NULL ? rasterTexture(cam->zBuffer) : NULL;
+    top = drvTopRaster(cam->frameBuffer);
+    drvDrawSetTarget(color, depth, top->width, top->height, cam->frameBuffer->originX,
+                     cam->frameBuffer->originY, cam->frameBuffer->width, cam->frameBuffer->height);
+    return 1;
 }
 
-/* 0x4d4a80 (standard 10). */
+/* 0x4d4a80 (standard 10): draws the deferred translucent primitives, then the batch; the x87 back to normal.
+ */
 int drvCameraEndUpdate(void *out, void *camera, int32_t in)
 {
     DRV_TRACE("drvCameraEndUpdate", (uint32_t)(uintptr_t)out, (uint32_t)(uintptr_t)camera,
               (uint32_t)(uintptr_t)in);
+    rwD3DDeferFlush();
+    if (rwCameraFpuSet != 0) {
+        fpuRestore();
+        rwCameraFpuSet = 0;
+    }
+    rwD3DCurrentCamera = NULL;
+    drvDrawFlush();
+    rwD3DContext = NULL;
     drvCurrentCamera = NULL;
     return 1;
 }
@@ -134,6 +199,7 @@ int drvHintRenderFront2Back(void *out, void *inOut, int32_t in)
     DRV_TRACE("drvHintRenderFront2Back", (uint32_t)(uintptr_t)out, (uint32_t)(uintptr_t)inOut,
               (uint32_t)(uintptr_t)in);
     drvRenderOrderHint = in == 0 ? 1 : 2;
+    rwD3DRenderOrder = drvRenderOrderHint;
     return 1;
 }
 
@@ -281,6 +347,17 @@ int drvRasterCreate(void *out, void *raster, int32_t flags)
         return 1;
     }
     r->stride = r->type == rwRASTERTYPETEXTURE ? 0 : r->width * (r->depth / 8);
+    if (r->type == rwRASTERTYPETEXTURE) {
+        /* What the render states read: the texture handle and whether the format has alpha. */
+        static const RwD3DRasterInfo kOpaque = {{0}, 0}, kAlpha = {{0}, 1};
+        const int32_t format = (r->format << 8) & kDrvFormatPixelMask;
+        DrvRasterExt *const ext = drvRasterExt(r);
+        ext->handle = r;
+        ext->info = format == kDrvFormat1555 || format == kDrvFormat4444 || format == kDrvFormat8888
+                        ? &kAlpha
+                        : &kOpaque;
+        ext->dirty = 1;
+    }
     return 1;
 }
 
@@ -292,7 +369,10 @@ int drvRasterDestroy(void *out, void *raster, int32_t in)
     RwRaster *const r = raster;
     DrvRasterExt *const ext = drvRasterExt(r);
 
-    drvRenderStateForgetRaster(r);
+    if (rwD3DState.textureRaster == r) {
+        rwD3DState.textureRaster = NULL;
+    }
+    drvDrawForgetRaster(r);
     if (drvContextRaster == r) {
         drvContextRaster = NULL;
     }

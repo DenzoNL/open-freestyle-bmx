@@ -8,6 +8,7 @@
 
 #include "driver/driver.h"
 #include "native/native.h"
+#include "rw/rwd3d.h"
 #include "rw/rwim.h"
 #include "rw/rwplugins.h"
 
@@ -133,13 +134,123 @@ static int32_t drvRasterRegisterPlugin(int32_t size, int32_t pluginID, RwPluginO
  * rwDEVICESYSTEMREGISTER (0x4ecbf0): copy the device table into the engine and register the raster and camera
  * plugins (0x20 bytes each, like the original, so later plugin offsets and object sizes stay the same).
  */
-static int systemRegister(RwDevice *device)
+static int systemRegister(RwDevice *device, const RwMemoryFunctions *memory)
 {
     *device = rwOrigDevice;
+    rwD3DEngineDevice = device;
+    rwD3DMemory = memory;
     drvRasterOffset = drvRasterRegisterPlugin(0x20, kDrvPluginId, NULL, NULL, NULL);
     drvCameraOffset =
         RwCameraRegisterPlugin(0x20, kDrvPluginId, RW_CTOR(0x004d4ea0), RW_DTOR(0x004d4f80), NULL);
+    rwD3DRasterExtOffset = drvRasterOffset;
+    rwD3DCameraExtOffset = drvCameraOffset;
     return 1;
+}
+
+/*
+ * The device caps the ported render states check (rwD3DCaps): what SDL3 GPU does for this driver. Dither;
+ * every z compare, source and destination blend and alpha compare; flat and Gouraud colour and alpha; vertex
+ * fog; perspective correct textures; nearest and linear filtering (no mip filters, like the texture formats);
+ * wrap, mirror and clamp addressing (no border colour in SDL3 GPU).
+ */
+static uint32_t drvCaps[0x130 / 4];
+
+static void buildCaps(void)
+{
+    memset(drvCaps, 0, sizeof drvCaps);
+    drvCaps[rwD3DCAPSRASTER / 4] = 0x1;
+    drvCaps[rwD3DCAPSZCMP / 4] = 0xff;
+    drvCaps[rwD3DCAPSSRCBLEND / 4] = 0x1fff;
+    drvCaps[rwD3DCAPSDESTBLEND / 4] = 0x1fff;
+    drvCaps[rwD3DCAPSALPHACMP / 4] = 0xff;
+    drvCaps[rwD3DCAPSSHADE / 4] = 0x2 | 0x8 | 0x1000 | 0x4000 | 0x40000 | 0x80000;
+    drvCaps[rwD3DCAPSTEXTURE / 4] = 0x1;
+    drvCaps[rwD3DCAPSFILTER / 4] = 0x1 | 0x2;
+    drvCaps[rwD3DCAPSADDRESS / 4] = 0x1 | 0x2 | 0x4;
+    rwD3DCaps = (const uint8_t *)drvCaps;
+}
+
+/*
+ * 0x4d7ed0: the device's initial render states and their cache (rwD3DState), by the caps: perspective, z test
+ * and write with less-equal, Gouraud, alpha test greater (or not equal) against 0 when the device can, source
+ * alpha / inverse source alpha blending (off), stage 0 modulating texture and diffuse (selecting diffuse
+ * while there is no texture), the best non-mip filter, no fog, no culling.
+ */
+static void initRenderStates(void)
+{
+    RwD3DStateCache *s = &rwD3DState;
+    const uint32_t filter = rwD3DCap(rwD3DCAPSFILTER);
+    uint32_t func;
+
+    s->perspective = (rwD3DCap(rwD3DCAPSTEXTURE) & 1) != 0;
+    rwD3DDevSetRenderState(4, (uint32_t)s->perspective);
+    rwD3DDevSetRenderState(0x80, 0);
+    s->zWrite = 1;
+    s->zTest = 1;
+    rwD3DDevSetRenderState(7, 1);
+    rwD3DDevSetRenderState(0xe, 1);
+    rwD3DDevSetRenderState(0x17, 4);
+    s->shadeMode = 2;
+    rwD3DDevSetRenderState(9, 2);
+    if ((rwD3DCap(rwD3DCAPSALPHACMP) & 0x30) == 0) {
+        rwD3DAlphaTestCaps = 0;
+        func = 8;
+    } else {
+        rwD3DAlphaTestCaps = 1;
+        func = (rwD3DCap(rwD3DCAPSALPHACMP) & 0x10) == 0 ? 6 : 5;
+    }
+    rwD3DDevSetRenderState(0x18, 0);
+    rwD3DDevSetRenderState(0xf, 0);
+    rwD3DDevSetRenderState(0x19, func);
+    s->srcBlend = 5;
+    s->destBlend = 6;
+    rwD3DDevSetRenderState(0x13, 5);
+    rwD3DDevSetRenderState(0x14, 6);
+    s->alphaBlend = 0;
+    rwD3DDevSetRenderState(0x1b, 0);
+    s->colorKey = 0;
+    s->vertexAlpha = 0;
+    rwD3DDevSetRenderState(0x29, 0);
+    s->address = 1;
+    rwD3DDevSetTextureStageState(0, 0xc, 1);
+    rwD3DDevSetTextureStageState(0, 2, 2);
+    rwD3DDevSetTextureStageState(0, 3, 0);
+    rwD3DDevSetTextureStageState(0, 5, 2);
+    rwD3DDevSetTextureStageState(0, 6, 0);
+    s->alphaOp = 3;
+    rwD3DDevSetTextureStageState(0, 4, 3);
+    s->colorOp = 3;
+    rwD3DDevSetTextureStageState(0, 1, 3);
+    s->textureAlpha = 0;
+    s->textureRaster = NULL;
+    rwD3DDevSetTexture(0, NULL);
+    /* The best filter: linear / point, with mip linear / point / none (the caps' bits 0x20 down to 2). */
+    if ((filter & 0x20) != 0) {
+        s->mipFilter = 3, s->minFilter = s->magFilter = 2;
+    } else if ((filter & 0x10) != 0) {
+        s->mipFilter = 3, s->minFilter = s->magFilter = 1;
+    } else if ((filter & 0x8) != 0) {
+        s->mipFilter = 2, s->minFilter = s->magFilter = 2;
+    } else if ((filter & 0x4) != 0) {
+        s->mipFilter = 2, s->minFilter = s->magFilter = 1;
+    } else {
+        s->mipFilter = 1, s->minFilter = s->magFilter = (filter & 0x2) != 0 ? 2 : 1;
+    }
+    rwD3DDevSetTextureStageState(0, 0x10, (uint32_t)s->magFilter);
+    rwD3DDevSetTextureStageState(0, 0x11, (uint32_t)s->minFilter);
+    rwD3DDevSetTextureStageState(0, 0x12, (uint32_t)s->mipFilter);
+    rwD3DDevSetRenderState(0x1a, (rwD3DCap(rwD3DCAPSRASTER) & 1) != 0);
+    s->fogColor = 0;
+    s->fogEnable = 0;
+    rwD3DDevSetRenderState(0x1c, 0);
+    rwD3DDevSetRenderState(0x22, 0);
+    rwD3DDevSetRenderState(0x23, 0);
+    rwD3DDevSetRenderState(0x27, 0);
+    rwD3DDevSetRenderState(0x16, 1);
+    rwD3DDevSetRenderState(8, 3);
+    rwD3DDevSetRenderState(0x1d, 0);
+    rwD3DDevSetRenderState(2, 0);
+    s->alphaSort = 0;
 }
 
 /* rwDEVICESYSTEMOPEN (0x4ecce0): the window handle, the sub systems and the mode list. */
@@ -175,6 +286,13 @@ static int systemStart(void)
     drvState.cameraFormat = mode->depth == 16 ? kDrvFormat565 : kDrvFormat888;
     drvState.zDepth = 16;
     drvState.zFormat = kDrvFormat16;
+    buildCaps();
+    if (!rwD3DIm2DOpen()) {
+        drvGpuStop();
+        return 0;
+    }
+    initRenderStates();
+    rwD3DContext = NULL;
     drvState.started = 1;
     return 1;
 }
@@ -274,7 +392,7 @@ static int drvSystem(int32_t request, void *out, void *inOut, int32_t in)
         systemStop();
         return 1;
     case rwDEVICESYSTEMREGISTER:
-        return systemRegister(out);
+        return systemRegister(out, inOut);
     case rwDEVICESYSTEMGETNUMMODES:
         *(int32_t *)out = drvState.numModes;
         return 1;
@@ -316,66 +434,10 @@ static int drvSystem(int32_t request, void *out, void *inOut, int32_t in)
 
 /* ---- core extension (0x69bee0) ------------------------------------------------------------------------ */
 
-/*
- * Engine plugin 0x40e constructor (0x4eaaa0): the Im3D side of the driver. Installs the Im3D entries of the
- * engine's device (still the original addresses: unported, they trap when reached), the transform
- * open/close pair of the Im3D module and gouraud shading.
- */
-static void *drvCoreExtCtor(void *engine, int32_t offset, int32_t size)
-{
-    RwDevice *device = &RwEngineInstance->dOpenDevice;
-
-    rwIm3DGouraud = 1;
-    rwIm3DSetEntries(RW_CB(RwIm3DBeginFunc, 0x004ea960), RW_CB(RwIm3DEndFunc, 0x004eaa10));
-    device->fpIm3DRenderLine = RW_CB(RwIm3DRenderLineFunc, 0x004f69b0);
-    device->fpIm3DRenderTriangle = RW_CB(void *, 0x004f6050);
-    device->fpIm3DRenderPrimitive = RW_CB(RwIm3DRenderPrimitiveFunc, 0x004f6090);
-    device->fpIm3DRenderIndexedPrimitive = RW_CB(RwIm3DRenderIndexedPrimitiveFunc, 0x004f64e0);
-    return engine;
-}
-
-static void *drvCoreExtDtor(void *engine, int32_t offset, int32_t size)
-{
-    return engine;
-}
-
 /* Entry 0 (0x4eac90): attach. */
 static int drvCoreExtAttach(void)
 {
     return RwEngineRegisterPlugin(0, kDrvCoreExtId, RW_CTOR(0x004eaaa0), RW_DTOR(0x004eabd0)) >= 0;
-}
-
-/*
- * Entry 1 (0x4eb150), from CameraBeginUpdate: the Im3D side's view of the camera (projection, raster size and
- * origin, view window and offset, z range; the driver's own state, kept from step 3 on) and z test and z
- * write on.
- */
-static void drvCoreExtCameraBegin(void *camera)
-{
-    DRV_TRACE("drvCoreExtCameraBegin", (uint32_t)(uintptr_t)camera, 0, 0);
-    RwRenderStateSet(4, 1);
-    RwRenderStateSet(6, 1);
-}
-
-/* Entry 2 (0x4eb120): render state hook; shade mode (5) gouraud (2) or flat. */
-static void drvCoreExtRenderState(int32_t state, int32_t value)
-{
-    if (state == 5) {
-        rwIm3DGouraud = value == 2;
-    }
-}
-
-/* Entry 3 (0x4f6b80): fills the Im3D pipeline's driver stages (unported: they trap when used). */
-static int drvCoreExtPipeline(uint32_t *pipeline)
-{
-    if (pipeline == NULL) {
-        return 0;
-    }
-    pipeline[0] = 0x004f6a50;
-    pipeline[2] = 0x004f6b00;
-    pipeline[5] = 0x004f6b10;
-    pipeline[6] = 0x004f6b70;
-    return 1;
 }
 
 /* ---- the jump table ------------------------------------------------------------------------------------ */
@@ -389,13 +451,6 @@ const BmxHook bmxDriverJumps[] = {
     {0x004eb2f0, (void *)drvIm2DNothing},
     {0x004dd270, (void *)drvRasterRegisterPlugin},
     {0x004eac90, (void *)drvCoreExtAttach},
-    {0x004eaaa0, (void *)drvCoreExtCtor},
-    {0x004eabd0, (void *)drvCoreExtDtor},
-    {0x004eb150, (void *)drvCoreExtCameraBegin},
-    {0x004eb120, (void *)drvCoreExtRenderState},
-    {0x004d7320, (void *)drvRenderStateSet},
-    {0x004d7c10, (void *)drvRenderStateGet},
-    {0x004f6b80, (void *)drvCoreExtPipeline},
     {0x004d4ea0, (void *)drvCameraCtor},
     {0x004d4f80, (void *)drvCameraDtor},
     {0x004d45a0, (void *)drvCameraBeginUpdate},

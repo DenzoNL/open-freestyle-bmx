@@ -100,6 +100,9 @@ int drvRasterUnlock(void *out, void *raster, int32_t in)
     if (rasterCpu(r) == NULL) {
         return 0;
     }
+    if ((r->privateFlags & 4) != 0) {
+        drvDrawTextureChanged(r);
+    }
     r->width = rasterSaved(r)->width;
     r->stride = rasterSaved(r)->stride;
     r->height = rasterSaved(r)->height;

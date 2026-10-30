@@ -90,7 +90,9 @@ if(BMX_HOOK)
 
   # Differential-test DLL: ported code + test cases, loaded next to NgBMX.exe in the Unicorn harness.
   file(GLOB_RECURSE BMX_TEST_SOURCES CONFIGURE_DEPENDS tests/cases/*.c)
-  add_library(bmxtest SHARED ${BMX_TEST_SOURCES} ${CMAKE_BINARY_DIR}/hooks_table.c $<TARGET_OBJECTS:bmx_game>)
+  # src/hook/d3dcom.c: the D3D7 driver cut forwarded to the original device (the native exe has src/driver).
+  add_library(bmxtest SHARED ${BMX_TEST_SOURCES} src/hook/d3dcom.c ${CMAKE_BINARY_DIR}/hooks_table.c
+    $<TARGET_OBJECTS:bmx_game>)
   target_include_directories(bmxtest PRIVATE src tests/cases)
   target_compile_definitions(bmxtest PRIVATE BMX_HOOK=1)
   # Test code is unoptimised on purpose: stub logs written to file-static arrays that nothing reads
@@ -102,7 +104,8 @@ if(BMX_HOOK)
   target_link_options(bmxtest PRIVATE -Wl,-base:0x10000000 -Wl,-fixed -Wl,-noentry)
 
   # In-game hook DLL (dev only): dinput.dll proxy that redirects ported functions.
-  add_library(bmxhook SHARED src/hook/hook.c src/hook/trace.c src/hook/crash.c ${CMAKE_BINARY_DIR}/hooks_table.c $<TARGET_OBJECTS:bmx_game>)
+  add_library(bmxhook SHARED src/hook/hook.c src/hook/trace.c src/hook/crash.c src/hook/d3dcom.c
+    ${CMAKE_BINARY_DIR}/hooks_table.c $<TARGET_OBJECTS:bmx_game>)
   target_include_directories(bmxhook PRIVATE src)
   target_compile_definitions(bmxhook PRIVATE BMX_HOOK=1)
   if(BMX_CALLTRACE)

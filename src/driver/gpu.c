@@ -105,12 +105,22 @@ int drvGpuStart(void *hwnd)
     }
     bmxLog("driver: SDL %d.%d.%d, GPU driver %s\n", SDL_MAJOR_VERSION, SDL_MINOR_VERSION, SDL_MICRO_VERSION,
            SDL_GetGPUDeviceDriver(gpuDevice));
+    if (!drvDrawStart()) {
+        drvGpuStop();
+        return 0;
+    }
     return 1;
+}
+
+struct SDL_GPUDevice *drvGpuDevice(void)
+{
+    return gpuDevice;
 }
 
 void drvGpuStop(void)
 {
     if (gpuDevice != NULL) {
+        drvDrawStop();
         if (gpuWindow != NULL) {
             SDL_ReleaseWindowFromGPUDevice(gpuDevice, gpuWindow);
         }
@@ -171,6 +181,7 @@ int drvGpuClear(struct SDL_GPUTexture *color, struct SDL_GPUTexture *depth, cons
     if (flags == 0 || (flags == 2 && !clearDepth)) {
         return 1;
     }
+    drvDrawFlush();
     cmd = SDL_AcquireGPUCommandBuffer(gpuDevice);
     if (cmd == NULL) {
         return sdlFail("SDL_AcquireGPUCommandBuffer");
@@ -272,6 +283,7 @@ int drvGpuPresent(struct SDL_GPUTexture *color, int32_t x, int32_t y, int32_t wi
 
     /* The game's own message loop dispatches the window's messages; drop the events SDL queued from them. */
     SDL_FlushEvents(SDL_EVENT_FIRST, SDL_EVENT_LAST);
+    drvDrawFlush();
     cmd = SDL_AcquireGPUCommandBuffer(gpuDevice);
     if (cmd == NULL) {
         return sdlFail("SDL_AcquireGPUCommandBuffer");

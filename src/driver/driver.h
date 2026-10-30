@@ -11,6 +11,7 @@
 #ifndef BMX_DRIVER_DRIVER_H
 #define BMX_DRIVER_DRIVER_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "hook/hook.h"
@@ -72,16 +73,26 @@ typedef struct DrvState {
 
 extern DrvState drvState;
 
-/* The driver's raster plugin data (0x20 bytes per raster, registered like the original's). */
+/*
+ * The driver's raster plugin data (0x20 bytes per raster, registered like the original's). The ported render
+ * states (rw/d3dstate.c) read three fields at the original's offsets: the colour key flag, the texture handle
+ * the device's SetTexture gets, and the pixel format record whose flags say whether the texture has alpha.
+ */
 typedef struct DrvRasterExt {
-    struct SDL_GPUTexture *texture; /* camera raster: render target; z raster: depth texture */
-    uint8_t *cpu;                   /* CPU copy in the raster's own format (what RwRasterLock returns) */
-    uint32_t cpuSize;
-    uint8_t lockFlags; /* rwRASTERLOCK* of the current lock */
-    uint8_t pad0d[0x13];
+    struct SDL_GPUTexture *texture; /* 0x00 camera: render target; z: depth texture; texture: RGBA8 copy */
+    int32_t colorKey;               /* 0x04 always 0 (no colour keyed textures) */
+    uint8_t *cpu;                   /* 0x08 CPU copy in the raster's own format (what RwRasterLock returns) */
+    RwRaster *handle;               /* 0x0c the texture handle: the raster itself (textures only) */
+    const void *info;               /* 0x10 RwD3DRasterInfo: alpha or not */
+    uint32_t cpuSize;               /* 0x14 */
+    uint8_t lockFlags;              /* 0x18 mip level of the current lock */
+    uint8_t dirty;                  /* 0x19 the GPU texture needs an upload */
+    uint8_t pad1a[6];
 } DrvRasterExt;
 
 _Static_assert(sizeof(DrvRasterExt) == 0x20, "the original's raster plugin size");
+_Static_assert(offsetof(DrvRasterExt, handle) == 0x0c && offsetof(DrvRasterExt, info) == 0x10,
+               "the raster plugin fields rw/d3dstate.c reads");
 
 extern int32_t drvCameraOffset; /* the driver's camera plugin data (DrvCameraExt) */
 DrvRasterExt *drvRasterExt(const RwRaster *raster);
@@ -104,10 +115,6 @@ int drvCameraUpdating(void);
 extern int32_t drvRenderOrderHint;
 extern RwRaster *drvContextRaster;
 int drvSetRasterContext(void *out, void *raster, int32_t in);
-/* state.c */
-int drvRenderStateSet(int32_t state, int32_t value);
-int drvRenderStateGet(int32_t state, void *value);
-void drvRenderStateForgetRaster(const void *raster);
 /* texture.c */
 RwRaster *drvTopRaster(RwRaster *raster);
 int drvRasterLock(void *out, void *raster, int32_t in);
@@ -130,5 +137,15 @@ struct SDL_GPUTexture *drvGpuCreateTarget(int32_t width, int32_t height, int dep
 void drvGpuReleaseTexture(struct SDL_GPUTexture *texture);
 int drvGpuClear(struct SDL_GPUTexture *color, struct SDL_GPUTexture *depth, const uint8_t rgba[4], int flags);
 int drvGpuPresent(struct SDL_GPUTexture *color, int32_t x, int32_t y, int32_t width, int32_t height);
+struct SDL_GPUDevice *drvGpuDevice(void);
+
+/* draw.c: the D3D7 device calls of the ported driver code (rw/rwd3d.h) on SDL3 GPU. */
+int drvDrawStart(void);
+void drvDrawStop(void);
+void drvDrawFlush(void);
+void drvDrawSetTarget(struct SDL_GPUTexture *color, struct SDL_GPUTexture *depth, int32_t width,
+                      int32_t height, int32_t x, int32_t y, int32_t w, int32_t h);
+void drvDrawTextureChanged(RwRaster *raster);
+void drvDrawForgetRaster(RwRaster *raster);
 
 #endif

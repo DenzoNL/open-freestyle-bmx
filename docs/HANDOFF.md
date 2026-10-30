@@ -15,7 +15,7 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   workflow), not on push: run `tools/check.sh` locally before pushing. It has no assets, so
   the differential cases are skipped there and run locally.
 
-## Next up (2026-10-29)
+## Next up (2026-10-30)
 
 - Game: 2117/2120 (WinMain, the EpicFail trap and the 1-byte crtNop stay original on purpose).
 - RenderWare: 708/711 ported (the three 4-byte stubs stay original: a hook jmp would overlap the next
@@ -29,6 +29,12 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   exe, byte-identical to libpng 1.0.5 on 112 files (all game PNGs + synthetic set) via `BMX_PNG_CHECK`. Next blocker:
   the D3D driver's Im3D code, 0x4ea960 from rwIm3DPipelinePush (0x4e85b0), i.e. SDL3 driver step 2/3. The x87
   RwMatrixMultiply routine 0x54b038 runs as kept original code for now (stopgap, SDL3-DRIVER.md open points).
+- SDL3 driver step 2 done 2026-10-30 (docs/SDL3-DRIVER.md step 2, docs/NATIVE.md "Step 2: the menu draws"): the main
+  menu draws like the original. The D3D7 driver's CPU side (Im3D transform/clip, render states, Im2D with the alpha
+  sort; 80 functions) is ported into src/rw/d3d*.c with oracle tests at 0 ULP; its Direct3D calls go through five cut
+  functions (rw/rwd3d.h) to SDL3 GPU (src/driver/draw.c). Shaders: tools/shaders.sh (dxc; DXIL + SPIR-V, MSL missing).
+  Next: step 3, the instancing pipelines, first trap 0x4c92d0 from rwIm3DPipelineRun. Also: run the menu once more
+  with the final (stripped) shader headers, and the D7 screenshot diff against the original.
 - Golden traces: record sessions with `bmxtrace.orig` (docs/TRACING.md) if not done yet.
 
 ## Machine setup
