@@ -345,6 +345,22 @@ New in the loader's view: 0x4d7320 (8-byte entry falling into 0x4d7328) and the 
 src/rw now get their jumps from the hook table; `bmxDriverJumps` lost the step 1 stand-ins (render state set/get,
 the core extension ctor/dtor/entries 1-3).
 
+### Step 3: the instancing pipelines (2026-10-30/31)
+
+The world sector and atomic pipelines (0x4c8ba0..0x4cb000 and 0x4eafa0) are ported into src/rw/d3dpipe.c with
+`BMX_ADDR` (docs/SDL3-DRIVER.md step 3), so the hook table gives 0x4c92d0 and the other stages their jumps, as well
+as the five light routines rpWorldExtLightSelectCallback stores. They draw through Im3D's index lists and Im2D's
+indexed primitive, which bmxnative already implements; no loader or driver change was needed.
+
+First native run (2026-10-31): trap at 0x4b1860, the atomics' light stage that _rpClumpOpen installs (reached only
+through that pointer, so tools/rwmap.py never saw it, nor the stack argument entries 0x4b9ac0 / 0x4b9b20 of the two
+light walks it calls). Ported into rw/light.c (rpAtomicLightStage) and rw/world.c with oracle tests. After that,
+`BMX_NO_MOVIES=1 BMX_MUTE=1 BMX_QUIT_FRAMES=4000 bmxnative.exe Scene.Txt -r640.480.16` runs 4000 frames without a
+trap: the menu times out into the attract mode and the demo level renders (rider, bike, ramps, textures, "DEMO
+PLAY"; screenshot at frame 3000). **Next:** Enter through the menus into a level (keyboard input in the native exe)
+and port what it traps on; candidates are raster render, raster clear rect, image from raster, native texture
+read, fog density 0x4d6590.
+
 ### Open points from the CRT layer (2026-10-28)
 
 - (Done) RW functions reached only through function pointers are now in data/functions-rw.csv: tools/rwmap.py

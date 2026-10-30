@@ -35,6 +35,16 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   functions (rw/rwd3d.h) to SDL3 GPU (src/driver/draw.c). Shaders: tools/shaders.sh (dxc; DXIL + SPIR-V, MSL missing).
   Next: step 3, the instancing pipelines, first trap 0x4c92d0 from rwIm3DPipelineRun. Also: run the menu once more
   with the final (stripped) shader headers, and the D7 screenshot diff against the original.
+- SDL3 driver step 3 CPU port done 2026-10-30 (docs/SDL3-DRIVER.md step 3, docs/NATIVE.md "Step 3"): the world
+  sector and atomic instancing pipelines (instancing, morph targets, the five light routines, colour and render
+  stages; 15 functions) are ported into src/rw/d3dpipe.c with oracle tests at 0 ULP. They are Im3D pipelines without
+  D3D vertex buffers, so the cut and src/driver needed no change. Lesson: clang folds `x - y * -d` into `x + y * d`
+  even at -O0, which is wrong when rounding down; keep negations opaque in camera-mode float code (negMul).
+  Native (2026-10-31, after porting the pointer-only light stage 0x4b1860): 4000 frames without a trap, the attract
+  mode's demo level renders. The hooked game with steps 2 + 3 passes the smoke test (menus, level, riding).
+  **Next:** drive the native exe into a level by keyboard and port its traps (docs/NATIVE.md "Step 3"); then the D7
+  screenshot diff harness (step 4). rwmap.py misses functions reached only through pointers stored by code it
+  never saw: expect more of those as traps.
 - Golden traces: record sessions with `bmxtrace.orig` (docs/TRACING.md) if not done yet.
 
 ## Machine setup

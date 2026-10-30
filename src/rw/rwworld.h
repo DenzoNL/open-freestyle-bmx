@@ -388,6 +388,8 @@ __attribute__((regparm(1))) void rpSectorRenderAtomics(RpWorldSector *sector);
 void *rpWorldSectorRenderWithAtomics(RpWorldSector *sector);
 RpLight *rpLightApplyToObject(RpLight *light, RpLightApplyArgs *args);
 __attribute__((regparm(2))) int rpWorldForAllDirectionalLights(RwObjectCallBack callback, void *data);
+int RpWorldForAllDirectionalLights(RwObjectCallBack callback, void *data);
+RpWorldSector *RpWorldSectorForAllLights(RpWorldSector *sector, RwObjectCallBack callback, void *data);
 __attribute__((regparm(3))) RpWorldSector *rpSectorForAllLights(RpWorldSector *sector,
                                                                 RwObjectCallBack callback, void *data);
 void *rpWorldLightObject(void *object, RpLightApplyFn apply);

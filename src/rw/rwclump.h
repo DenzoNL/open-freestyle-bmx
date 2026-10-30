@@ -40,6 +40,7 @@ enum {
     rpGEOMETRYTEXTURED = 0x04,
     rpGEOMETRYPRELIT = 0x08,
     rpGEOMETRYNORMALS = 0x10,
+    rpGEOMETRYLIGHT = 0x20,
 };
 
 /* The instance list of triangles of one material in a geometry (a mesh header holds these). */
@@ -114,6 +115,15 @@ int RpClumpDestroy(RpClump *clump);
 int rpWorldExtAttachNothing(void);
 __attribute__((regparm(1))) int rpRasterFormatHasAlpha(uint32_t format);
 int rpMeshCompareMaterials(const RpMesh *const *a, const RpMesh *const *b);
+/*
+ * Vertex type and size (bytes) of the instancing pipelines' vertices, by rpGEOMETRYTEXTURED / the world's
+ * textured flag (index 0 or 4): rpWorldPipelineInit fills the first pair, which the atomic instance stage
+ * (0x4c8e30) reads, rpAtomicPipelineInit the second, which the world sector instance stage (0x4c92d0) reads.
+ */
+#define rpPipelineTypes  ((uint8_t *)(uintptr_t)0x006767f0)
+#define rpPipelineSizes  ((uint8_t *)(uintptr_t)0x006767f8)
+#define rpPipelineSizesB ((uint8_t *)(uintptr_t)0x00676800)
+#define rpPipelineTypesB ((uint8_t *)(uintptr_t)0x00676808)
 int rpWorldPipelineInit(struct RwIm3DPipeline *pipeline);
 int rpAtomicPipelineInit(struct RwIm3DPipeline *pipeline);
 RpAtomic *RpAtomicSetGeometry(RpAtomic *atomic, RpGeometry *geometry, uint32_t flags);

@@ -47,6 +47,7 @@ _Static_assert(sizeof(RpLightVisit) == 0x50, "RpLightVisit layout");
 void rpWorldExtLightSelectCallback(RpLight *light);
 RpLight *rpLightVisitOnce(RpLight *light, RpLightVisit *visit);
 RpLight *rpLightVisitEnabled(RpLight *light, RpLightVisit *visit);
+void rpAtomicLightStage(RwResEntry *work, RpLightVisitFn apply);
 int rpLightFreeListDestroyCB(void *light, void *data);
 void *rpLightSyncCallback(void *light);
 void *_rpLightOpen(void *engine, int32_t offset);

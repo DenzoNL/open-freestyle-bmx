@@ -314,7 +314,7 @@ static void setup_open(DtCtx *c)
 {
     d3dEnv(c, 0x3f);
     gRwtMallocFailAt = dt_range(0, 4);
-    rwD3DIm3DSpare0 = dt_u32() % 2 ? dt_alloc(8) : NULL;
+    rwD3DVertexBits = dt_u32() % 2 ? dt_alloc(8) : NULL;
     if (dt_u32() % 3 == 0) {
         rwD3DIm3DWork = NULL;
         rwD3DTLBuffer = NULL;

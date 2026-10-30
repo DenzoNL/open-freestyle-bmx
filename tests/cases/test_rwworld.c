@@ -12,6 +12,7 @@
 #include "dt_rw.h"
 #include "dt_zmem.h"
 #include "rw/rwclump.h"
+#include "rw/rwlight.h"
 #include "rw/rwworld.h"
 
 enum {
@@ -2530,6 +2531,109 @@ static void setup_light_object(DtCtx *c)
     rwtEnd();
 }
 
+/* The atomics' light stage (rw/light.c, 0x4b1860): frame matrix and its inverse and the fast square root are
+ * logging stubs; the walks, the visit callbacks and the lights are real. Runs with the x87 control word of a
+ * camera update (24-bit precision, rounding down) on both sides. */
+static RwMatrix *gStageLtm, *gStageInverse;
+
+static RwMatrix *BMX_CDECL stStageLtm(RwFrame *frame)
+{
+    rwtLog(0x4d2b10);
+    rwtLogPtr(frame);
+    return gStageLtm;
+}
+
+static RwMatrix *BMX_CDECL stStageInvert(RwMatrix *out, const RwMatrix *in)
+{
+    rwtLog(0x4d1340);
+    rwtLogPtr(out);
+    rwtLogPtr(in);
+    __builtin_memcpy(out, gStageInverse, sizeof *out);
+    return out;
+}
+
+static double BMX_CDECL stStageSqrt(int32_t bits)
+{
+    float f;
+    rwtLog(0x4d3880);
+    rwtLog((uint32_t)bits);
+    __builtin_memcpy(&f, &bits, 4);
+    return f * 0.5f;
+}
+
+static void BMX_CDECL cbStageVisit(void *context, RpLight *light, void *block, void *tail, void *extra)
+{
+    rwtLog(0x1b18);
+    rwtLogPtr(context);
+    rwtLogPtr(light);
+    rwtLogPtr(block);
+    rwtLog((uint32_t)(uintptr_t)tail);
+    rwtLogPtr(extra);
+}
+
+static void setup_atomic_light_stage(DtCtx *c)
+{
+    worldEnv(c, 0);
+    if (dt_u32() % 6 == 0) {
+        RwEngineInstance->curWorld = NULL;
+    } else {
+        mkLitWorld();
+    }
+    dt_stub(0x004d2b10, NULL, (void *)stStageLtm);
+    dt_stub(0x004d1340, NULL, (void *)stStageInvert);
+    dt_stub(0x004d3880, NULL, (void *)stStageSqrt);
+    gStageLtm = dt_alloc(sizeof(RwMatrix));
+    gStageInverse = dt_alloc(sizeof(RwMatrix));
+    float *m = (float *)gStageInverse;
+    for (int i = 0; i < 16; i++) {
+        m[i] = dt_u32() % 8 == 0 ? 0.0f : dt_float(-40.0f, 40.0f);
+    }
+    RpGeometry *geometry = dt_alloc(sizeof(RpGeometry));
+    geometry->flags = (uint8_t)(dt_u32() % 5 == 0 ? 0 : rpGEOMETRYLIGHT);
+    RpAtomic *atomic = dt_alloc(sizeof(RpAtomic));
+    atomic->geometry = geometry;
+    atomic->object.object.parent = dt_alloc(0x10);
+    listInit(&atomic->llWorldSectorsInAtomic);
+    for (int n = dt_range(0, 3); n > 0; n--) {
+        RpTie *tie = dt_alloc(sizeof(RpTie));
+        RpWorldSector *s = pvsSector();
+        listInit(&s->lightsInWorldSector);
+        addLightTies(s);
+        tie->worldSector = s;
+        listAddTail(&atomic->llWorldSectorsInAtomic, &tie->lWorldSectorInAtomic);
+    }
+    RwResEntry *work = dt_alloc(0x48);
+    work->owner = atomic;
+    DT_ARG_PTR(c, 0, work);
+    DT_ARG_PTR(c, 1, cbStageVisit);
+    rwtEnd();
+}
+
+static uint16_t stageCameraCw(void)
+{
+    uint16_t old, cw;
+    __asm__ volatile("fnstcw %0" : "=m"(old));
+    cw = (uint16_t)((old & 0xf0ff) | 0x0400);
+    __asm__ volatile("fldcw %0" ::"m"(cw));
+    return old;
+}
+
+static int lightStageOrig(RwResEntry *work, RpLightVisitFn apply)
+{
+    const uint16_t cw = stageCameraCw();
+    ((void(BMX_CDECL *)(RwResEntry *, RpLightVisitFn))(uintptr_t)0x004b1860)(work, apply);
+    __asm__ volatile("fldcw %0" ::"m"(cw));
+    return 0;
+}
+
+static int lightStageImpl(RwResEntry *work, RpLightVisitFn apply)
+{
+    const uint16_t cw = stageCameraCw();
+    rpAtomicLightStage(work, apply);
+    __asm__ volatile("fldcw %0" ::"m"(cw));
+    return 0;
+}
+
 /* The world module's open, close, default render and extension call. */
 static void *BMX_CDECL stPipelineOpen(void)
 {
@@ -2750,6 +2854,12 @@ DT_CASES(rwworld_cases) = {
     {"rpSectorForAllLights", (uint32_t)(uintptr_t)sectorLightsOrig, sectorLightsImpl, 3, DT_RET_INT,
      setup_sector_lights, 200, 0},
     {"rpWorldLightObject", 0x004bae70, rpWorldLightObject, 2, DT_RET_INT, setup_light_object, 300, 0},
+    {"rpAtomicLightStage", (uint32_t)(uintptr_t)lightStageOrig, lightStageImpl, 2, DT_RET_INT,
+     setup_atomic_light_stage, 300, 0},
+    {"RpWorldForAllDirectionalLights", 0x004b9ac0, RpWorldForAllDirectionalLights, 2, DT_RET_INT,
+     setup_dir_lights, 100, 0},
+    {"RpWorldSectorForAllLights", 0x004b9b20, RpWorldSectorForAllLights, 3, DT_RET_INT, setup_sector_lights,
+     100, 0},
     {"WorldOpen", 0x004bc090, WorldOpen, 2, DT_RET_INT, setup_world_open, 200, 0},
     {"WorldClose", 0x004bc020, WorldClose, 1, DT_RET_INT, setup_world_close, 100, 0},
     {"rpWorldDefaultRender", 0x004bc360, rpWorldDefaultRender, 1, DT_RET_INT, setup_default_render, 60, 0},

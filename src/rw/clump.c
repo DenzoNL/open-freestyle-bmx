@@ -3318,11 +3318,6 @@ int rpMeshCompareMaterials(const RpMesh *const *a, const RpMesh *const *b)
     return (int)(firstBits - secondBits);
 }
 
-#define rpPipelineTypes  ((uint8_t *)(uintptr_t)0x006767f0)
-#define rpPipelineSizes  ((uint8_t *)(uintptr_t)0x006767f8)
-#define rpPipelineSizesB ((uint8_t *)(uintptr_t)0x00676800)
-#define rpPipelineTypesB ((uint8_t *)(uintptr_t)0x00676808)
-
 /* Stages of the world's render pipeline and the vertex layouts of its five mesh types (still original code).
  */
 BMX_ADDR(0x004c9270)

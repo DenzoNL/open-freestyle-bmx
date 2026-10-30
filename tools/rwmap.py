@@ -108,7 +108,8 @@ NAME_RULES = [
 RECLASS = [
     # Instancing pipelines of world sectors and atomics (resource arena entries, vertex buffers in the D3D vertex
     # format, morph interpolation, lighting and uv effects into them): rpWorldPipelineInit/rpAtomicPipelineInit
-    # hang them in the pipeline, the device draws the result.
+    # hang them in the pipeline, the device draws the result. Ported since (SDL3 driver step 3, rw/d3dpipe.c): ported
+    # rows keep their file, so the range only matters for rows without a port.
     (0x4C8BA0, 0x4CB000, "lib/d3d7driver", "world/atomic instancing pipelines"),
     # Instance buffer allocators and the driver's instance hook (0x4eb0d0 calls a function pointer of the driver);
     # their callers are the pipelines above and the D3D mesh code.

@@ -62,15 +62,20 @@ typedef struct RwD3DTLVertex {
 
 _Static_assert(sizeof(RwD3DTLVertex) == 0x20, "RwD3DTLVertex layout");
 
-/* A vertex in camera space: position, the clip flags of RwD3DClip, and the texture coordinates. */
+/*
+ * A vertex in camera space: position, the clip flags of RwD3DClip, the colour the instancing pipelines light
+ * (0..255 per channel, clamped when converted to the TL vertex), and the texture coordinates.
+ */
 typedef struct RwD3DCamVertex {
     float x, y, z; /* 0x00 */
     uint8_t clip;  /* 0x0c */
-    uint8_t pad0d[0x13];
-    float u, v; /* 0x20 */
+    uint8_t pad0d[3];
+    float r, g, b, a; /* 0x10 */
+    float u, v;       /* 0x20 */
 } RwD3DCamVertex;
 
 _Static_assert(sizeof(RwD3DCamVertex) == 0x28, "RwD3DCamVertex layout");
+_Static_assert(offsetof(RwD3DCamVertex, r) == 0x10, "RwD3DCamVertex layout");
 
 /* Clip flags (outcodes) of a camera space vertex. */
 enum {
@@ -92,20 +97,33 @@ typedef struct RwD3DIm3DVertex {
 
 _Static_assert(sizeof(RwD3DIm3DVertex) == 0x24, "RwD3DIm3DVertex layout");
 
-/* The work object the Im3D instance stage hands to the other stages (0x88 bytes, allocated once). */
+/*
+ * The work object an instance stage hands to the other stages. Im3D allocates one (0x88 bytes); the
+ * instancing pipelines of atomics and world sectors (rw/d3dpipe.c) keep theirs in a resource entry of the
+ * object, with the vertices and triangles behind it: an atomic's at 0x88, a world sector's already at 0x48
+ * (it has no matrix of its own and uses the camera's view matrix).
+ */
 typedef struct RwD3DIm3DWork {
-    uint8_t pad00[0x20];
-    int32_t numVertices;    /* 0x20 */
-    int32_t stride;         /* 0x24 0x24, set at allocation */
-    void *vertices;         /* 0x28 RwD3DIm3DVertex */
-    uint8_t pad2c[0x12];    /* 0x2c zeroed at allocation */
-    int16_t pad3e;          /* 0x3e zeroed by every instance */
-    int32_t pad40;          /* 0x40 zeroed at allocation */
-    const RwMatrix *matrix; /* 0x44 object to camera space */
-    RwMatrix combined;      /* 0x48 ltm x view matrix */
+    RwResEntry entry;          /* 0x00 the resource entry (pipelines) */
+    uint32_t serialNum;        /* 0x18 the mesh header's serial number at instancing */
+    uint32_t flags;            /* 0x1c geometry or world flags; 0x40: modulate by the material colour */
+    int32_t numVertices;       /* 0x20 */
+    int32_t stride;            /* 0x24 0x24 for Im3D; 0x1c or 0x24 (with normals) for the pipelines */
+    void *vertices;            /* 0x28 RwD3DIm3DVertex layout */
+    uint32_t numTriangles;     /* 0x2c */
+    int32_t triangleStride;    /* 0x30 bytes per triangle (6) */
+    int32_t triangleOffset;    /* 0x34 */
+    uint8_t *triangles;        /* 0x38 three vertex indices each */
+    uint16_t type;             /* 0x3c the vertex type of the pipeline's table */
+    uint16_t lit;              /* 0x3e bit 0: a light was applied; zeroed by every instance */
+    struct RpMeshHeader *mesh; /* 0x40 */
+    const RwMatrix *matrix;    /* 0x44 object to camera space */
+    RwMatrix combined;         /* 0x48 ltm x view */
 } RwD3DIm3DWork;
 
 _Static_assert(sizeof(RwD3DIm3DWork) == 0x88, "RwD3DIm3DWork layout");
+_Static_assert(offsetof(RwD3DIm3DWork, numVertices) == 0x20, "RwD3DIm3DWork layout");
+_Static_assert(offsetof(RwD3DIm3DWork, mesh) == 0x40, "RwD3DIm3DWork layout");
 
 typedef int(BMX_CDECL *RwD3DTriFunc)(int32_t a, int32_t b, int32_t c);
 typedef void(BMX_CDECL *RwD3DTriVoidFunc)(int32_t a, int32_t b, int32_t c);
@@ -169,9 +187,9 @@ typedef struct RwD3DIndexList {
 #define rwD3DCamBuffer   ORIG_VAR(0x00696a80, RwD3DCamVertex *, rwD3DCamBuffer)
 #define rwD3DBufferSize  ORIG_VAR(0x00696a84, uint32_t, rwD3DBufferSize)
 #define rwD3DIm3DWork    ORIG_VAR(0x00696a88, RwD3DIm3DWork *, rwD3DIm3DWork)
-/* The two words after the Gouraud flag's neighbours that the plugin constructor and destructor reset. */
-#define rwD3DIm3DSpare0 ORIG_VAR(0x00696a5c, void *, rwD3DIm3DSpare0)
-#define rwD3DIm3DSpare1 ORIG_VAR(0x00696a60, int32_t, rwD3DIm3DSpare1)
+/* One bit per instanced vertex: the pipelines' render stage colours each vertex of a mesh once. */
+#define rwD3DVertexBits     ORIG_VAR(0x00696a5c, uint32_t *, rwD3DVertexBits)
+#define rwD3DVertexBitsSize ORIG_VAR(0x00696a60, uint32_t, rwD3DVertexBitsSize)
 /* Clip flags of the last transform: or'ed and and'ed over the vertices. */
 #define rwD3DOrClip  ORIG_VAR(0x00696710, uint32_t, rwD3DOrClip)
 #define rwD3DAndClip ORIG_VAR(0x00696720, uint32_t, rwD3DAndClip)
@@ -413,5 +431,37 @@ int rwD3DIm3DRenderLine(int32_t a, int32_t b);
 int rwD3DIm3DRenderTriangle(int32_t a, int32_t b, int32_t c);
 int rwD3DIm3DRenderPrimitive(int32_t primType);
 int rwD3DIm3DRenderIndexedPrimitive(int32_t primType, const uint16_t *indices, int32_t numIndices);
+int rwD3DVertexBitsAlloc(int32_t count);
+
+/* rw/d3dpipe.c: the instancing pipelines of atomics and world sectors */
+struct RpAtomic;
+struct RpLight;
+struct RpWorldSector;
+struct RwSurfaceProperties;
+
+/* A light routine (RpLight.worldExtCallback): adds the light to the camera vertices' colours. */
+typedef void(BMX_CDECL *RwD3DLightFunc)(RwD3DIm3DWork *work, struct RpLight *light, const RwMatrix *inverse,
+                                        float scale, const struct RwSurfaceProperties *surface);
+
+__attribute__((regparm(1))) void rwD3DAtomicMorph(struct RpAtomic *atomic);
+RwD3DIm3DWork *rwD3DAtomicInstance(struct RpAtomic *atomic);
+RwD3DIm3DWork *rwD3DSectorInstance(struct RpWorldSector *sector);
+void rwD3DApplyLight(RwD3DIm3DWork *work, struct RpLight *light, const RwMatrix *inverse, float scale,
+                     const struct RwSurfaceProperties *surface);
+void rwD3DPrelight(RwD3DIm3DWork *work);
+void rwD3DLightColors(RwD3DIm3DWork *work);
+void rwD3DLightAmbient(RwD3DIm3DWork *work, struct RpLight *light, const RwMatrix *inverse, float scale,
+                       const struct RwSurfaceProperties *surface);
+void rwD3DLightDirectional(RwD3DIm3DWork *work, struct RpLight *light, const RwMatrix *inverse, float scale,
+                           const struct RwSurfaceProperties *surface);
+void rwD3DLightPoint(RwD3DIm3DWork *work, struct RpLight *light, const RwMatrix *inverse, float scale,
+                     const struct RwSurfaceProperties *surface);
+void rwD3DLightSpot(RwD3DIm3DWork *work, struct RpLight *light, const RwMatrix *inverse, float scale,
+                    const struct RwSurfaceProperties *surface);
+void rwD3DLightSoftSpot(RwD3DIm3DWork *work, struct RpLight *light, const RwMatrix *inverse, float scale,
+                        const struct RwSurfaceProperties *surface);
+void rwD3DModulateColor(uint32_t index, const float *color);
+void rwD3DVertexColor(uint32_t index);
+void rwD3DRenderMeshes(RwD3DIm3DWork *work);
 
 #endif

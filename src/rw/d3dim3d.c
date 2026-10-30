@@ -83,6 +83,27 @@ int rwD3DIm3DGrow(uint32_t extra)
     return 1;
 }
 
+/* 0x4eafa0: (re)allocates the vertex bits for `count` vertices, all clear; 0 (bits unchanged) on no memory.
+ */
+BMX_ADDR(0x004eafa0)
+int rwD3DVertexBitsAlloc(int32_t count)
+{
+    const int32_t bytes = (count + 0x1f) >> 3;
+    RwMemoryFunctions *mem = &RwEngineInstance->memoryFuncs;
+    uint8_t *bits = rwD3DVertexBits == NULL ? mem->rwmalloc((uint32_t)bytes)
+                                            : mem->rwrealloc(rwD3DVertexBits, (uint32_t)bytes);
+
+    if (bits == NULL) {
+        return 0;
+    }
+    rwD3DVertexBits = (uint32_t *)bits;
+    rwD3DVertexBitsSize = (uint32_t)count;
+    for (uint32_t n = (uint32_t)bytes; n != 0; n--) {
+        *bits++ = 0;
+    }
+    return 1;
+}
+
 /* ---- index lists ----------------------------------------------------------------------------------------
  */
 
@@ -267,8 +288,8 @@ void *rwD3DIm3DOpen(void *engine)
     rwD3DIndexListCreate(&rwD3DLineIndices);
     rwD3DIm3DLevel = NULL;
     rwD3DIm3DDepth = 0;
-    rwD3DIm3DSpare1 = 0;
-    rwD3DIm3DSpare0 = NULL;
+    rwD3DVertexBitsSize = 0;
+    rwD3DVertexBits = NULL;
     rwIm3DGouraud = 1;
     rwD3DIndexStart = D3D_FN(RwD3DVoidFunc, 0x004eae10, rwD3DIndexStartDefault);
     rwD3DIndexTri = D3D_FN(RwD3DTriVoidFunc, 0x004eaeb0, rwD3DIndexTriDefault);
@@ -290,11 +311,11 @@ void *rwD3DIm3DOpen(void *engine)
         return NULL;
     }
     work->stride = sizeof(RwD3DIm3DVertex);
-    *(int32_t *)(work->pad2c + 0xc) = 0;
-    *(int32_t *)(work->pad2c + 0x0) = 0;
-    *(int32_t *)(work->pad2c + 0x4) = 0;
-    *(int32_t *)(work->pad2c + 0x8) = 0;
-    work->pad40 = 0;
+    work->triangles = NULL;
+    work->numTriangles = 0;
+    work->triangleStride = 0;
+    work->triangleOffset = 0;
+    work->mesh = NULL;
     return engine;
 }
 
@@ -304,9 +325,9 @@ void *rwD3DIm3DClose(void *engine)
 {
     RwMemoryFunctions *mem = &RwEngineInstance->memoryFuncs;
 
-    if (rwD3DIm3DSpare0 != NULL) {
-        mem->rwfree(rwD3DIm3DSpare0);
-        rwD3DIm3DSpare0 = NULL;
+    if (rwD3DVertexBits != NULL) {
+        mem->rwfree(rwD3DVertexBits);
+        rwD3DVertexBits = NULL;
     }
     if (rwD3DTLBuffer != NULL) {
         RwEngineInstance->memoryFuncs.rwfree(rwD3DTLBuffer);
@@ -394,7 +415,7 @@ RwD3DIm3DWork *rwD3DIm3DInstance(RwIm3DTransformInfo *info)
     rwD3DSetUVStage0((info->flags & 1) != 0 ? 2 : 0);
     work = rwD3DIm3DWork;
     n = (uint32_t)info->numVertices;
-    work->pad3e = 0;
+    work->lit = 0;
     work->numVertices = (int32_t)n;
     work->vertices = info->vertices;
     view = &((const RwCamera *)RwEngineInstance->curCamera)->viewMatrix;

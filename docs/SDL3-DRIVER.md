@@ -1,6 +1,7 @@
 # SDL3 render driver for RenderWare (P4)
 
-Status 2026-10-30: decided; steps 1 and 2 done (the menu draws). The user chose option A for D1..D7 (the recommendations below).
+Status 2026-10-30: decided; steps 1 and 2 done (the menu draws); step 3's CPU port done (instancing pipelines,
+oracle-tested), its native runs still to do. The user chose option A for D1..D7 (the recommendations below).
 The game and RenderWare (708/711) are ported. What `bmxnative.exe` still lacks is RW's Direct3D 7 device driver (`lib/d3d7driver` in data/functions-rw.csv: 250 functions, 107 KB, never ported).
 The decisions below record the options that were considered; A is the chosen one in each.
 
@@ -18,7 +19,8 @@ RW talks to its driver through three tables in the original's data, all set up b
   is where bmxnative traps now.
 
 Plus the world/atomic **instancing pipelines** (0x4c8ba0..0x4cb000, moved to `lib/d3d7driver` in the
-classification): they transform, light, fog and morph vertices on the CPU into D3D vertex buffers.
+classification): they morph and light vertices on the CPU. Step 3 found that they use no D3D vertex buffers:
+they are Im3D pipelines that feed the Im3D TL buffer and index lists (step 3 below).
 
 The game itself touches DirectDraw directly in two places only: the quit prompt (`zrwzgl.c`, GDI surface flip)
 and FMV playback (`zmovie.c`).
@@ -202,7 +204,55 @@ DirectSound -> SDL3 audio, the quit prompt's DirectDraw GDI flip.
        nothing changes it in the menu.
      - Screenshots compared by eye only (D7's diff harness is step 4). The final shader headers (DXIL stripped of
        debug/reflection) were regenerated after the screenshot runs and have not been run in a window yet.
-3. Instancing pipelines (D2) + world/atomic rendering: levels. Next trap: 0x4c92d0 (one of the instancing pipelines)
-   from rwIm3DPipelineRun 0x4e8600, in the 4000 frame run, some time after frame 1500 (the menu itself draws
-   without it).
+3. Instancing pipelines (D2) + world/atomic rendering: levels. **CPU port done 2026-10-30; native runs still to do**
+   (no window could be opened while the user was gaming). The first trap was 0x4c92d0 from rwIm3DPipelineRun
+   0x4e8600, some time after frame 1500 of the 4000 frame menu run.
+   - **What the pipelines are.** rpWorldPipelineInit / rpAtomicPipelineInit (rw/clump.c) build two Im3D pipelines
+     out of the driver's stages; rwIm3DPipelineRun calls instance, stage 1 (the ported Im3D transform 0x4f97c0, which
+     the device's pipeline request installs), stage 2, stage 4 (the world's light walk, which calls the stage data
+     0x4c9790 per light), stage 5 and stage 6. There are **no Direct3D vertex buffers**: the instance stage caches
+     the vertices (Im3D vertex layout, 0x1c or 0x24 bytes) and the triangles in a resource entry of the atomic or
+     sector, the transform writes the Im3D camera and TL buffers, and the render stage draws through the Im3D index
+     lists, which end in RwIm2DRenderIndexedPrimitive (step 2's cut). **The cut needs no extension** and
+     src/driver/draw.c no change: world and atomic geometry reaches SDL3 GPU as indexed TL triangle lists, like
+     Im3D. Texture, filter, addressing and vertex alpha come from RwRenderStateSet (rw/d3dstate.c).
+   - **Shared ports (`BMX_ADDR`, src/rw/d3dpipe.c, 14 functions; 0x4eafa0 in rw/d3dim3d.c)**, oracle tests in
+     tests/cases/test_rwd3dpipe.c (15 cases, 0 ULP, under the camera's x87 mode like step 2):
+     - instancing: atomic 0x4c8e30 (resource entry reused while mesh serial, vertex type and stride match; refreshed
+       by the geometry's lock bits: texture coordinates, prelit colours, triangles, positions / normals; LTM x view
+       matrix) with the morph target interpolation 0x4c8ba0 (EAX = atomic); world sector 0x4c92d0 (built once;
+       signed-byte normals times 1/128; the camera's view matrix);
+     - colours: stage 2 0x4c9800 (prelit RwRGBA into the camera vertices' float colours), the light walk callback
+       0x4c9790 (marks the instance lit, calls RpLight.worldExtCallback), the five light routines ambient 0x4c9b20,
+       directional 0x4c9c20, point 0x4c9e20, spot 0x4ca130, soft spot 0x4ca5b0 (white and coloured variants each;
+       light position / axis into object space by the inverse matrix the walk passes, radius scaled), stage 5
+       0x4c9880 (clamp to 0..255 and FISTP into the D3DCOLOR, unless the instance modulates by the material colour);
+     - render: stage 6 0x4cac00 (per mesh: Gouraud, vertex alpha for translucent material colours, the texture's
+       raster / filter / addressing / border colour, each used vertex coloured once through a bit per vertex
+       (0x4caad0 modulated by the material colour, 0x4cab70 plain; the bits come from 0x4eafa0), then the
+       triangles through the driver's cull / clip / index function pointers and an index flush).
+   - Layouts named on the way (rw/rwd3d.h): RwD3DIm3DWork is also the pipelines' resource entry (serial number,
+     flags, triangle count / stride / offset / pointer, vertex type, lit flag, mesh header); RwD3DCamVertex has float
+     r, g, b, a at 0x10; 0x696a5c / 0x696a60 are the vertex bits (rwD3DVertexBits / Size, formerly "spare" words).
+   - **Decisions taken in step 3, to review:**
+     - **Negation under round-down.** The spot lights' cone test computes `dy - dir.y * -d` (FCHS, FMUL, FSUBR).
+       Rounding down, `y * -d` is not `-(y * d)`, but clang folds the negation into the subtraction (`dy + dir.y * d`)
+       even at -O0 (a DAG combine that is only valid when rounding to nearest); `#pragma STDC FENV_ACCESS ON` did not
+       stop it. The port makes the negated factor and the product opaque (`negMul`, an empty asm barrier like camSub
+       in rw/camera.c). Found by the soft spot test (1-4 ULP), confirmed with exact rational arithmetic. Step 2's
+       driver ports have no float negations.
+     - The vector helpers the light routines call (RwV3dTransformPoints / Vectors, _rwV3dNormalize, _rwFastSqrt,
+       _rwFastInvSqrt) are stubbed in the tests (exact permutations / bit tricks on both sides). Natively and in the
+       hook DLL they are the earlier SSE2 ports; they run with MXCSR in the camera's rounding mode (rwD3DRoundBegin
+       covers the whole routine) but not at 24-bit precision, so a transformed light position or axis can differ
+       from the original in the last bit (the pre-existing "game code at SSE2 inside a camera update" open point).
+       _rwFastSqrt / InvSqrt are table lookups and exact.
+     - The pipeline tables 0x6767f0.. moved from rw/clump.c to rw/rwclump.h (shared). rpWorldPipelineInit fills the
+       tables the *atomic* instance stage reads and installs that stage, rpAtomicPipelineInit the world sector's:
+       the names of those two ported functions look swapped (not renamed here).
+   - Open points: the native runs (the menu up to where 0x4c92d0 trapped, then the frontend's 3D model and a level);
+     the D7 screenshot diff; the remaining standards (raster render fast / scaled, raster clear rect, image from
+     raster, RGB <-> pixel, palette lock / unlock, native texture read / write / size; fog density 0x4d6590) still
+     trap and get ported when a native run reaches them. The game calls RwRasterLockPalette / RwRGBAFromPixel only
+     for paletted rasters (zrwtxr.c), which this driver never creates.
 4. Screenshot diff harness against the original (D7).

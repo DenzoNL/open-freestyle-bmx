@@ -1,10 +1,11 @@
 /* RenderWare 3.1 lights: creation, destruction and the property setters (RpLight*). */
 #include "compat/x87.h"
+#include "rw/rwclump.h"
+#include "rw/rwd3d.h"
 #include "rw/rwlight.h"
+#include "rw/rwmath.h"
 #include "rw/rwplugins.h"
-
-/* Callees in other RenderWare groups, still original code. */
-ORIG_FN(0x004d2a80, void *, RwFrameUpdateObjects, (RwFrame * frame));
+#include "rw/rwworld.h"
 
 /* The light's address in the original: its sync callback, which only returns the object. */
 #define RP_LIGHT_SYNC_CALLBACK 0x004c2510
@@ -220,6 +221,42 @@ RpLight *rpLightVisitEnabled(RpLight *light, RpLightVisit *visit)
         visit->callback(visit->context, light, visit->block, visit->tail, visit->extra);
     }
     return light;
+}
+
+/*
+ * Light hook of the atomics' pipeline (stage 4, installed by _rpClumpOpen): when there is a world and the
+ * geometry is lit, every enabled light of the world's directional list and, once per light frame, of the
+ * sectors the atomic touches goes to `apply` with the inverse of the atomic's frame matrix, the length of its
+ * at row and the geometry's surface properties. Runs inside a camera update: the length is summed under the
+ * camera's x87 rounding (rwD3DRoundBegin).
+ */
+BMX_ADDR(0x004b1860)
+void rpAtomicLightStage(RwResEntry *work, RpLightVisitFn apply)
+{
+    RpAtomic *atomic = work->owner;
+    if (RwEngineInstance->curWorld == NULL || (atomic->geometry->flags & rpGEOMETRYLIGHT) == 0) {
+        return;
+    }
+    RpLightVisit visit;
+    RwMatrix *inverse = (RwMatrix *)visit.block;
+    RwMatrixInvert(inverse, RwFrameGetLTM(atomic->object.object.parent));
+    const uint32_t mxcsr = rwD3DRoundBegin();
+    const float len2 =
+        inverse->at.x * inverse->at.x + (inverse->at.y * inverse->at.y + inverse->at.z * inverse->at.z);
+    rwD3DRoundEnd(mxcsr);
+    const float len = (float)_rwFastSqrt(rwD3DBits(len2));
+    visit.context = work;
+    visit.callback = apply;
+    visit.extra = &atomic->geometry->surfaceProps;
+    __builtin_memcpy((void *)&visit.tail, &len, sizeof len);
+    (*(uint16_t *)((uint8_t *)RwEngineInstance + 0x0c))++;
+    RpWorldForAllDirectionalLights(BMX_FNPTR(RwObjectCallBack, 0x004b17c0, rpLightVisitEnabled), &visit);
+    RwLLLink *head = &atomic->llWorldSectorsInAtomic;
+    for (RwLLLink *link = head->next; link != head; link = link->next) {
+        RpTie *tie = (RpTie *)((uint8_t *)link - offsetof(RpTie, lWorldSectorInAtomic));
+        RpWorldSectorForAllLights(tie->worldSector, BMX_FNPTR(RwObjectCallBack, 0x004b1800, rpLightVisitOnce),
+                                  &visit);
+    }
 }
 
 /* Gives a light the lighting routine of its type (field at 0x14; point, directional, spot...). */

@@ -1970,6 +1970,19 @@ __attribute__((regparm(3))) RpWorldSector *rpSectorForAllLights(RpWorldSector *s
     return sector;
 }
 
+/* Stack argument entries of the two walks above: they load the arguments and fall into the bodies. */
+BMX_ADDR(0x004b9ac0)
+int RpWorldForAllDirectionalLights(RwObjectCallBack callback, void *data)
+{
+    return rpWorldForAllDirectionalLights(callback, data);
+}
+
+BMX_ADDR(0x004b9b20)
+RpWorldSector *RpWorldSectorForAllLights(RpWorldSector *sector, RwObjectCallBack callback, void *data)
+{
+    return rpSectorForAllLights(sector, callback, data);
+}
+
 /* The pipeline's light hook (stored at +0x10 of the world pipeline): lights the object with the world's
  * lights and those tied to its sector. Returns the sector, or the object when the sector is not lit. */
 BMX_ADDR(0x004bae70)
