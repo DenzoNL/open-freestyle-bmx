@@ -416,16 +416,48 @@ volume sliders); Cool Stuff (challenges, high scores); QUIT (with the message bo
 clear rect, image from raster, native texture read / write / size, palette lock, fog density 0x4d6590) are not
 reached in single-player play: no ported code calls a raster render standard; image from raster only comes from the
 mip generator (this driver sets no mip format bits); native textures and palettes are not in the game's files (the
-models' textures are PNG); the game never sets fog density. Not covered: Session mode, the movies (BMX_NO_MOVIES
-runs; without it the intro movies run but present no RW frames, so `BMX_SHOT_FRAME` does not count them), Cool
-Stuff's movies / credits (Enter on them did nothing with BMX_NO_MOVIES), two-player modes.
+models' textures are PNG); the game never sets fog density. Session, the movies and two-player play are covered
+in the next section.
+
+### Session, movies and two-player (2026-10-31, second pass)
+
+Runs from a copy of the game folder (`C:\Users\Dennis\Games\dmfbmx\native-run`: the install without `dinput.dll`,
+the `*.bin` traces and the save, with the user's `SAVE.DAT` copied in), so the hooked game in the real folder and
+its save stay untouched while the user plays. Same switches as above; `save/SAVE.DAT` restored after each run.
+
+- **Session** (main menu `down` once): `f300:down,f450:enter,+150:enter` x6 gets to Vail Trails with the 2:00 timer
+  at frame ~1250. Covered: a full 2-minute run to RUN FINISHED (the session menu: another run, level select,
+  gear up, view replay, trick list, view records, exit to main menu); another run; the session PAUSE menu
+  (continue, options, trick list, view records, end run; `up` from continue wraps to end run) and END RUN?;
+  gear up and level select (both ask EXIT? (no, yes), then the frontend's bike / style / level screens; level
+  select into Greenville Park, its intro page, continue, riding); view replay (replay cameras); exit to main menu.
+  Recipe for the run-finished menu: `f1500:esc,f1560:up,f1620:enter,f1700:down,f1760:enter` (end run, yes), then
+  `down` steps from "another run" about 100 frames apart (keys pressed while the menu is still sliding in are
+  lost).
+- **Cool Stuff movies and credits with movies on** (no `BMX_NO_MOVIES`, `BMX_MUTE=1`, silent): main menu `down` x3,
+  Enter; hub CHALLENGES, HIGH SCORES, MOVIES, CREDITS; MOVIES lists only INTRO MOVIE in the user's save (amish /
+  mirra / nyquist.avi not unlocked). Playing INTRO (105 s) and CREDITS (221 s) goes through moviePlay's
+  ngifShutdown / guiModeShutdown, the AVI player and ngifInit / guiModeInit and back to the list / hub without a
+  trap. The movie is drawn by the original's AVI path into the window (seen with `PrintWindow` during the startup
+  intro); `BMX_SHOT_FRAME` does not count movie frames, so script frames resume where they stopped. A scripted run
+  with movies on spends ~155 s on ACCLAIM / ZAXIS / INTRO before frame 1 (keys are not pressed then: the frame
+  counter does not move).
+- **Two-player modes do not exist in the PC version.** The player count 0x69621c is only ever written with 0 or 1
+  (the five `mov byte [0x69621c], imm` in the exe: comdata init, the main menu's ProQuest / Session / Freeride
+  cases, the attract exit; no register stores), and the main menu and the select screen answer player 2's start
+  (messages 0x2f / 0x31) with the "refused" sound 0x7d4. The split-screen camera / overlymp / two-player select
+  code is dead code inherited from the console version; no menu reaches it.
+
+**Result: no trap** in any of these runs (11 runs, the log only has the usual start lines), so nothing new to port.
+By eye: the session HUD (timer bottom left, score bottom right, the height meter of the run's start), the PAUSE /
+END RUN? / RUN FINISHED / EXIT? overlays, the frontend and the replay look right. No split screen to check.
 
 **State 2026-10-31:** BMX_KEYS, the MessageBoxA shim, the multi-frame
 `BMX_SHOT_FRAME` and the tidy fixes in loader.c / main.c build and were used for all runs above. No trap is open.
 The four audits pass (0; 5/2/8/0/11; 0; 0/0/0) and the full gate passed after the merge. A native and a hooked frame
-at the Vail Trails start look identical apart from the timer (no rider shadow in either). Next steps: compare more
-native and hooked frames (docs/SDL3-DRIVER.md step 3), drive
-Session and two-player modes, then the D7 screenshot diff (step 4).
+at the Vail Trails start look identical apart from the timer (no rider shadow in either). Every mode the PC menus
+offer has now run natively without a trap. Next steps: compare more native and hooked frames (docs/SDL3-DRIVER.md
+step 3), then the D7 screenshot diff (step 4).
 
 ### Open points from the CRT layer (2026-10-28)
 

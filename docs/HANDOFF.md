@@ -50,8 +50,11 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   the focus, ignores the user's real keyboard/pad; MessageBoxA answered too). ProQuest, a full run, pause / end run /
   replay / main menu, Freeride in all seven unlocked levels, Options, Cool Stuff and QUIT run **without a trap**, so
   there is no next trap in single-player play. **Next:** compare native and hooked frames (docs/SDL3-DRIVER.md
-  step 3 "Visual check"; the rider shadow is absent in the hooked original at the Vail Trails start too), then the D7 screenshot diff harness (step 4); Session and
-  two-player modes were not driven yet.
+  step 3 "Visual check"; the rider shadow is absent in the hooked original at the Vail Trails start too), then the D7 screenshot diff harness (step 4).
+  Second pass (docs/NATIVE.md "Session, movies and two-player"): Session (full run, gear up, level select, replay,
+  exit) and Cool Stuff's intro movie and credits with movies on also run without a trap. Two-player modes do not
+  exist in the PC version (player count only ever 0 or 1). Native runs go from a copy of the game folder
+  (`C:\Users\Dennis\Games\dmfbmx\native-run`, no dinput.dll) so the user can play the hooked game meanwhile.
 - Golden traces: record sessions with `bmxtrace.orig` (docs/TRACING.md) if not done yet.
 
 ## Machine setup

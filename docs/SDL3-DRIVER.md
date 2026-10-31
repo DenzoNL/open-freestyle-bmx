@@ -262,7 +262,10 @@ DirectSound -> SDL3 audio, the quit prompt's DirectDraw GDI flip.
      Options, Cool Stuff and QUIT. **No trap**: the step 1 list of still-original standards is not reached in
      single-player play (no ported caller of raster render; image from raster only from the mip generator, and this
      driver sets no mip bits; no native textures or palettes in the game's files; fog density never set). They stay
-     int3 and get ported when something reaches them (two-player modes and Session were not driven).
+     int3 and get ported when something reaches them. A second pass the same day (docs/NATIVE.md "Session, movies
+     and two-player") drove Session (full run, gear up, level select, replay) and Cool Stuff's intro movie and
+     credits with movies on: no trap either. Two-player modes are unreachable in the PC version (the player count is
+     only ever 0 or 1), so the split-screen viewports never reach this driver.
    - **Visual check by eye** (no hooked reference frames were taken in this session; the user runs the hooked
      game): levels, rider, bike, sky, HUD text, the pause / results overlays and the menus look right: geometry
      complete, textures right side up and coloured, translucent menu items and overlays blended, distance darkening
