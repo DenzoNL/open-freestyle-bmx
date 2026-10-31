@@ -1,6 +1,6 @@
 # Widescreen, native resolution and HUD layout (P6 enhancement)
 
-Status 2026-10-31: **WS1-WS4 implemented** (not committed; "Implementation status" at the end), WS5/WS6 open, the
+Status 2026-10-31: **WS1-WS5 implemented** (WS5 not committed; "Implementation status" at the end), WS6 open, the
 default stays vanilla until the user's playtest (WS7, `native-run2\widetest.ps1`). The user took the
 recommendation (marked **rec**) for every decision W1..W11; for W9 the default stays vanilla (640x480 4:3) until a
 clean playtest, then decided with screenshots. Order: WS1-WS4 first. Scope: the native exe (`bmxnative.exe`, SDL3
@@ -286,11 +286,12 @@ the 2D install after rwD3DIm2DOpen), `raster.c` (`drvCameraCurrent`), `native/lo
 
 | Slice | State | Notes |
 |---|---|---|
-| WS1 | done | `[video]` keys `widescreen aspect fov_scale max_hfov hud menus movies scale_filter` (W9; `hud_aspect`, `ui_filter` come with WS5/WS6 and are still "unknown key"); `width = 0` / `height = 0` = the primary display's desktop size, full screen and windowed (`bmxVideoSize`); `scale_filter` 0 linear letterbox (unchanged), 1 nearest, 2 integer factor (linear letterbox when not even 1x fits) in `presentTarget` |
+| WS1 | done | `[video]` keys `widescreen aspect fov_scale max_hfov hud menus movies scale_filter` (W9; `hud_aspect` came with WS5, `ui_filter` comes with WS6 and is still "unknown key"); `width = 0` / `height = 0` = the primary display's desktop size, full screen and windowed (`bmxVideoSize`); `scale_filter` 0 linear letterbox (unchanged), 1 nearest, 2 integer factor (linear letterbox when not even 1x fits) in `presentTarget` |
 | WS2 | done | `wideSetFov` in the zgl slot 0x561d98 (data pointer, written by the loader when `widescreen = 1`; log `wide: 1 slot`, else `wide: 0 slots`): calls the original, reads the window it set, applies W2-A (hor+ above 4:3, vert+ below, identity at exactly 4:3), then `fov_scale` and the `max_hfov` cap; RwCameraSetViewWindow only when something changed. BMX_SIM_HASH (below) |
 | WS3 | done | `wideIm2DPrimitive` wraps the engine device's fpIm2DRenderPrimitive at the device start. Only while the screen camera is in its update (camera raster = gZrwScreenW x H, not 4:3); classifier W6-A: untextured and the x extent reaching both edges (within 2 virtual pixels) = cover, stays stretched; textured full width = backdrop, pillarboxed unless `menus = 1`; everything else centred 4:3 unless `hud = 2` (`hud = 1` acts as 0 until WS5). Moved primitives are copied, mapped and **clipped to the 4:3 area** (finding 2 below). Movies: DrawDibDraw's destination mapped the same way (`movies = 0`), the target stays black around it |
 | WS4 | done | runs below; one fix (the clip) |
-| WS5, WS6 | open | |
+| WS5 | done | `hud = 1`, `hud_aspect` (below, "WS5: HUD edge anchoring") |
+| WS6 | open | |
 
 **Byte identity** (BMX_SHOT BMPs of the same BMX_KEYS run: ProQuest into Vail Trails, riding, pause, END RUN?,
 RUN FINISHED, view replay; frames 200..3200; build without the feature = 6e7f88a):
@@ -333,5 +334,88 @@ windowed, 5:4 1280x1024):
    unit tests only.
 
 **Open points:** the playtest (W10.6: all levels, replays, attract demo, cut-scenes with bars, the goal lists);
-WS5 / WS6; the run-to-run variation above; `hud = 1` and `menus = 2` act as 0 until WS5 / WS6; `-r<w>.<h>.<depth>`
+WS6; the run-to-run variation above; `menus = 2` acts as 0 until WS6; `-r<w>.<h>.<depth>`
 still overrides `[video]` (and has the original's pick bug).
+
+## WS5: HUD edge anchoring (2026-10-31, not committed)
+
+`[video] hud = 1` (with `widescreen = 1`) anchors the HUD per element; `hud_aspect` (aspect · 100, default 178)
+bounds it: the anchored HUD lives in a centred area `hud_aspect · H / 100` wide, at least the 4:3 area and at most
+the screen, on whole pixels (3440x1440: 2563 wide, x 438..3002; 1920x1080: the full width; `hud_aspect = 0`: the full
+width). Every element keeps the 4:3 scale (H / 480 per virtual pixel); only its offset changes:
+
+- **left:** virtual x 0 at the area's left edge (x' = lo + x · s);
+- **right:** virtual x 640 at the area's right edge (x' = hi - (640 - x) · s);
+- **centre** (and everything that is not a HUD element): the centred 4:3 map of WS3, unchanged.
+
+A moved primitive is clipped to where its own virtual screen [0, 640] lands (WS3's clip, per anchor). Menu screens
+(layer 1), menus, backdrops, covers and movies behave as in WS3. Narrower than 4:3 (5:4) and exactly 4:3, `hud = 1`
+does nothing.
+
+**Seam (W8-A3).** `drvWideJumps` (src/driver/wide.c) gives the loader a jump over the entry of the ported
+`ngifDrawList` (0x462350; ngifFlushFrame calls it directly) to `wideDrawList`, a copy (the same 10 lines) that sets
+the anchor of each packet before ngifDrawPrimitive and clears it after; the Im2D wrapper reads it. Installed only for
+`widescreen = 1` and `hud = 1` (log `wide: 1 hud jumps`, else `wide: 0 hud jumps`). The copy is a no-op at 4:3.
+
+**Elements at the draw list.** The HUD reaches the ordering table two ways (overlay.c, zoverii.c), both with the
+element still recoverable:
+
+1. **zover pools of layer 0** (pool 1: glyphs, pool 0: rectangles / gradients / sprites; both frames): the packet's
+   address says which item it is. At the start of each draw list, a read-only walk of the pools builds every text from
+   its glyph chain (the head is the glyph no other glyph points at; `next` at 0x9e) and its box; each text gets one
+   anchor, each shape its own. A text or shape that lies inside a **wider text** on the same lines takes that text's
+   anchor (the hint lines' button glyphs, separate one-glyph texts placed inside the line). Pools 2 / 3 (layer 1 =
+   menu screens) get none.
+2. **The 3D list** (gNgifPrim3DBuffer .. gNgifPrim3D): `zoverDrawText` (name, combo lines, combo score, height labels,
+   indicator / replay arrow) writes one 0x9c byte FT4 packet per glyph back to back and links them into table entry 0
+   in a row; `zoverDrawRect` one F4. Only while `gZoverLayer == 0` (no menu screen) and only for 2D packets (no float
+   flag). At the first packet of a run the copy looks ahead along the chain: consecutive packets that are 0x9c apart,
+   FT4, on the same lines and with x0 = the other's x1 + 1 (zoverDrawText's spacing, exact) are one text
+   (`drvWideGlyphRun`); a rect is its own element. Fades and letterbox bars from the same buffer stay covers (the
+   funnel's cover rule comes first).
+
+**Anchor of an element** (`drvWideHudAnchorOf`, from its x extent): centre when its middle is within 8 virtual pixels
+of 320 (ovlCentreX texts land within 1); otherwise left if the middle is left of 320, right if right of it. Thirds (W4's
+first idea) would split the left-aligned flash lines (x 0x19, long lines reach past 213) and put the icon at 0x1b1
+in the centre; the "centred or which side" rule matches every element below.
+
+| Element (overlay.c) | Path | Box (virtual) | Anchor |
+|---|---|---|---|
+| Timer (2) | pool text | 0x35.., y 400 | left |
+| Score (1) | pool text | right-aligned at 0x24b | right |
+| Rider name (3) | 3D list run | 0x35.., y 0x3c | left |
+| Combo lines, "TO", combo score (4) | 3D list runs | centred on 0x140 | centre |
+| Height meter (5): frame, ticks, labels, marker | pool rects + 3D list rects / runs | 0x213..0x24b | right |
+| Balance meter (6) | pool gradients, rects | 0xd5..0xf3 | (left; draws nothing on PC) |
+| Caption (7) | pool text | centred 0x140, y 0x132 | centre |
+| Indicator / replay arrow (9) | 3D list run (icon font) | centred on 0x240, y 0x30 | right |
+| Hint lines + button glyphs (10) | pool texts | centred 0x140; buttons inside | centre (buttons by containment) |
+| Goal message (11), status message (12) | pool texts | centred 0x140 | centre |
+| Flash message (13) | pool texts | x 0x19, four lines | left |
+| Icon sprite (14) | pool sprite | 0x1b1, 0x148 | right |
+| physHudText 0x10ba (physics.c) | pool text | centred on 0x210, y 0x3c | right |
+| Fade (16), letterbox (0) | 3D list | full width | cover (stretched) |
+| Menu screens (pause, challenges, results, records, save) | pools 2 / 3, 3D list with layer 1 | - | centred 4:3 (as WS3) |
+
+**Verification.**
+- Unit tests (`bmxwidetest`, now 179 checks): the anchor rule on the elements above, packet boxes (FT4, F4, the 3D
+  list's float flag, mode packets), the pool walk on synthetic pools (timer / score / a centred combo line spanning all
+  thirds: one anchor per element, not per glyph; a hint line stored backwards with a button inside; cycles; free
+  items), zoverDrawText runs (two texts back to back, other lines, a rect, forward order), the hud_aspect area and
+  the anchored map (3440x1440 and 1920x1080 edges, hud_aspect 0, centre = drvWideMap2D bit for bit, 4:3 untouched).
+- Byte identity (BMX_SHOT, the WS4 script, frames 300..3000): `widescreen = 0` (`hud = 1` in the ini) at 1920x1080:
+  13/13 identical to WS4's off run and to the build before the feature; `hud = 1` at 1024x768: 12/12 identical to
+  WS4's on1024 and base1024; `hud = 0` at 1920x1080: 12/13 identical to WS4's on1080, the 13th (f1600, 305 pixels in
+  the 3D scene) is the known run-to-run variation. `hud = 1` at 3440x1440 and 1920x1080: menu frames (challenges,
+  pause, END RUN?, RUN FINISHED) identical to `hud = 0`, only HUD frames differ (one RUN FINISHED frame at 1080 had 34
+  scattered 3D pixels: the same variation).
+- BMX_SIM_HASH: `hud = 1` at 3440x1440 and 1920x1080, `hud = 0` at 1920x1080 and `widescreen = 0`: the same hash for
+  all 1974 ticks.
+- Screenshots (3440x1440, 1920x1080): timer and score at the 16:9 edges on 21:9 (x 597 and 2843 of 3440) and at the
+  screen edges on 16:9; the height meter (frame, ticks, labels, marker together) at the right; the replay arrow at
+  the right; challenges, pause, END RUN?, RUN FINISHED centred 4:3 as before.
+
+**Open (WS5).** The combo / trick text was not caught in a screenshot (the scripted hops did not land a trick); it is a
+centred element by the unit tests and by its code (ovlCentreX 0x140). Not seen yet: hint lines with buttons, goal /
+status / flash messages, the icon sprite, physHudText, the balance meter. The playtest (W10.6) should look at them
+with `widetest.ps1 -Hud 1`. Default stays `hud = 0` (W9) until then.

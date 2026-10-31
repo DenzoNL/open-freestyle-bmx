@@ -335,6 +335,23 @@ static int loadImage(const uint8_t *file, size_t size)
         }
         bmxLog("smooth: %u jumps\n", (unsigned)smoothCount);
     }
+    /* [video] hud = 1 (with widescreen = 1): the ngifDrawList copy that anchors the HUD (driver/wide.c), the
+     * same way over the ported ngifDrawList's entry (ngifFlushFrame calls it directly). */
+    {
+        uint32_t wideCount;
+        const BmxHook *const wide = drvWideJumps(&wideCount);
+
+        for (uint32_t i = 0; i < wideCount; i++) {
+            DWORD prot;
+
+            if (!VirtualProtect((void *)(uintptr_t)wide[i].orig, 5, PAGE_EXECUTE_READWRITE, &prot)) {
+                bmxLog("wide: cannot patch %#x (error %lu)\n", (unsigned)wide[i].orig, GetLastError());
+                return -1;
+            }
+            writeJump(wide[i].orig, wide[i].impl);
+        }
+        bmxLog("wide: %u hud jumps\n", (unsigned)wideCount);
+    }
     /* [video] widescreen: the hor+ wrapper in the zgl camera slot 0x561d98 (data, no jump; driver/wide.c). */
     drvWideInstall();
     bmxSimHashInstall();

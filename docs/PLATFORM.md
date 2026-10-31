@@ -353,7 +353,7 @@ pass need handling (GENERIC_READ, OPEN_EXISTING, FILE_BEGIN/CURRENT).
   height, rendered at that size); the widescreen options of docs/WIDESCREEN.md W9 (WS1-WS3): `widescreen` (0; 1
   installs the seams), `aspect` (1 hor+ keeping the 4:3 view inside, 0 stretch, 2 vert-), `fov_scale` (100, percent
   of both view axes, 10..400), `max_hfov` (0 = none; cap of the horizontal FOV in degrees), `hud` (0 centred 4:3, 2
-  stretch; 1 = edge anchored is WS5 and acts as 0), `menus` (0 pillarbox, 1 stretch), `movies` (0 pillarbox, 1
+  stretch; 1 = edge anchored, WS5; `hud_aspect` bounds it, aspect · 100, default 178), `menus` (0 pillarbox, 1 stretch), `movies` (0 pillarbox, 1
   stretch), `scale_filter` (0 linear letterbox, 1 nearest, 2 integer factor; the present, also without
   widescreen). `-r<w>.<h>.<depth>` on the command line still wins over width / height / depth / fullscreen.
 

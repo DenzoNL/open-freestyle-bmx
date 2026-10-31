@@ -11,11 +11,19 @@
  *   centred 4:3 area unless it is a cover. Clipping happened before in stretched space; the map is affine, so
  *   clip and draw agree.
  * - Movies (W5): DrawDibDraw's destination rectangle (movie.c calls drvWideMovieRect).
+ * - HUD anchoring (W4-B, `hud = 1`): a jump over the entry of the ported ngifDrawList (0x462350) to
+ *   wideDrawList, a copy that, before each packet is drawn, tells the 2D funnel the anchor of the HUD element
+ *   the packet belongs to (left, centre, right; None for everything outside the HUD layer). The elements are
+ *   known there: the zover pools of layer 0 (a text is one glyph chain) and zoverDrawText's runs of glyph
+ *   packets in the 3D list. The funnel maps left / right elements to the edges of the hud_aspect area.
  */
 #include <SDL3/SDL.h>
 
+#include "bmx/com/zge/bmx/zoverii.h"
+#include "bmx/com/zge/ngif/ngifpsx.h"
 #include "driver/driver.h"
 #include "driver/wide.h"
+#include "hook/hook.h"
 #include "platform/platform.h"
 #include "rw/rwcamera.h"
 #include "rw/rwd3d.h"
@@ -34,9 +42,14 @@ const DrvWideConfig *drvWideConfig(void)
         cfg.fovScale = bmxConfigInt("video.fov_scale", 100);
         cfg.maxHfov = bmxConfigInt("video.max_hfov", 0);
         cfg.hud = bmxConfigInt("video.hud", 0);
+        cfg.hudAspect = bmxConfigInt("video.hud_aspect", 178);
         cfg.menus = bmxConfigInt("video.menus", 0);
         cfg.movies = bmxConfigInt("video.movies", 0);
         cfg.scaleFilter = bmxConfigInt("video.scale_filter", 0);
+        if (cfg.hudAspect < 0) {
+            bmxLog("wide: hud_aspect %d out of range (0, or the aspect * 100), using 178\n", cfg.hudAspect);
+            cfg.hudAspect = 178;
+        }
         if (cfg.fovScale < 10 || cfg.fovScale > 400) {
             bmxLog("wide: fov_scale %d out of range (10..400), using 100\n", cfg.fovScale);
             cfg.fovScale = 100;
@@ -79,12 +92,16 @@ void drvWideInstall(void)
     }
     gSetFovNext = gZrwCamSetFov;
     gZrwCamSetFov = wideSetFov;
-    bmxLog("wide: 1 slot (camera fov 0x561d98); aspect %d, fov_scale %d, max_hfov %d, hud %d, menus %d, "
-           "movies %d; the 2D funnel at the device start\n",
-           cfg->aspect, cfg->fovScale, cfg->maxHfov, cfg->hud, cfg->menus, cfg->movies);
+    bmxLog("wide: 1 slot (camera fov 0x561d98); aspect %d, fov_scale %d, max_hfov %d, hud %d, hud_aspect %d, "
+           "menus %d, movies %d; the 2D funnel at the device start\n",
+           cfg->aspect, cfg->fovScale, cfg->maxHfov, cfg->hud, cfg->hudAspect, cfg->menus, cfg->movies);
 }
 
 /* ---- 2D: the Im2D funnel ---- */
+
+/* The anchor of the packet wideDrawList is drawing (kDrvWideAnchorNone outside it and for non-HUD packets).
+ */
+static int gHudAnchor;
 
 static RwIm2DRenderPrimitiveFunc gIm2DNext;
 static DrvWideVertex *gCopy, *gClip, *gScratch; /* gCopyCap vertices each (n + 2 for a clipped fan) */
@@ -138,11 +155,17 @@ static int BMX_CDECL wideIm2DPrimitive(int32_t type, void *vertices, int32_t num
         return gIm2DNext(type, vertices, numVertices);
     }
     SDL_memcpy(gCopy, vertices, (size_t)numVertices * sizeof *gCopy);
-    drvWideMap2D(&gCopy->sx, sizeof *gCopy, numVertices, w, h);
+    /* What lay beyond the 4:3 screen's edge stays hidden (the pillarbox, or the 3D around a centred HUD); an
+     * edge anchored HUD element is clipped where its virtual screen lands. */
+    if (gHudAnchor != kDrvWideAnchorNone) {
+        axis = drvWideMapHud(&gCopy->sx, sizeof *gCopy, numVertices, w, h, gHudAnchor,
+                             drvWideConfig()->hudAspect, &lo, &hi);
+    } else {
+        drvWideMap2D(&gCopy->sx, sizeof *gCopy, numVertices, w, h);
+        axis = drvWideArea(w, h, &lo, &hi);
+    }
     draw = gCopy;
     n = numVertices;
-    /* What lay beyond the 4:3 screen's edge stays hidden (the pillarbox, or the 3D around a centred HUD). */
-    axis = drvWideArea(w, h, &lo, &hi);
     if (drvWideOutside(gCopy, numVertices, axis, lo, hi)) {
         if (type == 5) { /* rwPRIMTYPETRIFAN: zrwprim's polygons */
             n = drvWideClipFan(gCopy, numVertices, axis, lo, hi, gClip, gScratch);
@@ -169,6 +192,119 @@ void drvWideInstall2D(void)
     gIm2DNext = device->fpIm2DRenderPrimitive;
     device->fpIm2DRenderPrimitive = (RwIm2DRenderPrimitiveFunc)wideIm2DPrimitive;
     bmxLog("wide: Im2D funnel wrapped (fpIm2DRenderPrimitive)\n");
+}
+
+/* ---- HUD anchoring: the ngifDrawList copy ---- */
+
+static uint8_t gGlyphAnchor[2][128], gShapeAnchor[2][16]; /* layer 0's pools 1 and 0, both frames */
+static int32_t gRunLeft;                                  /* packets of the current text run still to come */
+static int gRunAnchor;
+
+static int inside(const void *p, const void *base, const void *end)
+{
+    return (uintptr_t)p >= (uintptr_t)base && (uintptr_t)p < (uintptr_t)end;
+}
+
+/* The 3D list's buffer: from gNgifPrim3DBuffer up to the pointer gNgifPrim3D, which follows it. */
+static int inPrim3D(const void *p)
+{
+    return inside(p, gNgifPrim3DBuffer, (const uint8_t *)&gNgifPrim3D);
+}
+
+/* The next packet of the ordering table chain after p (NULL at the end marker). */
+static const uint8_t *nextPacket(const uint8_t *p)
+{
+    const uint32_t word = *(const uint32_t *)p;
+
+    return (word & 0x0fffffffu) == 0x0fffffffu ? NULL : (const uint8_t *)(uintptr_t)(word & 0x0fffffffu);
+}
+
+/* The anchor of the run of 3D list packets that starts at p (one zoverDrawText, or a single packet). */
+static int runAnchor(const uint8_t *p)
+{
+    enum { kMaxRun = 256 };
+    const uint8_t *run[kMaxRun];
+    int32_t n = 0;
+    int16_t box[4], g[4];
+
+    for (const uint8_t *q = p; q != NULL && n < kMaxRun && inPrim3D(q); q = nextPacket(q)) {
+        run[n++] = q;
+    }
+    n = drvWideGlyphRun(run, n);
+    gRunLeft = n - 1;
+    if (!drvWidePacketBox(p, box)) {
+        return kDrvWideAnchorNone;
+    }
+    for (int32_t i = 1; i < n; i++) {
+        if (drvWidePacketBox(run[i], g)) {
+            box[0] = g[0] < box[0] ? g[0] : box[0];
+            box[2] = g[2] > box[2] ? g[2] : box[2];
+        }
+    }
+    return drvWideHudAnchorOf(box[0], box[2]);
+}
+
+/* The anchor of packet p (visited in chain order: a text run's anchor is decided at its first glyph). */
+static int packetAnchor(const uint8_t *p)
+{
+    if (inside(p, gZoverPool1, (const uint8_t *)gZoverPool1 + sizeof gZoverPool1)) {
+        const size_t i = (size_t)(p - (const uint8_t *)gZoverPool1) / sizeof(ZOverItem);
+
+        return gGlyphAnchor[i / 128][i % 128];
+    }
+    if (inside(p, gZoverPool0, (const uint8_t *)gZoverPool0 + sizeof gZoverPool0)) {
+        const size_t i = (size_t)(p - (const uint8_t *)gZoverPool0) / sizeof(ZOverItem);
+
+        return gShapeAnchor[i / 16][i % 16];
+    }
+    /* The 3D list holds the HUD's per-frame drawing (zoverDrawText, zoverDrawRect) while no menu screen
+     * (layer 1) is up; also fades and bars, which the funnel keeps as covers anyway. */
+    if (!inPrim3D(p) || gZoverLayer != 0) {
+        gRunLeft = 0;
+        return kDrvWideAnchorNone;
+    }
+    if (gRunLeft > 0) {
+        gRunLeft--;
+        return gRunAnchor;
+    }
+    gRunAnchor = runAnchor(p);
+    return gRunAnchor;
+}
+
+/* ngifDrawList (0x462350), plus the anchor of each packet for the 2D funnel. */
+static void wideDrawList(uint32_t *entry)
+{
+    const int anchored = (int64_t)gZrwScreenW * 3 > (int64_t)gZrwScreenH * 4;
+    uint32_t word = *entry;
+
+    if (anchored) {
+        for (int f = 0; f < 2; f++) {
+            drvWideHudPools(gZoverPool1[f][0].b, 128, gZoverPool0[f][0].b, 16, gGlyphAnchor[f],
+                            gShapeAnchor[f]);
+        }
+        gRunLeft = 0;
+    }
+    while ((word & 0x0fffffffu) != 0x0fffffffu) {
+        entry = (uint32_t *)(uintptr_t)(*entry & 0x0fffffffu);
+        gHudAnchor = anchored ? packetAnchor((const uint8_t *)entry) : kDrvWideAnchorNone;
+        if ((*entry & 0xf0000000u) != 0) {
+            ngifDrawPrimitive((const uint8_t *)entry);
+        }
+        word = *entry;
+    }
+    gHudAnchor = kDrvWideAnchorNone;
+}
+
+static BmxHook gJumps[1];
+
+const BmxHook *drvWideJumps(uint32_t *count)
+{
+    const DrvWideConfig *const cfg = drvWideConfig();
+
+    gJumps[0].orig = (uint32_t)(uintptr_t)ngifDrawList;
+    gJumps[0].impl = (void *)wideDrawList;
+    *count = cfg->enabled && cfg->hud == 1 ? 1u : 0u;
+    return gJumps;
 }
 
 /* ---- movies ---- */

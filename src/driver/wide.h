@@ -1,5 +1,6 @@
 /*
- * Widescreen, native resolution and the present filter (docs/WIDESCREEN.md, slices WS1-WS3). Native exe only.
+ * Widescreen, native resolution, HUD anchoring and the present filter (docs/WIDESCREEN.md, slices WS1-WS5).
+ * Native exe only.
  *
  * Everything here is visual-only and attaches at seams (W8-A): the zgl camera slot 0x561d98 (the 3D view
  * window, W2), the engine device's fpIm2DRenderPrimitive (all game 2D, W4-W6), the DrawDib stand-in (movies,
@@ -21,7 +22,8 @@ typedef struct DrvWideConfig {
     int aspect;      /* 0 stretch, 1 hor+ fit (4:3 inside), 2 vert- */
     int fovScale;    /* fov_scale: percent of both view window axes (100 = none) */
     int maxHfov;     /* max_hfov: cap of the horizontal field of view in degrees (0 = none) */
-    int hud;         /* 0 centred 4:3, 1 edge anchored (WS5, not yet: as 0), 2 stretch */
+    int hud;         /* 0 centred 4:3, 1 edge anchored (WS5), 2 stretch */
+    int hudAspect;   /* hud_aspect: width of the anchored HUD as aspect * 100 (0 = the full width) */
     int menus;       /* 0 pillarbox, 1 stretch (2: blurred fill, WS6, not yet: as 0) */
     int movies;      /* 0 pillarbox, 1 stretch */
     int scaleFilter; /* scale_filter: 0 linear, 1 nearest, 2 integer (present, independent of widescreen) */
@@ -94,6 +96,68 @@ int32_t drvWideClipFan(const DrvWideVertex *in, int32_t n, int axis, float lo, f
 int32_t drvWideClipLines(const DrvWideVertex *in, int32_t n, int axis, float lo, float hi,
                          DrvWideVertex *out);
 
+/* ---- HUD anchoring (WS5, W4-B) ---- */
+
+/* The anchor of a HUD element; None = not a HUD element (centred 4:3 like everything else). */
+enum {
+    kDrvWideAnchorNone = 0,
+    kDrvWideAnchorLeft = 1,
+    kDrvWideAnchorCentre = 2,
+    kDrvWideAnchorRight = 3,
+};
+
+/*
+ * The anchor of an element whose x extent in the 640 wide virtual screen is [x0, x1]: centre when its middle
+ * lies within 8 virtual pixels of the screen's middle (ovlCentreX texts land within one), else left when the
+ * middle is left of the screen's middle, else right.
+ */
+int drvWideHudAnchorOf(int32_t x0, int32_t x1);
+
+/*
+ * The box {x0, y0, x1, y1} of a display packet (an ngif PSX style packet: command byte at +7, 16 bit
+ * virtual 640x480 corners). Returns 0 for a packet that is not a 2D polygon or line (other commands, or
+ * the float flag of the 3D list).
+ */
+int drvWidePacketBox(const uint8_t *packet, int16_t box[4]);
+
+/* zover pool items (ZOverItem, zoverii.h): 0xa0 bytes, kind at 0x9c, next glyph handle at 0x9e. */
+enum {
+    kDrvWideItemSize = 0xa0,
+    kDrvWideMaxItems = 512,
+};
+
+/*
+ * The anchors of the HUD layer's pool items (one frame): `glyphs` (pool 1, n of them) are texts, a glyph
+ * chain per text; `shapes` (pool 0) are rectangles, gradients and sprites. Each text gets the anchor of
+ * its whole chain's box, each shape its own; an element that lies inside a text's x extent on the same
+ * lines (the button glyphs of a hint line) takes that text's anchor. Free items get None.
+ */
+void drvWideHudPools(const uint8_t *glyphs, int32_t nGlyphs, const uint8_t *shapes, int32_t nShapes,
+                     uint8_t *glyphAnchor, uint8_t *shapeAnchor);
+
+/*
+ * The 3D list's text runs: zoverDrawText writes one 0x9c byte FT4 packet per glyph, back to back, each
+ * at x = previous x1 + 1 on the same lines, and links them into ordering table entry 0 in a row (so the
+ * draw order is reversed). `packets` are the next packets in draw order; returns how many of them, from
+ * the first, belong to the first one's text (at least 1 when n > 0).
+ */
+int32_t drvWideGlyphRun(const uint8_t *const *packets, int32_t n);
+
+/*
+ * The anchored HUD area of a w x h screen wider than 4:3: hud_aspect * h / 100 wide (0: w), at least the
+ * 4:3 area and at most w, centred on whole pixels. Returns 0 (nothing) for a screen not wider than 4:3.
+ */
+int drvWideHudArea(int32_t w, int32_t h, int hudAspect, float *lo, float *hi);
+
+/*
+ * Maps n vertices from the stretched screen like drvWideMap2D, but with the edge of the anchor: left keeps
+ * the virtual left edge at the HUD area's left edge, right the right edge at its right edge, centre (and
+ * None) is drvWideMap2D. [lo, hi] is where the virtual screen [0, 640] lands (what the moved primitive is
+ * clipped to). Returns the axis as drvWideArea (-1: nothing moved).
+ */
+int drvWideMapHud(float *xy, size_t stride, int32_t n, int32_t w, int32_t h, int anchor, int hudAspect,
+                  float *lo, float *hi);
+
 /* The same for an integer rectangle {x, y, w, h} (movies), edges rounded to the nearest pixel. */
 void drvWideMapRect(int32_t rect[4], int32_t w, int32_t h);
 
@@ -111,6 +175,11 @@ int drvWidePresentRect(int filter, int32_t width, int32_t height, uint32_t w, ui
 void drvWideInstall(void);
 /* The device start, after rwD3DIm2DOpen: wraps the engine device's fpIm2DRenderPrimitive. */
 void drvWideInstall2D(void);
+/*
+ * The loader's jumps (like bmxSmoothJumps): with widescreen = 1 and hud = 1, the entry of the ported
+ * ngifDrawList to the copy that tells the 2D funnel each packet's HUD anchor; none otherwise.
+ */
+const struct BmxHook *drvWideJumps(uint32_t *count);
 /* The movies (DrawDibDraw): pillarboxes the destination rectangle of a target_w x target_h target. */
 void drvWideMovieRect(int32_t rect[4], int32_t targetW, int32_t targetH);
 

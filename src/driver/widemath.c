@@ -3,6 +3,7 @@
  * transforms, present rectangle. No SDL and no game state, so tests/platform/test_wide.c links it alone.
  */
 #include <math.h>
+#include <string.h>
 
 #include "driver/wide.h"
 
@@ -278,4 +279,259 @@ int drvWidePresentRect(int filter, int32_t width, int32_t height, uint32_t w, ui
         out[3] = dh;
     }
     return filter == 1;
+}
+
+/* ---- HUD anchoring (WS5) ---- */
+
+int drvWideHudAnchorOf(int32_t x0, int32_t x1)
+{
+    const int32_t twiceMiddle = x0 + x1;
+
+    if (twiceMiddle >= 640 - 16 && twiceMiddle <= 640 + 16) {
+        return kDrvWideAnchorCentre;
+    }
+    return twiceMiddle < 640 ? kDrvWideAnchorLeft : kDrvWideAnchorRight;
+}
+
+static int16_t rdS16(const uint8_t *p, unsigned off)
+{
+    return (int16_t)(uint16_t)(p[off] | p[off + 1] << 8);
+}
+
+static uint32_t rdU32(const uint8_t *p, unsigned off)
+{
+    return (uint32_t)p[off] | (uint32_t)p[off + 1] << 8 | (uint32_t)p[off + 2] << 16 |
+           (uint32_t)p[off + 3] << 24;
+}
+
+int drvWidePacketBox(const uint8_t *packet, int16_t box[4])
+{
+    /* The corner offsets and the flag word of each command, as ngifDrawPoly* / ngifDrawLine* read them. */
+    static const struct {
+        uint8_t code, flagOff, count, xy[4];
+    } kinds[] = {
+        {0x20, 0x18, 3, {8, 0xc, 0x10, 0}},       /* F3 */
+        {0x28, 0x1c, 4, {8, 0xc, 0x10, 0x14}},    /* F4 */
+        {0x2c, 0x34, 4, {8, 0x12, 0x1c, 0x26}},   /* FT4 */
+        {0x38, 0x28, 4, {8, 0x10, 0x18, 0x20}},   /* G4 */
+        {0x3c, 0x3c, 4, {0xc, 0x18, 0x24, 0x30}}, /* GT4 */
+        {0x40, 0x14, 2, {8, 0xc, 0, 0}},          /* F2 */
+        {0x50, 0x18, 2, {8, 0x10, 0, 0}},         /* G2 */
+    };
+    const uint8_t code = packet[7] & 0xfc;
+
+    for (size_t k = 0; k < sizeof kinds / sizeof kinds[0]; k++) {
+        if (kinds[k].code != code) {
+            continue;
+        }
+        if ((rdU32(packet, kinds[k].flagOff) & 0x20) != 0) {
+            return 0; /* float corners: the 3D list, not 2D */
+        }
+        box[0] = box[2] = rdS16(packet, kinds[k].xy[0]);
+        box[1] = box[3] = rdS16(packet, kinds[k].xy[0] + 2u);
+        for (int i = 1; i < kinds[k].count; i++) {
+            const int16_t x = rdS16(packet, kinds[k].xy[i]), y = rdS16(packet, kinds[k].xy[i] + 2u);
+
+            box[0] = x < box[0] ? x : box[0];
+            box[2] = x > box[2] ? x : box[2];
+            box[1] = y < box[1] ? y : box[1];
+            box[3] = y > box[3] ? y : box[3];
+        }
+        return 1;
+    }
+    return 0;
+}
+
+enum {
+    kItemKind = 0x9c,
+    kItemNext = 0x9e,
+    kKindGlyph = 5,
+};
+
+static uint32_t itemNext(const uint8_t *item)
+{
+    return (uint32_t)(item[kItemNext] | item[kItemNext + 1] << 8);
+}
+
+static void boxUnion(int16_t into[4], const int16_t box[4])
+{
+    into[0] = box[0] < into[0] ? box[0] : into[0];
+    into[1] = box[1] < into[1] ? box[1] : into[1];
+    into[2] = box[2] > into[2] ? box[2] : into[2];
+    into[3] = box[3] > into[3] ? box[3] : into[3];
+}
+
+/* The anchor of `box`, or of the widest (and wider) text in `texts` that holds it on the same lines. */
+static uint8_t anchorWithin(const int16_t box[4], int16_t (*texts)[4], const uint8_t *textAnchor, int32_t n,
+                            int32_t self)
+{
+    int32_t best = -1;
+
+    for (int32_t t = 0; t < n; t++) {
+        const int16_t *const c = texts[t];
+
+        if (t == self || c[0] > box[0] || c[2] < box[2] || c[1] > box[3] || c[3] < box[1] ||
+            c[2] - c[0] <= box[2] - box[0]) {
+            continue;
+        }
+        if (best < 0 || c[2] - c[0] > texts[best][2] - texts[best][0]) {
+            best = t;
+        }
+    }
+    return best >= 0 ? textAnchor[best] : (uint8_t)drvWideHudAnchorOf(box[0], box[2]);
+}
+
+void drvWideHudPools(const uint8_t *glyphs, int32_t nGlyphs, const uint8_t *shapes, int32_t nShapes,
+                     uint8_t *glyphAnchor, uint8_t *shapeAnchor)
+{
+    static int16_t texts[kDrvWideMaxItems][4];
+    static uint8_t textAnchor[kDrvWideMaxItems], own[kDrvWideMaxItems];
+    static int32_t textOf[kDrvWideMaxItems];
+    static uint8_t referenced[kDrvWideMaxItems];
+    int32_t nTexts = 0;
+
+    nGlyphs = nGlyphs > kDrvWideMaxItems ? kDrvWideMaxItems : nGlyphs;
+    nShapes = nShapes > kDrvWideMaxItems ? kDrvWideMaxItems : nShapes;
+    memset(referenced, 0, sizeof referenced);
+    for (int32_t i = 0; i < nGlyphs; i++) {
+        const uint8_t *const it = glyphs + (size_t)i * kDrvWideItemSize;
+        const uint32_t next = itemNext(it);
+
+        textOf[i] = -1;
+        if (it[kItemKind] == kKindGlyph && next != 0xffff && (int32_t)(next & 0xfff) < nGlyphs) {
+            referenced[next & 0xfff] = 1;
+        }
+    }
+    /* Every chain from a glyph nobody points at is one text (zoverAddText's handle is its first glyph). */
+    for (int32_t head = 0; head < nGlyphs; head++) {
+        int16_t box[4] = {0, 0, 0, 0};
+        int32_t i = head;
+        int found = 0;
+
+        if (glyphs[(size_t)head * kDrvWideItemSize + kItemKind] != kKindGlyph || referenced[head]) {
+            continue;
+        }
+        for (int32_t steps = 0; steps < nGlyphs && i >= 0 && textOf[i] < 0; steps++) {
+            const uint8_t *const it = glyphs + (size_t)i * kDrvWideItemSize;
+            const uint32_t next = itemNext(it);
+            int16_t g[4];
+
+            if (it[kItemKind] != kKindGlyph) {
+                break;
+            }
+            textOf[i] = nTexts;
+            if (drvWidePacketBox(it, g)) {
+                if (found) {
+                    boxUnion(box, g);
+                } else {
+                    memcpy(box, g, sizeof box);
+                    found = 1;
+                }
+            }
+            i = next == 0xffff || (int32_t)(next & 0xfff) >= nGlyphs ? -1 : (int32_t)(next & 0xfff);
+        }
+        memcpy(texts[nTexts], box, sizeof box);
+        textAnchor[nTexts] = (uint8_t)drvWideHudAnchorOf(box[0], box[2]);
+        nTexts++;
+    }
+    /* A text inside a wider one on the same lines (a hint's button glyph) goes with it. */
+    for (int32_t t = 0; t < nTexts; t++) {
+        own[t] = anchorWithin(texts[t], texts, textAnchor, nTexts, t);
+    }
+    memcpy(textAnchor, own, (size_t)nTexts);
+    for (int32_t i = 0; i < nGlyphs; i++) {
+        const uint8_t *const it = glyphs + (size_t)i * kDrvWideItemSize;
+        int16_t g[4];
+
+        if (it[kItemKind] != kKindGlyph) {
+            glyphAnchor[i] = kDrvWideAnchorNone;
+        } else if (textOf[i] >= 0) {
+            glyphAnchor[i] = textAnchor[textOf[i]];
+        } else { /* a cycle without a head (zoverAddText never makes one) */
+            glyphAnchor[i] = drvWidePacketBox(it, g) ? (uint8_t)drvWideHudAnchorOf(g[0], g[2])
+                                                     : (uint8_t)kDrvWideAnchorCentre;
+        }
+    }
+    for (int32_t i = 0; i < nShapes; i++) {
+        const uint8_t *const it = shapes + (size_t)i * kDrvWideItemSize;
+        int16_t g[4];
+
+        if (it[kItemKind] == 0) {
+            shapeAnchor[i] = kDrvWideAnchorNone;
+        } else if (!drvWidePacketBox(it, g)) {
+            shapeAnchor[i] = kDrvWideAnchorCentre;
+        } else {
+            shapeAnchor[i] = anchorWithin(g, texts, textAnchor, nTexts, -1);
+        }
+    }
+}
+
+int32_t drvWideGlyphRun(const uint8_t *const *packets, int32_t n)
+{
+    int16_t first[4], prev[4];
+    int32_t i;
+
+    if (n <= 0) {
+        return 0;
+    }
+    if ((packets[0][7] & 0xfc) != 0x2c || !drvWidePacketBox(packets[0], first)) {
+        return 1;
+    }
+    memcpy(prev, first, sizeof prev);
+    for (i = 1; i < n; i++) {
+        const uint8_t *const p = packets[i];
+        int16_t box[4];
+
+        if ((p[7] & 0xfc) != 0x2c || !drvWidePacketBox(p, box) || box[1] != first[1] || box[3] != first[3]) {
+            break;
+        }
+        /* The glyph before it in the text (draw order is reversed), or after it. */
+        if (!(p == packets[i - 1] - 0x9c && (uint16_t)(box[2] + 1) == (uint16_t)prev[0]) &&
+            !(p == packets[i - 1] + 0x9c && (uint16_t)(prev[2] + 1) == (uint16_t)box[0])) {
+            break;
+        }
+        memcpy(prev, box, sizeof prev);
+    }
+    return i;
+}
+
+int drvWideHudArea(int32_t w, int32_t h, int hudAspect, float *lo, float *hi)
+{
+    double inner, area;
+    int32_t left;
+
+    if (w <= 0 || h <= 0 || (int64_t)w * 3 <= (int64_t)h * 4) {
+        return 0;
+    }
+    inner = h * 4.0 / 3.0;
+    area = hudAspect <= 0 ? (double)w : h * (double)hudAspect / 100.0;
+    area = area < inner ? inner : area > w ? (double)w : area;
+    left = (w - (int32_t)lround(area)) / 2;
+    *lo = (float)left;
+    *hi = (float)(w - left);
+    return 1;
+}
+
+int drvWideMapHud(float *xy, size_t stride, int32_t n, int32_t w, int32_t h, int anchor, int hudAspect,
+                  float *lo, float *hi)
+{
+    float areaLo, areaHi;
+    double inner, off, s;
+
+    if ((anchor != kDrvWideAnchorLeft && anchor != kDrvWideAnchorRight) ||
+        !drvWideHudArea(w, h, hudAspect, &areaLo, &areaHi)) {
+        drvWideMap2D(xy, stride, n, w, h);
+        return drvWideArea(w, h, lo, hi);
+    }
+    inner = h * 4.0 / 3.0;
+    s = inner / w;
+    off = anchor == kDrvWideAnchorLeft ? (double)areaLo : (double)areaHi - inner;
+    for (int32_t i = 0; i < n; i++) {
+        float *const x = (float *)((uint8_t *)xy + (size_t)i * stride);
+
+        *x = (float)(off + *x * s);
+    }
+    *lo = (float)off;
+    *hi = (float)(off + inner);
+    return 0;
 }

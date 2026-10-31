@@ -115,7 +115,13 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   Off, and on at an exact 4:3 mode, BMX_SHOT frames are byte-identical to the build before; `BMX_SIM_HASH` per-tick
   hashes are equal on / off at every aspect tried. Unit tests: `bmxwidetest`. Default stays vanilla (W9) until the
   user's playtest: `native-run2\widetest.ps1` (default 3440x1440 21:9; `-Aspect 16:9` for 1920x1080). **Next:**
-  that playtest, then WS5 (HUD edge anchoring) and WS6 (ui_filter, blurred menu fill).
+  that playtest, then WS6 (ui_filter, blurred menu fill).
+  **WS5 done 2026-10-31** (not committed): `[video] hud = 1` anchors the HUD per element (timer, name, flash left;
+  score, height meter, replay arrow, icon right; combo, caption, hints, messages centred) within a centred
+  `hud_aspect` area (default 178 = 16:9; 0 = full width). Seam: a jump over the ported ngifDrawList to a copy that
+  tells the Im2D wrapper each packet's anchor; elements come from the layer-0 zover pools (glyph chains) and from
+  zoverDrawText's glyph runs in the 3D list (docs/WIDESCREEN.md "WS5"). `hud = 0`, widescreen off and exact 4:3 stay
+  byte-identical; sim hash equal. Try it with `widetest.ps1 -Hud 1` (`-HudAspect 0` for the full 21:9 width).
 - Golden traces: record sessions with `bmxtrace.orig` (docs/TRACING.md) if not done yet.
 
 ## Machine setup

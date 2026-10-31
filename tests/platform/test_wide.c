@@ -2,7 +2,8 @@
  * bmxwidetest: the widescreen maths (src/driver/widemath.c, docs/WIDESCREEN.md W10.3) on synthetic input:
  * the view window (hor+, vert+, vert-, the 4:3 identity, fov_scale, max_hfov), the 2D classifier (fade, bars,
  * dim rect, backdrop, glyphs, clipped quads), the 2D and rectangle maps, the clip to the 4:3 area and the
- * present rectangle.
+ * present rectangle; the HUD anchoring (WS5): element anchors, packet boxes, the pool walk (texts as glyph
+ * chains, containment), zoverDrawText runs, the anchored map and the hud_aspect area.
  */
 #include <math.h>
 #include <stdio.h>
@@ -348,8 +349,241 @@ static void testPresent(void)
     CHECK(drvWidePresentRect(2, 1920, 1080, 1000, 700, r) == 0 && r[2] == 1000 && r[3] == 563);
 }
 
+/* ---- HUD anchoring (WS5) ---- */
+
+static void put16(uint8_t *p, unsigned off, int v)
+{
+    p[off] = (uint8_t)v;
+    p[off + 1] = (uint8_t)((unsigned)v >> 8);
+}
+
+/* A glyph or sprite packet as zoverAddText / zoverAddSprite / ngifDrawTextGlyph write it (FT4, code 0x2c). */
+static void ft4(uint8_t *p, int x0, int y0, int x1, int y1)
+{
+    p[7] = 0x2c;
+    p[0x34] = 0x80; /* flag word 0x7f80: no float flag */
+    p[0x35] = 0x7f;
+    put16(p, 8, x0);
+    put16(p, 10, y0);
+    put16(p, 0x12, x1);
+    put16(p, 0x14, y0);
+    put16(p, 0x1c, x0);
+    put16(p, 0x1e, y1);
+    put16(p, 0x26, x1);
+    put16(p, 0x28, y1);
+}
+
+/* A rectangle as zoverAddRect writes it (F4, code 0x28). */
+static void f4(uint8_t *p, int x, int y, int w, int h)
+{
+    p[7] = 0x28;
+    p[0x1c] = 0x80;
+    p[0x1d] = 0x7f;
+    put16(p, 8, x);
+    put16(p, 10, y);
+    put16(p, 0xc, x + w);
+    put16(p, 0xe, y);
+    put16(p, 0x10, x);
+    put16(p, 0x12, y + h);
+    put16(p, 0x14, x + w);
+    put16(p, 0x16, y + h);
+}
+
+static uint8_t gGlyphs[128][0xa0], gShapes[16][0xa0];
+
+/* A text of `count` glyphs of width `gw` at x, y as zoverAddText chains it from pool item `first` on. */
+static void addText(int first, int count, int x, int y, int gw, int h)
+{
+    for (int i = 0; i < count; i++) {
+        uint8_t *const it = gGlyphs[first + i];
+
+        ft4(it, x, y, x + gw, y + h);
+        it[0x9c] = 5;
+        put16(it, 0x9e, i + 1 < count ? 0x1000 | (first + i + 1) : 0xffff);
+        x += gw + 1;
+    }
+}
+
+static void testHudAnchor(void)
+{
+    int16_t box[4];
+    uint8_t p[0xa0] = {0};
+
+    /* Timer at 0x35, score right-aligned at 0x24b, centred texts (ovlCentreX 0x13f / 0x140, odd widths). */
+    CHECK(drvWideHudAnchorOf(0x35, 0x35 + 60) == kDrvWideAnchorLeft);
+    CHECK(drvWideHudAnchorOf(0x24b - 14, 0x24b) == kDrvWideAnchorRight);
+    CHECK(drvWideHudAnchorOf(0x13f - 101, 0x13f - 101 + 203) == kDrvWideAnchorCentre);
+    CHECK(drvWideHudAnchorOf(0x140 - 240, 0x140 + 240) == kDrvWideAnchorCentre);
+    /* A long text at the left edge (the flash message at 0x19) stays left; the height meter, the
+     * indicator at 0x240 and the icon at 0x1b1 go right. */
+    CHECK(drvWideHudAnchorOf(0x19, 0x19 + 500) == kDrvWideAnchorLeft);
+    CHECK(drvWideHudAnchorOf(0x224, 0x224 + 0x26) == kDrvWideAnchorRight);
+    CHECK(drvWideHudAnchorOf(0x240 - 8, 0x240 + 8) == kDrvWideAnchorRight);
+    CHECK(drvWideHudAnchorOf(0x1b1, 0x1b1 + 32) == kDrvWideAnchorRight);
+    /* Just outside the centre band (8 virtual pixels). */
+    CHECK(drvWideHudAnchorOf(300, 356) == kDrvWideAnchorCentre);
+    CHECK(drvWideHudAnchorOf(300, 358) == kDrvWideAnchorRight);
+    CHECK(drvWideHudAnchorOf(282, 340) == kDrvWideAnchorLeft);
+
+    /* Packet boxes: FT4 and F4 as the pools hold them; a 3D list polygon (float flag) is not 2D. */
+    ft4(p, 10, 20, 30, 45);
+    CHECK(drvWidePacketBox(p, box) && box[0] == 10 && box[1] == 20 && box[2] == 30 && box[3] == 45);
+    memset(p, 0, sizeof p);
+    f4(p, -40, 400, 30, 2);
+    CHECK(drvWidePacketBox(p, box) && box[0] == -40 && box[1] == 400 && box[2] == -10 && box[3] == 402);
+    p[0x1c] |= 0x20;
+    CHECK(!drvWidePacketBox(p, box));
+    memset(p, 0, sizeof p);
+    p[7] = 0xe1; /* a draw mode packet */
+    CHECK(!drvWidePacketBox(p, box));
+}
+
+static void testHudPools(void)
+{
+    uint8_t ga[128], sa[16];
+
+    memset(gGlyphs, 0, sizeof gGlyphs);
+    memset(gShapes, 0, sizeof gShapes);
+    /* Timer "1:57" (left), score "1234" right-aligned at 0x24b, a centred combo line that spans all three
+     * thirds, written in pool order with gaps between them (as allocations and frees leave them). */
+    addText(0, 4, 0x35, 400, 12, 26);
+    addText(10, 4, 0x24b - 4 * 13 + 1, 400, 12, 26);
+    addText(20, 30, 0x140 - (30 * 15 - 1) / 2, 0x132, 14, 26);
+    /* A hint line centred at y 0x83, with a one-glyph button text inside it at its left end (left third on
+     * its own) and the chain stored backwards in the pool (a chain is followed, not the pool order). */
+    for (int i = 0; i < 20; i++) {
+        uint8_t *const it = gGlyphs[79 - i];
+        const int x = 0x140 - (20 * 21 - 1) / 2 + i * 21;
+
+        ft4(it, x, 0x83, x + 20, 0x83 + 26);
+        it[0x9c] = 5;
+        put16(it, 0x9e, i + 1 < 20 ? 0x1000 | (79 - i - 1) : 0xffff);
+    }
+    addText(90, 1, 0x140 - (20 * 21 - 1) / 2 + 2 * 21, 0x83 - 2, 24, 30);
+    /* A button glyph of the same size somewhere else (not inside a wider text): its own anchor. */
+    addText(95, 1, 0x40, 0x100, 24, 30);
+    /* Height meter (right), the meter's marker, and a sprite inside the combo line's box. */
+    f4(gShapes[0], 0x224, 0x51, 0x26, 0x12a);
+    gShapes[0][0x9c] = 3;
+    f4(gShapes[3], 0x213, 0x17a, 0x10, 2);
+    gShapes[3][0x9c] = 3;
+    ft4(gShapes[5], 0x60, 0x134, 0x80, 0x140);
+    gShapes[5][0x9c] = 2;
+
+    drvWideHudPools(&gGlyphs[0][0], 128, &gShapes[0][0], 16, ga, sa);
+    for (int i = 0; i < 4; i++) {
+        CHECK(ga[i] == kDrvWideAnchorLeft);
+        CHECK(ga[10 + i] == kDrvWideAnchorRight);
+    }
+    for (int i = 0; i < 30; i++) {
+        CHECK(ga[20 + i] == kDrvWideAnchorCentre); /* per element, not per glyph */
+    }
+    CHECK(ga[60] == kDrvWideAnchorCentre && ga[79] == kDrvWideAnchorCentre);
+    CHECK(ga[90] == kDrvWideAnchorCentre); /* inside the hint line */
+    CHECK(ga[95] == kDrvWideAnchorLeft);
+    CHECK(ga[5] == kDrvWideAnchorNone && ga[127] == kDrvWideAnchorNone);
+    CHECK(sa[0] == kDrvWideAnchorRight && sa[3] == kDrvWideAnchorRight);
+    CHECK(sa[5] == kDrvWideAnchorCentre); /* inside the combo line */
+    CHECK(sa[1] == kDrvWideAnchorNone);
+    /* A cycle without a head does not hang and gets per-glyph anchors. */
+    put16(gGlyphs[3], 0x9e, 0x1000);
+    drvWideHudPools(&gGlyphs[0][0], 128, &gShapes[0][0], 16, ga, sa);
+    CHECK(ga[0] == kDrvWideAnchorLeft && ga[3] == kDrvWideAnchorLeft);
+}
+
+static void testGlyphRun(void)
+{
+    /* zoverDrawText into the 3D list: 0x9c byte packets back to back; draw order is reversed. */
+    static uint8_t buf[12][0x9c];
+    const uint8_t *order[12];
+    int x = 0x35;
+
+    memset(buf, 0, sizeof buf);
+    for (int i = 0; i < 5; i++) { /* "TO" style text: 5 glyphs */
+        ft4(buf[i], x, 0x100, x + 9, 0x11a);
+        x += 10;
+    }
+    x = 0x200; /* the next call: another text on the same lines */
+    for (int i = 5; i < 8; i++) {
+        ft4(buf[i], x, 0x100, x + 9, 0x11a);
+        x += 10;
+    }
+    f4(buf[8], 0x224, 0x80, 0x13, 1); /* zoverDrawRect */
+    for (int i = 0; i < 9; i++) {
+        order[i] = buf[8 - i];
+    }
+    CHECK(drvWideGlyphRun(order, 9) == 1);     /* the rect alone */
+    CHECK(drvWideGlyphRun(order + 1, 8) == 3); /* the second text */
+    CHECK(drvWideGlyphRun(order + 4, 5) == 5); /* the first text */
+    CHECK(drvWideGlyphRun(order + 4, 3) == 3); /* bounded by n */
+    CHECK(drvWideGlyphRun(order, 0) == 0);
+    /* Two texts that touch with the one pixel gap but on other lines are two runs. */
+    ft4(buf[7], 0x200 + 20, 0x120, 0x200 + 29, 0x13a);
+    CHECK(drvWideGlyphRun(order + 1, 8) == 1);
+    /* Forward order (written in draw order) is accepted too. */
+    {
+        const uint8_t *fwd[5] = {buf[0], buf[1], buf[2], buf[3], buf[4]};
+
+        CHECK(drvWideGlyphRun(fwd, 5) == 5);
+    }
+}
+
+static void testMapHud(void)
+{
+    Vertex v[2] = {{0}, {0}};
+    float lo, hi;
+
+    /* 3440x1440, hud_aspect 178: area 2563 wide -> [438, 3002]; the 4:3 part is 1920 wide. */
+    CHECK(drvWideHudArea(3440, 1440, 178, &lo, &hi) && lo == 438.0f && hi == 3002.0f);
+    CHECK(drvWideHudArea(3440, 1440, 0, &lo, &hi) && lo == 0.0f && hi == 3440.0f);
+    CHECK(drvWideHudArea(3440, 1440, 100, &lo, &hi) && lo == 760.0f && hi == 2680.0f); /* at least 4:3 */
+    CHECK(drvWideHudArea(1920, 1080, 178, &lo, &hi) && lo == 0.0f &&
+          hi == 1920.0f); /* 16:9: the full width */
+    CHECK(!drvWideHudArea(1024, 768, 178, &lo, &hi));
+    CHECK(!drvWideHudArea(1280, 1024, 178, &lo, &hi));
+
+    /* Left: virtual 0 (stretched 0) lands on the area's left edge; virtual 640 at left + 1920. */
+    v[0].sx = 0.0f;
+    v[1].sx = 3440.0f * 0x35 / 640.0f;
+    CHECK(drvWideMapHud(&v[0].sx, sizeof v[0], 2, 3440, 1440, kDrvWideAnchorLeft, 178, &lo, &hi) == 0);
+    CHECK(v[0].sx == 438.0f && fabsf(v[1].sx - (438.0f + 0x35 * 3.0f)) < 0.01f);
+    CHECK(lo == 438.0f && hi == 438.0f + 1920.0f);
+    /* Right: virtual 640 on the right edge, the score's right end 0x24b keeps its margin (53 * 3 px). */
+    v[0].sx = 3440.0f;
+    v[1].sx = 3440.0f * 0x24b / 640.0f;
+    CHECK(drvWideMapHud(&v[0].sx, sizeof v[0], 2, 3440, 1440, kDrvWideAnchorRight, 178, &lo, &hi) == 0);
+    CHECK(v[0].sx == 3002.0f && fabsf(v[1].sx - (3002.0f - (640 - 0x24b) * 3.0f)) < 0.01f);
+    CHECK(lo == 3002.0f - 1920.0f && hi == 3002.0f);
+    /* hud_aspect 0 at 21:9: the screen's edges. */
+    v[0].sx = 0.0f;
+    drvWideMapHud(&v[0].sx, sizeof v[0], 1, 3440, 1440, kDrvWideAnchorLeft, 0, &lo, &hi);
+    CHECK(v[0].sx == 0.0f);
+    /* 16:9: left at 0, right at 1920, with the 4:3 scale (2.25 per virtual pixel). */
+    v[0].sx = 1920.0f * 0x35 / 640.0f;
+    drvWideMapHud(&v[0].sx, sizeof v[0], 1, 1920, 1080, kDrvWideAnchorLeft, 178, &lo, &hi);
+    CHECK(fabsf(v[0].sx - 0x35 * 2.25f) < 0.01f);
+    /* Centre and None are drvWideMap2D bit for bit, with the 4:3 area as the clip. */
+    {
+        Vertex a = {0}, b = {0};
+        float lo2, hi2;
+
+        a.sx = b.sx = 1234.5f;
+        a.sy = b.sy = 77.0f;
+        CHECK(drvWideMapHud(&a.sx, sizeof a, 1, 3440, 1440, kDrvWideAnchorCentre, 178, &lo, &hi) == 0);
+        drvWideMap2D(&b.sx, sizeof b, 1, 3440, 1440);
+        CHECK(sameBits(&a, &b, 8) && drvWideArea(3440, 1440, &lo2, &hi2) == 0 && lo == lo2 && hi == hi2);
+        a.sx = 100.0f; /* 4:3: untouched */
+        CHECK(drvWideMapHud(&a.sx, sizeof a, 1, 1024, 768, kDrvWideAnchorLeft, 178, &lo, &hi) == -1);
+        CHECK(a.sx == 100.0f);
+    }
+}
+
 int main(void)
 {
+    testHudAnchor();
+    testHudPools();
+    testGlyphRun();
+    testMapHud();
     testViewWindow();
     testClassify();
     testMap();

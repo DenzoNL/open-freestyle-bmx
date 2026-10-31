@@ -48,7 +48,8 @@ static const char *const kKnownKeys[] = {
     "video.aspect",       /* 0 stretch, 1 hor+ keeping the 4:3 view inside (default), 2 vert- */
     "video.fov_scale",    /* percent on both view window axes (default 100) */
     "video.max_hfov",     /* cap of the horizontal field of view in degrees (0: none) */
-    "video.hud",          /* 0 centred 4:3 (default), 2 stretch; 1 (edge anchored) is WS5, acts as 0 */
+    "video.hud",          /* 0 centred 4:3 (default), 1 edge anchored (WS5), 2 stretch */
+    "video.hud_aspect",   /* width of the anchored HUD: aspect * 100 (default 178, 16:9); 0 = full width */
     "video.menus",        /* 0 pillarbox (default), 1 stretch */
     "video.movies",       /* 0 pillarbox (default), 1 stretch */
     "video.scale_filter", /* present: 0 linear (default), 1 nearest, 2 integer scale */
