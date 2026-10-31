@@ -69,11 +69,11 @@ static void parseResolution(char *cmd)
             if (p[j] == '.' || p[j] == ' ') {
                 p[j] = 0;
                 if (n == 0) {
-                    gResX = atoi(p);
+                    gResX = (int)strtol(p, NULL, 10);
                 } else if (n == 1) {
-                    gResY = atoi(p);
+                    gResY = (int)strtol(p, NULL, 10);
                 } else if (n == 2) {
-                    gResZ = atoi(p);
+                    gResZ = (int)strtol(p, NULL, 10);
                 }
                 n++;
                 p += j + 1;
@@ -86,7 +86,7 @@ static void parseResolution(char *cmd)
             }
         } while (1);
         if (n == 2) {
-            gResZ = atoi(p);
+            gResZ = (int)strtol(p, NULL, 10);
         }
     }
 }
@@ -168,6 +168,7 @@ int main(void)
     WNDCLASSA wc;
     RECT r;
     MSG msg;
+    int background;
 
     bmxLogOpen();
     if (bmxLoadImage("NgBMX.exe") != 0) {
@@ -185,6 +186,14 @@ int main(void)
     if (getenv("BMX_MUTE")) {
         muteProcess();
     }
+    /* BMX_KEYS: scripted keyboard (keys.c). Such a run must not take the focus from what the user is doing:
+     * the window is shown without activation at the bottom of the z order, and SDL is told not to activate
+     * it either. */
+    background = bmxKeysInstall();
+    if (background) {
+        SetEnvironmentVariableA("SDL_WINDOW_ACTIVATE_WHEN_SHOWN", "0");
+        SetEnvironmentVariableA("SDL_WINDOW_ACTIVATE_WHEN_RAISED", "0");
+    }
     snprintf(cmd, sizeof cmd, "%s", skipProgramName(GetCommandLineA()));
     parseResolution(cmd);
 
@@ -200,8 +209,9 @@ int main(void)
         r.right = gWidth;
         r.bottom = gHeight;
         AdjustWindowRect(&r, kWindowStyle, FALSE);
-        gHwnd = CreateWindowExA(0, gClassName, gAppTitle, kWindowStyle, (int)0x80000000, (int)0x80000000,
-                                r.right - r.left, r.bottom - r.top, NULL, NULL, inst, NULL);
+        gHwnd = CreateWindowExA(background ? WS_EX_NOACTIVATE : 0, gClassName, gAppTitle, kWindowStyle,
+                                (int)0x80000000, (int)0x80000000, r.right - r.left, r.bottom - r.top, NULL,
+                                NULL, inst, NULL);
     } else {
         gHwnd = NULL;
     }
@@ -215,9 +225,14 @@ int main(void)
     }
     if (gFullscreen) {
         SetWindowLongA(gHwnd, GWL_STYLE, (LONG)0x80000000);
-        SetWindowPos(gHwnd, NULL, 0, 0, 0, 0, 0x27);
+        SetWindowPos(gHwnd, NULL, 0, 0, 0, 0, background ? 0x27 | SWP_NOACTIVATE : 0x27);
     }
-    ShowWindow(gHwnd, SW_SHOWDEFAULT);
+    if (background) {
+        ShowWindow(gHwnd, SW_SHOWNOACTIVATE);
+        SetWindowPos(gHwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    } else {
+        ShowWindow(gHwnd, SW_SHOWDEFAULT);
+    }
     UpdateWindow(gHwnd);
     if (initApp(cmd)) {
         while (!gQuit) {

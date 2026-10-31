@@ -15,7 +15,7 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   workflow), not on push: run `tools/check.sh` locally before pushing. It has no assets, so
   the differential cases are skipped there and run locally.
 
-## Next up (2026-10-30)
+## Next up (2026-10-31)
 
 - Game: 2117/2120 (WinMain, the EpicFail trap and the 1-byte crtNop stay original on purpose).
 - RenderWare: 708/711 ported (the three 4-byte stubs stay original: a hook jmp would overlap the next
@@ -45,6 +45,13 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   **Next:** drive the native exe into a level by keyboard and port its traps (docs/NATIVE.md "Step 3"); then the D7
   screenshot diff harness (step 4). rwmap.py misses functions reached only through pointers stored by code it
   never saw: expect more of those as traps.
+- Native into the levels done 2026-10-31 (docs/NATIVE.md "Scripted input"): `BMX_KEYS="f300:enter,+150:enter,..."`
+  drives the native exe by a scripted keyboard (a stand-in DirectInput at the import; works unfocused, never takes
+  the focus, ignores the user's real keyboard/pad; MessageBoxA answered too). ProQuest, a full run, pause / end run /
+  replay / main menu, Freeride in all seven unlocked levels, Options, Cool Stuff and QUIT run **without a trap**, so
+  there is no next trap in single-player play. **Next:** compare native and hooked frames (docs/SDL3-DRIVER.md
+  step 3 "Visual check"; the rider shadow is absent in the hooked original at the Vail Trails start too), then the D7 screenshot diff harness (step 4); Session and
+  two-player modes were not driven yet.
 - Golden traces: record sessions with `bmxtrace.orig` (docs/TRACING.md) if not done yet.
 
 ## Machine setup

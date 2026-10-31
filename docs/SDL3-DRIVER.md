@@ -1,7 +1,8 @@
 # SDL3 render driver for RenderWare (P4)
 
-Status 2026-10-30: decided; steps 1 and 2 done (the menu draws); step 3's CPU port done (instancing pipelines,
-oracle-tested), its native runs still to do. The user chose option A for D1..D7 (the recommendations below).
+Status 2026-10-31: decided; steps 1, 2 and 3 done: the menus draw, and the native exe plays ProQuest and Freeride in
+all unlocked levels without a trap (driven by the scripted keyboard `BMX_KEYS`, docs/NATIVE.md "Scripted input").
+Step 4 (screenshot diff against the original) is next. The user chose option A for D1..D7 (the recommendations below).
 The game and RenderWare (708/711) are ported. What `bmxnative.exe` still lacks is RW's Direct3D 7 device driver (`lib/d3d7driver` in data/functions-rw.csv: 250 functions, 107 KB, never ported).
 The decisions below record the options that were considered; A is the chosen one in each.
 
@@ -204,8 +205,8 @@ DirectSound -> SDL3 audio, the quit prompt's DirectDraw GDI flip.
        nothing changes it in the menu.
      - Screenshots compared by eye only (D7's diff harness is step 4). The final shader headers (DXIL stripped of
        debug/reflection) were regenerated after the screenshot runs and have not been run in a window yet.
-3. Instancing pipelines (D2) + world/atomic rendering: levels. **CPU port done 2026-10-30; native runs still to do**
-   (no window could be opened while the user was gaming). The first trap was 0x4c92d0 from rwIm3DPipelineRun
+3. Instancing pipelines (D2) + world/atomic rendering: levels. **CPU port done 2026-10-30; native runs done
+   2026-10-31** (below). The first trap was 0x4c92d0 from rwIm3DPipelineRun
    0x4e8600, some time after frame 1500 of the 4000 frame menu run.
    - **What the pipelines are.** rpWorldPipelineInit / rpAtomicPipelineInit (rw/clump.c) build two Im3D pipelines
      out of the driver's stages; rwIm3DPipelineRun calls instance, stage 1 (the ported Im3D transform 0x4f97c0, which
@@ -255,4 +256,28 @@ DirectSound -> SDL3 audio, the quit prompt's DirectDraw GDI flip.
      raster, RGB <-> pixel, palette lock / unlock, native texture read / write / size; fog density 0x4d6590) still
      trap and get ported when a native run reaches them. The game calls RwRasterLockPalette / RwRGBAFromPixel only
      for paletted rasters (zrwtxr.c), which this driver never creates.
+   - **Native runs (2026-10-31).** With `BMX_KEYS` (docs/NATIVE.md "Scripted input") the native exe went through
+     ProQuest into Vail Trails, a full 2-minute run, the pause menu, end run, the replay and back to the main menu;
+     Freeride in Vail Trails, Greenville Park, Backyard Pools, Woodward Trails, Lot 8, Titanic and Sleepy's Ditch;
+     Options, Cool Stuff and QUIT. **No trap**: the step 1 list of still-original standards is not reached in
+     single-player play (no ported caller of raster render; image from raster only from the mip generator, and this
+     driver sets no mip bits; no native textures or palettes in the game's files; fog density never set). They stay
+     int3 and get ported when something reaches them (two-player modes and Session were not driven).
+   - **Visual check by eye** (no hooked reference frames were taken in this session; the user runs the hooked
+     game): levels, rider, bike, sky, HUD text, the pause / results overlays and the menus look right: geometry
+     complete, textures right side up and coloured, translucent menu items and overlays blended, distance darkening
+     plausible. To compare against the hooked original:
+     - **No rider shadow is visible** in any native frame (light sand in Lot 8, dirt in Woodward Trails, concrete in
+       Vail Trails). The game draws it as Im3D quads with the `ShadowMap` texture (zrollerShadowDraw 0x49b3d0,
+       flags 0x4103). The hooked original (D3D7) shows none either at the Vail Trails start (2026-10-31, the same
+       frame side by side: identical apart from the timer), so this is not a driver bug; whether the shadow shows
+       anywhere in the original is still open.
+     - Alpha-tested foliage (the tree line behind the RUN FINISHED screen) has hard, jagged edges: expected with
+       alpha test GREATER 0 and no mip maps, but worth a side-by-side.
+     - Textures look smoother / blurrier at a distance than mip-mapped D3D7 would (no mip filter caps by design,
+       step 1).
+   - Decision (dev aid, to review): `BMX_KEYS` replaces DirectInput entirely at the import (a stand-in keyboard,
+     no joystick) instead of feeding window messages or merging with the real keyboard, so a scripted run is
+     deterministic and isolated from the user's input; the run's window is shown without activation at the bottom
+     of the z order, and modal message boxes are answered by a MessageBoxA shim.
 4. Screenshot diff harness against the original (D7).

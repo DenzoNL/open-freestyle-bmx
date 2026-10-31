@@ -4,7 +4,8 @@
  * with letterboxing).
  *
  * Dev aids (environment): BMX_SHOT=<file.bmp> saves the camera raster of the shown frame number
- * BMX_SHOT_FRAME (default 1) as a BMP; BMX_QUIT_FRAMES=<n> exits the process after n shown frames.
+ * BMX_SHOT_FRAME (default 1; a comma separated list saves several, a `%d` in the file name takes the frame
+ * number) as a BMP; BMX_QUIT_FRAMES=<n> exits the process after n shown frames.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,6 +20,32 @@ static SDL_Window *gpuWindow;
 static SDL_GPUDevice *gpuDevice;
 static int videoInited;
 static int shownFrames;
+
+int drvGpuShownFrames(void)
+{
+    return shownFrames;
+}
+
+/* Whether `frame` is in BMX_SHOT_FRAME's comma separated list (frame 1 without the variable). */
+static int isShotFrame(const char *list, int frame)
+{
+    if (list == NULL) {
+        return frame == 1;
+    }
+    while (*list) {
+        char *end;
+        const long n = SDL_strtol(list, &end, 10);
+
+        if (end == list) {
+            break;
+        }
+        if (n == frame) {
+            return 1;
+        }
+        list = *end == ',' ? end + 1 : end;
+    }
+    return 0;
+}
 
 static int sdlFail(const char *what)
 {
@@ -312,8 +339,15 @@ int drvGpuPresent(struct SDL_GPUTexture *color, int32_t x, int32_t y, int32_t wi
         return sdlFail("SDL_SubmitGPUCommandBuffer");
     }
     shownFrames++;
-    if (shot != NULL && shownFrames == (shotFrame != NULL ? SDL_atoi(shotFrame) : 1)) {
-        saveShot(color, width, height, shot);
+    if (shot != NULL && isShotFrame(shotFrame, shownFrames)) {
+        char path[MAX_PATH];
+        const char *mark = SDL_strstr(shot, "%d");
+
+        /* The frame number replaces the first `%d` (not a format string: the rest is copied as is). */
+        if (mark != NULL) {
+            SDL_snprintf(path, sizeof path, "%.*s%d%s", (int)(mark - shot), shot, shownFrames, mark + 2);
+        }
+        saveShot(color, width, height, mark != NULL ? path : shot);
     }
     if (quit != NULL && shownFrames >= SDL_atoi(quit)) {
         bmxLog("driver: BMX_QUIT_FRAMES reached after %d frames\n", shownFrames);

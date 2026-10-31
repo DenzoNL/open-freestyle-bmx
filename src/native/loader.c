@@ -110,6 +110,10 @@ static int fillImports(const IMAGE_NT_HEADERS32 *nt, uint32_t *iatLo, uint32_t *
                     fn = kImportShims[s].fn;
                 }
             }
+            /* BMX_KEYS's shims (src/native/keys.c). */
+            if (!byOrdinal && bmxKeysImportShim(name) != NULL) {
+                fn = (FARPROC)bmxKeysImportShim(name);
+            }
 
             if (!fn) {
                 bmxLog("import: %s!%s not found\n", dllName, byOrdinal ? "(ordinal)" : name);
@@ -152,10 +156,9 @@ static void writeJump(uint32_t from, const void *to)
     memcpy(p + 1, &rel, 4);
 }
 
-int bmxLoadImage(const char *exePath)
+/* bmxLoadImage on the file's bytes (freed by the caller). */
+static int loadImage(const uint8_t *file, size_t size)
 {
-    size_t size;
-    uint8_t *file = readFile(exePath, &size);
     const IMAGE_DOS_HEADER *dos;
     const IMAGE_NT_HEADERS32 *nt;
     const IMAGE_SECTION_HEADER *sec;
@@ -165,12 +168,8 @@ int bmxLoadImage(const char *exePath)
     int thunks = 0;
     const int pngCheck = getenv("BMX_PNG_CHECK") != NULL;
 
-    if (!file) {
-        bmxLog("cannot read %s (run from the game folder)\n", exePath);
-        return -1;
-    }
     if (sha256Hex(file, size, hex) != 0 || strcmp(hex, kKnownSha256) != 0) {
-        bmxLog("%s is not the supported NgBMX.exe (sha256 %s)\n", exePath, hex);
+        bmxLog("NgBMX.exe is not the supported one (sha256 %s)\n", hex);
         return -1;
     }
     dos = (const IMAGE_DOS_HEADER *)file;
@@ -268,6 +267,20 @@ int bmxLoadImage(const char *exePath)
     }
     bmxCrtInstall();
     FlushInstructionCache(GetCurrentProcess(), NULL, 0);
-    free(file);
     return 0;
+}
+
+int bmxLoadImage(const char *exePath)
+{
+    size_t size;
+    uint8_t *file = readFile(exePath, &size);
+    int result;
+
+    if (!file) {
+        bmxLog("cannot read %s (run from the game folder)\n", exePath);
+        return -1;
+    }
+    result = loadImage(file, size);
+    free(file);
+    return result;
 }

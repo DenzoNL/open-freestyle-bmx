@@ -86,7 +86,8 @@ Environment (dev aids):
 | `BMX_NO_MOVIES=1` | sets the original's own movie skip switch (0x67288c, which the game never sets): no ACCLAIM/ZAXIS/INTRO.AVI |
 | `BMX_MUTE=1` | mutes this process's audio session (WASAPI) before the game opens waveOut / DirectSound |
 | `BMX_QUIT_FRAMES=N` | exit after N shown frames (`RwRasterShowRaster`) |
-| `BMX_SHOT=<file.bmp>`, `BMX_SHOT_FRAME=N` | save the shown camera raster of frame N (default 1) as a BMP (GPU readback) |
+| `BMX_SHOT=<file.bmp>`, `BMX_SHOT_FRAME=N[,M...]` | save the shown camera raster of frame N (default 1; a list saves each, a `%d` in the file name becomes the frame number) as a BMP (GPU readback) |
+| `BMX_KEYS=<script>` | scripted keyboard, see "Scripted input" below: e.g. `f300:enter,+150:enter,+100:up*400,+20:up+e*30` |
 | `BMX_DRIVER_TRACE=1` | log every SDL3 driver entry with its first arguments |
 | `BMX_PNG_CHECK=1` or `=<folder>` | compare our PNG reader with the original libpng on every PNG read (and on every `*.png` in the folder), see "PNG reader" |
 | `SDL_GPU_DRIVER=vulkan` | SDL's own: pick the GPU backend (default here: direct3d12) |
@@ -96,7 +97,7 @@ the window shows black while the D3D12 swapchain is presented as an independent 
 `PW_RENDERFULLCONTENT` sees the real content.
 
 Sources: `src/native/loader.c` (hash check, image, imports, jumps), `trap.c` (exception handler, names),
-`main.c` (WinMain's job), `range.S` (see below), and the SDL3 render driver in `src/driver/` (docs/SDL3-DRIVER.md).
+`main.c` (WinMain's job), `keys.c` (BMX_KEYS), `range.S` (see below), and the SDL3 render driver in `src/driver/` (docs/SDL3-DRIVER.md).
 The game objects are compiled with `BMX_HOOK=1`, `-ffreestanding -fno-builtin` and the hook build's SSE2 flags; the
 loader is hosted C. The driver (object library `bmx_driver`) is hosted C with `BMX_HOOK=1` (RW globals at their
 original addresses) and is never part of the hook DLL. It is not in build/hook's compile database, so `tools/check.sh`
@@ -357,9 +358,74 @@ through that pointer, so tools/rwmap.py never saw it, nor the stack argument ent
 light walks it calls). Ported into rw/light.c (rpAtomicLightStage) and rw/world.c with oracle tests. After that,
 `BMX_NO_MOVIES=1 BMX_MUTE=1 BMX_QUIT_FRAMES=4000 bmxnative.exe Scene.Txt -r640.480.16` runs 4000 frames without a
 trap: the menu times out into the attract mode and the demo level renders (rider, bike, ramps, textures, "DEMO
-PLAY"; screenshot at frame 3000). **Next:** Enter through the menus into a level (keyboard input in the native exe)
-and port what it traps on; candidates are raster render, raster clear rect, image from raster, native texture
-read, fog density 0x4d6590.
+PLAY"; screenshot at frame 3000). Into a level by scripted keys (2026-10-31, "Scripted input" below): ProQuest and
+Freeride in all unlocked levels play without a trap.
+
+### Scripted input (BMX_KEYS, 2026-10-31)
+
+The game reads the keyboard only through DirectInput (pcinput.c: `GetDeviceState` on a `c_dfDIKeyboard` device in
+foreground, non-exclusive mode, once per poll; the window procedure only watches WM_KEYDOWN for the quit key). So the
+script replaces DirectInput itself, at the import: the loader's import shim for `DINPUT.dll!DirectInputCreateEx`
+(src/native/keys.c) hands out a stand-in IDirectInput7 when `BMX_KEYS` is set. It enumerates no joystick (so the pad
+falls back to the keyboard, as on a PC without a pad) and creates only the keyboard, whose state is the script's keys
+held at the current shown frame (`drvGpuShownFrames`, the counter of `BMX_SHOT_FRAME` / `BMX_QUIT_FRAMES`). Nothing
+real is read: a scripted run is the same with or without focus, and keys or pad input the user gives another program
+never reach it. Without `BMX_KEYS` the shim forwards to the real DirectInputCreateEx.
+
+A second shim, for `USER32.dll!MessageBoxA` (the slot 0x6997bc), answers the game's modal boxes in a scripted run:
+without it the main menu's QUIT hung the run in "Do you want to quit the game?" (and its `MB_SETFOREGROUND` would take
+the focus). It logs the text and answers Yes for Yes/No (the quit prompt quits: exit code -1 like the original's
+`_exit(-1)`), Cancel for Yes/No/Cancel (an assert terminates) and OK otherwise. Unscripted runs get the real box.
+
+A scripted run also does not take the focus: the window is created with `WS_EX_NOACTIVATE`, shown with
+`SW_SHOWNOACTIVATE` and put at the bottom of the z order, and SDL gets `SDL_WINDOW_ACTIVATE_WHEN_SHOWN=0` /
+`..._RAISED=0`. Checked by polling `GetForegroundWindow` during a run: unchanged. The game does not pause when it is
+not active (WM_ACTIVATE only acquires / unacquires the devices, which the stand-in ignores).
+
+Script: comma separated events `<when>:<keys>[*<hold>]`. `<when>` is `f<N>` (shown frame N) or `+<N>` (N frames after
+the previous event's start). `<keys>` are names joined by `+`: `enter`, `esc`, `space`, `up`, `down`, `left`,
+`right`, `a`..`z`, `0`..`9`, or a DIK code `0x..`. `<hold>` is the number of frames the keys stay down (default 2).
+Every event is logged when it fires. The game's keyboard map for player 1 (0x561e68): arrows = stick, Enter = start,
+Esc = select/back, E S F D = the four face buttons, W R 3 4 = shoulder buttons, Space = input 20.
+
+Into a level (2026-10-31, `-r640.480.16`, `BMX_NO_MOVIES=1`): Enter at frame 300 and then every 150 frames, ten
+times, goes main menu (ProQuest) -> rider (Dave Mirra) -> bike -> style -> level (Greenville / Vail Trails) ->
+loading -> the challenges screen -> continue: the rider stands in Vail Trails at frame ~1400 and the timer runs.
+
+```
+BMX_KEYS="f300:enter,+150:enter,+150:enter,+150:enter,+150:enter,+150:enter,+150:enter,+150:enter,+150:enter,+150:enter"
+```
+
+Other paths (menu positions, all from a fresh start with the user's save restored before each run; the game writes
+`save/SAVE.DAT` as it goes, so scripted runs change it):
+
+- Main menu wheel: PROQUEST, SESSION, FREERIDE, COOL STUFF, OPTIONS, QUIT (`down` steps). Freeride:
+  `f300:down,f360:down,f450:enter,f600:enter,f750:enter,f900:enter`, then `right` n times on the level screen and
+  Enter (Vail Trails, Greenville Park, Backyard Pools, Woodward Trails, Lot 8, Titanic, Pro Tour Sleepy's Ditch are
+  unlocked in that save; the rest are locked), then about 6 Enters through loading / challenges.
+- In a level: `up` pedals, arrows steer, E/S/F/D tricks. Esc opens PAUSE (continue, view challenges, options,
+  trick list, view records, end run); "end run" asks END RUN? (no, yes); then RUN FINISHED (another run, level
+  select, view replay, trick list, view records, exit to main menu; the cursor starts at "another run") and EXIT?
+  (no, yes) back to the main menu.
+
+**Result (2026-10-31): no trap.** Scripted runs covered: ProQuest into Vail Trails, riding, tricks and bails, a full
+2-minute run to RUN FINISHED, the pause menu and its sub screens, end run, the replay, back to the main menu;
+Freeride in all seven unlocked levels (about 3000 frames of riding each); Options (controller, cheats, audio with the
+volume sliders); Cool Stuff (challenges, high scores); QUIT (with the message box shim). Every run ended at
+`BMX_QUIT_FRAMES` or by the quit, without a trap, so the expected candidates (raster render fast / scaled, raster
+clear rect, image from raster, native texture read / write / size, palette lock, fog density 0x4d6590) are not
+reached in single-player play: no ported code calls a raster render standard; image from raster only comes from the
+mip generator (this driver sets no mip format bits); native textures and palettes are not in the game's files (the
+models' textures are PNG); the game never sets fog density. Not covered: Session mode, the movies (BMX_NO_MOVIES
+runs; without it the intro movies run but present no RW frames, so `BMX_SHOT_FRAME` does not count them), Cool
+Stuff's movies / credits (Enter on them did nothing with BMX_NO_MOVIES), two-player modes.
+
+**State 2026-10-31:** BMX_KEYS, the MessageBoxA shim, the multi-frame
+`BMX_SHOT_FRAME` and the tidy fixes in loader.c / main.c build and were used for all runs above. No trap is open.
+The four audits pass (0; 5/2/8/0/11; 0; 0/0/0) and the full gate passed after the merge. A native and a hooked frame
+at the Vail Trails start look identical apart from the timer (no rider shadow in either). Next steps: compare more
+native and hooked frames (docs/SDL3-DRIVER.md step 3), drive
+Session and two-player modes, then the D7 screenshot diff (step 4).
 
 ### Open points from the CRT layer (2026-10-28)
 

@@ -28,6 +28,14 @@ void bmxCrtInstall(void);
 void bmxPngCheckInstall(const uint8_t *code, uint32_t codeStart);
 void bmxPngCheckArm(void);
 
+/*
+ * BMX_KEYS (src/native/keys.c): parse the key script; returns 1 when the keyboard is scripted. The import
+ * shims (DirectInputCreateEx: the stand-in DirectInput; MessageBoxA: answered without a window) act only in a
+ * scripted run and call the real function otherwise. bmxKeysImportShim returns NULL for other imports.
+ */
+int bmxKeysInstall(void);
+void *bmxKeysImportShim(const char *name);
+
 /* Install the vectored exception handler that reports int3 traps. */
 void bmxTrapInstall(void);
 
