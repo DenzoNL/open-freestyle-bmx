@@ -21,7 +21,8 @@ if [[ -n ${OPENDMFBMX_CROSS_CLANG:-} && -x $(dirname "$OPENDMFBMX_CROSS_CLANG")/
     tidy=("$(dirname "$OPENDMFBMX_CROSS_CLANG")/clang-tidy"
         "--extra-arg=-resource-dir=$("$OPENDMFBMX_CROSS_CLANG" -print-resource-dir)")
 fi
-"${tidy[@]}" --quiet -p build/hook "${units[@]}"
+# One clang-tidy per batch of units, in parallel (serially it took ~2 minutes).
+printf '%s\0' "${units[@]}" | xargs -0 -n 16 -P "${BMX_JOBS:-$(nproc)}" "${tidy[@]}" --quiet -p build/hook
 echo "== functions.csv (${SECONDS} s)"
 "${PYTHON:-python3}" -I tools/progress.py --check >/dev/null
 "${PYTHON:-python3}" -I -m py_compile tools/*.py tests/oracle/*.py
