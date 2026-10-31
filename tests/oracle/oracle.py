@@ -12,6 +12,7 @@ function, captures again, and compares. Heap calls are intercepted at the exe's 
 served by a deterministic bump allocator, so allocation addresses match between the two runs.
 """
 import argparse
+import ctypes
 import hashlib
 import math
 import struct
@@ -40,6 +41,8 @@ from unicorn.x86_const import (
 
 STACK_BASE, STACK_SIZE = 0x00100000, 0x00100000
 HEAP_BASE, HEAP_SIZE = 0x20000000, 0x04000000
+PAGE = 0x1000
+ZERO_PAGE = bytes(PAGE)
 TRAP_BASE, TRAP_SIZE = 0x7FF00000, 0x00010000
 RET_MAGIC = TRAP_BASE + TRAP_SIZE - 0x10
 HYPER_FILL = TRAP_BASE + TRAP_SIZE - 0x20  # dt_fill(); keep in sync with tests/cases/dt.c
@@ -75,6 +78,42 @@ class Case:
     ulps: int
 
 
+class WriteWatch:
+    """Windows' write watch (VirtualAlloc MEM_WRITE_WATCH + GetWriteWatch): which pages of a host buffer
+    were written since the last query, by the emulated code or by host-side writes alike. With it a snapshot
+    or a restore copies only the pages a case touched, not all writable memory (~3.4 MB, four times per
+    iteration). Elsewhere the harness copies everything (`BMX_ORACLE_FULLCOPY=1` forces that here too)."""
+
+    def __init__(self):
+        k = ctypes.WinDLL("kernel32", use_last_error=True)
+        self.alloc = k.VirtualAlloc
+        self.alloc.restype = ctypes.c_void_p
+        self.alloc.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32]
+        self.get = k.GetWriteWatch
+        self.get.restype = ctypes.c_uint32
+        self.get.argtypes = [ctypes.c_uint32, ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p,
+                             ctypes.POINTER(ctypes.c_size_t), ctypes.POINTER(ctypes.c_uint32)]
+        self.buf = (ctypes.c_void_p * (HEAP_SIZE // PAGE))()
+
+    def map(self, size):
+        addr = self.alloc(None, size, 0x3000 | 0x200000, 0x04)  # MEM_COMMIT | MEM_RESERVE | MEM_WRITE_WATCH
+        if not addr:
+            raise OSError(ctypes.get_last_error(), "VirtualAlloc(MEM_WRITE_WATCH) failed")
+        return addr
+
+    def written(self, host, size):
+        """Host addresses of the pages written in [host, host + size) since the last call; resets the watch."""
+        out = []
+        while True:
+            count = ctypes.c_size_t(len(self.buf))
+            gran = ctypes.c_uint32()
+            if self.get(1, host, size, self.buf, ctypes.byref(count), ctypes.byref(gran)) != 0:
+                raise OSError(ctypes.get_last_error(), "GetWriteWatch failed")
+            out.extend(self.buf[: count.value])
+            if count.value < len(self.buf):
+                return out
+
+
 @dataclass
 class Capture:
     eax: int = 0
@@ -83,6 +122,8 @@ class Capture:
     abort: tuple = None
     files: tuple = None
     mem: dict = field(default_factory=dict)
+    heap_ptr: int = 0
+    pages: dict = None  # write-watch mode: the pages that differ from the baseline (see Machine.complete)
 
 
 def f80_to_float(mant, exp):
@@ -115,10 +156,14 @@ class Machine:
         self.trap_names = {}
         self.unexpected_import = None
         self.heap_ptr = HEAP_BASE
+        self.host = []  # (base, size, view, host address or buffer): guest memory on host buffers, _map_host
+        self.watch = WriteWatch() if os.name == "nt" and not os.environ.get("BMX_ORACLE_FULLCOPY") else None
+        self.dirty = set()  # write-watch mode: writable pages that may differ from the baseline
+        self.base = {}  # write-watch mode: page -> bytes at the baseline
         self.exe = self._load(exe_path, trap_imports=True)
         self.dll = self._load(dll_path, trap_imports=False)
         self.uc.mem_map(STACK_BASE, STACK_SIZE, UC_PROT_ALL)
-        self.uc.mem_map(HEAP_BASE, HEAP_SIZE, UC_PROT_ALL)
+        self._map_host(HEAP_BASE, HEAP_SIZE)
         self.uc.mem_map(TRAP_BASE, TRAP_SIZE, UC_PROT_ALL)
         self.uc.mem_write(TRAP_BASE, b"\xc3" * TRAP_SIZE)
         self.writable.append((HEAP_BASE, None))  # sized dynamically by heap_ptr
@@ -144,7 +189,7 @@ class Machine:
         pe = pefile.PE(path)
         base = pe.OPTIONAL_HEADER.ImageBase
         size = (pe.OPTIONAL_HEADER.SizeOfImage + 0xFFF) & ~0xFFF
-        self.uc.mem_map(base, size, UC_PROT_ALL)
+        self._map_host(base, size)
         self.uc.mem_write(base, pe.header)
         protect = []
         for s in pe.sections:
@@ -173,6 +218,26 @@ class Machine:
                 slot += 8
         pe.close()
         return pe
+
+    def _map_host(self, base, size):
+        """Maps guest memory onto a host buffer, so snapshots and restores of the writable sections are plain
+        memory copies instead of thousands of mem_read/mem_write calls (they were ~80% of the run time).
+        Code is still patched through uc.mem_write, which also drops stale translated blocks."""
+        if self.watch:
+            addr = self.watch.map(size)
+            self.uc.mem_map_ptr(base, size, UC_PROT_ALL, addr)
+            self.host.append((base, size, memoryview((ctypes.c_ubyte * size).from_address(addr)).cast("B"), addr))
+            return
+        raw = (ctypes.c_ubyte * (size + 0xFFF))()
+        skip = -ctypes.addressof(raw) & 0xFFF  # page-aligned start
+        self.uc.mem_map_ptr(base, size, UC_PROT_ALL, ctypes.addressof(raw) + skip)
+        self.host.append((base, size, memoryview(raw).cast("B")[skip : skip + size], raw))
+
+    def _view(self, b, s):
+        for base, size, view, _ in self.host:
+            if base <= b and b + s <= base + size:
+                return view[b - base : b - base + s]
+        return None
 
     # --- heap -------------------------------------------------------------------------------
     def alloc(self, n):
@@ -278,19 +343,91 @@ class Machine:
         if self.uc.reg_read(UC_X86_REG_EIP) != WINMAIN:
             raise RuntimeError(f"CRT startup did not reach WinMain (eip={self.uc.reg_read(UC_X86_REG_EIP):#x})")
 
+    # --- write-watch pages ------------------------------------------------------------------
+    def _collect(self):
+        """Adds the writable pages written since the last call to self.dirty."""
+        for b, s in self.writable:
+            s = HEAP_SIZE if s is None else s
+            for base, size, _, addr in self.host:
+                if base <= b and b + s <= base + size:
+                    host = addr + (b - base)
+                    self.dirty.update(b + (h - host) for h in self.watch.written(host, s))
+                    break
+
+    def _page(self, p):
+        return bytes(self._view(p, PAGE))
+
+    def set_baseline(self):
+        """The state every iteration starts from. In write-watch mode the writable pages are copied once here;
+        later snapshots hold only the pages that differ."""
+        if not self.watch:
+            return self.snapshot()
+        self._collect()
+        self.dirty = set()
+        self.base = {}
+        for b, s in self.writable:
+            end = b + (s if s is not None else (self.heap_ptr - HEAP_BASE + PAGE - 1) & ~(PAGE - 1))
+            for p in range(b, end, PAGE):
+                self.base[p] = self._page(p)
+        # Windows reports a page as written on the first touch of a never-touched (demand-zero) page, even by
+        # a read: drop what reading the baseline itself reported.
+        self._collect()
+        self.dirty = set()
+        return self.snapshot()
+
+    def complete(self, a, b):
+        """Write-watch mode: fills a.mem / b.mem for diff() with the pages either capture changed, the heap cut
+        at each capture's own end (like the full copies, which hold the heap up to heap_ptr)."""
+        if a.pages is None:
+            return
+        for c in (a, b):
+            c.mem = {}
+            for p in a.pages.keys() | b.pages.keys():
+                data = c.pages.get(p) or self.base.get(p, ZERO_PAGE)
+                if HEAP_BASE <= p < HEAP_BASE + HEAP_SIZE:
+                    data = data[: max(0, c.heap_ptr - p)]
+                c.mem[p] = data
+
     # --- execution --------------------------------------------------------------------------
     def snapshot(self):
+        if self.watch:
+            self._collect()
+            return {
+                "pages": {p: self._page(p) for p in self.dirty},
+                "heap_ptr": self.heap_ptr,
+                "sizes": dict(self.sizes),
+                "win32": self.win32.snapshot(),
+            }
         regions = [(b, s if s is not None else self.heap_ptr - HEAP_BASE) for b, s in self.writable]
         return {
-            "mem": {b: bytes(self.uc.mem_read(b, s)) for b, s in regions if s},
+            "mem": {b: self._read_region(b, s) for b, s in regions if s},
             "heap_ptr": self.heap_ptr,
             "sizes": dict(self.sizes),
             "win32": self.win32.snapshot(),
         }
 
+    def _read_region(self, b, s):
+        view = self._view(b, s)
+        return bytes(view) if view is not None else bytes(self.uc.mem_read(b, s))
+
     def restore(self, snap):
+        if self.watch:
+            self._collect()
+            pages = snap["pages"]
+            for p in self.dirty | pages.keys():
+                self._view(p, PAGE)[:] = pages.get(p) or self.base.get(p, ZERO_PAGE)
+            self._collect()  # the restore's own writes
+            self.dirty = set(pages)
+            self.heap_ptr = snap["heap_ptr"]
+            self.sizes = dict(snap["sizes"])
+            self.win32.restore(snap["win32"])
+            return
         for b, data in snap["mem"].items():
-            self.uc.mem_write(b, data)
+            view = self._view(b, len(data))
+            if view is not None:
+                view[:] = data
+            else:
+                self.uc.mem_write(b, data)
         # anything allocated after the snapshot is garbage now; zero it for determinism
         if self.heap_ptr > snap["heap_ptr"]:
             self.uc.mem_write(snap["heap_ptr"], b"\0" * (self.heap_ptr - snap["heap_ptr"]))
@@ -330,7 +467,11 @@ class Machine:
         c.files = (self.win32.state["overlay"], {h: f["pos"] for h, f in self.win32.state["files"].items()})
         if c.abort is None and flags & RET_MASK in (RET_FLOAT, RET_DOUBLE):
             c.st0 = self.st0()
-        c.mem = self.snapshot()["mem"]
+        c.heap_ptr = self.heap_ptr
+        if self.watch:
+            c.pages = self.snapshot()["pages"]
+        else:
+            c.mem = self.snapshot()["mem"]
         return c
 
     def apply_stubs(self):
@@ -413,6 +554,8 @@ def diff(case, a, b):
     problems = []
     if a.abort != b.abort:
         problems.append(f"assert orig={a.abort} ours={b.abort}")
+    if a.heap_ptr != b.heap_ptr:
+        problems.append(f"heap end orig={a.heap_ptr:#x} ours={b.heap_ptr:#x} (allocation mismatch)")
     if a.files != b.files:
         problems.append(f"file state differs: orig={a.files!r:.200} ours={b.files!r:.200}")
     rk = case.flags & RET_MASK if a.abort is None else RET_VOID
@@ -509,7 +652,7 @@ def run(exe, dll, only=None, iters_override=None, verbose=False, game_root=None,
     m.crt_startup()
     for fn in init:
         m.call(fn, [])
-    baseline = m.snapshot()
+    baseline = m.set_baseline()
     have_assets = m.win32.game_root is not None and (m.win32.game_root / "Assets").is_dir()
     failed = skipped = 0
     durations = []
@@ -553,6 +696,7 @@ def run(exe, dll, only=None, iters_override=None, verbose=False, game_root=None,
             except RuntimeError as e:
                 errors.append(f"iter {it}: {e}")
                 break
+            m.complete(a, b)
             p = diff(case, a, b)
             if p:
                 errors.append(f"iter {it} args={[hex(x) for x in args]}: " + "; ".join(p))
