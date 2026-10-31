@@ -1,9 +1,9 @@
 # Platform layer: Windows APIs -> SDL3 (P4, "Windows first")
 
-Status 2026-10-31: **decided; S1-S7 implemented** (sections 4a, 4b, 4c; S5's check with real pads and S7's listening
-test are the user's). The user took the recommendation for every decision
+Status 2026-10-31: **decided; S1-S9 implemented** (sections 4a, 4b, 4c, 4d; S5's check with real pads, S7's
+listening test and S9's watch test are the user's). The user took the recommendation for every decision
 P1..P19 (A unless said otherwise). Order: S1-S4 (done, S3 reviewed), input + d-pad (S5, S6: done), DirectSound (S7:
-done), then the rest.
+done), movies (S8, S9: done), then the rest (S10 window and message queue next).
 Goal: `bmxnative.exe` (src/native/) as a clean standalone
 Windows build whose game and engine code reach the OS only through SDL3 and our own code. The fixed 32-bit memory
 layout (image at 0x400000, docs/NATIVE.md) stays; Mac/Linux come after. Vanilla stays vanilla (PLAN.md Decisions):
@@ -614,6 +614,132 @@ Release. No DuplicateSoundBuffer, SetFrequency, GetCaps or QueryInterface; they 
 - Open: the user's listening test (docs/NATIVE.md "DirectSound on SDL3"), including whether the original also goes
   silent behind the QUIT message box (ours does: the box takes the focus) and on alt-tab.
 
+### 4d. Status of S8 and S9 (2026-10-31, native-only, not committed; the watch test is the user's)
+
+Code: `src/platform/avi.c` (the AVIFIL32 stand-ins: RIFF/AVI reader), `cinepak.c` / `cinepak.h` (the decoder),
+`avi.h` (AVIERR codes), `waveout.c` (WINMM waveOut on SDL3 audio), `src/driver/movie.c` (DrawDib, GetDC / ReleaseDC
+/ GetClientRect on the driver); `gpu.c` got `drvGpuPresentMovie` (present without counting a shown frame). zmovie.c
+and zrwPlayMovie are unchanged; **the hook DLL is unchanged**. Test tool: `tests/platform/test_movie.c`, target
+`bmxmovietest` (Windows only, links vfw32: compares with avifil32 / iccvid / DrawDib in the same process).
+
+What the game calls (from the import table and zge/zmovie.c, zrwzgl.c): AVIFIL32 AVIFileInit / Exit / OpenA (mode
+0) / GetStream (type 0, by index) / Release, AVIStreamInfoA (0x8c bytes), ReadFormat (size query, then the bytes),
+Start, Length, TimeToSample, SampleToTime, GetFrameOpen (NULL: the stream's own format), GetFrame, GetFrameClose,
+Read (audio, 32 KB at a time), Release, AVISaveOptionsFree (the old shim); AVIStreamAddRef is imported, never
+called. MSVFW32 DrawDibOpen / DrawDibDraw (whole frame into the client rectangle, flags 0, DDF_BACKGROUND for other
+video streams) / DrawDibClose. USER32 GetDC / ReleaseDC / GetClientRect (only zmovie.c). WINMM waveOutOpen
+(WAVE_MAPPER, CALLBACK_WINDOW), Prepare / Unprepare / Write (16 buffers of 32 KB), Pause / Restart / Reset /
+Close, sndPlaySoundA(NULL, 0) (a retry when the open fails). The 7 files: Cinepak 320x240 15 fps (scale/rate
+10000/150000, credits 1/15), two strips per frame, key frames with a 0x10 and a 0x11 strip; audio PCM 16-bit, mono
+37800 / 38700 Hz in 1 s chunks, credits stereo 44100 Hz in 1/15 s chunks inside `rec ` lists; idx1 offsets relative
+to `movi`; trailing zero bytes after the RIFF (ignored).
+
+- **The cut.** 18 AVIFIL32, 3 MSVFW32, 9 WINMM (waveOut, sndPlaySoundA) and 3 USER32 slots are stand-ins. The
+  loader now says `137 slots filled: 58 stand-ins, 64 dead, 15 real; real DLLs still used: USER32.dll` (WINMM: 15
+  stand-ins, 0 real). During a movie the process has no avifil32, msvfw32, iccvid, wdmaud.drv or msacm32 loaded
+  (module list of the 32-bit process, credits playing); WINMM.DLL itself stays loaded because SDL3.dll imports it.
+- **AVI reader (P12).** The header list (avih, strl: strh, strf), the movi position and idx1 at open, per stream the
+  chunks (offset, size, flags) and, for fixed-size samples, each chunk's first sample; data read on demand through
+  SDL_IOStream (`bmxPathResolve` path). Everything the game sees is avifil32's, measured with bmxmovietest:
+  - AVISTREAMINFOA: the strh fields (the frame rectangle as four int16 in a 56-byte strh, four int32 in a 64-byte
+    one), dwSuggestedBufferSize = the largest chunk of the stream (not strh's), szName = `<file name as passed>
+    Video #1` / `Audio #1`; only the fixed part and the name up to its terminator are written (the rest of szName
+    keeps the caller's bytes).
+  - TimeToSample: -1 for a negative time; `time * rate / (scale * 1000)` in 64-bit integers, rounded down when
+    rate / scale < 1000 and up otherwise, an overflow of 31 bits gives -1; then clamped to [start, start + length].
+    SampleToTime: the sample clamped first, then the same rounding the other way. (Wine's float formulas are off by
+    one at exact multiples; the real one is integer.)
+  - AVIStreamRead: a start before the stream fails with BADPARAM and leaves the counts alone; else they are zeroed;
+    past the end ERROR for a 0-byte buffer, BUFFERTOOSMALL for less than a sample, FILEREAD otherwise. Audio:
+    samples -1 = the rest of the chunk, 0 = as many as fit, another negative count = no limit; with a buffer clipped
+    to the stream end and the buffer (a negative size: BUFFERTOOSMALL; less than a sample: 0 bytes, OK), without
+    one only to size / sample size (not to the end), not at all for size 0. Reads cross chunks. Video: one frame
+    per call; with a buffer a negative size is BUFFERTOOSMALL, 0 is ERROR, a too small one BUFFERTOOSMALL with the
+    frame's size in the byte count.
+  - ReadFormat: copies what fits and returns BUFFERTOOSMALL when the buffer is smaller than the format (size 0:
+    OK); the size out is always the format's. GetStream past the last stream: NODATA. Reference counts as
+    avifil32's (a stream and a GetFrame object hold the file). A missing file: FILEOPEN.
+  - GetFrame: decodes from the last key frame at or before the frame (or on from the frame in the buffer when that
+    is nearer) into one persistent 24-bit bottom-up DIB (header + bits, biSizeImage 230400) whose pointer is
+    returned; NULL outside the stream; a 0-byte chunk keeps the picture.
+- **Cinepak decoder.** The usual bitstream (frame header, strips of 4x4 blocks, V1 / V4 codebooks with full and
+  selective updates, vector chunks 0x30 / 0x31 / 0x32), the colour conversion R = Y + 2V, G = Y - U/2 - V,
+  B = Y + 2U clamped (C's truncating U/2), which is iccvid's exactly, and two **iccvid quirks**, found from the
+  frames that differed and then measured with hand-made frames through ICDecompress:
+  1. A selective V1 codebook update whose last flag word is zero overwrites one more entry with the chunk's first
+     four bytes as luma and zero chroma: the entry after the last updated one when the word before is not zero,
+     else entry 32 * (G - 1) + 1 for the last word G (400 random flag-word sets, all fit). V4 updates do not. In
+     the movies this shows as single wrong-looking blocks for a frame or so (acclaim.avi frame 35, nyquist.avi frame
+     232: 108 frames of acclaim / intro / nyquist differed before the fix).
+  2. A strip copies the codebooks of the strip above it (frame flag bit 0 clear) only when it is an inter strip
+     (0x11); a key strip (0x10) keeps its own from the previous frame. ffmpeg copies for both.
+  Greyscale codebook chunks (0x24..0x27) are decoded as luma with zero chroma; iccvid differs in some cases there
+  (not pursued: no movie of the game has one).
+- **Exactness of the decoder:** byte-identical to iccvid for **every frame of all seven files** (6467 frames in
+  order, plus 2800 random positions with backward jumps and positions outside the stream), and for 3000 random
+  hand-made colour frames (1 to 3 strips of random heights, key and inter strips, full codebooks of 0..256 entries,
+  selective updates with zero, single-bit, all-ones and random flag words, all three vector chunk kinds). So no
+  tolerance was needed; the maximum per-channel difference is 0.
+- **waveOut (P14).** One SDL audio stream per open device in the file's own format (SDL resamples to the device);
+  its get-callback (SDL's audio thread) hands the queued buffers over in order and, when a buffer's last byte has
+  gone, sets WHDR_DONE (clears WHDR_INQUEUE) and posts MM_WOM_DONE (wParam the device, lParam the header) to the
+  window, as winmm's CALLBACK_WINDOW does; MM_WOM_OPEN / MM_WOM_CLOSE are posted too. Until the message queue is ours
+  (S10) the messages go through the real PostMessageA, so zrwPlayMovie's PeekMessage loop gets them exactly as
+  before. Pause / Restart stop and resume the callback; Reset returns every queued buffer done (each with its
+  MM_WOM_DONE) and drops what SDL still holds; Unprepare / Close of a queued buffer: WAVERR_STILLPLAYING; Write of an
+  unprepared one: WAVERR_UNPREPARED. BMX_MUTE: the bytes are consumed at the same pace, SDL gets silence. The
+  close log line has the bytes written / played / dropped with FNV-1a 64 hashes; avi.c logs the same for the bytes
+  AVIStreamRead returned.
+- **DrawDib (P13).** GetDC gives a token DC, ReleaseDC takes it back; GetClientRect gives the presented size (the
+  mode's in full screen, the window's client size when windowed: what the original's client rectangle was under
+  D3D7). DrawDibDraw converts the DIB to RGBA, uploads it and blits it with nearest filtering into a target of the
+  presented size at the requested rectangle (a new target starts black), then presents the target through the
+  driver (letterboxed, D4) without counting a shown frame, so BMX_SHOT_FRAME / BMX_KEYS / BMX_QUIT_FRAMES numbers do
+  not move during movies (as before). Only 24-bit uncompressed DIBs and the token DC (logged once otherwise).
+  `BMX_MOVIE_SHOT=<file %d.bmp>` + `BMX_MOVIE_SHOT_FRAME=<n,...>` save the target after the n-th DrawDibDraw and log
+  which movie frame it showed.
+- **BMX_KEYS `t<ms>` events** (keys.c): a key at a time since the start, for movies, during which no frame is
+  shown (`t4000:up` aborts the first startup movie).
+
+Checks (all 2026-10-31):
+
+- `bmxmovietest <game>\bin\movie` (about 7 s): 18.8 million comparisons, 0 differences: per file the open / GetStream
+  results (also by type and past the end, and a missing file), AVIFileRelease / AddRef / Release counts; per stream
+  StreamInfo (all 0x8c bytes, from a prefilled buffer), Start / Length, ReadFormat (size query, then every buffer
+  size from 0 to the format size + 8), TimeToSample for every millisecond from -3 s to 3 s past the end plus
+  extremes (INT32_MIN .. INT32_MAX), SampleToTime for every sample from -3000 to 3000 past the end plus extremes;
+  audio AVIStreamRead in the game's pattern from start to end (bytes and FNV equal) and 4000 random reads per stream
+  (starts around both ends, counts -1 / 0 / random, NULL and small buffers; result, both counts and the whole buffer);
+  video Read of every frame with a large, a NULL and a too small buffer; GetFrame as above; the synthetic iccvid
+  frames.
+- DrawDib: `bmxmovietest --drawdib <file> <frame> <shot.bmp>` draws the real frame with the real DrawDibDraw into a
+  640x480 DIB section (memory DC) as zmovieDraw calls it and compares it with our GPU readback (BMX_MOVIE_SHOT) of
+  the same frame in the game: **0 of 307200 pixels differ** for 7 frames (acclaim 18 and 181, zaxis 146, intro 652,
+  credits 192, 1706 and 3160); DrawDib's 2x is plain pixel doubling (also 0 differences).
+- waveOut: `bmxplatformtest` runs the movie's protocol and its error cases (open, early write, prepare twice,
+  pause, four writes, a write of a queued buffer, no MM_WOM_DONE while paused, restart, the four MM_WOM_DONE in
+  order, two long buffers, unprepare / close while queued, reset, unprepare all, close) on the real winmm and on
+  ours with a hidden window: every result, every header's flags and every message (kind, device, header) equal.
+- Game runs (`native-run2`, `BMX_MUTE=1`, `BMX_KEYS`): the three startup movies to the end, the intro from Cool
+  Stuff's MOVIES list to the end (the device open 105.0 s, 243 buffers), the credits to the end (220.9 s, 1190
+  buffers); the bytes written to waveOut equal the bytes AVIStreamRead returned and the bytes played (same FNV-1a 64;
+  and the same hash as real avifil32's reads in bmxmovietest: e.g. credits 38984400 bytes, 59d756f13803cada); every
+  startup movie and the credits (30 s in) abort on a key (`Movie : Key Abort`; reset drops the rest: played +
+  dropped = written); no trap, the save restored each time.
+- `bmxplatformtest`: 262055 checks, 0 failures. Twice (of three runs) S7's real-time check of the first tone failed
+  with an average step of 10.58 / 10.77 ms against 10 +- 0.5 (dsound.c and that test are unchanged; it runs before the
+  waveOut test); the third run passed. A timing flake of the machine, to watch.
+
+Decisions beyond the document: no FFmpeg-style tolerance (exact); iccvid's quirks copied (they are the original
+picture); GetClientRect returns the presented size instead of asking Windows (in full screen the original's client
+area was the mode under D3D7's exclusive mode, while main.c's window only changes its style and keeps its size); movie
+frames are presented but not counted as shown frames; BMX_MOVIE_SHOT instead of BMX_SHOT for movie frames; the
+waveOut messages still go through the real PostMessageA until S10; BMX_KEYS got `t` events for the abort checks.
+
+Open: the user's watch test (docs/NATIVE.md "Movies on our decoder and SDL3"): picture, sound, lip sync, abort.
+main.c's WASAPI session mute (BMX_MUTE) is now redundant for the movies (both stand-ins output silence) and can go
+in S11.
+
 ## 5. Windows behaviour that is hard to reproduce
 
 - **DirectInput's view of a pad**: button numbering comes from the HID driver per device (and Steam Input can present
@@ -647,7 +773,10 @@ Release. No DuplicateSoundBuffer, SetFrequency, GetCaps or QueryInterface; they 
   1 ms (the game calls timeEndPeriod right after timeSetEvent); GetTickCount steps ~15.6 ms (movie clock). SDL clocks
   are finer: the frame limiter and movie frame choice can differ by a tick. Not part of the simulation (fixed tick).
 - **iccvid's YUV->RGB rounding** and DrawDib's stretch for non-integer ratios: match by testing (S8/S9), only
-  2x is checked pixel-exact.
+  2x is checked pixel-exact. Done (4d): the conversion is exact (R = Y + 2V, G = Y - U/2 - V, B = Y + 2U, clamped);
+  iccvid's two bitstream quirks (the zero-tail selective V1 update, no codebook copy for key strips) are copied;
+  greyscale codebook chunks are not matched in every case (no movie of the game has one). DrawDib's 2x is plain
+  pixel doubling; other ratios are our nearest-neighbour blit, unchecked (the game draws only 2x at 640x480).
 - **Exclusive full screen**: D3D7 changed the display mode; SDL3-DRIVER.md D4 already decided not to.
 - **DPI virtualisation** of the DPI-unaware original window, and CW_USEDEFAULT placement: cosmetic.
 - **x87 control word**: MSVC's CRT starts at 53-bit precision; D3D7 may switch the x87 to 24-bit at device

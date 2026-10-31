@@ -148,6 +148,7 @@ struct SDL_GPUDevice *drvGpuDevice(void)
 void drvGpuStop(void)
 {
     if (gpuDevice != NULL) {
+        drvMovieRelease();
         drvDrawStop();
         if (gpuWindow != NULL) {
             SDL_ReleaseWindowFromGPUDevice(gpuDevice, gpuWindow);
@@ -299,15 +300,12 @@ static void letterbox(int32_t width, int32_t height, Uint32 w, Uint32 h, SDL_GPU
     dst->h = dh;
 }
 
-/* Blits the camera raster's target into the swapchain (black bars around it) and presents. */
-int drvGpuPresent(struct SDL_GPUTexture *color, int32_t x, int32_t y, int32_t width, int32_t height)
+/* Blits a target into the swapchain (black bars around it) and presents. */
+static int presentTarget(struct SDL_GPUTexture *color, int32_t x, int32_t y, int32_t width, int32_t height)
 {
     SDL_GPUCommandBuffer *cmd;
     SDL_GPUTexture *swapchain = NULL;
     Uint32 w = 0, h = 0;
-    const char *shot = SDL_getenv("BMX_SHOT");
-    const char *shotFrame = SDL_getenv("BMX_SHOT_FRAME");
-    const char *quit = SDL_getenv("BMX_QUIT_FRAMES");
 
     /* The game's own message loop dispatches the window's messages; drop the events SDL queued from them. */
     SDL_FlushEvents(SDL_EVENT_FIRST, SDL_EVENT_LAST);
@@ -338,6 +336,45 @@ int drvGpuPresent(struct SDL_GPUTexture *color, int32_t x, int32_t y, int32_t wi
     }
     if (!SDL_SubmitGPUCommandBuffer(cmd)) {
         return sdlFail("SDL_SubmitGPUCommandBuffer");
+    }
+    return 1;
+}
+
+/* The client size of the game's window in pixels (0 x 0 before the device exists). */
+void drvGpuWindowSize(int32_t *width, int32_t *height)
+{
+    int w = 0, h = 0;
+
+    if (gpuWindow != NULL) {
+        SDL_GetWindowSizeInPixels(gpuWindow, &w, &h);
+    }
+    *width = w;
+    *height = h;
+}
+
+/* A movie frame (src/driver/movie.c): presented like a camera raster, but not counted as a shown frame, so
+ * BMX_SHOT_FRAME / BMX_KEYS / BMX_QUIT_FRAMES numbers do not move during a movie. `shot`: save the target
+ * too. */
+int drvGpuPresentMovie(struct SDL_GPUTexture *color, int32_t width, int32_t height, const char *shot)
+{
+    if (!presentTarget(color, 0, 0, width, height)) {
+        return 0;
+    }
+    if (shot != NULL) {
+        saveShot(color, width, height, shot);
+    }
+    return 1;
+}
+
+/* Blits the camera raster's target into the swapchain (black bars around it) and presents. */
+int drvGpuPresent(struct SDL_GPUTexture *color, int32_t x, int32_t y, int32_t width, int32_t height)
+{
+    const char *shot = SDL_getenv("BMX_SHOT");
+    const char *shotFrame = SDL_getenv("BMX_SHOT_FRAME");
+    const char *quit = SDL_getenv("BMX_QUIT_FRAMES");
+
+    if (!presentTarget(color, x, y, width, height)) {
+        return 0;
     }
     shownFrames++;
     if (shot != NULL && isShotFrame(shotFrame, shownFrames)) {

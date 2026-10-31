@@ -2230,6 +2230,165 @@ static void testSmoothMix(void)
     VirtualProtect(range, 0x2a0000, oldProtect, &oldProtect);
 }
 
+/* ---- waveOut (the movies' sound) against the real winmm ---- */
+
+typedef struct WaveApi {
+    const char *name;
+    MMRESULT(WINAPI *open)(HWAVEOUT *, UINT, const WAVEFORMATEX *, DWORD_PTR, DWORD_PTR, DWORD);
+    MMRESULT(WINAPI *prepare)(HWAVEOUT, WAVEHDR *, UINT);
+    MMRESULT(WINAPI *unprepare)(HWAVEOUT, WAVEHDR *, UINT);
+    MMRESULT(WINAPI *write)(HWAVEOUT, WAVEHDR *, UINT);
+    MMRESULT(WINAPI *pause)(HWAVEOUT);
+    MMRESULT(WINAPI *restart)(HWAVEOUT);
+    MMRESULT(WINAPI *reset)(HWAVEOUT);
+    MMRESULT(WINAPI *close)(HWAVEOUT);
+} WaveApi;
+
+enum { kWaveHeaders = 6, kWaveTrace = 96 };
+
+/* Waits up to `ms` for window messages from the device; each MM_WOM_* goes into the trace as message * 16 +
+ * header index (+15: no header) when wParam is the device. Returns how many MM_WOM_DONE came. */
+static int wavePump(HWND window, HWAVEOUT device, WAVEHDR *headers, int ms, int stopAfter, uint32_t *trace,
+                    int *n)
+{
+    const uint64_t end = SDL_GetTicks() + (uint64_t)ms;
+    int done = 0;
+
+    while (SDL_GetTicks() < end && (stopAfter == 0 || done < stopAfter)) {
+        MSG msg;
+
+        if (!PeekMessageA(&msg, window, MM_WOM_OPEN, MM_WOM_DONE, PM_REMOVE)) {
+            SDL_Delay(1);
+            continue;
+        }
+        if ((HWAVEOUT)msg.wParam != device) {
+            trace[(*n)++] = 0xbad;
+            continue;
+        }
+        int index = 15;
+
+        for (int i = 0; i < kWaveHeaders; i++) {
+            if ((WAVEHDR *)msg.lParam == &headers[i]) {
+                index = i;
+            }
+        }
+        trace[(*n)++] = msg.message * 16 + (uint32_t)index;
+        done += msg.message == MM_WOM_DONE;
+    }
+    return done;
+}
+
+/* The movie's protocol and its error cases on one device; the results, the headers' flags and the messages go
+ * into the trace. */
+static int waveScript(const WaveApi *api, HWND window, uint32_t *trace)
+{
+    static int16_t data[kWaveHeaders][37800];
+    WAVEFORMATEX format = {WAVE_FORMAT_PCM, 1, 37800, 75600, 2, 16, 0};
+    WAVEHDR headers[kWaveHeaders];
+    HWAVEOUT device = NULL;
+    int n = 0;
+
+    memset(headers, 0, sizeof headers);
+    for (int i = 0; i < kWaveHeaders; i++) {
+        headers[i].lpData = (LPSTR)data[i];
+        headers[i].dwBufferLength = i < 4 ? 2000 : 75600; /* 26 ms, then 1 s */
+    }
+    trace[n++] = api->open(&device, WAVE_MAPPER, &format, (DWORD_PTR)window, 0, CALLBACK_WINDOW);
+    if (trace[0] != 0) {
+        return n;
+    }
+    wavePump(window, device, headers, 100, 0, trace, &n);
+    trace[n++] = api->write(device, &headers[0], sizeof headers[0]); /* not prepared */
+    for (int i = 0; i < kWaveHeaders; i++) {
+        trace[n++] = api->prepare(device, &headers[i], sizeof headers[i]);
+        trace[n++] = headers[i].dwFlags;
+    }
+    trace[n++] = api->prepare(device, &headers[0], sizeof headers[0]); /* again */
+    trace[n++] = api->pause(device);
+    for (int i = 0; i < 4; i++) {
+        trace[n++] = api->write(device, &headers[i], sizeof headers[i]);
+        trace[n++] = headers[i].dwFlags;
+    }
+    trace[n++] = api->write(device, &headers[0], sizeof headers[0]); /* queued already */
+    {
+        uint32_t ignored[kWaveTrace];
+        int none = 0;
+
+        trace[n++] = (uint32_t)wavePump(window, device, headers, 150, 0, ignored, &none); /* paused: none */
+    }
+    trace[n++] = api->restart(device);
+    trace[n++] = (uint32_t)wavePump(window, device, headers, 3000, 4, trace, &n);
+    for (int i = 0; i < 4; i++) {
+        trace[n++] = headers[i].dwFlags;
+    }
+    trace[n++] = api->write(device, &headers[4], sizeof headers[4]);
+    trace[n++] = api->write(device, &headers[5], sizeof headers[5]);
+    trace[n++] = api->unprepare(device, &headers[4], sizeof headers[4]); /* still queued */
+    trace[n++] = api->close(device);                                     /* still playing */
+    trace[n++] = api->reset(device);
+    trace[n++] = (uint32_t)wavePump(window, device, headers, 1000, 2, trace, &n);
+    trace[n++] = headers[4].dwFlags;
+    trace[n++] = headers[5].dwFlags;
+    for (int i = 0; i < kWaveHeaders; i++) {
+        trace[n++] = api->unprepare(device, &headers[i], sizeof headers[i]);
+        trace[n++] = headers[i].dwFlags;
+    }
+    trace[n++] = api->close(device);
+    wavePump(window, device, headers, 200, 0, trace, &n);
+    return n;
+}
+
+static void testWaveOut(void)
+{
+    const HWND window = CreateWindowExA(0, "STATIC", "bmxplatformtest waveout", WS_OVERLAPPEDWINDOW, 0, 0, 64,
+                                        64, NULL, NULL, GetModuleHandleA(NULL), NULL); /* never shown */
+    const WaveApi real = {
+        "winmm",
+        (void *)bmxRealProc("WINMM.dll", "waveOutOpen"),
+        (void *)bmxRealProc("WINMM.dll", "waveOutPrepareHeader"),
+        (void *)bmxRealProc("WINMM.dll", "waveOutUnprepareHeader"),
+        (void *)bmxRealProc("WINMM.dll", "waveOutWrite"),
+        (void *)bmxRealProc("WINMM.dll", "waveOutPause"),
+        (void *)bmxRealProc("WINMM.dll", "waveOutRestart"),
+        (void *)bmxRealProc("WINMM.dll", "waveOutReset"),
+        (void *)bmxRealProc("WINMM.dll", "waveOutClose"),
+    };
+    const WaveApi ours = {
+        "ours",
+        (void *)bmxStandWaveOutOpen,
+        (void *)bmxStandWaveOutPrepareHeader,
+        (void *)bmxStandWaveOutUnprepareHeader,
+        (void *)bmxStandWaveOutWrite,
+        (void *)bmxStandWaveOutPause,
+        (void *)bmxStandWaveOutRestart,
+        (void *)bmxStandWaveOutReset,
+        (void *)bmxStandWaveOutClose,
+    };
+    uint32_t a[kWaveTrace], b[kWaveTrace];
+    int na, nb;
+
+    if (gMeter == NULL && !muteSession()) {
+        printf("waveout: could not mute this process's audio session; skipped\n");
+        DestroyWindow(window);
+        return;
+    }
+    memset(a, 0, sizeof a);
+    memset(b, 0, sizeof b);
+    na = waveScript(&real, window, a);
+    nb = waveScript(&ours, window, b);
+    CHECK(na == nb && memcmp(a, b, (size_t)na * sizeof a[0]) == 0, "waveOut script: %d vs %d entries", na,
+          nb);
+    printf("waveout: %d results, flags and messages, %s\n", na,
+           na == nb && memcmp(a, b, (size_t)na * sizeof a[0]) == 0 ? "equal to winmm's" : "DIFFERENT:");
+    if (na != nb || memcmp(a, b, (size_t)na * sizeof a[0]) != 0) {
+        for (int i = 0; i < SDL_max(na, nb); i++) {
+            printf("  %2d: winmm %5x ours %5x%s\n", i, a[i], b[i], a[i] != b[i] ? "  <--" : "");
+        }
+    }
+    CHECK(bmxStandSndPlaySoundA(NULL, 0) == 1, "sndPlaySoundA(NULL, 0)");
+    DestroyWindow(window);
+}
+
 int main(void)
 {
     SetEnvironmentVariableA("BMX_FILE_CHECK", "1"); /* every call above is also made through kernel32 */
@@ -2250,6 +2409,7 @@ int main(void)
     testConfig();
     testSound();
     testSmoothMix();
+    testWaveOut();
     bmxPlatformShutdown();
     printf("%d checks, %d failures\n", checks, failures);
     return failures != 0;

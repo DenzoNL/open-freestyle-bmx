@@ -8,10 +8,11 @@
  *
  * BMX_KEYS="f300:enter,+100:enter,+20:down*10,f900:left+e" is a comma separated list of events:
  *   f<N>       press at shown frame N (RwRasterShowRaster count, as BMX_SHOT_FRAME / BMX_QUIT_FRAMES)
- *   +<N>       press N frames after the previous event's start
+ *   t<N>       press N milliseconds after the start (for movies, during which no frame is shown)
+ *   +<N>       press N frames (milliseconds after a t event) after the previous event's start
  *   :<keys>    key names joined by '+': enter, esc, space, up, down, left, right, a..z, 0..9, or a DIK code
  *              as 0x<hex>
- *   *<H>       hold for H frames (default 2)
+ *   *<H>       hold for H frames (default 2; for t events milliseconds, default 100)
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,10 +28,11 @@
 #include "native/native.h"
 #include "platform/platform.h"
 
-enum { kMaxEvents = 256, kMaxEventKeys = 4, kDefaultHold = 2 };
+enum { kMaxEvents = 256, kMaxEventKeys = 4, kDefaultHold = 2, kDefaultHoldMs = 100 };
 
 typedef struct KeyEvent {
-    int frame, hold, count;
+    int frame, hold, count; /* frame and hold in milliseconds when timed */
+    int timed;
     uint8_t keys[kMaxEventKeys];
 } KeyEvent;
 
@@ -38,6 +40,7 @@ static KeyEvent events[kMaxEvents];
 static int eventCount;
 static int nextLogged; /* first event not logged yet */
 static int scripted;
+static uint32_t startTime; /* bmxTimeGetTime at install, for t events */
 
 static const struct {
     const char *name;
@@ -95,20 +98,21 @@ static int keyCode(const char *name, size_t len)
     return code;
 }
 
-/* Parses one event ("f300:enter*4"); `previous` is the start frame of the event before it. */
-static int parseEvent(const char *s, size_t len, int previous, KeyEvent *e)
+/* Parses one event ("f300:enter*4"); `previous` is the event before it (NULL for the first). */
+static int parseEvent(const char *s, size_t len, const KeyEvent *previous, KeyEvent *e)
 {
     const char *const end = s + len;
     const char *p = s;
     char *num;
 
-    if (p < end && (*p == 'f' || *p == '+')) {
+    if (p < end && (*p == 'f' || *p == 't' || *p == '+')) {
         const long n = strtol(p + 1, &num, 10);
 
         if (num == p + 1 || n < 0) {
             return -1;
         }
-        e->frame = (*p == 'f') ? (int)n : previous + (int)n;
+        e->timed = *p == 't' || (*p == '+' && previous != NULL && previous->timed);
+        e->frame = (*p == '+') ? (previous != NULL ? previous->frame : 0) + (int)n : (int)n;
         p = num;
     } else {
         return -1;
@@ -117,7 +121,7 @@ static int parseEvent(const char *s, size_t len, int previous, KeyEvent *e)
         return -1;
     }
     p++;
-    e->hold = kDefaultHold;
+    e->hold = e->timed ? kDefaultHoldMs : kDefaultHold;
     e->count = 0;
     while (p < end) {
         const char *k = p;
@@ -151,7 +155,6 @@ int bmxKeysInstall(void)
     static char script[8192];
     const char *env = getenv("BMX_KEYS");
     const char *s = script;
-    int previous = 0;
 
     if (env == NULL) {
         return 0;
@@ -162,15 +165,18 @@ int bmxKeysInstall(void)
         const size_t len = comma != NULL ? (size_t)(comma - s) : strlen(s);
 
         if (len > 0) {
-            if (eventCount == kMaxEvents || parseEvent(s, len, previous, &events[eventCount]) != 0) {
+            if (eventCount == kMaxEvents ||
+                parseEvent(s, len, eventCount > 0 ? &events[eventCount - 1] : NULL, &events[eventCount]) !=
+                    0) {
                 bmxLog("BMX_KEYS: cannot parse \"%.*s\" (or more than %d events)\n", (int)len, s, kMaxEvents);
                 exit(1);
             }
-            previous = events[eventCount++].frame;
+            eventCount++;
         }
         s += len + (comma != NULL);
     }
     scripted = 1;
+    startTime = bmxTimeGetTime();
     bmxLog("BMX_KEYS: %d scripted key events; the real keyboard and joysticks are not read\n", eventCount);
     return 1;
 }
@@ -185,19 +191,21 @@ int bmxKeysScripted(void)
 void bmxKeysFillState(uint8_t *state, uint32_t size)
 {
     const int frame = drvGpuShownFrames();
+    const int ms = (int)(bmxTimeGetTime() - startTime);
 
     for (int i = 0; i < eventCount; i++) {
         const KeyEvent *e = &events[i];
+        const int now = e->timed ? ms : frame;
 
-        if (frame >= e->frame && frame < e->frame + e->hold) {
+        if (now >= e->frame && now < e->frame + e->hold) {
             for (int k = 0; k < e->count; k++) {
                 if (e->keys[k] < size) {
                     state[e->keys[k]] = 0x80;
                 }
             }
             if (i >= nextLogged) {
-                bmxLog("BMX_KEYS: frame %d: event %d (%d keys, first DIK 0x%02x, %d frames)\n", frame, i,
-                       e->count, e->keys[0], e->hold);
+                bmxLog("BMX_KEYS: frame %d (%d ms): event %d (%d keys, first DIK 0x%02x, %d %s)\n", frame, ms,
+                       i, e->count, e->keys[0], e->hold, e->timed ? "ms" : "frames");
                 nextLogged = i + 1;
             }
         }

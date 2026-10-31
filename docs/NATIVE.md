@@ -86,11 +86,12 @@ Environment (dev aids):
 |---|---|
 | `BMX_TRAP_SKIP=N` | log the first N traps and fake a `return 1` from each instead of stopping (a survey; state is bogus after the first skip) |
 | `BMX_NO_MOVIES=1` | sets the original's own movie skip switch (0x67288c, which the game never sets): no ACCLAIM/ZAXIS/INTRO.AVI |
-| `BMX_MUTE=1` | mutes this process's audio session (WASAPI) before the game opens waveOut (movies), and the DirectSound stand-in outputs silence (it still mixes, so the cursors run as in an audible run) |
+| `BMX_MUTE=1` | mutes this process's audio session (WASAPI), and the DirectSound and waveOut (movies) stand-ins output silence (they still consume their data at the normal pace, so cursors and MM_WOM_DONE run as in an audible run) |
 | `BMX_SOUND_CHECK=1` | repeat every DirectSound call of the game on the real dsound.dll and compare (log lines `soundcheck:`, last line `soundcheck: RESULT clean\|DIFFERENCES`); the real buffers get no data, so nothing is heard twice |
 | `BMX_QUIT_FRAMES=N` | exit after N shown frames (`RwRasterShowRaster`) |
 | `BMX_SHOT=<file.bmp>`, `BMX_SHOT_FRAME=N[,M...]` | save the shown camera raster of frame N (default 1; a list saves each, a `%d` in the file name becomes the frame number) as a BMP (GPU readback) |
-| `BMX_KEYS=<script>` | scripted keyboard, see "Scripted input" below: e.g. `f300:enter,+150:enter,+100:up*400,+20:up+e*30` |
+| `BMX_KEYS=<script>` | scripted keyboard, see "Scripted input" below: e.g. `f300:enter,+150:enter,+100:up*400,+20:up+e*30`; `t<ms>:` events count milliseconds since the start instead of frames (movies show no frames): `t4000:up` aborts the first startup movie |
+| `BMX_MOVIE_SHOT=<file.bmp>`, `BMX_MOVIE_SHOT_FRAME=N[,M...]` | save the movie picture after the N-th DrawDibDraw of the process (a `%d` in the file name becomes N; GPU readback) and log which movie frame it showed |
 | `BMX_DRIVER_TRACE=1` | log every SDL3 driver entry with its first arguments |
 | `BMX_PNG_CHECK=1` or `=<folder>` | compare our PNG reader with the original libpng on every PNG read (and on every `*.png` in the folder), see "PNG reader" |
 | `BMX_TIME_BASE=<n>` | the value timeGetTime / GetTickCount show at process start (default 0x36ee80; `0xfffff000` runs through the 32-bit wrap) |
@@ -475,8 +476,9 @@ step 3), then the D7 screenshot diff (step 4).
 
 docs/PLATFORM.md has the design and the status (4a). In the native exe: the loader fills each import slot from the
 table in `src/platform/imports.c` (stand-in, else trap stub for the 64 dead slots, else the real function); the log
-shows per DLL `N stand-ins, N dead (trap stubs), N real` and the DLLs still used (KERNEL32, USER32, WINMM, AVIFIL32,
-MSVFW32 today; ADVAPI32, DDRAW and, unscripted, DINPUT only when asked; since S7 KERNEL32 has no real slot left). A call of a dead slot prints
+shows per DLL `N stand-ins, N dead (trap stubs), N real` and the DLLs still used (since S9 only USER32: the window,
+message loop, dialog and message box slots; ADVAPI32, DDRAW and, unscripted, DINPUT only when asked; S7 removed the
+last real KERNEL32 slot, S8 / S9 AVIFIL32, MSVFW32 and WINMM). A call of a dead slot prints
 `DEAD IMPORT called: <dll>!<name>, caller <addr>` and exits with code 3. The stand-ins: timeGetTime / GetTickCount /
 Sleep / QPC / QPF / OutputDebugStringA / DebugBreak / critical sections (kernel.c), the winmm timer functions on an
 SDL thread (winmm.c), the sound loader's CreateFileA / ReadFile / SetFilePointer / CloseHandle (fileio.c).
@@ -620,6 +622,49 @@ right before or after, to compare loudness, the music / effects balance and the 
 Report: anything that sounds different from the original (what, where), and the lines the script prints at the end
 (`sound: ... underruns`, `soundcheck: ... differences`, `soundcheck: RESULT ...`). Expected: no audible difference,
 `0 resampler underruns`, `RESULT clean`.
+
+### Movies on our decoder and SDL3 (S8, S9, 2026-10-31)
+
+docs/PLATFORM.md 4d has the design, the measurements and the status. Since S8 / S9 the movies (ACCLAIM / ZAXIS /
+INTRO at the start, Cool Stuff's movies and credits) run on our own AVI reader and Cinepak decoder
+(src/platform/avi.c, cinepak.c), their picture goes through the SDL3 driver (src/driver/movie.c: DrawDibDraw blits
+the frame 2x, nearest, into a target of the presented size and presents it) and their sound through SDL3 audio
+(src/platform/waveout.c, MM_WOM_DONE posted to the window as winmm does). No AVIFIL32, MSVFW32, iccvid or waveOut
+driver is loaded any more. Each movie logs `waveout: close after <s>: <n> buffers, <bytes> written (FNV ...),
+<bytes> played (FNV ...), <bytes> dropped by reset` and `avi: "<stream>": <n> reads, <bytes> (FNV ...)`; written
+equals what AVIStreamRead returned.
+
+Checks: `build/native32/bmxmovietest.exe <game>\bin\movie` (Windows only; every frame of the seven files against
+iccvid, byte-identical; StreamInfo / ReadFormat / TimeToSample / SampleToTime / Read against avifil32; 3000 synthetic
+Cinepak frames); `bmxmovietest --drawdib <file.avi> <frame> <shot.bmp>` against a `BMX_MOVIE_SHOT` readback (0
+pixels differ); `bmxplatformtest` (waveOut against winmm). Scripted runs with movies on: no `BMX_NO_MOVIES`,
+`BMX_MUTE=1`, `BMX_KEYS` with `t<ms>` events for aborting (`t4000:up,t6500:up,t9000:up` skips the three startup
+movies), then `f300:down,f400:down,f500:down,f600:enter` (Cool Stuff), `f900:down,f1000:down,f1100:down,f1200:enter`
+(CREDITS; two downs and Enter, then `+300:enter`, for MOVIES -> INTRO MOVIE).
+
+**Watch test (the user's).** Needs a build of this state and the movies' sound audible (check the volume; `-Mute`
+for a silent run). PowerShell, a fresh window:
+
+```powershell
+cd C:\Users\Dennis\Games\dmfbmx\native-run      # copy movietest.ps1 here from native-run2 first
+.\movietest.ps1
+```
+
+The script backs up `save\SAVE.DAT`, runs `bmxnative.exe Scene.Txt -r640.480.16` with movies on, restores the save
+and keeps the log as `movietest.log`. Window focused, keyboard or pad:
+
+1. ACCLAIM and ZAXIS play to the end without a key: picture sharp (2x pixels), no wrong blocks or tearing, sound in
+   sync with the picture, no crackles or dropouts.
+2. INTRO starts: press Enter (or a pad button) after a few seconds: it stops at once, sound included, and the game
+   goes on to the title / main menu.
+3. Main menu: COOL STUFF, then MOVIES, INTRO MOVIE: let it play to the end (1:45); it returns to the list.
+4. Back, CREDITS: watch a minute (the music is stereo 44.1 kHz), then press Enter: the credits stop and the hub
+   comes back.
+5. QUIT, Yes.
+
+If you can, watch the same in the original (hooked or vanilla) to compare the picture and the sound. Report anything
+that looks or sounds different, and the lines the script prints (`waveout: close ...`, `avi: ...`, `Movie : Key
+Abort`, any TRAP). Expected: for each movie `written` = `played` + `dropped` and the `avi:` bytes equal `written`.
 
 ### Open points from the CRT layer (2026-10-28)
 

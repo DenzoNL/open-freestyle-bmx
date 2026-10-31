@@ -81,6 +81,15 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   real-time steps and levels; `BMX_SOUND_CHECK=1` mirrors the game's calls on the real dsound.dll (two scripted runs:
   `RESULT clean`, 0 differences in 46000 calls). **Open:** the user's listening test (`native-run\soundtest.ps1`).
   **Next:** S8 (own AVI / Cinepak), S9 (movie output and waveOut on SDL3).
+- Platform layer S8/S9 done 2026-10-31 (docs/PLATFORM.md 4d, docs/NATIVE.md "Movies on our decoder and SDL3", native
+  only): own AVI reader + Cinepak decoder (src/platform/avi.c, cinepak.c) replace AVIFIL32/iccvid, DrawDib draws on
+  the SDL3 driver (src/driver/movie.c), waveOut plays on SDL3 audio and posts MM_WOM_DONE (src/platform/waveout.c).
+  `bmxmovietest` (tests/platform/test_movie.c): every frame of the 7 movies byte-identical to iccvid (two iccvid
+  quirks found and copied: the zero-tail selective V1 update, no codebook copy for key strips), StreamInfo /
+  ReadFormat / TimeToSample / SampleToTime / Read equal to avifil32's at every position; DrawDib vs our GPU readback
+  0 pixels differ; waveOut's results, flags and messages equal winmm's (bmxplatformtest); bytes queued = bytes read.
+  The game's import slots now load only USER32 for real. **Open:** the user's watch test (`native-run2\movietest.ps1`).
+  **Next:** S10 (SDL-owned window, message queue, message boxes).
 - Golden traces: record sessions with `bmxtrace.orig` (docs/TRACING.md) if not done yet.
 
 ## Machine setup

@@ -77,6 +77,11 @@ int bmxConfigInt(const char *key, int fallback);
 /* Replaces the configuration by the text (tests; `origin` names it in the log). */
 void bmxConfigLoadText(const char *text, const char *origin);
 
+/* ---- movies (avi.c) ---- */
+
+/* The frame number and stream name ("INTRO.AVI Video #1") of a DIB AVIStreamGetFrame handed out, or -1. */
+int32_t bmxAviFrameOf(const void *dib, const char **streamName);
+
 /* ---- paths (paths.c) ---- */
 
 /* The host path for a path as the game spells it (relative to the install folder, backslashes). Identity

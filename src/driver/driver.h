@@ -139,6 +139,10 @@ int drvGpuClear(struct SDL_GPUTexture *color, struct SDL_GPUTexture *depth, cons
 int drvGpuPresent(struct SDL_GPUTexture *color, int32_t x, int32_t y, int32_t width, int32_t height);
 struct SDL_GPUDevice *drvGpuDevice(void);
 int drvGpuShownFrames(void); /* frames presented so far (RwRasterShowRaster) */
+int drvGpuPresentMovie(struct SDL_GPUTexture *color, int32_t width, int32_t height, const char *shot);
+void drvGpuWindowSize(int32_t *width, int32_t *height);
+/* movie.c: releases the movie textures (before the GPU device goes). */
+void drvMovieRelease(void);
 
 /* draw.c: the D3D7 device calls of the ported driver code (rw/rwd3d.h) on SDL3 GPU. */
 int drvDrawStart(void);

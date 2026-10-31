@@ -86,7 +86,7 @@ if(BMX_NATIVE32)
   # Checks of the platform stand-ins against Windows (tests/platform): hosted, no game image.
   add_executable(bmxplatformtest $<TARGET_OBJECTS:bmx_range> ${BMX_CRT_STARTFILES} tests/platform/test_platform.c src/platform/kernel.c src/platform/winmm.c
     src/platform/fileio.c src/platform/paths.c src/platform/input.c src/platform/inputcheck.c
-    src/platform/config.c src/platform/dsound.c src/platform/soundcheck.c src/platform/smoothmix.c
+    src/platform/config.c src/platform/dsound.c src/platform/soundcheck.c src/platform/smoothmix.c src/platform/waveout.c
     src/bmx/pc/zge/sound/winchan.c)
   # The real winchanMix (compared with the smooth mixer) keeps its state at the original addresses: the test
   # owns that range like bmxnative does (range.S first, then the crt start files); the test unprotects it.
@@ -96,6 +96,12 @@ if(BMX_NATIVE32)
   target_include_directories(bmxplatformtest PRIVATE src)
   target_compile_options(bmxplatformtest PRIVATE ${BMX_WARNINGS})
   target_link_libraries(bmxplatformtest PRIVATE SDL3::SDL3 dinput dxguid ole32) # c_dfDIKeyboard / c_dfDIJoystick
+  # Our AVI reader / Cinepak decoder against avifil32 / iccvid on the game's movies (needs the files).
+  add_executable(bmxmovietest tests/platform/test_movie.c src/platform/avi.c src/platform/cinepak.c
+    src/platform/paths.c)
+  target_include_directories(bmxmovietest PRIVATE src)
+  target_compile_options(bmxmovietest PRIVATE ${BMX_WARNINGS})
+  target_link_libraries(bmxmovietest PRIVATE SDL3::SDL3 vfw32 msvfw32 gdi32)
   # SDL3.dll next to the exe (copy it into the game folder with bmxnative.exe).
   add_custom_command(TARGET bmxnative POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
     $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:bmxnative>)
