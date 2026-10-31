@@ -123,6 +123,10 @@ round floats (so the hook build uses SSE2, not x87). Rules are in CONTRIBUTING.m
   `-ffp-contract=off` so ARM FMA can't drift physics. Ported functions stay as decompiled; enhancements
   attach at seams (main loop, renderer, input, audio), not as option checks inside faithful code.
   Options are tagged visual-only or gameplay-changing; replays and saves record the gameplay-changing ones.
+- **Exception (2026-10-31, the user's call):** the native exe's input conveniences `dpad_steering` and
+  `stick_8way` (bmxnative.ini `[input]`) default **on**: the original reads only the stick (axial 10% dead
+  zone), which makes pure directions (backflip) very hard on a thumbstick. They act on the pad's lX/lY only,
+  after `BMX_INPUT_CHECK` compares, so the game still sees DirectInput-shaped input; `= 0` gives vanilla.
 
 ## Enhancement backlog (P6+, unordered)
 

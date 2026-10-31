@@ -296,7 +296,7 @@ int zprofileInitialize(void)
     s->peakResetFrames = s->limit60;
     if (s->limit60 == 0) {
         for (ZMemFreeNode *n = zmemFreeListFirst(s->entries); n != NULL; n = zmemFreeNodeNext(n)) {
-            *(uint32_t *)((uint8_t *)zmemFreeNodePayload(n) + 0x10) = 0;
+            ((ZProfileEntry *)zmemFreeNodePayload(n))->peak = 0;
         }
     }
     return 1;

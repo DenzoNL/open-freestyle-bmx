@@ -682,10 +682,11 @@ int zrwWorldRender(void)
 BMX_ADDR(0x00497640)
 void zrwWorldNop(void) {}
 
+/* The particle steps keep the original signatures: `system` is not const although they only read it. */
+// NOLINTBEGIN(readability-non-const-parameter)
 /* Moves every particle's velocity by the acceleration times the time since the last step (which is not
  * updated here). The timestamp is read before `system` is checked. */
 BMX_ADDR(0x00497650)
-// NOLINTNEXTLINE(readability-non-const-parameter): the system owns the particles the step changes
 void zrwParticleAccelerate(int enabled, uint32_t *system, const ZVec3 *acceleration)
 {
     const uint32_t now = gZrwTimeGetTime();
@@ -710,7 +711,6 @@ void zrwParticleNop(void) {}
 
 /* Particles whose y reaches the floor value are set onto it and have their y velocity reflected. */
 BMX_ADDR(0x00497700)
-// NOLINTNEXTLINE(readability-non-const-parameter): the system owns the particles the step changes
 void zrwParticleFloorBounce(int enabled, uint32_t *system, const float *params)
 {
     const float *p = params != NULL ? params : gZrwDefaultBounce;
@@ -732,3 +732,4 @@ void zrwParticleFloorBounce(int enabled, uint32_t *system, const float *params)
         }
     }
 }
+// NOLINTEND(readability-non-const-parameter)

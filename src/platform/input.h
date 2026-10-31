@@ -70,6 +70,14 @@ void bmxPadToJoyState(const BmxPadSnapshot *pad, const BmxDiAxisProps props[kDiA
  * axis range, over the stick. Returns 1 when it changed the state. */
 int bmxPadApplyDpad(uint8_t dpad, const BmxDiAxisProps props[kDiAxes], BmxDiJoyState *state);
 
+/* The stick 8-way option (docs/PLATFORM.md P7-B): the left stick (raw SDL values) inside a radial dead zone
+ * of kStick8WayDeadZone gives lX = lY = 0, outside it the angle snaps to the nearest of 8 directions (45
+ * degree sectors centred on the axes and diagonals) and lX / lY are the axis ends (props min / max) or 0.
+ * Returns 1 when it changed the state. */
+enum { kStick8WayDeadZone = 3277 }; /* 10% of 32767 */
+int bmxPadApplyStick8Way(const BmxPadSnapshot *pad, const BmxDiAxisProps props[kDiAxes],
+                         BmxDiJoyState *state);
+
 /* Forgets the pad and every device (tests). */
 void bmxInputReset(void);
 

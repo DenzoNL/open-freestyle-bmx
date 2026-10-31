@@ -86,6 +86,81 @@ typedef struct ZPrimAsset {
 
 _Static_assert(sizeof(ZPrimAsset) == 0x10, "asset size");
 
+/*
+ * Data of a picture or a sprite set (the block zprimAssetData returns). A picture is a set with one frame,
+ * which is why its texture handle sits at 0x20 and the group loader copies 0x24 header bytes. Offsets are
+ * relative to the start of the block. Pixel rows are `width` bytes wide (bpp 8) in sprite frames.
+ */
+typedef struct ZPrimFrame {
+    uint16_t width;      /* 0x00 */
+    uint16_t height;     /* 0x02 */
+    int32_t pixelOffset; /* 0x04 */
+    uint16_t originX;    /* 0x08 subtracted from the draw position (not for compressed sets) */
+    uint16_t originY;    /* 0x0a */
+    int32_t texture;     /* 0x0c renderer texture handle, 0 = none */
+} ZPrimFrame;
+
+typedef struct ZPrimSet {
+    uint16_t frameCount;   /* 0x00 (1 for a picture) */
+    uint16_t flags;        /* 0x02 bit 0: one 0x204 byte palette per frame */
+    uint16_t width;        /* 0x04 */
+    uint16_t height;       /* 0x06 */
+    int32_t pixelOffset;   /* 0x08 pixels of frame 0 */
+    int32_t paletteOffset; /* 0x0c {flags, count, colours}, 0 = none */
+    uint16_t bpp;          /* 0x10 */
+    uint8_t pad12[2];
+    ZPrimFrame frames[]; /* 0x14 */
+} ZPrimSet;
+
+_Static_assert(sizeof(ZPrimFrame) == 0x10, "frame size");
+_Static_assert(__builtin_offsetof(ZPrimFrame, pixelOffset) == 0x04, "frame layout");
+_Static_assert(__builtin_offsetof(ZPrimFrame, originX) == 0x08, "frame layout");
+_Static_assert(__builtin_offsetof(ZPrimFrame, texture) == 0x0c, "frame layout");
+_Static_assert(sizeof(ZPrimSet) == 0x14, "set header size");
+_Static_assert(__builtin_offsetof(ZPrimSet, pixelOffset) == 0x08, "set layout");
+_Static_assert(__builtin_offsetof(ZPrimSet, paletteOffset) == 0x0c, "set layout");
+_Static_assert(__builtin_offsetof(ZPrimSet, bpp) == 0x10, "set layout");
+_Static_assert(__builtin_offsetof(ZPrimSet, frames) == 0x14, "set layout");
+/* A picture's only texture handle is frame 0's. */
+_Static_assert(sizeof(ZPrimSet) + __builtin_offsetof(ZPrimFrame, texture) == 0x20, "picture texture at 0x20");
+
+/* One glyph record of a font (10 bytes). */
+typedef struct ZPrimGlyph {
+    uint8_t x, y;          /* 0x00 top left of the glyph in the pixel sheet */
+    uint8_t width, height; /* 0x02 */
+    int8_t offsetX;        /* 0x04 */
+    int8_t offsetY;        /* 0x05 */
+    int8_t trailingX;      /* 0x06 space after the glyph (adds to its advance and box) */
+    int8_t trailingY;      /* 0x07 space below the glyph (adds to its box height) */
+    uint16_t code;         /* 0x08 character code */
+} ZPrimGlyph;
+
+/*
+ * Data of a font. Fonts with fewer than 0x100 glyphs are "small": they cover consecutive codes from the
+ * code of glyph 0, and glyphs are found by index. Larger fonts are searched by code.
+ */
+typedef struct ZPrimFont {
+    uint16_t glyphCount; /* 0x00 */
+    uint16_t flags;      /* 0x02 returned by zprimFontFlags */
+    int32_t pixelOffset; /* 0x04 */
+    uint16_t pitch;      /* 0x08 bytes per row of the pixel sheet */
+    uint8_t pad0a[2];
+    int32_t *pages; /* 0x0c 32 texture handles, created when glyphs are drawn; NULL before */
+    uint8_t pad10[4];
+    uint16_t field14; /* 0x14 low half of the `c` argument zprimDrawText hands to ngifDrawGlyph */
+    uint8_t pad16[2];
+    ZPrimGlyph glyphs[]; /* 0x18 */
+} ZPrimFont;
+
+_Static_assert(sizeof(ZPrimGlyph) == 10, "glyph size");
+_Static_assert(__builtin_offsetof(ZPrimGlyph, code) == 0x08, "glyph layout");
+_Static_assert(sizeof(ZPrimFont) == 0x18, "font header size");
+_Static_assert(__builtin_offsetof(ZPrimFont, pixelOffset) == 0x04, "font layout");
+_Static_assert(__builtin_offsetof(ZPrimFont, pitch) == 0x08, "font layout");
+_Static_assert(__builtin_offsetof(ZPrimFont, pages) == 0x0c, "font layout");
+_Static_assert(__builtin_offsetof(ZPrimFont, field14) == 0x14, "font layout");
+_Static_assert(__builtin_offsetof(ZPrimFont, glyphs) == 0x18, "font layout");
+
 typedef struct ZPrimRect {
     int16_t x0, y0, x1, y1;
 } ZPrimRect;

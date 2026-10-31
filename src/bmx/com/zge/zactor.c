@@ -235,11 +235,12 @@ int zvec3IsZero(const ZVec3 *v)
     return zfpEqual(v->x, 0.0f) && zfpEqual(v->y, 0.0f) && zfpEqual(v->z, 0.0f);
 }
 
-/* Copies the nine secondary joints (0x36 bytes) of a's motion result into b's joints 1 to 9. */
+/* Copies joints 1 to 9 (the secondary chains) of a's channel 6 (the mirror companion of sampled motion
+ * 2) into the blended result of b. */
 BMX_ADDR(0x00474960)
 void zactorCopySecondaryJoints(const ZActor *a, const ZActor *b)
 {
-    zmemCopy((uint8_t *)b->player + 0x10a, (const uint8_t *)a->player + 0x9f2, 0x36);
+    zmemCopy(&b->player->ch[0].joints[1], &a->player->ch[6].joints[1], 9 * sizeof(ZAngle3));
 }
 
 /* One angle of zmotionAverageAngles. A difference of 0x8000 or more is a wrap: the sum is then unsigned. */
@@ -446,11 +447,13 @@ ZMotionBank *zmotionBankAdd(uint8_t *data, uint32_t size, int replaceFirst)
     }
     bank->base = data;
     bank->size = size;
-    if (*(uint32_t *)data == 0x2a81511c) {
-        bank->base += 0x10;
-        bank->cursor = (const uint32_t *)(data + 0x14);
-        bank->table = (const uint16_t *)(data + 0x10);
-        bank->remaining = *(const uint16_t *)(data + 0x12);
+    if (*(uint32_t *)data == kZmotionBankMagic) {
+        /* Banks with a 0x10 byte header: the table follows it, entries start behind the table's two
+         * 16 bit words. */
+        bank->base += kZmotionBankHeaderSize;
+        bank->cursor = (const uint32_t *)(data + kZmotionBankHeaderSize + 4);
+        bank->table = (const uint16_t *)(data + kZmotionBankHeaderSize);
+        bank->remaining = *(const uint16_t *)(data + kZmotionBankHeaderSize + 2);
         return bank;
     }
     if (data[0] == 0xff) {
@@ -540,7 +543,7 @@ uint8_t zmotionMarkerCount(const ZMotion *m)
     if (m->markerOffset == 0) {
         return 0;
     }
-    return *((const uint8_t *)m + m->markerOffset + 0xc);
+    return ((const ZMotionMarkerBlock *)((const uint8_t *)m + m->markerOffset))->count;
 }
 
 static ZAngle zmotionMarkerRotation(void)
@@ -558,11 +561,11 @@ uint8_t zmotionGetMarkers(const ZMotion *m, ZMotionMarker *out)
     if (m->markerOffset == 0) {
         return 0;
     }
-    const uint8_t *block = (const uint8_t *)m + m->markerOffset;
-    const int16_t *src = (const int16_t *)(block + 0x10);
+    const ZMotionMarkerBlock *block = (const ZMotionMarkerBlock *)((const uint8_t *)m + m->markerOffset);
+    const int16_t *src = block->points;
     const int wide = (m->format & 0x70) != 0; /* entries carry an extra angle */
     int i = 0;
-    if (*(const uint16_t *)(block + 0xc) != 0) {
+    if (block->count16 != 0) {
         do {
             out->pos.x = (float)((double)src[1] * 0x1p-3f);
             out->pos.y = (float)((double)src[2] * 0x1p-3f);
@@ -573,9 +576,9 @@ uint8_t zmotionGetMarkers(const ZMotion *m, ZMotionMarker *out)
             src += wide ? 5 : 4;
             i++;
             out++;
-        } while (i < *(const uint16_t *)(block + 0xc));
+        } while (i < block->count16);
     }
-    return block[0xc];
+    return (uint8_t)block->count16;
 }
 
 /* Like zmotionGetMarkers for the first marker only. */
@@ -585,8 +588,8 @@ uint8_t zmotionGetFirstMarker(const ZMotion *m, ZMotionMarker *out)
     if (m->markerOffset == 0) {
         return 0;
     }
-    const uint8_t *block = (const uint8_t *)m + m->markerOffset;
-    const int16_t *src = (const int16_t *)(block + 0x10);
+    const ZMotionMarkerBlock *block = (const ZMotionMarkerBlock *)((const uint8_t *)m + m->markerOffset);
+    const int16_t *src = block->points;
     const int wide = (m->format & 0x70) != 0;
     out->pos.x = (float)((double)src[1] * 0x1p-3f);
     out->pos.y = (float)((double)src[2] * 0x1p-3f);
@@ -594,7 +597,7 @@ uint8_t zmotionGetFirstMarker(const ZMotion *m, ZMotionMarker *out)
     out->weight = (float)((double)src[0] * 0x1p-10f);
     out->angle = wide ? src[4] : 0;
     zvec3RotateY(&out->pos, &out->pos, zmotionMarkerRotation());
-    return block[0xc];
+    return (uint8_t)block->count16;
 }
 
 BMX_ADDR(0x004758f0)

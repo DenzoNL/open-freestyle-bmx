@@ -197,16 +197,16 @@ int zmovieOpenAudio(ZMovie *m, uint32_t callback)
     }
     m->bufferCount = 0;
     do {
-        ZMovieWaveHeader *buffer = zmemAlloc(kZmovieBufferBytes + 0x20);
+        ZMovieWaveHeader *buffer = zmemAlloc(kZmovieBufferBytes + sizeof(ZMovieWaveHeader));
 
         m->buffers[m->bufferCount] = buffer;
         if (buffer == 0) {
             break;
         }
         buffer->flags = 1;
-        buffer->data = (uint8_t *)buffer + 0x20;
+        buffer->data = (uint8_t *)(buffer + 1); /* the data follows the header */
         buffer->length = kZmovieBufferBytes;
-        if (gWaveOutPrepare(m->waveOut, buffer, 0x20) != 0) {
+        if (gWaveOutPrepare(m->waveOut, buffer, sizeof(ZMovieWaveHeader)) != 0) {
             zmemFree(buffer);
             break;
         }

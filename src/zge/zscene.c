@@ -38,7 +38,7 @@ typedef struct ZsceneChunkHandler {
 BMX_ADDR(0x004900d0)
 void zobjLightSetColor(void *light, const uint8_t *rgba)
 {
-    gZrwLightColor(((void **)light)[0x2c / 4], rgba);
+    gZrwLightColor(((ZObj *)light)->model, rgba);
 }
 
 BMX_ADDR(0x004900f0)
@@ -49,13 +49,13 @@ void zobjLightSetFlags(void *light, uint8_t flags)
     if ((flags & 2) != 0) {
         bits |= 2;
     }
-    gZrwLightFlags(((void **)light)[0x2c / 4], bits);
+    gZrwLightFlags(((ZObj *)light)->model, bits);
 }
 
 BMX_ADDR(0x00490120)
 void zobjLightSetDirection(void *light, const ZVec3 *direction)
 {
-    gZrwLightDirection(((void **)light)[0x2c / 4], direction);
+    gZrwLightDirection(((ZObj *)light)->model, direction);
 }
 
 /* Free list destructor of a scene node. */
@@ -286,7 +286,7 @@ void zsceneReleaseEntries(int all)
             if ((uint8_t)(flags >> 8) == 0) {
                 void *object = entry->object;
 
-                if (((void **)object)[0x2c / 4] != 0) {
+                if (((ZObj *)object)->model != 0) {
                     zsceneForgetEntry(1, 0, object, 0);
                 }
                 zobjFree(object);

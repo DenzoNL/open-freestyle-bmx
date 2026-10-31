@@ -70,8 +70,8 @@ void bmxPlatformShutdown(void);
 
 /*
  * bmxnative.ini next to the exe (BMX_CONFIG=<path> names another), read on first use: `key = value` lines,
- * `[section]` headers prefix the keys ("input.dpad_steering"), `#` and `;` start comments. Every option is
- * off by default; unknown keys are logged.
+ * `[section]` headers prefix the keys ("input.dpad_steering"), `#` and `;` start comments. Options are off
+ * by default except the input conveniences dpad_steering and stick_8way (on); unknown keys are logged.
  */
 int bmxConfigInt(const char *key, int fallback);
 /* Replaces the configuration by the text (tests; `origin` names it in the log). */

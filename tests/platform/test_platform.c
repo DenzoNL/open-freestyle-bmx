@@ -582,6 +582,103 @@ static void testPadTables(void)
     CHECK(bmxPadApplyDpad(bmxPadDpad(&p), props, &s) == 0, "no d-pad, no change");
 }
 
+static void stick8Props(BmxDiAxisProps props[kDiAxes])
+{
+    for (int i = 0; i < kDiAxes; i++) {
+        bmxDiAxisDefaults(&props[i]);
+        props[i].min = -127;
+        props[i].max = 127;
+    }
+}
+
+static void stick8(int x, int y, int *outX, int *outY)
+{
+    BmxDiAxisProps props[kDiAxes];
+    BmxPadSnapshot p = padWith(kBmxPadDualSense, 0);
+    BmxDiJoyState s;
+
+    stick8Props(props);
+    p.leftX = (int16_t)x;
+    p.leftY = (int16_t)y;
+    bmxPadToJoyState(&p, props, &s);
+    (void)bmxPadApplyStick8Way(&p, props, &s);
+    *outX = s.axis[kDiAxisX];
+    *outY = s.axis[kDiAxisY];
+}
+
+static int roundToInt(double v)
+{
+    return (int)(v < 0 ? v - 0.5 : v + 0.5);
+}
+
+static void testStick8Way(void)
+{
+    /* angle (degrees, 0 = right, 90 = down as SDL's +Y) at radius 20000 -> expected lX, lY; the sector
+     * boundaries are at 22.5 + k * 45, tested 2.5 degrees to each side */
+    static const struct {
+        int deg10, ex, ey;
+    } kCases[] = {
+        {0, 127, 0},        {200, 127, 0},      {250, 127, 127},   {450, 127, 127},   {650, 127, 127},
+        {700, 0, 127},      {900, 0, 127},      {1100, 0, 127},    {1150, -127, 127}, {1350, -127, 127},
+        {1550, -127, 127},  {1600, -127, 0},    {1800, -127, 0},   {2000, -127, 0},   {2050, -127, -127},
+        {2250, -127, -127}, {2450, -127, -127}, {2500, 0, -127},   {2700, 0, -127},   {2900, 0, -127},
+        {2950, 127, -127},  {3150, 127, -127},  {3350, 127, -127}, {3400, 127, 0},
+    };
+    BmxDiAxisProps props[kDiAxes];
+    BmxPadSnapshot p;
+    BmxDiJoyState s, plain;
+    int x, y;
+
+    for (size_t i = 0; i < sizeof kCases / sizeof kCases[0]; i++) {
+        const double a = kCases[i].deg10 / 10.0 * 3.14159265358979 / 180.0;
+
+        stick8(roundToInt(20000 * cos(a)), roundToInt(20000 * sin(a)), &x, &y);
+        CHECK(x == kCases[i].ex && y == kCases[i].ey, "8-way %.1f deg: %d %d", kCases[i].deg10 / 10.0, x, y);
+    }
+    /* radial dead zone: inside the radius is 0/0, just outside it a full deflection */
+    stick8(3000, 0, &x, &y);
+    CHECK(x == 0 && y == 0, "inside dead zone %d %d", x, y);
+    stick8(2300, 2300, &x, &y);
+    CHECK(x == 0 && y == 0, "diagonal inside the circle %d %d", x, y);
+    stick8(3500, 0, &x, &y);
+    CHECK(x == 127 && y == 0, "outside dead zone %d %d", x, y);
+    /* the problem case: down with a little X (vanilla gives a diagonal) is a pure down */
+    stick8(2500, 30000, &x, &y);
+    CHECK(x == 0 && y == 127, "down with drift %d %d", x, y);
+    stick8(-32768, 32767, &x, &y);
+    CHECK(x == -127 && y == 127, "extremes %d %d", x, y);
+
+    /* option off = the function is not applied: the state stays the vanilla cooked one */
+    stick8Props(props);
+    p = padWith(kBmxPadDualSense, 0);
+    p.leftX = 5000;
+    p.leftY = 30000;
+    bmxPadToJoyState(&p, props, &plain);
+    CHECK(plain.axis[kDiAxisX] > 0 && plain.axis[kDiAxisY] > 100 && plain.axis[kDiAxisY] < 127,
+          "vanilla is an analog diagonal-ish value %d %d", (int)plain.axis[0], (int)plain.axis[1]);
+    s = plain;
+    CHECK(bmxPadApplyStick8Way(&p, props, &s) == 1 && s.axis[kDiAxisX] == 0 && s.axis[kDiAxisY] == 127,
+          "snap changes it");
+    /* a state already snapped reports no change */
+    CHECK(bmxPadApplyStick8Way(&p, props, &s) == 0, "idempotent");
+    /* d-pad wins (input.c skips the snap while a d-pad direction is held): the d-pad then acts as before */
+    p = padWith(kBmxPadDualSense, 1ull << SDL_GAMEPAD_BUTTON_DPAD_LEFT);
+    p.leftY = 30000;
+    bmxPadToJoyState(&p, props, &s);
+    plain = s;
+    CHECK(bmxPadDpad(&p) != 0 && bmxPadApplyDpad(bmxPadDpad(&p), props, &s) == 1 &&
+              s.axis[kDiAxisX] == -127 && s.axis[kDiAxisY] == plain.axis[kDiAxisY],
+          "d-pad press: X from the d-pad, Y vanilla");
+    /* generic pad: the left stick is axes 0 / 1 */
+    p = padWith(kBmxPadGeneric, 0);
+    p.axisCount = 2;
+    p.axes[0] = 2000;
+    p.axes[1] = -30000;
+    bmxPadToJoyState(&p, props, &s);
+    (void)bmxPadApplyStick8Way(&p, props, &s);
+    CHECK(s.axis[kDiAxisX] == 0 && s.axis[kDiAxisY] == -127, "generic %d %d", (int)s.axis[0], (int)s.axis[1]);
+}
+
 typedef struct KeyCase {
     int scancode, vk;
 } KeyCase;
@@ -973,6 +1070,7 @@ int main(void)
     testFiles();
     testDiArithmetic();
     testPadTables();
+    testStick8Way();
     testKeyTable();
     testInputObjects();
     testInputCheck();

@@ -233,7 +233,7 @@ static void setup_sync_pose(DtCtx *c)
     *(float *)(player + 0x100) = dt_float_edgy(-5.0f, 5.0f);
     a->player = (struct ZMotionPlayer *)player;
     a->object = make_model_object();
-    a->object2 = make_model_object();
+    a->shadow = make_model_object();
     a->partCount = dt_range(0, 15);
     for (int i = 0; i < 15; i++) {
         a->partHash[i] = (dt_u32() % 3 == 0) ? dt_u32() : (uint32_t)zstrHash(kArms[dt_range(0, 5)]);

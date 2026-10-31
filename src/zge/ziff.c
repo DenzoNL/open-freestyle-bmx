@@ -158,7 +158,7 @@ int ziffBeginModel(void *iffp)
         iff->frame->size = gZiff.headSize;
         iff->frame->start = gZiff.headOffset - 8;
     } else {
-        if ((uint8_t *)f >= (uint8_t *)iff + 0xe8) {
+        if (f >= &iff->frames[kZiffFrames - 1]) { /* the last frame is in use: no room to nest */
             zdebugFail("Nested too deep", kZiffFile, 0x31a, 0);
             return 0;
         }

@@ -14,11 +14,20 @@ ANNOT = re.compile(r"^BMX_ADDR\((0x[0-9a-fA-F]+)\)\s*\n(?:static\s+)?(?:__attrib
 def scan(src_dir):
     seen = {}
     for path in sorted(Path(src_dir).rglob("*.c")):
-        for m in ANNOT.finditer(path.read_text()):
+        text = path.read_text()
+        matched = 0
+        for m in ANNOT.finditer(text):
+            matched += 1
             addr, name = int(m.group(1), 16), m.group(2)
             if addr in seen:
                 sys.exit(f"{path}: {addr:#x} already ported as {seen[addr]}")
             seen[addr] = name
+        # An annotation the pattern can't pair with a definition (e.g. a comment line in between) would silently
+        # leave that function unhooked: the hooked game runs the original instead, the native exe traps. Of
+        # stacked annotations (guilabel.c) only the last one, next to the definition, is hooked.
+        total = len(re.findall(r"^BMX_ADDR\(.*\n(?!BMX_ADDR\()", text, re.M))
+        if total != matched:
+            sys.exit(f"{path}: {total - matched} BMX_ADDR annotation(s) not directly followed by a function definition")
     return seen
 
 

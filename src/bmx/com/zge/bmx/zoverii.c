@@ -5,6 +5,7 @@
 #include "bmx/com/zge/ngif/ngifzactor.h"
 #include "bmx/com/zge/ngif/ngifzbsp.h"
 #include "compat/crt.h"
+#include "zge/com/zglrw/zrwcol.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zobjcamera.h"
 #include "zge/zmem.h"
@@ -498,7 +499,8 @@ static int rigFaceContact(const ZbspFaceHit *h, const ZVec3 *move, const ZVec3 *
 
     *n = f->normal;
     zvec3NormalizeScaled(n, n);
-    f->d = (float)-zvec3Dot(n, (const ZVec3 *)((const uint8_t *)f->owner + 0x10));
+    /* The owner is the renderer hit the face was built from; its first corner lies on the plane. */
+    f->d = (float)-zvec3Dot(n, (const ZVec3 *)((const ZrwColHit *)f->owner)->vertex[0]);
     if (!(zvec3Dot(move, move) >= 0x1.99999ap-4f)) {
         target->x = (float)((double)f->normal.x * CONTACT_GAP + h->point.x);
         target->y = (float)((double)f->normal.y * CONTACT_GAP + h->point.y);
@@ -1128,13 +1130,12 @@ void zoverRigGrabEdges(ZRig *rig)
         ZVec3 bestPos;
 
         for (void **e = edges; *e != NULL; e++) {
-            const uint8_t *edge = *e;
+            const PhysEdge *edge = *e;
             ZVec3 q;
             int dx, dy, dz;
             uint32_t score;
 
-            zbspClosestPointOnEdge((const int16_t *)(edge + 8), (const int16_t *)(edge + 0xe),
-                                   (const ZVec3 *)(edge + 0x18), &p->pos, &q);
+            zbspClosestPointOnEdge(edge->a, edge->b, &edge->dir, &p->pos, &q);
             dx = bmxFtol((double)q.x - p->pos.x);
             dy = bmxFtol((double)q.y - p->pos.y);
             dz = bmxFtol((double)q.z - p->pos.z);

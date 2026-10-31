@@ -63,6 +63,9 @@ typedef struct ZObj {
 
 _Static_assert(sizeof(ZObj) == 0x3c, "object layout");
 _Static_assert(__builtin_offsetof(ZObj, links) == 0x24, "object layout");
+_Static_assert(__builtin_offsetof(ZObj, ops) == 0x28, "object layout");
+_Static_assert(__builtin_offsetof(ZObj, model) == 0x2c, "object layout");
+_Static_assert(__builtin_offsetof(ZObj, events) == 0x38, "object layout");
 
 enum {
     kZobjActive = 0x08,

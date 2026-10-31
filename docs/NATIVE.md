@@ -517,7 +517,9 @@ in PLATFORM.md 4a / 5 (four fixes).
 
 Switches: `BMX_INPUT_CHECK=1` repeats every DirectInput call of the game on the real dinput.dll and compares (log
 lines `inputcheck:`; summary at exit, last line `inputcheck: RESULT clean|MISMATCHES`); `BMX_CONFIG=<file>` names
-the config file (default `bmxnative.ini` next to the exe), whose only option so far is `[input] dpad_steering = 1`.
+the config file (default `bmxnative.ini` next to the exe), whose options (both on by default since 2026-10-31; `= 0` gives vanilla) are `[input] dpad_steering = 1` and `[input] stick_8way = 1` (the left stick snaps to 8 directions
+with a radial 10% dead zone and full deflection, so pure down / up / left / right are possible; pad only; a held
+d-pad wins; log `input: stick 8-way snapping on`; `inputtest.ps1 -Snap`; PLATFORM.md P7).
 Both need a focused window, so they are the user's tests (an agent must not take the focus):
 
 **Test A, vanilla input against real DirectInput** (DualSense attached before the start, by USB; Steam closed, its

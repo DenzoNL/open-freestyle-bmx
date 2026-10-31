@@ -13,6 +13,7 @@
  * BMX_KEYS (src/native/keys.c) is a source of the same keyboard: the script's keys, focus ignored, no pad.
  * BMX_INPUT_CHECK=1 mirrors every call on the real DirectInput and compares (inputcheck.c).
  * Option `input.dpad_steering` (bmxnative.ini, P7): the d-pad also sets lX / lY.
+ * Option `input.stick_8way` (P7-B): the left stick snaps to 8 directions (radial dead zone, full deflection).
  */
 #include <SDL3/SDL.h>
 #include <string.h>
@@ -222,6 +223,37 @@ int bmxPadApplyDpad(uint8_t dpad, const BmxDiAxisProps props[kDiAxes], BmxDiJoyS
     return memcmp(&before, state, sizeof before) != 0;
 }
 
+int bmxPadApplyStick8Way(const BmxPadSnapshot *pad, const BmxDiAxisProps props[kDiAxes], BmxDiJoyState *state)
+{
+    const BmxDiJoyState before = *state;
+    int32_t x, y;
+
+    if (pad->family == kBmxPadGeneric) {
+        if (pad->axisCount < 2) {
+            return 0;
+        }
+        x = pad->axes[0];
+        y = pad->axes[1];
+    } else {
+        x = pad->leftX;
+        y = pad->leftY;
+    }
+    /* The radial dead zone on the raw SDL vector (-32768..32767): 10% of the half range as a radius. */
+    if ((int64_t)x * x + (int64_t)y * y <= (int64_t)kStick8WayDeadZone * kStick8WayDeadZone) {
+        state->axis[kDiAxisX] = 0;
+        state->axis[kDiAxisY] = 0;
+    } else {
+        /* An axis is active when its share of the vector is beyond tan(22.5 deg) = 0.4142 of the other. */
+        const int64_t ax = x < 0 ? -(int64_t)x : x, ay = y < 0 ? -(int64_t)y : y;
+        const int32_t sx = x < 0 ? props[kDiAxisX].min : props[kDiAxisX].max;
+        const int32_t sy = y < 0 ? props[kDiAxisY].min : props[kDiAxisY].max;
+
+        state->axis[kDiAxisX] = ax * 10000 > ay * 4142 ? sx : 0;
+        state->axis[kDiAxisY] = ay * 10000 > ax * 4142 ? sy : 0;
+    }
+    return memcmp(&before, state, sizeof before) != 0;
+}
+
 /* ---- keyboard: SDL_Scancode (USB HID usage) -> DIK (set-1 scan code, + 0x80 for E0 keys) ---- */
 
 static const uint8_t kDik[SDL_SCANCODE_COUNT] = {
@@ -369,7 +401,7 @@ static struct {
     int present;
 } gPad;
 
-static int gScripted, gDpadSteering, gStarted;
+static int gScripted, gDpadSteering, gStick8Way, gStarted;
 
 static int focused(void)
 {
@@ -755,10 +787,15 @@ static BmxHresult BMX_WINAPI devGetDeviceState(BmxDiDevice *self, uint32_t size,
         r = joyState(d, size, &state, &pad);
         bmxCheckJoyState(d->check, r, r == kDiOk ? &state : NULL, &pad);
         if (r == kDiOk) {
+            const uint8_t dpadNow = gDpadSteering ? bmxPadDpad(&pad) : 0;
+
+            if (gStick8Way && dpadNow == 0) {
+                (void)bmxPadApplyStick8Way(&pad, d->props, &state);
+            }
             if (gDpadSteering) {
                 static uint8_t lastDpad;
                 static int lines;
-                const uint8_t dpad = bmxPadDpad(&pad);
+                const uint8_t dpad = dpadNow;
 
                 (void)bmxPadApplyDpad(dpad, d->props, &state);
                 if (dpad != lastDpad && lines < 200) {
@@ -964,7 +1001,9 @@ int32_t BMX_WINAPI bmxStandDirectInputCreateEx(void *instance, uint32_t version,
     if (!gStarted) {
         gStarted = 1;
         gScripted = bmxKeysScripted();
-        gDpadSteering = bmxConfigInt("input.dpad_steering", 0);
+        /* On by default (the user's call, PLAN.md Decisions): input conveniences; 0 gives vanilla. */
+        gDpadSteering = bmxConfigInt("input.dpad_steering", 1);
+        gStick8Way = bmxConfigInt("input.stick_8way", 1);
         if (gScripted) {
             bmxLog("input: scripted keyboard (BMX_KEYS), no pad, focus ignored\n");
         } else {
@@ -972,6 +1011,9 @@ int32_t BMX_WINAPI bmxStandDirectInputCreateEx(void *instance, uint32_t version,
         }
         if (gDpadSteering) {
             bmxLog("input: d-pad steering on (the d-pad also sets lX / lY)\n");
+        }
+        if (gStick8Way) {
+            bmxLog("input: stick 8-way snapping on\n");
         }
         if (bmxCheckEnabled()) {
             bmxCheckStart(instance, version, iid);
@@ -991,5 +1033,5 @@ void bmxInputReset(void)
     padClose();
     memset(&gPad, 0, sizeof gPad);
     memset(gDevices, 0, sizeof gDevices);
-    gStarted = gScripted = gDpadSteering = gDiRefs = 0;
+    gStarted = gScripted = gDpadSteering = gStick8Way = gDiRefs = 0;
 }

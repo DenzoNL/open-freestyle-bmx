@@ -110,8 +110,8 @@ void zprimClear(void)
     ngifBegin();
     switch (st->kind) {
     case 1: {
-        const uint16_t *pic = zprimAssetData(st->asset);
-        ngifSetPictureScreen(pic, pic[2], pic[3]);
+        const ZPrimSet *pic = zprimAssetData(st->asset);
+        ngifSetPictureScreen(pic, pic->width, pic->height);
         zprimAssetRelease(st->asset);
         break;
     }
@@ -702,6 +702,27 @@ static uint32_t zprimRoundDimension(uint32_t v)
     return v;
 }
 
+/* Bitmap file header and BITMAPINFOHEADER, back to back (0x36 bytes, unaligned fields). */
+typedef struct __attribute__((packed)) ZBmpHeader {
+    uint16_t magic;
+    uint32_t fileSize;
+    uint32_t reserved;
+    uint32_t dataOffset;
+    uint32_t infoSize;
+    uint32_t width;
+    uint32_t height;
+    uint16_t planes;
+    uint16_t bitCount;
+    uint32_t compression;
+    uint32_t imageSize;
+    uint32_t xPixelsPerMeter;
+    uint32_t yPixelsPerMeter;
+    uint32_t colorsUsed;
+    uint32_t colorsImportant;
+} ZBmpHeader;
+
+_Static_assert(sizeof(ZBmpHeader) == 0x36, "BMP header size");
+
 /*
  * Builds a bottom-up BMP in static memory from `pixels` (w x h, bpp 1, 4 or 8) and a 15 bit palette
  * ({flags, count, colours}), hands it to the renderer and returns the texture handle. The texture is
@@ -731,44 +752,47 @@ int zprimCreateTexture(uint32_t w, uint32_t h, uint32_t bpp, const uint8_t *pixe
     uint32_t *mark = zmemStaticMark();
     const uint32_t imageBytes = pitch * texH;
     const uint32_t colors = 1u << (bpp & 0x1f);
-    const uint32_t size = imageBytes + 0x36 + colors * 4;
+    const uint32_t size = imageBytes + sizeof(ZBmpHeader) + colors * 4;
     uint8_t *bmp = zmemStaticAlloc(size);
     zmemFill(bmp, 0, size);
-    *(uint16_t *)bmp = 0x4d42;
-    *(uint32_t *)(bmp + 2) = size;
-    *(uint32_t *)(bmp + 6) = 0;
-    *(uint32_t *)(bmp + 10) = colors * 4 + 0x36;
-    *(uint32_t *)(bmp + 0xe) = 0x28;
-    *(uint32_t *)(bmp + 0x12) = texW;
-    *(uint32_t *)(bmp + 0x16) = texH;
-    *(uint16_t *)(bmp + 0x1a) = 1;
-    *(uint16_t *)(bmp + 0x1c) = (uint16_t)bpp;
-    *(uint32_t *)(bmp + 0x1e) = 0;
-    *(uint32_t *)(bmp + 0x22) = imageBytes;
-    *(uint32_t *)(bmp + 0x26) = 0;
-    *(uint32_t *)(bmp + 0x2a) = 0;
-    *(uint32_t *)(bmp + 0x2e) = 0;
-    *(uint32_t *)(bmp + 0x32) = 0;
+    ZBmpHeader *header = (ZBmpHeader *)bmp;
+    header->magic = 0x4d42;
+    header->fileSize = size;
+    header->reserved = 0;
+    header->dataOffset = colors * 4 + 0x36;
+    header->infoSize = 0x28;
+    header->width = texW;
+    header->height = texH;
+    header->planes = 1;
+    header->bitCount = (uint16_t)bpp;
+    header->compression = 0;
+    header->imageSize = imageBytes;
+    header->xPixelsPerMeter = 0;
+    header->yPixelsPerMeter = 0;
+    header->colorsUsed = 0;
+    header->colorsImportant = 0;
     for (uint32_t i = 0; i < colors; i++) {
-        uint8_t *c = bmp + 0x38 + i * 4; /* c[-2], c[-1], c[0] are the colour bytes, c[1] the index */
+        /* A palette entry is blue, green, red and a fourth byte, which gets the index. The 15 bit colours
+         * keep red in the low bits. */
+        uint8_t *q = bmp + sizeof(ZBmpHeader) + i * 4;
         if (i < palette[1]) {
             const uint16_t v = *entries++;
-            c[0] = (uint8_t)(v << 3);
-            c[-1] = (uint8_t)((v >> 5) << 3);
-            c[-2] = (uint8_t)((v >> 10) << 3);
-            c[1] = (uint8_t)i;
-            if (c[0] == 0xf8 && c[-1] == 0 && c[-2] == 0xf8) {
-                c[-2] = 0xff;
-                c[0] = 0xff;
+            q[2] = (uint8_t)(v << 3);
+            q[1] = (uint8_t)((v >> 5) << 3);
+            q[0] = (uint8_t)((v >> 10) << 3);
+            q[3] = (uint8_t)i;
+            if (q[2] == 0xf8 && q[1] == 0 && q[0] == 0xf8) {
+                q[0] = 0xff;
+                q[2] = 0xff;
             }
         } else {
-            c[0] = 0;
-            c[-1] = 0;
-            c[-2] = 0;
-            c[1] = 0;
+            q[2] = 0;
+            q[1] = 0;
+            q[0] = 0;
+            q[3] = 0;
         }
     }
-    uint8_t *dst = bmp + imageBytes + colors * 4 + 0x36;
+    uint8_t *dst = bmp + imageBytes + colors * 4 + sizeof(ZBmpHeader);
     for (uint32_t row = h; row != 0; row--) {
         dst -= pitch;
         zmemCopy(dst, pixels, rowBytes);
@@ -776,6 +800,7 @@ int zprimCreateTexture(uint32_t w, uint32_t h, uint32_t bpp, const uint8_t *pixe
     }
     if (bpp == 4) {
         for (uint32_t i = 0; i < imageBytes; i++) {
+            /* The pixels start at 0x76: the header and 16 palette entries. */
             const uint8_t b = bmp[0x76 + i];
             bmp[0x76 + i] = (uint8_t)(b * 16 + (b >> 4));
         }
@@ -841,10 +866,10 @@ ZPrimAsset *zprimLoadPicture(uint32_t id, int keep)
     node->id = (uint16_t)id;
     node->dmm = handle;
     node->offset = offset;
-    uint8_t *data = zprimAssetData(node);
-    *(int32_t *)(data + 0x20) = zprimCreateTexture(*(uint16_t *)(data + 4), *(uint16_t *)(data + 6),
-                                                   *(uint16_t *)(data + 0x10), data + *(int32_t *)(data + 8),
-                                                   (const uint16_t *)(data + *(int32_t *)(data + 0xc)));
+    ZPrimSet *data = zprimAssetData(node);
+    data->frames[0].texture =
+        zprimCreateTexture(data->width, data->height, data->bpp, (const uint8_t *)data + data->pixelOffset,
+                           (const uint16_t *)((const uint8_t *)data + data->paletteOffset));
     zprimAssetRelease(node);
     return node;
 }
@@ -858,8 +883,8 @@ void zprimFreePicture(ZPrimAsset *a)
 BMX_ADDR(0x004791e0)
 uint16_t zprimPictureWidth(const ZPrimAsset *a)
 {
-    const uint16_t *data = zprimAssetData(a);
-    const uint16_t w = data[2];
+    const ZPrimSet *data = zprimAssetData(a);
+    const uint16_t w = data->width;
     zprimAssetRelease(a);
     return w;
 }
@@ -867,8 +892,8 @@ uint16_t zprimPictureWidth(const ZPrimAsset *a)
 BMX_ADDR(0x00479210)
 uint16_t zprimPictureHeight(const ZPrimAsset *a)
 {
-    const uint16_t *data = zprimAssetData(a);
-    const uint16_t h = data[3];
+    const ZPrimSet *data = zprimAssetData(a);
+    const uint16_t h = data->height;
     zprimAssetRelease(a);
     return h;
 }
@@ -883,13 +908,13 @@ void zprimNop2(const ZPrimAsset *sprite, const ZPrimAsset *backdrop, int a, int 
 BMX_ADDR(0x00479280)
 void zprimCopyTexture(const ZPrimAsset *src, const ZPrimAsset *dst)
 {
-    uint8_t *s = zprimAssetData(src);
-    uint8_t *d = zprimAssetData(dst);
-    if (*(int32_t *)(d + 0x20) != 0) {
-        gRwTextureFree(*(int32_t *)(d + 0x20));
-        *(int32_t *)(d + 0x20) = 0;
+    ZPrimSet *s = zprimAssetData(src);
+    ZPrimSet *d = zprimAssetData(dst);
+    if (d->frames[0].texture != 0) {
+        gRwTextureFree(d->frames[0].texture);
+        d->frames[0].texture = 0;
     }
-    *(int32_t *)(d + 0x20) = gRwTextureClone(*(int32_t *)(s + 0x20));
+    d->frames[0].texture = gRwTextureClone(s->frames[0].texture);
     zprimAssetRelease(src);
     zprimAssetRelease(dst);
 }
@@ -902,9 +927,9 @@ BMX_ADDR(0x00479300)
 void zprimReplaceVramGrey(const ZPrimAsset *src, const ZPrimAsset *dst, int unused, uint32_t brightness)
 {
     uint8_t buf[0xff0];
-    uint8_t *s = zprimAssetData(src);
-    uint8_t *d = zprimAssetData(dst);
-    const uint8_t *pal = s + *(int32_t *)(s + 0xc);
+    ZPrimSet *s = zprimAssetData(src);
+    ZPrimSet *d = zprimAssetData(dst);
+    const uint8_t *pal = (const uint8_t *)s + s->paletteOffset;
     const uint32_t count = *(const uint16_t *)(pal + 2);
     if (count * 2 + 4 >= 0x1000) {
         zdebugFail("Buffer overflow in zprimReplaceVRAMGrey()", zprimFile, 0x7c4, 0);
@@ -921,13 +946,13 @@ void zprimReplaceVramGrey(const ZPrimAsset *src, const ZPrimAsset *dst, int unus
             entries[i] = (uint16_t)(((g << 5 | g) << 5) | g);
         }
     }
-    if (*(int32_t *)(d + 0x20) != 0) {
-        gRwTextureFree(*(int32_t *)(d + 0x20));
-        *(int32_t *)(d + 0x20) = 0;
+    if (d->frames[0].texture != 0) {
+        gRwTextureFree(d->frames[0].texture);
+        d->frames[0].texture = 0;
     }
-    *(int32_t *)(d + 0x20) =
-        zprimCreateTexture(*(uint16_t *)(s + 4), *(uint16_t *)(s + 6), *(uint16_t *)(s + 0x10),
-                           s + *(int32_t *)(s + 0x18), (const uint16_t *)buf);
+    /* Reads the pixels through frame 0 (the picture loader uses the header's offset, the same value). */
+    d->frames[0].texture = zprimCreateTexture(
+        s->width, s->height, s->bpp, (const uint8_t *)s + s->frames[0].pixelOffset, (const uint16_t *)buf);
     zprimAssetRelease(src);
     zprimAssetRelease(dst);
 }
@@ -938,9 +963,9 @@ BMX_ADDR(0x00479500)
 void zprimReplaceVramPalette(const ZPrimAsset *src, const ZPrimAsset *dst, int unused, uint32_t index)
 {
     uint8_t buf[0xff0];
-    uint8_t *s = zprimAssetData(src);
-    uint8_t *d = zprimAssetData(dst);
-    const uint8_t *pal = s + *(int32_t *)(s + 0xc);
+    ZPrimSet *s = zprimAssetData(src);
+    ZPrimSet *d = zprimAssetData(dst);
+    const uint8_t *pal = (const uint8_t *)s + s->paletteOffset;
     const uint32_t count = *(const uint16_t *)(pal + 2);
     if (count * 2 + 4 >= 0x1000) {
         zdebugFail("Buffer overflow in zprimReplaceVRAMGrey()", zprimFile, 0x7f8, 0);
@@ -951,13 +976,13 @@ void zprimReplaceVramPalette(const ZPrimAsset *src, const ZPrimAsset *dst, int u
     for (int i = 0; i < 16; i++) {
         entries[i] = slice[i];
     }
-    if (*(int32_t *)(d + 0x20) != 0) {
-        gRwTextureFree(*(int32_t *)(d + 0x20));
-        *(int32_t *)(d + 0x20) = 0;
+    if (d->frames[0].texture != 0) {
+        gRwTextureFree(d->frames[0].texture);
+        d->frames[0].texture = 0;
     }
-    *(int32_t *)(d + 0x20) =
-        zprimCreateTexture(*(uint16_t *)(s + 4), *(uint16_t *)(s + 6), *(uint16_t *)(s + 0x10),
-                           s + *(int32_t *)(s + 0x18), (const uint16_t *)buf);
+    /* Reads the pixels through frame 0 (the picture loader uses the header's offset, the same value). */
+    d->frames[0].texture = zprimCreateTexture(
+        s->width, s->height, s->bpp, (const uint8_t *)s + s->frames[0].pixelOffset, (const uint16_t *)buf);
     zprimAssetRelease(src);
     zprimAssetRelease(dst);
 }
@@ -1019,17 +1044,16 @@ ZPrimAsset *zprimLoadSprite(uint32_t id, int keep)
     node->id = (uint16_t)id;
     node->dmm = handle;
     node->offset = offset;
-    uint8_t *data = zprimAssetData(node);
-    uint16_t *set = (uint16_t *)data;
-    if (*(int32_t *)(data + 0xc) != 0) {
-        const uint32_t frames = set[0];
-        if (!((set[1] & 1) != 0 && frames == 0)) {
+    ZPrimSet *set = zprimAssetData(node);
+    if (set->paletteOffset != 0) {
+        const uint32_t frames = set->frameCount;
+        if (!((set->flags & 1) != 0 && frames == 0)) {
             /* the original wraps this in a loop that always runs once */
             for (uint32_t i = 0; i < frames; i++) {
-                uint8_t *entry = data + 0x14 + i * 16;
-                *(int32_t *)(entry + 0xc) = zprimCreateTexture(
-                    *(uint16_t *)entry, *(uint16_t *)(entry + 2), set[8], data + *(int32_t *)(entry + 4),
-                    (const uint16_t *)(data + *(int32_t *)(data + 0xc)));
+                ZPrimFrame *frame = &set->frames[i];
+                frame->texture = zprimCreateTexture(
+                    frame->width, frame->height, set->bpp, (const uint8_t *)set + frame->pixelOffset,
+                    (const uint16_t *)((const uint8_t *)set + set->paletteOffset));
             }
         }
     }
@@ -1043,7 +1067,7 @@ ZPrimAsset *zprimCreateSprite(uint16_t w, uint16_t h, uint16_t count)
 {
     const uint32_t pixels = (uint32_t)w * h;
     const uint32_t n = count;
-    uint32_t pixelBase = n * 0x10 + 0x14;
+    uint32_t pixelBase = n * sizeof(ZPrimFrame) + sizeof(ZPrimSet);
     const uint32_t size = (pixels + 0x10) * n + 0x318;
     const uint32_t paletteOffset = n * pixels + pixelBase;
     const int32_t handle = zmemdmmAlloc(size);
@@ -1061,23 +1085,23 @@ ZPrimAsset *zprimCreateSprite(uint16_t w, uint16_t h, uint16_t count)
     gZprimNextId = (uint16_t)(gZprimNextId + 1);
     node->dmm = handle;
     node->offset = 0;
-    uint16_t *data = zmemdmmLock(handle);
+    ZPrimSet *data = zmemdmmLock(handle);
     zmemFill(data, 0, size);
-    data[0] = count;
-    data[1] = 0;
-    *(uint32_t *)(data + 6) = paletteOffset;
-    data[2] = w;
-    data[3] = h;
-    *(uint32_t *)(data + 4) = pixelBase;
-    uint16_t *entry = data + 10;
+    data->frameCount = count;
+    data->flags = 0;
+    data->paletteOffset = (int32_t)paletteOffset;
+    data->width = w;
+    data->height = h;
+    data->pixelOffset = (int32_t)pixelBase;
+    ZPrimFrame *frame = data->frames;
     for (uint32_t i = n; i != 0; i--) {
-        entry[0] = w;
-        entry[1] = h;
-        *(uint32_t *)(entry + 2) = pixelBase;
-        entry[4] = 0;
-        entry[5] = 0;
+        frame->width = w;
+        frame->height = h;
+        frame->pixelOffset = (int32_t)pixelBase;
+        frame->originX = 0;
+        frame->originY = 0;
         pixelBase += pixels;
-        entry += 8;
+        frame++;
     }
     uint8_t *palette = (uint8_t *)data + paletteOffset;
     *(uint16_t *)palette = 0;
@@ -1105,23 +1129,24 @@ void zprimSpriteTouch(const ZPrimAsset *a)
 BMX_ADDR(0x00479ab0)
 void zprimSpriteReset(const ZPrimAsset *a, uint16_t w, uint16_t h, uint16_t bpp, uint16_t colors)
 {
-    uint16_t *set = zmemdmmLock(a->dmm);
-    uint16_t *palette = (uint16_t *)((uint8_t *)set + *(int32_t *)(set + 6));
-    set[0] = 1;
-    set[1] = 0;
-    set[2] = w;
-    set[3] = h;
-    *(int32_t *)(set + 4) = 0;
-    *(int32_t *)(set + 6) = 0x24;
-    set[8] = bpp;
-    set[10] = w;
-    set[11] = h;
-    *(int32_t *)(set + 12) = 0;
-    set[14] = 0;
-    set[15] = 0;
-    if (*(int32_t *)(set + 16) != 0) {
-        gRwTextureFree(*(int32_t *)(set + 16));
-        *(int32_t *)(set + 16) = 0;
+    ZPrimSet *set = zmemdmmLock(a->dmm);
+    /* The old palette position, read before the header is rewritten. */
+    uint16_t *palette = (uint16_t *)((uint8_t *)set + set->paletteOffset);
+    set->frameCount = 1;
+    set->flags = 0;
+    set->width = w;
+    set->height = h;
+    set->pixelOffset = 0;
+    set->paletteOffset = sizeof(ZPrimSet) + sizeof(ZPrimFrame); /* directly behind frame 0 */
+    set->bpp = bpp;
+    set->frames[0].width = w;
+    set->frames[0].height = h;
+    set->frames[0].pixelOffset = 0;
+    set->frames[0].originX = 0;
+    set->frames[0].originY = 0;
+    if (set->frames[0].texture != 0) {
+        gRwTextureFree(set->frames[0].texture);
+        set->frames[0].texture = 0;
     }
     palette[0] = 0;
     palette[1] = colors;
@@ -1152,25 +1177,26 @@ ZPrimAsset *zprimCreateSpriteSmall(uint16_t w, uint16_t h, uint16_t bpp, uint16_
     gZprimNextId = (uint16_t)(gZprimNextId + 1);
     node->dmm = handle;
     node->offset = 0;
-    uint16_t *set = zmemdmmLock(handle);
+    ZPrimSet *set = zmemdmmLock(handle);
     zmemFill(set, 0, 0xca * 4);
-    set[0] = 1;
-    set[1] = 0;
-    set[2] = w;
-    set[3] = h;
-    *(int32_t *)(set + 4) = 0;
-    *(int32_t *)(set + 6) = 0x24;
-    set[8] = bpp;
-    set[11] = h;
-    set[10] = w;
-    *(int32_t *)(set + 12) = 0;
-    set[14] = 0;
-    set[15] = 0;
-    *(int32_t *)(set + 16) = 0;
-    set[19] = colors;
-    set[18] = 0;
+    set->frameCount = 1;
+    set->flags = 0;
+    set->width = w;
+    set->height = h;
+    set->pixelOffset = 0;
+    set->paletteOffset = sizeof(ZPrimSet) + sizeof(ZPrimFrame); /* directly behind frame 0 */
+    set->bpp = bpp;
+    set->frames[0].height = h;
+    set->frames[0].width = w;
+    set->frames[0].pixelOffset = 0;
+    set->frames[0].originX = 0;
+    set->frames[0].originY = 0;
+    set->frames[0].texture = 0;
+    uint16_t *palette = (uint16_t *)&set->frames[1]; /* {flags, count, colours} */
+    palette[1] = colors;
+    palette[0] = 0;
     if (colors != 0) {
-        uint16_t *entries = set + 20;
+        uint16_t *entries = palette + 2;
         for (uint32_t i = 0; i < colors; i++) {
             entries[i] = 0x8000;
         }
@@ -1199,19 +1225,19 @@ void zprimDrawSprite(uint32_t frame, int16_t x, int16_t y)
         zprimClose(took);
         return;
     }
-    uint16_t *data = zprimAssetData(picture);
-    if ((uint16_t)frame >= data[0]) {
+    ZPrimSet *data = zprimAssetData(picture);
+    if ((uint16_t)frame >= data->frameCount) {
         zprimAssetRelease(st->picture);
         zprimClose(took);
         return;
     }
     const uint32_t f = frame & 0xffff;
-    const uint16_t *entry = data + f * 8 + 10;
-    const uint32_t entryH = entry[1];
-    const uint32_t entryW = entry[0];
+    const ZPrimFrame *entry = &data->frames[f];
+    const uint32_t entryH = entry->height;
+    const uint32_t entryW = entry->width;
     if ((picture->id & 0xe000) != 0x6000) {
-        x = (int16_t)(x - entry[4]);
-        y = (int16_t)(y - entry[5]);
+        x = (int16_t)(x - entry->originX);
+        y = (int16_t)(y - entry->originY);
     }
     int32_t mode = 0;
     int32_t extra = 0;
@@ -1227,9 +1253,9 @@ void zprimDrawSprite(uint32_t frame, int16_t x, int16_t y)
         mode = 3;
     }
     const uint8_t *pixels = NULL;
-    const int32_t paletteOffset = *(int32_t *)(data + 6);
+    const int32_t paletteOffset = data->paletteOffset;
     if (paletteOffset != 0) {
-        if (data[1] & 1) {
+        if (data->flags & 1) {
             pixels = (const uint8_t *)data + paletteOffset + f * 0x204;
         } else {
             pixels = (const uint8_t *)data + paletteOffset;
@@ -1239,7 +1265,7 @@ void zprimDrawSprite(uint32_t frame, int16_t x, int16_t y)
         ngifSetBlend(st->field38, st->field34);
     }
     ngifDrawSprite(data, (int)frame, pixels, mode, 0, extra, st->field24, x, y, (int)entryW, (int)entryH,
-                   data[8], st->field30);
+                   data->bpp, st->field30);
     if (st->field34 != 0) {
         ngifSetBlend(0, 0);
     }
@@ -1260,9 +1286,9 @@ uint16_t zprimSpriteFrameWidth(ZPrimAsset *asset, uint16_t index)
         asset = gZprimStates[gZprimDepth].picture;
     }
     if (asset != NULL) {
-        const uint16_t *data = zprimAssetData(asset);
-        if (index < data[0]) {
-            w = data[index * 8 + 10];
+        const ZPrimSet *data = zprimAssetData(asset);
+        if (index < data->frameCount) {
+            w = data->frames[index].width;
         }
         zprimAssetRelease(asset);
     }
@@ -1282,9 +1308,9 @@ uint16_t zprimSpriteFrameHeight(ZPrimAsset *asset, uint16_t index)
         asset = gZprimStates[gZprimDepth].picture;
     }
     if (asset != NULL) {
-        const uint16_t *data = zprimAssetData(asset);
-        if (index < data[0]) {
-            h = data[index * 8 + 11];
+        const ZPrimSet *data = zprimAssetData(asset);
+        if (index < data->frameCount) {
+            h = data->frames[index].height;
         }
         zprimAssetRelease(asset);
     }
@@ -1304,8 +1330,8 @@ uint16_t zprimSpriteFrameCount(ZPrimAsset *asset)
         asset = gZprimStates[gZprimDepth].picture;
     }
     if (asset != NULL) {
-        const uint16_t *data = zprimAssetData(asset);
-        n = data[0];
+        const ZPrimSet *data = zprimAssetData(asset);
+        n = data->frameCount;
         zprimAssetRelease(asset);
     }
     zprimClose(took);
@@ -1316,8 +1342,8 @@ uint16_t zprimSpriteFrameCount(ZPrimAsset *asset)
 BMX_ADDR(0x0047a1e0)
 void zprimDecompress(const ZPrimAsset *src, uint16_t srcFrame, const ZPrimAsset *dst, uint16_t dstFrame)
 {
-    uint8_t *s = zprimAssetData(src);
-    uint8_t *d = zprimAssetData(dst);
+    ZPrimSet *s = zprimAssetData(src);
+    ZPrimSet *d = zprimAssetData(dst);
     if ((src->id & 0xe000) != 0x6000 || (dst->id & 0xe000) != 0xc000) {
         gZdebugPrint("ZPRIM: Error - can only decompress from compressed sprite to virtual sprite (%d->%d)\n",
                      src->id, dst->id);
@@ -1325,9 +1351,9 @@ void zprimDecompress(const ZPrimAsset *src, uint16_t srcFrame, const ZPrimAsset 
         zprimAssetRelease(dst);
         return;
     }
-    if (srcFrame < *(uint16_t *)s && dstFrame < *(uint16_t *)d) {
-        zprimRleDecode(s + *(int32_t *)(s + 0x18 + srcFrame * 16),
-                       d + *(int32_t *)(d + 0x18 + dstFrame * 16));
+    if (srcFrame < s->frameCount && dstFrame < d->frameCount) {
+        zprimRleDecode((const uint8_t *)s + s->frames[srcFrame].pixelOffset,
+                       (uint8_t *)d + d->frames[dstFrame].pixelOffset);
         zprimAssetRelease(src);
         zprimAssetRelease(dst);
         return;
@@ -1341,10 +1367,11 @@ void zprimDecompress(const ZPrimAsset *src, uint16_t srcFrame, const ZPrimAsset 
 BMX_ADDR(0x0047a300)
 int zprimSpriteFrameData(const uint16_t *set, uint16_t frame)
 {
-    if (set[0] <= frame) {
+    const ZPrimSet *s = (const ZPrimSet *)set;
+    if (s->frameCount <= frame) {
         return 0;
     }
-    return *(const int32_t *)((const uint8_t *)set + 0x18 + frame * 16) + (int)(intptr_t)set;
+    return s->frames[frame].pixelOffset + (int)(intptr_t)set;
 }
 
 /*
@@ -1385,7 +1412,7 @@ int zprimRleDecode(const uint8_t *src, uint8_t *dst)
 
 /* ---- fonts and text ------------------------------------------------------------------------- */
 
-/* Loads font `id`. The page table (data + 0xc) is filled in lazily when glyphs are drawn. */
+/* Loads font `id`. The page table (`pages`) is filled in lazily when glyphs are drawn. */
 BMX_ADDR(0x0047a420)
 ZPrimAsset *zprimLoadFont(uint32_t id, int keep)
 {
@@ -1437,8 +1464,8 @@ ZPrimAsset *zprimLoadFont(uint32_t id, int keep)
     node->id = (uint16_t)id;
     node->dmm = handle;
     node->offset = offset;
-    uint8_t *data = zprimAssetData(node);
-    *(int32_t *)(data + 0xc) = 0;
+    ZPrimFont *data = zprimAssetData(node);
+    data->pages = NULL;
     zprimAssetRelease(node);
     return node;
 }
@@ -1459,19 +1486,19 @@ BMX_ADDR(0x0047c010)
 void zprimNop5(void) {}
 
 /* Finds the glyph record for `code`, retrying with the upper case letter. NULL when the char has no glyph. */
-static const uint8_t *zprimFindGlyph(const uint16_t *font, uint32_t code, uint32_t first, int smallFont)
+static const ZPrimGlyph *zprimFindGlyph(const ZPrimFont *font, uint32_t code, uint32_t first, int smallFont)
 {
     for (;;) {
-        const uint8_t *glyph = NULL;
+        const ZPrimGlyph *glyph = NULL;
         if (!smallFont) {
-            const uint8_t *g = (const uint8_t *)font + 0x18;
-            int32_t counter = font[0];
+            const ZPrimGlyph *g = font->glyphs;
+            int32_t counter = font->glyphCount;
             if (counter > 0) {
                 do {
-                    if (*(const uint16_t *)(g + 8) == code) {
-                        counter = -999;
+                    if (g->code == code) {
+                        counter = -999; /* found: leaves the loop and marks the hit */
                     } else {
-                        g += 10;
+                        g++;
                     }
                     counter--;
                 } while (counter > 0);
@@ -1479,8 +1506,9 @@ static const uint8_t *zprimFindGlyph(const uint16_t *font, uint32_t code, uint32
             if (counter < -500) {
                 glyph = g;
             }
-        } else if (!((int32_t)code < (int32_t)first || (int32_t)(font[0] + first) < (int32_t)code)) {
-            glyph = (const uint8_t *)font + (code - first) * 10 + 0x18;
+        } else if (!((int32_t)code < (int32_t)first || (int32_t)(font->glyphCount + first) < (int32_t)code)) {
+            /* The upper bound is glyphCount + first inclusive, one past the table. */
+            glyph = font->glyphs + (code - first);
         }
         if (glyph != NULL) {
             return glyph;
@@ -1523,11 +1551,11 @@ static void zprimDrawTextImpl(const uint8_t *str, int x, int y, int proportional
         zprimClose(took);
         return;
     }
-    const uint16_t *font = zprimAssetData(fontNode);
-    const int smallFont = font[0] < 0x100;
+    const ZPrimFont *font = zprimAssetData(fontNode);
+    const int smallFont = font->glyphCount < 0x100;
     uint32_t first = 0;
     if (smallFont) {
-        first = font[0x10];
+        first = font->glyphs[0].code;
     }
     if (proportional && (st->flagsC & 2) != 0 && st->field34 != 0) {
         ngifSetBlend(st->field38, st->field34);
@@ -1538,13 +1566,13 @@ static void zprimDrawTextImpl(const uint8_t *str, int x, int y, int proportional
             break;
         }
         uint32_t code = zprimTextCode(&str);
-        const uint8_t *g = zprimFindGlyph(font, code, first, smallFont);
+        const ZPrimGlyph *g = zprimFindGlyph(font, code, first, smallFont);
         if (g != NULL) {
             if ((st->flagsC & 1) == 0) {
-                const int16_t w = g[2];
-                const int16_t h = g[3];
-                int16_t boxW = (int16_t)((int8_t)g[6] + w + (int8_t)g[4]);
-                int16_t boxH = (int16_t)((int8_t)g[7] + h + (int8_t)g[5]);
+                const int16_t w = g->width;
+                const int16_t h = g->height;
+                int16_t boxW = (int16_t)(g->trailingX + w + g->offsetX);
+                int16_t boxH = (int16_t)(g->trailingY + h + g->offsetY);
                 if (boxW > w && boxH > h) {
                     int xc = (int16_t)x;
                     if ((int16_t)x < gZprimClip.x0) {
@@ -1584,10 +1612,10 @@ static void zprimDrawTextImpl(const uint8_t *str, int x, int y, int proportional
             } else if (f & 1) {
                 mode = 3;
             }
-            ngifDrawGlyph(font, g, mode, a, b, (int16_t)x + (int8_t)g[4], (int16_t)y + (int8_t)g[5],
-                          (int)(((uint32_t)st->field40 & 0xffff0000u) | font[10]), st->field40);
+            ngifDrawGlyph(font, g, mode, a, b, (int16_t)x + g->offsetX, (int16_t)y + g->offsetY,
+                          (int)(((uint32_t)st->field40 & 0xffff0000u) | font->field14), st->field40);
             if (proportional) {
-                x = (int16_t)(x + (int16_t)((int8_t)g[6] + g[2] + (uint16_t)st->spacing) + (int8_t)g[4]);
+                x = (int16_t)(x + (int16_t)(g->trailingX + g->width + (uint16_t)st->spacing) + g->offsetX);
             } else {
                 x = (int16_t)(x + (uint16_t)st->spacing);
             }
@@ -1614,7 +1642,7 @@ void zprimDrawText(const uint8_t *str, int x, int16_t y)
     zprimDrawTextImpl(str, x, y, 1);
 }
 
-/* The state's font (or `font` when given): flags word at +2 of its data. */
+/* The state's font (or `font` when given): the flags word of its data. */
 BMX_ADDR(0x0047af10)
 uint16_t zprimFontFlags(ZPrimAsset *font)
 {
@@ -1623,9 +1651,9 @@ uint16_t zprimFontFlags(ZPrimAsset *font)
     if (font == NULL) {
         font = gZprimStates[gZprimDepth].font;
     }
-    const uint16_t *data = zprimAssetData(font);
+    const ZPrimFont *data = zprimAssetData(font);
     if (data != NULL) {
-        const uint16_t flags = data[1];
+        const uint16_t flags = data->flags;
         zprimAssetRelease(font);
         zprimClose(took);
         return flags;
@@ -1643,18 +1671,18 @@ int16_t zprimTextWidth(ZPrimAsset *font, const uint8_t *str)
     if (font == NULL) {
         font = st->font;
     }
-    const uint16_t *fdata = zprimAssetData(font);
-    int smallFont = fdata[0] < 0x100;
+    const ZPrimFont *fdata = zprimAssetData(font);
+    int smallFont = fdata->glyphCount < 0x100;
     uint32_t first = 0;
     if (smallFont) {
-        first = fdata[0x10];
+        first = fdata->glyphs[0].code;
     }
     uint8_t c = *str;
     while (c >= 3) {
         uint32_t code = zprimTextCode(&str);
-        const uint8_t *g = zprimFindGlyph(fdata, code, first, smallFont);
+        const ZPrimGlyph *g = zprimFindGlyph(fdata, code, first, smallFont);
         if (g != NULL) {
-            width = (int16_t)(width + (int8_t)g[6] + (int8_t)g[4] + g[2] + (int16_t)st->spacing);
+            width = (int16_t)(width + g->trailingX + g->offsetX + g->width + (int16_t)st->spacing);
         }
         str++;
         c = *str;
@@ -1673,42 +1701,43 @@ void zprimDrawTextToSprite(ZPrimAsset *font, const uint8_t *str, uint32_t x, uin
                            uint16_t frame, uint8_t color)
 {
     if ((font->id & 0xe000) == 0x8000 && (sprite->id & 0xe000) == 0xc000) {
-        uint8_t *sdata = zprimAssetData(sprite);
-        if (*(uint16_t *)sdata <= frame) {
+        ZPrimSet *sdata = zprimAssetData(sprite);
+        if (sdata->frameCount <= frame) {
             gZdebugPrint("ZPRIM: Error - frame out of bounds during drawtexttosprite\n");
             zprimAssetRelease(sprite);
             return;
         }
-        const uint32_t pitch = *(uint16_t *)(sdata + 0x14 + frame * 16);
+        const uint32_t pitch = sdata->frames[frame].width;
         uint8_t *dstBase =
-            sdata + (x & 0xffff) + (y & 0xffff) * pitch + *(int32_t *)(sdata + 0x18 + frame * 16);
+            (uint8_t *)sdata + (x & 0xffff) + (y & 0xffff) * pitch + sdata->frames[frame].pixelOffset;
         int took;
         ZPrimState *st = zprimOpen(&took);
-        uint8_t *fdata = zprimAssetData(font);
+        ZPrimFont *fdata = zprimAssetData(font);
         uint8_t ch = *str;
         while (ch != 0) {
-            const uint8_t *g = fdata + 0x18 + (ch - *(uint16_t *)(fdata + 0x20)) * 10;
+            /* Indexed by character as in a small font, without a range check. */
+            const ZPrimGlyph *g = &fdata->glyphs[ch - fdata->glyphs[0].code];
             const uint8_t *src =
-                fdata + g[1] * (uint32_t)*(uint16_t *)(fdata + 8) + g[0] + *(int32_t *)(fdata + 4);
-            if (g[3] != 0) {
+                (const uint8_t *)fdata + g->y * (uint32_t)fdata->pitch + g->x + fdata->pixelOffset;
+            if (g->height != 0) {
                 uint32_t row = 0;
                 do {
-                    if (g[2] != 0) {
+                    if (g->width != 0) {
                         int col = 0;
                         do {
                             const int8_t px = (int8_t)src[col];
                             if (px != 0) {
-                                dstBase[(int8_t)g[4] + col + ((int8_t)g[5] + (int)row) * (int)pitch] =
+                                dstBase[g->offsetX + col + (g->offsetY + (int)row) * (int)pitch] =
                                     px == 1 ? color : (uint8_t)px;
                             }
                             col++;
-                        } while (col < g[2]);
+                        } while (col < g->width);
                     }
-                    src += *(uint16_t *)(fdata + 8);
+                    src += fdata->pitch;
                     row++;
-                } while ((int)row < g[3]);
+                } while ((int)row < g->height);
             }
-            dstBase += (int8_t)g[6] + (int8_t)g[4] + g[2] + st->spacing;
+            dstBase += g->trailingX + g->offsetX + g->width + st->spacing;
             str++;
             ch = *str;
         }
@@ -1743,20 +1772,20 @@ ZPrimAsset *zprimLoadGroupPicture(uint16_t group, uint16_t entry)
     uint32_t *e = table + 1;
     for (uint32_t i = 0; i < table[0]; i++, e += 2) {
         if (e[0] == entry && (e[0] & 0xe000) == 0) {
-            const int16_t *picture = (const int16_t *)((uint8_t *)table + e[1]);
-            if (picture[0] == 1) {
-                uint32_t size = (uint32_t)(uint16_t)picture[3] * (uint16_t)picture[2];
-                if (*(const int32_t *)(picture + 6) != 0) {
-                    size += 0x204;
+            const ZPrimSet *picture = (const ZPrimSet *)((uint8_t *)table + e[1]);
+            if (picture->frameCount == 1) {
+                uint32_t size = (uint32_t)picture->height * picture->width;
+                if (picture->paletteOffset != 0) {
+                    size += 0x204; /* 256 colours plus the palette header */
                 }
-                size += 0x24;
+                size += sizeof(ZPrimSet) + sizeof(ZPrimFrame);
                 const int32_t copy = zmemdmmAlloc(size);
                 if (copy != 0) {
                     node = zprimAssetAlloc();
                     if (node != NULL) {
-                        uint8_t *dst = zmemdmmLock(copy);
+                        ZPrimSet *dst = zmemdmmLock(copy);
                         zmemCopy(dst, picture, size);
-                        *(int32_t *)(dst + 0x20) = 0;
+                        dst->frames[0].texture = 0;
                         zmemdmmUnlock(copy);
                         node->flags = 1;
                         node->id = entry;
@@ -1860,32 +1889,32 @@ void zprimAssetFree(ZPrimAsset *a)
     const uint16_t type = a->id & 0xe000;
     int locked = 1;
     if (type == 0) {
-        uint8_t *data = zprimAssetData(a);
-        if (*(int32_t *)(data + 0x20) != 0) {
-            gRwTextureFree(*(int32_t *)(data + 0x20));
+        ZPrimSet *data = zprimAssetData(a);
+        if (data->frames[0].texture != 0) {
+            gRwTextureFree(data->frames[0].texture);
         }
     } else if (type == 0x4000 || type == 0x6000 || type == 0xc000) {
-        uint16_t *data = zprimAssetData(a);
-        for (int32_t i = (int32_t)data[0] - 1; i >= 0; i--) {
-            int32_t *tex = (int32_t *)((uint8_t *)data + (i + 2) * 16);
+        ZPrimSet *data = zprimAssetData(a);
+        for (int32_t i = (int32_t)data->frameCount - 1; i >= 0; i--) {
+            int32_t *tex = &data->frames[i].texture;
             if (*tex != 0) {
                 gRwTextureFree(*tex);
             }
             *tex = 0;
         }
     } else if (type == 0x8000) {
-        uint8_t *data = zprimAssetData(a);
-        int32_t *pages = *(int32_t **)(data + 0xc);
+        ZPrimFont *data = zprimAssetData(a);
+        int32_t *pages = data->pages;
         if (pages != NULL) {
-            for (int off = 0; off < 0x80; off += 4) {
+            for (int off = 0; off < 0x80; off += 4) { /* 32 handles */
                 int32_t tex = *(int32_t *)((uint8_t *)pages + off);
                 if (tex != 0) {
                     gRwTextureFree(tex);
-                    *(int32_t *)((uint8_t *)*(int32_t **)(data + 0xc) + off) = 0;
+                    *(int32_t *)((uint8_t *)data->pages + off) = 0;
                 }
             }
-            zmemFreeListFree(gZprimFontPageList, *(void **)(data + 0xc));
-            *(int32_t *)(data + 0xc) = 0;
+            zmemFreeListFree(gZprimFontPageList, data->pages);
+            data->pages = NULL;
         }
     } else {
         locked = 0;

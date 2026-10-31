@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 
+#include "bmx/com/zge/ngif/ngifzbsp.h"
 #include "zge/zdebug.h"
 #include "zge/ziff.h"
 #include "zge/zmem.h"
@@ -20,6 +21,8 @@ enum {
     kTagChunkF = 0x46474154, /* 'TAGF' */
     kTagChunkN = 0x4e474154, /* 'TAGN' */
 };
+
+_Static_assert(kFaceStride == sizeof(ZbspLevelFace), "face stride");
 
 /* Tree node's record in the file: 0x28 bytes. */
 typedef struct TagNodeRecord {
@@ -53,6 +56,12 @@ _Static_assert(sizeof(TagFaceRecord) == 0x50, "tag face record");
 static uint32_t fpuCopy(uint32_t bits)
 {
     return bits;
+}
+
+/* Stores a raw 32 bit pattern into a float (or byte) slot of a face. */
+static void storeBits(void *dst, uint32_t bits)
+{
+    __builtin_memcpy(dst, &bits, 4);
 }
 
 BMX_ADDR(0x0048d6f0)
@@ -220,30 +229,31 @@ int ztaginfLoad(void *iff)
                 if (rec.size != 0x50) {
                     zdebugFail("ztaginf : Tagging info face structure mismatch", kZtaginfFile, 0x17a, 0);
                 }
-                uint32_t *face = (uint32_t *)((uint8_t *)gZtaginfFaces + offset);
-                face[0x30 / 4] = fpuCopy(rec.w[9]);
-                face[0x34 / 4] = fpuCopy(rec.w[10]);
-                face[0x38 / 4] = fpuCopy(rec.w[11]);
-                face[0x00 / 4] = fpuCopy(rec.w[0]);
-                face[0x04 / 4] = fpuCopy(rec.w[1]);
-                face[0x08 / 4] = fpuCopy(rec.w[2]);
-                face[0x10 / 4] = fpuCopy(rec.w[3]);
-                face[0x14 / 4] = fpuCopy(rec.w[4]);
-                face[0x18 / 4] = fpuCopy(rec.w[5]);
-                face[0x20 / 4] = fpuCopy(rec.w[6]);
-                face[0x24 / 4] = fpuCopy(rec.w[7]);
-                face[0x28 / 4] = fpuCopy(rec.w[8]);
-                face[0x44 / 4] = dataPointer(rec.w[13]);
-                face[0x48 / 4] = dataPointer(rec.w[14]);
-                face[0x4c / 4] = dataPointer(rec.w[15]);
-                face[0x50 / 4] = dataPointer(rec.w[16]);
-                face[0x54 / 4] = dataPointer(rec.w[17]);
-                face[0x58 / 4] = dataPointer(rec.w[18]);
-                face[0x40 / 4] = dataPointer(rec.w[12]);
-                face[0x5c / 4] = 0;
-                face[0x60 / 4] = 0;
-                face[0x64 / 4] = 0;
-                face[0x68 / 4] = 0;
+                /* The index is not checked against the face count, like the original's offset. */
+                ZbspLevelFace *face = (ZbspLevelFace *)((uint8_t *)gZtaginfFaces + offset);
+                storeBits(&face->normal.x, fpuCopy(rec.w[9]));
+                storeBits(&face->normal.y, fpuCopy(rec.w[10]));
+                storeBits(&face->normal.z, fpuCopy(rec.w[11]));
+                storeBits(&face->v0.x, fpuCopy(rec.w[0]));
+                storeBits(&face->v0.y, fpuCopy(rec.w[1]));
+                storeBits(&face->v0.z, fpuCopy(rec.w[2]));
+                storeBits(&face->v1.x, fpuCopy(rec.w[3]));
+                storeBits(&face->v1.y, fpuCopy(rec.w[4]));
+                storeBits(&face->v1.z, fpuCopy(rec.w[5]));
+                storeBits(&face->v2.x, fpuCopy(rec.w[6]));
+                storeBits(&face->v2.y, fpuCopy(rec.w[7]));
+                storeBits(&face->v2.z, fpuCopy(rec.w[8]));
+                face->edgeTag[0] = (const ZbspEdgeTag *)(uintptr_t)dataPointer(rec.w[13]);
+                face->edgeTag[1] = (const ZbspEdgeTag *)(uintptr_t)dataPointer(rec.w[14]);
+                face->edgeTag[2] = (const ZbspEdgeTag *)(uintptr_t)dataPointer(rec.w[15]);
+                storeBits(&face->pad50[0], dataPointer(rec.w[16]));
+                storeBits(&face->pad50[4], dataPointer(rec.w[17]));
+                storeBits(&face->pad50[8], dataPointer(rec.w[18]));
+                face->tag = (const uint16_t *)(uintptr_t)dataPointer(rec.w[12]);
+                face->edge[0] = NULL; /* the caches are filled on demand by ngifzbsp */
+                face->edge[1] = NULL;
+                face->edge[2] = NULL;
+                face->face = NULL;
                 offset += kFaceStride;
             } while (ziffNextChunk(iff, kTagChunkF) != 0);
         }

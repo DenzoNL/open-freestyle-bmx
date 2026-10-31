@@ -6,6 +6,7 @@
 #include "compat/orig.h"
 #include "zge/zanim.h"
 #include "zge/zdebug.h"
+#include "zge/zobj.h"
 
 static const char kZobjModelFile[] = "C:\\NgEngine\\Zge\\ZgeMods\\zobjModel.c";
 
@@ -17,7 +18,7 @@ typedef int(BMX_CDECL *ZobjModelFreeFn)(void *model);
 BMX_ADDR(0x00488ea0)
 int zobjModelFree(void *object)
 {
-    void *model = *(void **)((uint8_t *)object + 0x2c);
+    void *model = ((ZObj *)object)->model;
 
     if (model != NULL) {
         gZobjModelFree(model);

@@ -49,6 +49,8 @@ typedef struct ZMovieWaveHeader {
     uint32_t reserved; /* 0x1c */
 } ZMovieWaveHeader;
 
+_Static_assert(sizeof(ZMovieWaveHeader) == 0x20, "WAVEHDR size");
+
 typedef struct ZMovie {
     int32_t videoStream;                      /* 0x000 index, -1 none */
     int32_t audioStream;                      /* 0x004 index, -1 none */

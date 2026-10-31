@@ -58,7 +58,7 @@ typedef struct ZActor {
     uint8_t lod[0x1d0 - 0x194]; /* uint16 model every 0x10 bytes, up to four levels of detail */
     float radius;               /* 0x1d0 */
     int32_t object;             /* 0x1d4 handle passed to the object module */
-    int32_t object2;            /* 0x1d8 second object that gets the same pose */
+    int32_t shadow;             /* 0x1d8 shadow object, posed like `object` (see zactorSyncPose) */
     uint32_t partHash[15];      /* 0x1dc name hash of each part (riders use 15, bikes 10), see ngifzactor.c */
     uint8_t pad218[0x228 - 0x218];
     uint32_t partOrder[15]; /* 0x228 part indices in drawing order */
@@ -74,6 +74,7 @@ _Static_assert(__builtin_offsetof(ZActor, player) == 0x48, "actor layout");
 _Static_assert(__builtin_offsetof(ZActor, lod) == 0x194, "actor layout");
 _Static_assert(__builtin_offsetof(ZActor, radius) == 0x1d0, "actor layout");
 _Static_assert(__builtin_offsetof(ZActor, object) == 0x1d4, "actor layout");
+_Static_assert(__builtin_offsetof(ZActor, shadow) == 0x1d8, "actor layout");
 _Static_assert(__builtin_offsetof(ZActor, partHash) == 0x1dc, "actor layout");
 _Static_assert(__builtin_offsetof(ZActor, partOrder) == 0x228, "actor layout");
 _Static_assert(__builtin_offsetof(ZActor, partCount) == 0x274, "actor layout");
@@ -93,6 +94,26 @@ typedef struct ZMotion {
     int32_t markerOffset; /* 0x08 */
     ZMotionBone bones[];  /* 0x0c, boneCount entries, then the key stream */
 } ZMotion;
+
+/*
+ * Marker block of a motion, at ZMotion.markerOffset. The count is read as a byte by the counting function
+ * and as a 16 bit value by the readers. Entries are {weight, x, y, z[, angle]} as int16.
+ */
+typedef struct ZMotionMarkerBlock {
+    uint8_t pad00[0x0c];
+    union {
+        uint8_t count;    /* 0x0c */
+        uint16_t count16; /* 0x0c */
+    };
+    uint8_t pad0e[2];
+    int16_t points[]; /* 0x10 */
+} ZMotionMarkerBlock;
+
+_Static_assert(__builtin_offsetof(ZMotionMarkerBlock, count) == 0x0c, "marker block layout");
+_Static_assert(__builtin_offsetof(ZMotionMarkerBlock, points) == 0x10, "marker block layout");
+
+/* Magic of a motion bank file that starts with a 0x10 byte header. */
+enum { kZmotionBankMagic = 0x2a81511c, kZmotionBankHeaderSize = 0x10 };
 
 /* Result of sampling a channel: root displacement for this step. */
 typedef struct ZMotionDelta {
@@ -161,6 +182,9 @@ typedef struct ZMotionPlayer {
 } ZMotionPlayer;
 
 _Static_assert(sizeof(ZMotionPlayer) == 0xd60, "player size");
+/* zactorCopySecondaryJoints copies from +0x9f2 to +0x10a. */
+_Static_assert(__builtin_offsetof(ZMotionPlayer, ch[6].joints[1]) == 0x9f2, "player layout");
+_Static_assert(__builtin_offsetof(ZMotionPlayer, ch[0].joints[1]) == 0x10a, "player layout");
 
 /* Entry of a motion bank (a loaded motion library). */
 typedef struct ZMotionBank {

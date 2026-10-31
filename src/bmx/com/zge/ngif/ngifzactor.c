@@ -243,7 +243,7 @@ void zactorSetupBike(void *actor)
 static const ZAngle3 kTwistPlus = {0, 0, 0x4000};
 static const ZAngle3 kTwistMinus = {0, 0, (ZAngle)0xc000};
 
-/* The skeleton of a model object (the object stores it at +0x30). */
+/* The skeleton of a model object (the object stores it at +0x30, in ZObj's pad30). */
 static void *objectSkeleton(int32_t object)
 {
     return *(void **)((uint8_t *)(uintptr_t)object + 0x30);
@@ -259,7 +259,7 @@ BMX_ADDR(0x004654b0)
 void zactorSyncPose(void *actor)
 {
     ZActor *a = actor;
-    const ZAngle3 *joints = (const ZAngle3 *)((uint8_t *)a->player + 0x104);
+    const ZAngle3 *joints = a->player->ch[0].joints; /* the blended result */
     ZAngle3 angles;
     ZVec3 pos;
 
@@ -270,7 +270,7 @@ void zactorSyncPose(void *actor)
     }
     for (uint32_t i = 0; i < (uint32_t)a->partCount; i++) {
         void *node1 = zrwmatFindSkeletonNode(objectSkeleton(a->object), a->partHash[i]);
-        void *node2 = zrwmatFindSkeletonNode(objectSkeleton(a->object2), a->partHash[i]);
+        void *node2 = zrwmatFindSkeletonNode(objectSkeleton(a->shadow), a->partHash[i]);
         ZQuat joint;
         ZQuat outer;
         ZQuat inner;
@@ -309,14 +309,14 @@ void zactorSyncPose(void *actor)
     pos.x = zactorGetPos(a)->x;
     pos.y = zactorGetPos(a)->y;
     pos.z = zactorGetPos(a)->z;
-    pos.y = (float)((double)pos.y + *(const float *)((const uint8_t *)a->player + 0x100));
+    pos.y = (float)((double)pos.y + a->player->ch[0].height);
     zobjSetPosition((void *)(uintptr_t)a->object, &pos);
-    zobjSetPosition((void *)(uintptr_t)a->object2, &pos);
+    zobjSetPosition((void *)(uintptr_t)a->shadow, &pos);
     angles.x = a->rot[0];
     angles.y = (ZAngle)-a->rot[1];
     angles.z = (ZAngle)-a->rot[2];
     zobjSetAngles((void *)(uintptr_t)a->object, &angles);
-    zobjSetAngles((void *)(uintptr_t)a->object2, &angles);
+    zobjSetAngles((void *)(uintptr_t)a->shadow, &angles);
 }
 
 /* Index of the rider the player controls (byte at 0x56b408); read directly, not through comdata. */

@@ -178,8 +178,17 @@ DirectInput.
 - **A (recommended):** in the stand-in pad's GetDeviceState, when the option is on, a pressed d-pad direction sets
   lX/lY to -127/+127 on that axis (d-pad wins over the stick on that axis; stick still works). The game sees a full
   stick deflection, i.e. the same direction bits 0x1..0x8, in menus and riding alike. No change to pcinput.c or the
-  game's tables; default off. It changes nothing the simulation does with its inputs (replays record the
+  game's tables; default **on** since 2026-10-31 (PLAN.md Decisions, exception). It changes nothing the simulation does with its inputs (replays record the
   controller state after the mapping, BMX_TRACE_POLL in contrlerPoll), so it is tagged input-only and not recorded.
+- **A2 (`[input] stick_8way = 1`, default **on** since 2026-10-31):** a thumbstick almost never gives a pure down / up / left /
+  right (the game's 10% per-axis square dead zone: a pure "down" needs |lX| inside it), so tricks that need a pure
+  direction (the backflip) fail. After the check has compared the vanilla state, the left stick (lX / lY) is
+  replaced: inside a **radial** dead zone (radius 3277 = 10% of 32767, measured on the raw SDL vector, before the
+  DirectInput cooking, which would already have clipped the drifting axis) lX = lY = 0; outside, the angle snaps to
+  the nearest of 8 directions (45 degree sectors centred on the axes and diagonals, boundaries at 22.5 + k * 45) and
+  lX / lY are -127 / +127 on the active axes, 0 on the other. Pad only, keyboard untouched; with `dpad_steering`
+  on and a d-pad direction held, the snap is skipped and the d-pad acts as in A (it wins). Input-only, not
+  recorded. Unit tests: sectors and boundaries, dead zone, no-option = vanilla, d-pad interplay.
 - B: report the d-pad as four extra DI buttons and add {button, 4..7} pairs to the button map. Needs a modified copy
   of the game's map data; the profile lookup could replace it.
 - C: d-pad as keyboard arrows. Mixes devices; the second player's map has no arrows.
@@ -324,7 +333,7 @@ pass need handling (GENERIC_READ, OPEN_EXISTING, FILE_BEGIN/CURRENT).
 
 **P19. Config file**
 - **A (recommended):** one small text file (`bmxnative.ini`, next to the exe by default, in the pref path when
-  profile saves are on) for the mode, the options of this document (all default off) and the remap tables. Options
+  profile saves are on) for the mode, the options of this document (off by default except the two input conveniences P7 A/A2) and the remap tables. Options
   that change gameplay must also go into replays (PLAN); none in this document do.
 - B: command line / environment only (as the dev aids today).
 
@@ -477,7 +486,7 @@ process, so P2's hook use is not needed for it).
     is the user's test (docs/NATIVE.md "Input on SDL3"). Xbox pads: no pad here, the table is from the usual
     DirectInput order (unverified).
 - **S6 done (code and unit tests).** `bmxnative.ini` (P19, config.c): next to the exe, or `BMX_CONFIG=<path>`;
-  `[section]` + `key = value`, `#` / `;` comments; read once, unknown keys logged; every option off by default.
+  `[section]` + `key = value`, `#` / `;` comments; read once, unknown keys logged; options off by default except dpad_steering and stick_8way.
   Option `[input] dpad_steering = 1` (P7-A): after the check has compared the vanilla state, a pressed d-pad
   direction sets lX / lY to the end of the range the game set (-127 / +127), over the stick on that axis; the log
   shows each d-pad change with the resulting lX / lY. Input-only (the game sees a full stick deflection, the same

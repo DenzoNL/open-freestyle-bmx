@@ -29,16 +29,10 @@ static const char *tableName(const ZrollerNameTable *table, uint32_t index)
     return ((const char *const *)table)[index];
 }
 
-/* The actor's shadow object lives at +0x1d8, next to ZActor.object. */
-static int32_t *actorShadow(ZActor *actor)
-{
-    return (int32_t *)((uint8_t *)actor + 0x1d8);
-}
-
-/* Model handle of a scene object (+0x2c). */
+/* Model handle of a scene object. */
 static void *modelOf(const void *object)
 {
-    return *(void *const *)((const uint8_t *)object + 0x2c);
+    return ((const ZObj *)object)->model;
 }
 
 /* x87 FCOM + `TEST AH,1`: true for a < b and for unordered operands. */
@@ -219,7 +213,7 @@ ZActor *zrollerCreatePlayerActor(const uint16_t *def)
     }
     zactorSetSkeleton(actor, 0);
     actor->object = (int32_t)(uintptr_t)riderObject;
-    *actorShadow(actor) = (int32_t)(uintptr_t)shadowObject;
+    actor->shadow = (int32_t)(uintptr_t)shadowObject;
     zactorSetupRider(actor);
     return actor;
 }
@@ -249,7 +243,7 @@ ZActor *zrollerCreateBikeActor(const uint32_t *def)
     zobjSetVisible((int32_t)(uintptr_t)shadowObject, 0);
     zactorSetSkeleton(actor, 1);
     actor->object = (int32_t)(uintptr_t)bikeObject;
-    *actorShadow(actor) = (int32_t)(uintptr_t)shadowObject;
+    actor->shadow = (int32_t)(uintptr_t)shadowObject;
     zactorSetupBike(actor);
     return actor;
 }

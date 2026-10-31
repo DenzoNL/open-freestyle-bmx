@@ -5,6 +5,7 @@
 
 #include "bmx/com/action/camera.h"
 #include "bmx/com/action/contrler.h"
+#include "bmx/com/action/physics.h"
 #include "bmx/com/action/physics_hit.h"
 #include "bmx/com/menu/gui/guimain.h"
 #include "bmx/com/zge/bmx/bmxsound.h"
@@ -123,8 +124,13 @@ typedef uint8_t NgKeyMaps[8][0x20];
 #define gNgMainLightColor ORIG_VAR(0x0055bc8c, uint8_t, gNgMainLightColor)
 #define gNgSpotMainColor  ORIG_VAR(0x0055bcfc, uint8_t, gNgSpotMainColor)
 
-/* Rider objects, 0xf70 bytes apart; the first word is the rider's scene object. */
-#define gNgRiderObject(i) (*(const uint8_t *const *)(uintptr_t)(0x00692ad4u + 0xf70u * (uint32_t)(i)))
+/* The actor of rider `i` (PhysRider.actor); the index is not range checked, like the original's address
+ * computation. */
+static const ZActor *riderActor(uint32_t i)
+{
+    return (const ZActor *)((const PhysRider *)((uintptr_t)&gPhysRiders + (size_t)i * sizeof(PhysRider)))
+        ->actor;
+}
 
 static uint32_t elapsedMs(uint32_t since)
 {
@@ -182,7 +188,7 @@ void moviePlay(struct MovieDesc *const *list)
 /* Position of the current player's camera object. */
 static const ZVec3 *debugEye(void)
 {
-    return (const ZVec3 *)(gNgRiderObject(gNgPlayer) + 0xc);
+    return &riderActor(gNgPlayer)->pos;
 }
 
 static void debugColor(ZrwDbgVertex *verts, uint32_t color)
@@ -388,34 +394,34 @@ void ngappInitSpotLights(void)
     gNgMainLight = zsceneAddLight(0, 1, (int)(uintptr_t)&gNgSpotMainColor);
     zobjLightSetFlags(gNgMainLight, 1);
     for (int i = 1; i <= 3; i++) {
-        uint8_t *marker = (uint8_t *)zrwcamFindMarker(zstrHash("SpotLight"), i);
-        uint8_t *target = (uint8_t *)zrwcamFindMarker(zstrHash("SpotLightT"), i);
+        ZrwMarker *marker = zrwcamFindMarker(zstrHash("SpotLight"), i);
+        ZrwMarker *target = zrwcamFindMarker(zstrHash("SpotLightT"), i);
         int param;
 
         if (marker == NULL) {
             continue;
         }
-        param = *(int *)(marker + 0x48);
+        param = (int)(intptr_t)marker->data; /* the light's colour block */
         if (param == 0) {
             continue;
         }
         if (target == NULL) {
             ZVec3 direction;
 
-            direction.x = *(float *)(marker + 8);
-            direction.y = *(float *)(marker + 0xc);
-            direction.z = *(float *)(marker + 0x10);
+            direction.x = marker->matrix.right.x;
+            direction.y = marker->matrix.right.y;
+            direction.z = marker->matrix.right.z;
             gNgSpotLights[i - 1] = zsceneAddLight(0, 0, param);
             zvec3NormalizeScaled(&direction, &direction);
             zobjLightSetDirection(gNgSpotLights[i - 1], &direction);
         } else {
             ZVec3 direction;
 
-            direction.x = (float)((double)*(float *)(target + 0x38) - (double)*(float *)(marker + 0x38));
-            direction.y = (float)((double)*(float *)(target + 0x3c) - (double)*(float *)(marker + 0x3c));
-            direction.z = (float)((double)*(float *)(target + 0x40) - (double)*(float *)(marker + 0x40));
+            direction.x = (float)((double)target->matrix.pos.x - (double)marker->matrix.pos.x);
+            direction.y = (float)((double)target->matrix.pos.y - (double)marker->matrix.pos.y);
+            direction.z = (float)((double)target->matrix.pos.z - (double)marker->matrix.pos.z);
             zvec3NormalizeScaled(&direction, &direction);
-            gNgSpotLights[i - 1] = zsceneAddLight(0, 0, *(int *)(marker + 0x48));
+            gNgSpotLights[i - 1] = zsceneAddLight(0, 0, (int)(intptr_t)marker->data);
             zobjLightSetDirection(gNgSpotLights[i - 1], &direction);
             zobjLightSetFlags(gNgSpotLights[i - 1], 1);
         }
@@ -907,11 +913,11 @@ dispatch:
             zdebugFail("Error loading level", kNgAppFile, 0x91f, 0);
         }
         {
-            const uint8_t *globals = (const uint8_t *)zrwcamFindMarker(zstrHash("Globals"), 1);
+            const ZrwMarker *globals = zrwcamFindMarker(zstrHash("Globals"), 1);
             const void *parameter = color;
 
-            if (globals != NULL && *(const void *const *)(globals + 0x48) != NULL) {
-                parameter = *(const void *const *)(globals + 0x48);
+            if (globals != NULL && globals->data != NULL) {
+                parameter = globals->data;
             }
             zrwSetParameter(4, zobjGetModel(gNgCamera), parameter);
         }
@@ -981,16 +987,16 @@ void ngappUpdateSun(void)
 {
     gNgSunTick++;
     if (gNgSunTick == 3) {
-        const uint8_t *rider;
+        const ZActor *rider;
         ZVec3 from;
         ZVec3 to;
         uint8_t hit[0x5c];
 
         gNgSunTick = 0;
-        rider = gNgRiderObject(gNgPlayer);
-        from.x = *(const float *)(rider + 0xc);
-        from.y = *(const float *)(rider + 0x10);
-        from.z = *(const float *)(rider + 0x14);
+        rider = riderActor(gNgPlayer);
+        from.x = rider->pos.x;
+        from.y = rider->pos.y;
+        from.z = rider->pos.z;
         to.x = from.x;
         to.y = (float)((double)from.y + (double)1000.0f);
         to.z = from.z;
