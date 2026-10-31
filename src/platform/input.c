@@ -19,6 +19,7 @@
 #include <string.h>
 
 #include "platform/input.h"
+#include "platform/platform.h"
 #include "platform/standins.h"
 
 /* ---- DirectInput arithmetic ---- */
@@ -389,6 +390,88 @@ uint8_t bmxDikFromScancode(int scancode)
     return scancode > 0 && scancode < SDL_SCANCODE_COUNT ? kDik[scancode] : 0;
 }
 
+/* ---- keys held at focus gain ---- */
+
+static uint8_t gSeed[256]; /* DIK-indexed: 0x80 for a key held at focus gain that SDL has not seen */
+static BmxKeyProbe gProbe;
+
+#if defined(_WIN32)
+typedef int16_t(BMX_WINAPI *GetAsyncKeyStateFn)(int vk);
+typedef uint32_t(BMX_WINAPI *MapVirtualKeyFn)(uint32_t code, uint32_t mapType);
+
+/*
+ * Windows-only fallback: the physical state of the key through USER32's GetAsyncKeyState (SDL does not
+ * resync its keyboard state when the window gains the focus). The DIK is a set-1 scan code (+ 0x80 for the
+ * extended keys): MapVirtualKeyW(MAPVK_VSC_TO_VK_EX) gives the virtual key, left / right modifiers included.
+ * USER32 is in the process anyway (SDL3 imports it); it is looked up at run time like the other dev aids.
+ */
+static int osKeyDown(uint8_t dik)
+{
+    static GetAsyncKeyStateFn getState;
+    static MapVirtualKeyFn mapKey;
+    static int looked;
+    uint32_t vk;
+
+    if (!looked) {
+        looked = 1;
+        getState = (GetAsyncKeyStateFn)bmxRealProc("USER32.dll", "GetAsyncKeyState");
+        mapKey = (MapVirtualKeyFn)bmxRealProc("USER32.dll", "MapVirtualKeyW");
+    }
+    if (getState == NULL || mapKey == NULL) {
+        return 0;
+    }
+    vk = mapKey((uint32_t)((dik & 0x80) != 0 ? 0xe000 : 0) | (dik & 0x7fu), 3 /* MAPVK_VSC_TO_VK_EX */);
+    return vk != 0 && (getState((int)vk) & (int16_t)0x8000) != 0;
+}
+#else
+static int osKeyDown(uint8_t dik)
+{
+    (void)dik;
+    return 0;
+}
+#endif
+
+static int probeKey(uint8_t dik)
+{
+    return gProbe != NULL ? gProbe(dik) : osKeyDown(dik);
+}
+
+void bmxInputSetKeyProbe(BmxKeyProbe probe)
+{
+    gProbe = probe;
+}
+
+void bmxInputFocusGained(void)
+{
+    memset(gSeed, 0, sizeof gSeed);
+    for (int s = 1; s < SDL_SCANCODE_COUNT; s++) {
+        const uint8_t dik = kDik[s];
+
+        if (dik != 0 && probeKey(dik)) {
+            gSeed[dik] = 0x80;
+        }
+    }
+}
+
+void bmxInputFocusLost(void)
+{
+    memset(gSeed, 0, sizeof gSeed);
+}
+
+void bmxKeyboardApplySeed(uint8_t state[256])
+{
+    for (int k = 1; k < 256; k++) {
+        if (gSeed[k] == 0) {
+            continue;
+        }
+        if (state[k] != 0 || !probeKey((uint8_t)k)) {
+            gSeed[k] = 0; /* SDL has the key now, or it was released */
+        } else {
+            state[k] = 0x80;
+        }
+    }
+}
+
 /* ---- the SDL side: the pad, focus ---- */
 
 static struct {
@@ -746,6 +829,7 @@ static BmxHresult keyboardState(Device *d, uint32_t size, uint8_t *state)
                 state[bmxDikFromScancode(s)] = 0x80;
             }
         }
+        bmxKeyboardApplySeed(state);
     }
     return kDiOk;
 }
@@ -1033,5 +1117,7 @@ void bmxInputReset(void)
     padClose();
     memset(&gPad, 0, sizeof gPad);
     memset(gDevices, 0, sizeof gDevices);
+    memset(gSeed, 0, sizeof gSeed);
+    gProbe = NULL;
     gStarted = gScripted = gDpadSteering = gStick8Way = gDiRefs = 0;
 }

@@ -86,6 +86,24 @@ void bmxInputReset(void);
 /* The DIK code (PC set-1 scan code, + 0x80 for extended keys) of an SDL_Scancode, 0 for none. */
 uint8_t bmxDikFromScancode(int scancode);
 
+/*
+ * Keys already held when the window gains the focus. DirectInput reads the keyboard's real state, so a key
+ * held at activation (the Enter that started the game) reads as down at once; SDL only follows key events,
+ * and (as observed with SDL 3.4.18 on Windows) does not resync on focus gain. At focus gain the platform
+ * asks the OS which keys are down and remembers them; each read reports them as down until SDL itself sees
+ * the key pressed, or the OS says it was released. Not used by a scripted (BMX_KEYS) keyboard.
+ */
+typedef int (*BmxKeyProbe)(uint8_t dik); /* 1 while the key is physically down */
+/* The OS probe: GetAsyncKeyState on Windows (a Windows-only fallback, loaded at run time); none elsewhere.
+ * NULL restores it (tests set their own). */
+void bmxInputSetKeyProbe(BmxKeyProbe probe);
+/* Focus gained: seeds the held keys from the probe. Focus lost: forgets them. */
+void bmxInputFocusGained(void);
+void bmxInputFocusLost(void);
+/* ORs the seeded keys into a DIK state read from SDL, and retires those SDL reports or the probe says are up.
+ */
+void bmxKeyboardApplySeed(uint8_t state[256]);
+
 /* ---- BMX_INPUT_CHECK (inputcheck.c): the same calls on the real DirectInput, compared ---- */
 
 typedef struct BmxCheckDevice BmxCheckDevice;

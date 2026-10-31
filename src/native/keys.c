@@ -19,15 +19,25 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define DIRECTINPUT_VERSION 0x0700
-#define CINTERFACE
-#include <windows.h>
-
-#include <dinput.h>
-
 #include "driver/driver.h"
 #include "native/native.h"
 #include "platform/platform.h"
+
+/* DirectInput's keyboard codes (dinput.h's DIK_*) for the keys the script names. */
+enum {
+    DIK_ESCAPE = 0x01,
+    DIK_1 = 0x02,
+    DIK_0 = 0x0b,
+    DIK_Q = 0x10,
+    DIK_RETURN = 0x1c,
+    DIK_A = 0x1e,
+    DIK_Z = 0x2c,
+    DIK_SPACE = 0x39,
+    DIK_UP = 0xc8,
+    DIK_LEFT = 0xcb,
+    DIK_RIGHT = 0xcd,
+    DIK_DOWN = 0xd0,
+};
 
 enum { kMaxEvents = 256, kMaxEventKeys = 4, kDefaultHold = 2, kDefaultHoldMs = 100 };
 

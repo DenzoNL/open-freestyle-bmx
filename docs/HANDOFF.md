@@ -28,7 +28,7 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
 - PNG reader done 2026-10-29 (src/png/, docs/NATIVE.md "PNG reader instead of libpng"): replaces libpng in the native
   exe, byte-identical to libpng 1.0.5 on 112 files (all game PNGs + synthetic set) via `BMX_PNG_CHECK`. Next blocker:
   the D3D driver's Im3D code, 0x4ea960 from rwIm3DPipelinePush (0x4e85b0), i.e. SDL3 driver step 2/3. The x87
-  RwMatrixMultiply routine 0x54b038 runs as kept original code for now (stopgap, SDL3-DRIVER.md open points).
+  RwMatrixMultiply routine 0x54b038 ran as kept original code at that time (stopgap; ported in S11 as rwMatrixMultiplyX87).
 - SDL3 driver step 2 done 2026-10-30 (docs/SDL3-DRIVER.md step 2, docs/NATIVE.md "Step 2: the menu draws"): the main
   menu draws like the original. The D3D7 driver's CPU side (Im3D transform/clip, render states, Im2D with the alpha
   sort; 80 functions) is ported into src/rw/d3d*.c with oracle tests at 0 ULP; its Direct3D calls go through five cut
@@ -98,7 +98,15 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   (`69 stand-ins, 68 dead, 0 real`) and bmxnative.exe no longer imports USER32 / WINMM. Findings: `-r` matches only
   height and depth (original bug, kept: `-r1024.768.16` gives 1366x768; use `[video]`); the Esc quit of the window
   procedure is unreachable in the shipped game (key lock before the first pump). **Open:** the user's focus test
-  (`native-run\focustest.ps1`). **Next:** S11 (PLATFORM.md 4e lists the remaining Win32 of main.c / keys.c / gpu.c).
+  (`native-run\focustest.ps1`).
+- Platform layer S11 done 2026-10-31 (docs/PLATFORM.md 4f, native only, hook DLL unchanged): main.c, keys.c and
+  driver/gpu.c have no Win32 left (argv, `__ImageBase`, `_exit`, own DIK constants; the WASAPI session mute is gone:
+  unmute bmxnative.exe once in the Windows mixer if an old BMX_MUTE run left it muted); winmm / ole32 no longer
+  linked; `tools/check.sh` fails if `build/native32/bmxnative.exe` imports a DLL outside SDL3 / KERNEL32 / bcrypt /
+  api-ms-win-crt-* (skipped without native32). A key held when the window gains the focus now reads as down (seed from
+  the OS key state, Windows-only GetAsyncKeyState probe; the focus test with Enter held at start is the user's). The
+  x87 RwMatrixMultiply routine 0x54b038 is ported (`rwMatrixMultiplyX87`, oracle-tested) and out of kTextKeep, which
+  keeps only the thunk table, the RpWorldDestroy stub, and the dinput tables under BMX_INPUT_CHECK. **Next:** S12.
 - Golden traces: record sessions with `bmxtrace.orig` (docs/TRACING.md) if not done yet.
 
 ## Machine setup

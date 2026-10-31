@@ -91,7 +91,7 @@ Environment (dev aids):
 |---|---|
 | `BMX_TRAP_SKIP=N` | log the first N traps and fake a `return 1` from each instead of stopping (a survey; state is bogus after the first skip) |
 | `BMX_NO_MOVIES=1` | sets the original's own movie skip switch (0x67288c, which the game never sets): no ACCLAIM/ZAXIS/INTRO.AVI |
-| `BMX_MUTE=1` | mutes this process's audio session (WASAPI), and the DirectSound and waveOut (movies) stand-ins output silence (they still consume their data at the normal pace, so cursors and MM_WOM_DONE run as in an audible run) |
+| `BMX_MUTE=1` | the DirectSound and waveOut (movies) stand-ins output silence (they still consume their data at the normal pace, so cursors and MM_WOM_DONE run as in an audible run); since S11 there is no WASAPI session mute (a machine whose last run was an old BMX_MUTE=1 run may need bmxnative.exe unmuted once in the Windows volume mixer) |
 | `BMX_SOUND_CHECK=1` | repeat every DirectSound call of the game on the real dsound.dll and compare (log lines `soundcheck:`, last line `soundcheck: RESULT clean\|DIFFERENCES`); the real buffers get no data, so nothing is heard twice |
 | `BMX_QUIT_FRAMES=N` | exit after N shown frames (`RwRasterShowRaster`) |
 | `BMX_SHOT=<file.bmp>`, `BMX_SHOT_FRAME=N[,M...]` | save the shown camera raster of frame N (default 1; a list saves each, a `%d` in the file name becomes the frame number) as a BMP (GPU readback) |
@@ -321,14 +321,17 @@ grep pngcheck <repo>/build/native32/bmxnative.log
 
 ### First trap after the PNG reader (2026-10-29)
 
-Two more `.text` pieces are kept as original code (kTextKeep in loader.c), both found on the way:
+Two more `.text` pieces were kept as original code (kTextKeep in loader.c), both found on the way (the second is
+ported since S11, see below; kTextKeep now holds the linker's thunk table, the RpWorldDestroy stub, and the dinput
+tables only under `BMX_INPUT_CHECK`):
 
 - `RpWorldDestroy` 0x4ba9c0, the 4-byte stub (`mov eax, [esp+4]`) that falls into the ported body at 0x4ba9c4: it
   is int3 otherwise and trapped from `ThisFoundChunk` (0x4966e0) when a level's world is replaced.
-- **Stopgap, to review:** 0x54b038..0x54b114, the core's x87 matrix multiply in `_rwcseg` that the driver's camera
-  begin update installs as RwMatrixMultiply's routine (SDL3-DRIVER.md open points). It is self-contained (no calls).
-  Without it the first trap is 0x54b038 itself, called from RwMatrixMultiply (0x4d04f0). Porting it (or modelling
-  the precision switch) replaces this.
+- **Stopgap (ported 2026-10-31, S11):** 0x54b038..0x54b114, the core's x87 matrix multiply in `_rwcseg` that the
+  driver's camera begin update installs as RwMatrixMultiply's routine (SDL3-DRIVER.md open points). It was
+  self-contained (no calls). It is now `rwMatrixMultiplyX87` (rw/math.c, BMX_ADDR 0x0054b038): the same x87
+  instruction sequence as inline asm (compat/x87.h `bmxX87MatrixMultiply`), run under the camera's control word like
+  the original, with an oracle test (test_rwmath.c) and no entry in kTextKeep any more (docs/PLATFORM.md 4f).
 
 `BMX_NO_MOVIES=1 BMX_MUTE=1 BMX_QUIT_FRAMES=4000 bmxnative.exe Scene.Txt -r640.480.16` then loads the bike and rider
 textures with our PNG reader and stops at the D3D driver's Im3D code:

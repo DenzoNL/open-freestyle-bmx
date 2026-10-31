@@ -11,7 +11,6 @@
 #include <stdlib.h>
 
 #include <SDL3/SDL.h>
-#include <windows.h>
 
 #include "driver/driver.h"
 #include "native/native.h"
@@ -370,7 +369,7 @@ int drvGpuPresent(struct SDL_GPUTexture *color, int32_t x, int32_t y, int32_t wi
     }
     shownFrames++;
     if (shot != NULL && isShotFrame(shotFrame, shownFrames)) {
-        char path[MAX_PATH];
+        char path[1024];
         const char *mark = SDL_strstr(shot, "%d");
 
         /* The frame number replaces the first `%d` (not a format string: the rest is copied as is). */
@@ -382,7 +381,7 @@ int drvGpuPresent(struct SDL_GPUTexture *color, int32_t x, int32_t y, int32_t wi
     if (quit != NULL && shownFrames >= SDL_atoi(quit)) {
         bmxLog("driver: BMX_QUIT_FRAMES reached after %d frames\n", shownFrames);
         bmxPlatformShutdown(); /* joins the sound timer thread; logs BMX_TIMER_LOG / BMX_INPUT_CHECK */
-        ExitProcess(0);
+        _Exit(0);              /* like the original's _exit: no atexit handlers */
     }
     return 1;
 }

@@ -26,6 +26,31 @@ printf '%s\0' "${units[@]}" | xargs -0 -n 16 -P "${BMX_JOBS:-$(nproc)}" "${tidy[
 echo "== functions.csv (${SECONDS} s)"
 "${PYTHON:-python3}" -I tools/progress.py --check >/dev/null
 "${PYTHON:-python3}" -I -m py_compile tools/*.py tests/oracle/*.py
+echo "== native32 imports (${SECONDS} s)"
+# The native exe's import table must stay free of the Windows DLLs the platform layer replaced (docs/PLATFORM.md
+# 4f). Only when build/native32 exists (CI without it is unaffected); needs llvm-objdump (llvm-mingw has it).
+if [[ -e build/native32/bmxnative.exe ]]; then
+    # sdl3: window, input, audio, GPU. kernel32: the loader / trap / range machinery and the thin CRT layer
+    # (VirtualProtect, AddVectoredExceptionHandler, LoadLibrary for the dev checks, ...). bcrypt: SHA-256 of
+    # NgBMX.exe until an own one. api-ms-win-crt-*: the UCRT's forwarders, which the mingw CRT imports.
+    allowed='^(sdl3\.dll|kernel32\.dll|bcrypt\.dll|api-ms-win-crt-[a-z0-9-]+\.dll)$'
+    mapfile -t imported < <("${OBJDUMP:-llvm-objdump}" -p build/native32/bmxnative.exe | sed -n 's/^[[:space:]]*DLL Name: //p' | tr -d '\r')
+    if [[ ${#imported[@]} -eq 0 ]]; then
+        echo "import check: no DLL names found in build/native32/bmxnative.exe (llvm-objdump missing?)" >&2
+        exit 1
+    fi
+    bad=0
+    for dll in "${imported[@]}"; do
+        if [[ ! ${dll,,} =~ $allowed ]]; then
+            echo "import check: bmxnative.exe imports $dll, which is not on the allowlist (tools/check.sh)" >&2
+            bad=1
+        fi
+    done
+    [[ $bad -eq 0 ]] || exit 1
+    echo "ok: ${#imported[@]} imported DLLs, all allowed"
+else
+    echo "skipped: build/native32 not available"
+fi
 echo "== differential tests (${SECONDS} s)"
 if [[ -e ${BMX_EXE:-work/NgBMX.exe} ]]; then
     tests/oracle/run.sh ${BMX_JOBS:+-j "$BMX_JOBS"} # BMX_JOBS: fewer workers when the PC is in use

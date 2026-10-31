@@ -104,6 +104,8 @@ RwFrameList *_rwFrameListDeinitialize(RwFrameList *frameList);
 void *_rwFrameOpen(void *engine, int32_t offset);
 void *_rwFrameClose(void *engine);
 void rwMatrixMultiplyDefault(RwMatrix *out, const RwMatrix *a, const RwMatrix *b);
+/* The x87 routine of _rwcseg that the camera begin update installs instead of the default. */
+void rwMatrixMultiplyX87(RwMatrix *out, const RwMatrix *a, const RwMatrix *b);
 RwV3d *rwV3dTransformPointsDefault(RwV3d *out, const RwV3d *in, int32_t count, const RwMatrix *matrix);
 RwV3d *rwV3dTransformVectorsDefault(RwV3d *out, const RwV3d *in, int32_t count, const RwMatrix *matrix);
 /* Installs the point and vector transforms (EAX, EDX; NULL = the defaults). */

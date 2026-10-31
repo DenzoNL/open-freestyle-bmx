@@ -179,22 +179,23 @@ static int fillImports(const IMAGE_NT_HEADERS32 *nt, uint32_t *iatLo, uint32_t *
     return 0;
 }
 
-/* Parts of the original's .text that are kept as they are instead of int3 (start, end). */
+/* Parts of the original's .text that are kept as they are instead of int3 (start, end, only for the
+ * BMX_INPUT_CHECK dev check). */
 static const struct {
     uint32_t start, end;
+    int inputCheckOnly;
 } kTextKeep[] = {
     /* The incremental linker's thunk table: 1130 `jmp <function>`. Function pointers in the data point at
      * these thunks; the jump then lands on the function's own address (our port or a trap). */
-    {0x00401005, 0x00402617},
+    {0x00401005, 0x00402617, 0},
     /* Data the linker put into .text: dinput.lib's object tables of c_dfDIJoystick (0x2c entries at 0x4afc60)
-     * and c_dfDIKeyboard (0x100 entries at 0x4aff20), which the data formats in .rdata point at. */
-    {0x004afc60, 0x004b0f20},
+     * and c_dfDIKeyboard (0x100 entries at 0x4aff20), which the data formats in .rdata point at. Only the
+     * real DirectInput reads them (BMX_INPUT_CHECK passes it the game's formats); our stand-in takes just the
+     * format's data size, so they are kept only for that check. */
+    {0x004afc60, 0x004b0f20, 1},
     /* RpWorldDestroy: a four byte stub (`mov eax, [esp+4]`) that falls into the ported body's jump at
      * 0x4ba9c4 (rpWorldDestroyBody, rw/world.c). */
-    {0x004ba9c0, 0x004ba9c4},
-    /* Stopgap until the x87 precision switch is modelled (docs/SDL3-DRIVER.md, open points): the core's x87
-     * RwMatrixMultiply routine in _rwcseg that camera begin update installs. Self-contained (no calls). */
-    {0x0054b038, 0x0054b114},
+    {0x004ba9c0, 0x004ba9c4, 0},
 };
 
 static void writeJump(uint32_t from, const void *to)
@@ -217,6 +218,8 @@ static int loadImage(const uint8_t *file, size_t size)
     DWORD oldProt;
     int thunks = 0;
     const int pngCheck = getenv("BMX_PNG_CHECK") != NULL;
+    const char *const inputEnv = getenv("BMX_INPUT_CHECK");
+    const int inputCheck = inputEnv != NULL && *inputEnv != 0 && *inputEnv != '0';
 
     if (sha256Hex(file, size, hex) != 0 || strcmp(hex, kKnownSha256) != 0) {
         bmxLog("NgBMX.exe is not the supported one (sha256 %s)\n", hex);
@@ -253,7 +256,8 @@ static int loadImage(const uint8_t *file, size_t size)
                 bmxPngCheckInstall(file + sec[i].PointerToRawData, start);
             }
             for (size_t k = 0; k < sizeof kTextKeep / sizeof kTextKeep[0]; k++) {
-                if (kTextKeep[k].start >= start && kTextKeep[k].end <= start + raw) {
+                if ((!kTextKeep[k].inputCheckOnly || inputCheck) && kTextKeep[k].start >= start &&
+                    kTextKeep[k].end <= start + raw) {
                     memcpy((void *)(uintptr_t)kTextKeep[k].start,
                            file + sec[i].PointerToRawData + (kTextKeep[k].start - start),
                            kTextKeep[k].end - kTextKeep[k].start);

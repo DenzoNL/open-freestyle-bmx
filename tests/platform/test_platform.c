@@ -788,6 +788,80 @@ static uint32_t BMX_WINAPI countJoysticks(const BmxDiDeviceInstance *instance, v
     return 0;
 }
 
+/* Keys held at focus gain (input.c): a fake OS probe stands in for GetAsyncKeyState. */
+static uint8_t gProbeDown[256];
+
+static int fakeProbe(uint8_t dik)
+{
+    return gProbeDown[dik];
+}
+
+static void testHeldKeys(void)
+{
+    uint8_t state[256];
+
+    bmxInputReset();
+    bmxInputSetKeyProbe(fakeProbe);
+    memset(gProbeDown, 0, sizeof gProbeDown);
+
+    /* Enter (DIK 0x1c) and right Ctrl (0x9d) are down when the window gains the focus; SDL knows neither. */
+    gProbeDown[0x1c] = gProbeDown[0x9d] = 1;
+    bmxInputFocusGained();
+    memset(state, 0, sizeof state);
+    bmxKeyboardApplySeed(state);
+    CHECK(state[0x1c] == 0x80 && state[0x9d] == 0x80 && state[0x1e] == 0, "held keys read as down");
+    memset(state, 0, sizeof state);
+    bmxKeyboardApplySeed(state);
+    CHECK(state[0x1c] == 0x80 && state[0x9d] == 0x80, "and keep reading as down while held");
+
+    /* Ctrl is released (SDL never hears of it): up again, and it stays up when the probe says down again */
+    gProbeDown[0x9d] = 0;
+    memset(state, 0, sizeof state);
+    bmxKeyboardApplySeed(state);
+    CHECK(state[0x1c] == 0x80 && state[0x9d] == 0, "a released key reads as up");
+    gProbeDown[0x9d] = 1;
+    memset(state, 0, sizeof state);
+    bmxKeyboardApplySeed(state);
+    CHECK(state[0x9d] == 0, "a released key is not seeded again (that is a new press, SDL's)");
+
+    /* SDL has seen Enter pressed (a new press): SDL's state takes over, the seed is gone */
+    memset(state, 0, sizeof state);
+    state[0x1c] = 0x80;
+    bmxKeyboardApplySeed(state);
+    CHECK(state[0x1c] == 0x80, "SDL's own report stays");
+    memset(state, 0, sizeof state);
+    bmxKeyboardApplySeed(state);
+    CHECK(state[0x1c] == 0, "after SDL took over, its release is final");
+
+    /* focus lost forgets; a key held at the next gain is seeded again; unknown keys never are */
+    gProbeDown[0x1c] = 1;
+    bmxInputFocusGained();
+    bmxInputFocusLost();
+    memset(state, 0, sizeof state);
+    bmxKeyboardApplySeed(state);
+    CHECK(state[0x1c] == 0, "focus lost forgets the held keys");
+    memset(gProbeDown, 1, sizeof gProbeDown);
+    bmxInputFocusGained();
+    memset(state, 0, sizeof state);
+    bmxKeyboardApplySeed(state);
+    CHECK(state[0x1c] == 0x80 && state[0xc8] == 0x80 && state[0] == 0 && state[0x7f] == 0 && state[0xff] == 0,
+          "every known key is seeded, no unknown one (DIK 0, 0x7f, 0xff)");
+
+    /* a seed with nothing held changes nothing */
+    memset(gProbeDown, 0, sizeof gProbeDown);
+    bmxInputFocusGained();
+    memset(state, 0, sizeof state);
+    bmxKeyboardApplySeed(state);
+    CHECK(state[0x1c] == 0, "nothing held, nothing seeded");
+
+    /* the OS probe (GetAsyncKeyState on Windows) runs for every key; the keys are the user's, so no value is
+     * asserted */
+    bmxInputSetKeyProbe(NULL);
+    bmxInputFocusGained();
+    bmxInputFocusLost();
+    bmxInputReset();
+}
+
 static void testInputObjects(void)
 {
     /* c_dfDIKeyboard: only dwDataSize (256) is read */
@@ -2658,6 +2732,7 @@ int main(void)
     testPadTables();
     testStick8Way();
     testKeyTable();
+    testHeldKeys();
     testInputObjects();
     testInputCheck();
     testTwoPads();

@@ -1,10 +1,10 @@
 # Platform layer: Windows APIs -> SDL3 (P4, "Windows first")
 
-Status 2026-10-31: **decided; S1-S10 implemented** (sections 4a-4e; S5's check with real pads, S7's
-listening test, S9's watch test and S10's focus test are the user's). The user took the recommendation for every
-decision P1..P19 (A unless said otherwise). Order: S1-S4 (done, S3 reviewed), input + d-pad (S5, S6: done), DirectSound
-(S7: done), movies (S8, S9: done), window and message queue (S10: done; no real DLL is left in the import table),
-then S11 (the native exe's own Win32, 4e lists it) and S12.
+Status 2026-10-31: **decided; S1-S11 implemented** (sections 4a-4f; S5's check with real pads, S7's
+listening test, S9's watch test and the focus test of S10 / S11 are the user's). The user took the recommendation for
+every decision P1..P19 (A unless said otherwise). Order: S1-S4 (done, S3 reviewed), input + d-pad (S5, S6: done),
+DirectSound (S7: done), movies (S8, S9: done), window and message queue (S10: done; no real DLL is left in the import
+table), the native exe's own Win32 (S11: done, 4f; tools/check.sh checks the import table), then S12.
 Goal: `bmxnative.exe` (src/native/) as a clean standalone
 Windows build whose game and engine code reach the OS only through SDL3 and our own code. The fixed 32-bit memory
 layout (image at 0x400000, docs/NATIVE.md) stays; Mac/Linux come after. Vanilla stays vanilla (PLAN.md Decisions):
@@ -86,7 +86,7 @@ relative to the working directory (the install folder): `bin\audio\*.ZSD`, `bin\
 loader.c (VirtualProtect, BCryptHash, LoadLibraryA/GetProcAddress for the imports), trap.c (vectored exception
 handler), main.c (window class, CreateWindowExA, message loop, WASAPI mute for `BMX_MUTE`), keys.c (dinput.h
 types), driver/gpu.c (wraps the game's HWND for SDL), range.S (the .orig section). (Since S10 the window, its
-messages and gpu.c's wrapping are SDL's; 4e lists what is left for S11.) The loader/trap/range parts are
+messages and gpu.c's wrapping are SDL's; since S11 main.c, keys.c and gpu.c have no Win32 left, 4f.) The loader/trap/range parts are
 the fixed-layout machinery and stay Windows-specific until the 64-bit step; the rest is in scope here.
 
 ## 2. The cut: stand-ins at the import slots (P1)
@@ -369,7 +369,7 @@ an opt-in (power) seam in main.c, not in ported code.
 | S8 | Movies: AVI reader + Cinepak decoder (P12) | ~1000 | Opus (decoder exactness) | Windows-only test tool: for all frames of the 7 files, AVIStreamGetFrame (VfW/iccvid) vs ours byte-identical; StreamInfo/ReadFormat/TimeToSample/SampleToTime for every position equal; AVIStreamRead bytes equal |
 | S9 | Movie output: DrawDib on the driver (P13), waveOut on SDL3 with MM_WOM_DONE (P14) | ~400 | Sonnet | DrawDibDraw into a memory DC (headless GDI) vs our GPU readback (BMX_SHOT) of the same frame at 640x480: pixel-identical; audio bytes queued equal AVIStreamRead's; intro/credits play to the end and abort on a key |
 | S10 | SDL-owned window + message queue + message boxes + window misc (P15, P17), mode without dialog (P16) | ~500 | Opus (touches driver window ownership) | Scripted runs incl. QUIT (message box), Esc-quit before the key lock, alt-tab focus (input stops, like DI foreground), window close; full screen and windowed at 640x480 and 1024x768 |
-| S11 | Remove the remaining Win32 from main.c / keys.c / driver (WASAPI mute -> no audio device), import check in tools/check.sh | ~100 | Sonnet | `llvm-objdump -p bmxnative.exe`: only SDL3, UCRT, KERNEL32 (+ BCRYPT until an own SHA-256) |
+| S11 (done, 4f) | Remove the remaining Win32 from main.c / keys.c / driver (WASAPI mute -> no audio device), import check in tools/check.sh | ~100 | Sonnet | `llvm-objdump -p bmxnative.exe`: only SDL3, UCRT, KERNEL32 (+ BCRYPT until an own SHA-256) |
 | S12 | Opt-in seams: profile saves + asset folder (P18), hot-plug (P5), remap (P8), window modes (P17) | ~400 | Sonnet | Each option off: S1..S10 checks unchanged; on: feature test |
 
 ### 4a. Status of S1-S4 (2026-10-31, native-only, not committed)
@@ -586,8 +586,8 @@ Release. No DuplicateSoundBuffer, SetFrequency, GetCaps or QueryInterface; they 
   dsound.dll, with GLOBALFOCUS it is heard): ours mute such buffers while SDL's keyboard focus is not on the game
   window; the cursors run on. Scripted (BMX_KEYS) runs are unfocused, hence silent, like the original would be.
 - **BMX_MUTE** keeps the device open and mixes as usual but outputs silence (the cursors and the callback timing stay
-  those of an audible run); main.c's WASAPI session mute stays for the movies' waveOut (S9 / S11). This replaces "don't
-  open the SDL audio device" from P11's note.
+  those of an audible run); the waveOut stand-in is silent as well, and main.c's WASAPI session mute is gone (S11, 4f).
+  This replaces "don't open the SDL audio device" from P11's note.
 - **`BMX_SOUND_CHECK=1`** (soundcheck.c): the real IDirectSound is created next to ours and every call is repeated on a
   real object made the same way: HRESULTs and Release counts, caps and format at creation, status, lock regions (offset
   and both sizes), volume / pan / frequency read back, the primary format, the steady write lead are strict (`DIFFERENCE`
@@ -744,8 +744,8 @@ frames are presented but not counted as shown frames; BMX_MOVIE_SHOT instead of 
 waveOut messages still go through the real PostMessageA until S10; BMX_KEYS got `t` events for the abort checks.
 
 Open: the user's watch test (docs/NATIVE.md "Movies on our decoder and SDL3"): picture, sound, lip sync, abort.
-main.c's WASAPI session mute (BMX_MUTE) is now redundant for the movies (both stand-ins output silence) and can go
-in S11.
+main.c's WASAPI session mute (BMX_MUTE) became redundant for the movies (both stand-ins output silence); removed in
+S11 (4f).
 
 ### 4e. Status of S10 (2026-10-31, native-only, not committed; the focus test is the user's)
 
@@ -846,19 +846,82 @@ become WM_KEYDOWN / WM_KEYUP; PeekMessage pumps SDL at most once per millisecond
 WA_CLICKACTIVE: the procedure treats it as a deactivation, and the game's poll re-acquires anyway); log lines for
 focus changes, the close and the chosen mode; the `-r` pick bug kept.
 
-**What S11 has left** (Win32 in the native exe's own code; the import table needs no real DLL any more):
-main.c: GetModuleHandleA (gHinstance), GetCommandLineA, ExitProcess, and the WASAPI session mute for BMX_MUTE
-(ole32 / mmdevapi; both stand-ins already output silence, so it can go); keys.c: `windows.h` + `dinput.h` for the
-DIK constants only (no calls); driver/gpu.c: `windows.h` for MAX_PATH and ExitProcess (BMX_QUIT_FRAMES);
-window.c: the real SetWindowPos for BMX_KEYS runs (dev aid, through bmxRealProc); CMakeLists links winmm, which
-nothing imports any more. The dev checks (BMX_INPUT_CHECK, BMX_SOUND_CHECK, BMX_FILE_CHECK) load the real DLLs on
-purpose. loader.c / trap.c / range.S / crt.c are the fixed-layout machinery (KERNEL32, bcrypt until an own
-SHA-256). USER32.dll is still in the process because SDL3.dll imports it.
+### 4f. Status of S11 (2026-10-31, native-only, not committed; the focus test is the user's)
 
-- **Open (S10 focus test 2026-10-31): a key already held when the window gains focus.** DirectInput reads the
-  keyboard's real state, so a key held at activation (the Enter that started the run) reads as down; SDL only
-  tracks key events, so ours reads it as up until it is pressed again (one run: DIK 0x1c for 0.18 s, 178
-  mismatches, nothing else). Fix later: seed the stand-in keyboard from the real key state on WM_ACTIVATE.
+The import table of `bmxnative.exe` is now SDL3.dll, bcrypt.dll, KERNEL32.dll and the UCRT's api-ms-win-crt-* sets
+(13 DLLs; no ole32, no WINMM, no USER32 of ours). **The hook DLL is unchanged.**
+
+- **main.c.** No Win32 call left, and no `windows.h`: `main(argc, argv)` builds WinMain's lpCmdLine from argv
+  (joined by single spaces, an argument with a blank or an empty one re-quoted) instead of GetCommandLineA;
+  gHinstance is the linker's `__ImageBase` (the exe's own base is its HINSTANCE, what GetModuleHandleA(NULL) gave);
+  the end is `_exit(-1)` like the original's, not ExitProcess. The WASAPI session mute (ole32 / mmdevapi) is gone.
+  Reasoning: BMX_MUTE is carried by the audio stand-ins (dsound.c's mixer and waveout.c output silence, 4c / 4d),
+  so the session mute added nothing. Its "unmute a muted session" half is not kept either: Windows remembers an
+  app's mute per exe, but only the old build set it, and every old non-BMX_MUTE run cleared it again; **a machine
+  whose last run was an old BMX_MUTE=1 run may still have bmxnative.exe muted in the Windows volume mixer: unmute it
+  there once** (the new build never changes the session).
+- **keys.c** has its own DIK constants (12, the keys the script names); **driver/gpu.c** has no `windows.h`
+  (`MAX_PATH` -> a 1024 byte buffer, BMX_QUIT_FRAMES exits through `_Exit(0)`); CMakeLists no longer links winmm
+  and ole32 for bmxnative (nothing imported them; bmxplatformtest still links ole32 / dinput for the real-DLL
+  comparisons).
+- **Kept Win32 (on purpose):** window.c's real SetWindowPos for BMX_KEYS runs (dev aid, loaded at run time through
+  bmxRealProc, no import); the dev checks BMX_INPUT_CHECK / BMX_SOUND_CHECK / BMX_FILE_CHECK and bmxplatformtest,
+  which load real DLLs; loader.c / trap.c / range.S / crt.c (VirtualProtect, the vectored handler, LoadLibrary /
+  GetProcAddress, the .orig section: KERNEL32) and bcrypt for the SHA-256 of NgBMX.exe. USER32.dll is in the process
+  because SDL3.dll imports it.
+- **Import check (tools/check.sh).** After the build, when `build/native32/bmxnative.exe` exists (CI without
+  native32 skips it), `llvm-objdump -p` lists the imported DLLs (`OBJDUMP` overrides the tool) and any outside this
+  allowlist fails the gate (also when no DLL name can be read):
+
+  | DLL | Why |
+  |---|---|
+  | `SDL3.dll` | window, input, audio, GPU: the platform layer |
+  | `KERNEL32.dll` | the loader / trap / range machinery and the CRT layer (VirtualProtect, the vectored exception handler, LoadLibrary / GetProcAddress for the dev checks and bmxRealProc, threads, files) |
+  | `bcrypt.dll` | BCryptHash for the SHA-256 check of NgBMX.exe, until an own SHA-256 |
+  | `api-ms-win-crt-*.dll` | the UCRT's forwarder sets that the mingw-w64 CRT imports (stdio, heap, string, ...) |
+
+  Tested: the real exe passes; a fake extra `USER32.dll` in the listing fails; an empty listing fails.
+- **Held key at focus gain (the S10 focus test's open point, fixed).** DirectInput reads the keyboard's real state, so
+  a key held at activation (the Enter that started the run: DIK 0x1c for 0.18 s in `focustest-fs640.log`, 178
+  mismatches) reads as down at once. SDL3 3.4.18 does not resync its keyboard state on focus gain (the user's log is
+  the evidence; SDL also drops a release for a key it thinks is up, so an SDL-side state could never end the key).
+  Now `bmxInputFocusGained()` (input.c, called by window.c's `setActive` before WM_ACTIVATE is sent, i.e. during
+  ShowWindow, before DirectInput exists) asks the OS which keys are down and remembers them as a seed; every
+  keyboard read ORs the seeded keys into the SDL state and retires a seed when SDL reports the key (a new press, SDL
+  tracks it from then on) or the OS says it was released (checked per read, only for seeded keys); focus lost
+  forgets the seed. The OS probe is **Windows-only**: `GetAsyncKeyState` through `MapVirtualKeyW(MAPVK_VSC_TO_VK_EX)`
+  (the DIK is the set-1 scan code, 0x80 for E0 keys), both loaded from USER32 at run time (no import);
+  `bmxInputSetKeyProbe` replaces it (tests; another platform would add its own). Like DirectInput it posts no
+  WM_KEYDOWN for the held key, and a scripted (BMX_KEYS) keyboard does not use the seed. Unit-tested in
+  bmxplatformtest (`testHeldKeys`: seeding, release retires, SDL takes over, focus lost forgets, unmapped DIKs never
+  seeded). The real focused behaviour is the user's test (`focustest.ps1`: hold Enter while the game starts, then
+  check that `inputcheck:` reports no mismatch for DIK 0x1c).
+- **The x87 RwMatrixMultiply routine (0x54b038, _rwcseg) is ported**: `rwMatrixMultiplyX87` in rw/math.c, a BMX_ADDR
+  function whose body is `bmxX87MatrixMultiply` (compat/x87.h), the original's instruction sequence in inline x87 asm
+  (same loop over three rows of the rotation part, the position row with b's position added, same additions
+  order), so the result follows the x87 control word the camera update sets (24 bit, round down) exactly as the
+  original's did; the non-hook fallback is plain float arithmetic. Oracle: test_rwmath.c "rwMatrixMultiplyX87
+  (camera mode)" and "(default mode)" (random and edge matrices, huge values, NaN / infinity / denormals,
+  out aliasing a or b), 0 differences. It is no longer in kTextKeep (docs/NATIVE.md).
+- **kTextKeep after S11.** The incremental-link thunks (0x401005..0x402617) stay: function pointers in the data
+  point at them and they jump to the function's own address (ported or trap), independent of dinput. The RpWorldDestroy
+  stub (0x4ba9c0) stays: its 4 bytes are the entry the stub's `mov eax, [esp+4]` hands to the ported body, with
+  nothing to port (a hook jump would overlap the next function). The dinput tables (0x4afc60..0x4b0f20) are only read
+  by the real DirectInput, i.e. under BMX_INPUT_CHECK (our stand-in takes just the format's data size): they are now
+  copied only when BMX_INPUT_CHECK is set (checked: a ProQuest ride without them has no trap); in normal runs the
+  range is int3 like the rest of `.text`.
+- **Checks** (2026-10-31, `native-run2`, `BMX_MUTE=1`, `BMX_SOUND_CHECK=1`, the save restored after each run, no trap,
+  no dead import): ProQuest ride (`-r640.480.16`, 1600 frames, `soundcheck: 7300 calls compared, 0 differences`,
+  `RESULT clean`); QUIT from the main menu (`window: quit prompt answered Yes without a box`, exit -1, soundcheck
+  clean); movies on (`t3000:esc` aborts ACCLAIM, ZAXIS and INTRO play to the end with the same hashes as in 4d:
+  INTRO 243 buffers, 7938000 bytes). `bmxplatformtest` 0 failures (its "tick step" checks of the GetTickCount
+  stand-in are timing based and fail on a loaded machine: re-run), `bmxmovietest` 18826111 checks, 0 failures.
+  Hook build, `tests/oracle/run.sh -k rwMatrixMultiplyX87`, void_eax / selfref / extend audits clean (argcount's
+  findings are the existing ones).
+
+Decisions beyond the document: the seed is kept in the platform layer (not in the device) because the activation
+comes before DirectInput exists; `__ImageBase` for the HINSTANCE; `_exit` / `_Exit` for ExitProcess; the dinput tables
+only under BMX_INPUT_CHECK.
 
 ## 5. Windows behaviour that is hard to reproduce
 
@@ -901,8 +964,8 @@ SHA-256). USER32.dll is still in the process because SDL3.dll imports it.
 - **DPI virtualisation** of the DPI-unaware original window, and CW_USEDEFAULT placement: cosmetic.
 - **x87 control word**: MSVC's CRT starts at 53-bit precision; D3D7 may switch the x87 to 24-bit at device
   creation unless the app passed DDSCL_FPUPRESERVE/FPUSETUP. To check once in the hooked original (read the control
-  word outside a camera update): if D3D7 left it at 24-bit, the kept x87 code (0x54b038) and the golden-trace
-  baseline depend on D3D7, not on the game.
+  word outside a camera update): if D3D7 left it at 24-bit, the ported x87 matrix multiply (0x54b038, S11) and the
+  golden-trace baseline depend on D3D7, not on the game.
 - **Case-insensitive, backslash paths** and a working directory equal to the install folder: free on Windows,
   P18's resolver for other platforms.
 - **Modal message boxes** keep the timer thread (audio) running while the game thread waits; SDL_ShowMessageBox is

@@ -435,7 +435,87 @@ static void setup_frame_list_deinit(DtCtx *c)
     rwtEnd();
 }
 
+/* ---- the core's x87 matrix product (_rwcseg 0x54b038) ---- */
+
+/* Sets the x87 control word of a camera update (24 bit, rounding down), or leaves the CRT's default. */
+static uint16_t setCw(int camera)
+{
+    uint16_t old, cw;
+    __asm__ volatile("fnstcw %0" : "=m"(old));
+    cw = camera ? (uint16_t)((old & 0xf0ff) | 0x0400) : old;
+    __asm__ volatile("fldcw %0" ::"m"(cw));
+    return old;
+}
+
+static void restoreCw(uint16_t cw)
+{
+    __asm__ volatile("fldcw %0" ::"m"(cw));
+}
+
+typedef void(BMX_CDECL *MultiplyFn)(RwMatrix *, const RwMatrix *, const RwMatrix *);
+
+static void multiplyOrigCamera(RwMatrix *out, const RwMatrix *a, const RwMatrix *b)
+{
+    const uint16_t cw = setCw(1);
+    ((MultiplyFn)(uintptr_t)0x0054b038)(out, a, b);
+    restoreCw(cw);
+}
+
+static void multiplyImplCamera(RwMatrix *out, const RwMatrix *a, const RwMatrix *b)
+{
+    const uint16_t cw = setCw(1);
+    rwMatrixMultiplyX87(out, a, b);
+    restoreCw(cw);
+}
+
+static void multiplyOrigPlain(RwMatrix *out, const RwMatrix *a, const RwMatrix *b)
+{
+    ((MultiplyFn)(uintptr_t)0x0054b038)(out, a, b);
+}
+
+static void multiplyImplPlain(RwMatrix *out, const RwMatrix *a, const RwMatrix *b)
+{
+    rwMatrixMultiplyX87(out, a, b);
+}
+
+/* Random matrices (edge values, huge values, now and then NaN, infinity or a denormal); out may be a or b. */
+static void setup_multiply_x87(DtCtx *c)
+{
+    static const uint32_t special[] = {0x7fc00000, 0xff800000, 0x7f800000, 0x00000001};
+    dt_seed(c);
+    RwMatrix *m[3];
+    for (int i = 0; i < 3; i++) {
+        m[i] = dt_alloc(sizeof(RwMatrix));
+        float *f = (float *)m[i];
+        for (int k = 0; k < 16; k++) {
+            f[k] = dt_float_edgy(-100.0F, 100.0F);
+            if (dt_u32() % 40 == 0) {
+                f[k] = dt_float(-1e30F, 1e30F);
+            } else if (dt_u32() % 60 == 0) {
+                *(uint32_t *)&f[k] = special[dt_u32() % 4];
+            }
+        }
+    }
+    switch (dt_u32() % 6) {
+    case 0:
+        m[0] = m[1];
+        break;
+    case 1:
+        m[0] = m[2];
+        break;
+    default:
+        break;
+    }
+    DT_ARG_PTR(c, 0, m[0]);
+    DT_ARG_PTR(c, 1, m[1]);
+    DT_ARG_PTR(c, 2, m[2]);
+}
+
 DT_CASES(rwmath_cases) = {
+    {"rwMatrixMultiplyX87 (camera mode)", (uint32_t)(uintptr_t)multiplyOrigCamera, multiplyImplCamera, 3,
+     DT_RET_VOID, setup_multiply_x87, 600, 0},
+    {"rwMatrixMultiplyX87 (default mode)", (uint32_t)(uintptr_t)multiplyOrigPlain, multiplyImplPlain, 3,
+     DT_RET_VOID, setup_multiply_x87, 300, 0},
     {"RpClumpForAllAtomics", 0x004b1990, RpClumpForAllAtomics, 3, DT_RET_INT, setup_clump_atomics, 200, 0},
     {"RwMatrixRotateOneMinusCosineSine", (uint32_t)(uintptr_t)rotate_omcs_orig, rotate_omcs_impl, 5,
      DT_RET_INT, setup_rotate_omcs, 1500, 0},

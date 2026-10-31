@@ -118,6 +118,52 @@ static inline void bmxX87Rotate(float *r1, float *r2, float a, float b, const fl
 }
 // NOLINTEND(readability-non-const-parameter)
 
+/*
+ * The core's x87 matrix product (_rwcseg 0x54b038) instruction by instruction: three rows of the rotation
+ * part (the loop), then the position row with the second matrix's position added. EAX = out, EDX = a,
+ * EBX = b, ECX = the row counter, as the original uses them. The result depends on the x87 control word
+ * (the camera update runs it at 24 bit precision, rounding down).
+ */
+// NOLINTBEGIN(readability-non-const-parameter)
+static inline void bmxX87MatrixMultiply(float *out, const float *a, const float *b)
+{
+    int rows = 3;
+    __asm__ volatile(
+        "1:\n\t"
+        "flds (%%edx)\n\tfmuls (%%ebx)\n\t"
+        "flds 4(%%edx)\n\tfmuls 0x10(%%ebx)\n\t"
+        "flds 8(%%edx)\n\tfmuls 0x20(%%ebx)\n\t"
+        "flds (%%edx)\n\tfxch %%st(1)\n\tfaddp %%st, %%st(2)\n\t"
+        "fmuls 4(%%ebx)\n\tfxch %%st(1)\n\tfaddp %%st, %%st(2)\n\t"
+        "flds 4(%%edx)\n\tfmuls 0x14(%%ebx)\n\t"
+        "flds 8(%%edx)\n\tfmuls 0x24(%%ebx)\n\t"
+        "flds (%%edx)\n\tfxch %%st(1)\n\tfaddp %%st, %%st(2)\n\t"
+        "fmuls 8(%%ebx)\n\tfxch %%st(1)\n\tfaddp %%st, %%st(2)\n\t"
+        "flds 4(%%edx)\n\tfmuls 0x18(%%ebx)\n\t"
+        "flds 8(%%edx)\n\tfmuls 0x28(%%ebx)\n\t"
+        "fxch %%st(4)\n\tfstps (%%eax)\n\tfaddp %%st, %%st(3)\n\t"
+        "fxch %%st(1)\n\tfstps 4(%%eax)\n\tfaddp %%st, %%st(1)\n\t"
+        "leal 0x10(%%edx), %%edx\n\tdecl %%ecx\n\tfstps 8(%%eax)\n\tleal 0x10(%%eax), %%eax\n\t"
+        "jne 1b\n\t"
+        "flds (%%edx)\n\tfmuls (%%ebx)\n\t"
+        "flds 4(%%edx)\n\tfxch %%st(1)\n\tfadds 0x30(%%ebx)\n\tfxch %%st(1)\n\tfmuls 0x10(%%ebx)\n\t"
+        "flds 8(%%edx)\n\tfmuls 0x20(%%ebx)\n\t"
+        "flds (%%edx)\n\tfxch %%st(1)\n\tfaddp %%st, %%st(2)\n\t"
+        "fmuls 4(%%ebx)\n\tfxch %%st(1)\n\tfaddp %%st, %%st(2)\n\t"
+        "flds 4(%%edx)\n\tfxch %%st(1)\n\tfadds 0x34(%%ebx)\n\tfxch %%st(1)\n\tfmuls 0x14(%%ebx)\n\t"
+        "flds 8(%%edx)\n\tfmuls 0x24(%%ebx)\n\t"
+        "flds (%%edx)\n\tfxch %%st(1)\n\tfaddp %%st, %%st(2)\n\t"
+        "fmuls 8(%%ebx)\n\tfxch %%st(1)\n\tfaddp %%st, %%st(2)\n\t"
+        "flds 4(%%edx)\n\tfxch %%st(1)\n\tfadds 0x38(%%ebx)\n\tfxch %%st(1)\n\tfmuls 0x18(%%ebx)\n\t"
+        "flds 8(%%edx)\n\tfmuls 0x28(%%ebx)\n\t"
+        "fxch %%st(4)\n\tfstps (%%eax)\n\tfaddp %%st, %%st(3)\n\t"
+        "fxch %%st(1)\n\tfstps 4(%%eax)\n\tfaddp %%st, %%st(1)\n\tfstps 8(%%eax)"
+        : "+a"(out), "+d"(a), "+c"(rows)
+        : "b"(b)
+        : "memory", "cc", "st", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)");
+}
+// NOLINTEND(readability-non-const-parameter)
+
 #else
 #include <math.h>
 
@@ -163,6 +209,17 @@ static inline void bmxX87Rotate(float *r1, float *r2, float a, float b, const fl
 
     *r1 = (float)(cd * a - sd * b);
     *r2 = (float)(cd * b + sd * a);
+}
+/* The matrix product in the original's order of additions, every operation rounded to float. */
+static inline void bmxX87MatrixMultiply(float *out, const float *a, const float *b)
+{
+    for (int row = 0; row < 4; row++) {
+        const float x0 = a[row * 4], x1 = a[row * 4 + 1], x2 = a[row * 4 + 2];
+        for (int col = 0; col < 3; col++) {
+            const float rest = x1 * b[4 + col] + x2 * b[8 + col];
+            out[row * 4 + col] = row == 3 ? (x0 * b[col] + b[12 + col]) + rest : x0 * b[col] + rest;
+        }
+    }
 }
 #endif
 

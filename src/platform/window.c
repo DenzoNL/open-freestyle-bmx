@@ -168,6 +168,12 @@ static void setActive(int active)
     gActive = active;
     bmxLog("window: %s (WM_ACTIVATE %s)\n", active ? "focus gained" : "focus lost",
            active ? "WA_ACTIVE" : "WA_INACTIVE");
+    /* Before the procedure runs: the keys already held now read as down, as in DirectInput. */
+    if (active) {
+        bmxInputFocusGained();
+    } else {
+        bmxInputFocusLost();
+    }
     send(kWmActivate, active ? kWaActive : kWaInactive, 0);
 }
 

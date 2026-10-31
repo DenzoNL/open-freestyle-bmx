@@ -1,2 +1,3 @@
 addr,size,file,name,reason
 00476850,2,bmx/com/zge/zactor.c,zactorBreak,"int3; ret debug-break helper: Ghidra will not create a function starting at int3"
+0054b038,220,rw/math.c,rwMatrixMultiplyX87,"core x87 matrix multiply in _rwcseg (after the int3 padding of the camera fpu helpers): Ghidra has no function there"

@@ -7,14 +7,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define COBJMACROS
-#include <windows.h>
-
-#include <initguid.h>
-
-#include <audiopolicy.h>
-#include <mmdeviceapi.h>
-
 #include "native/native.h"
 #include "platform/platform.h"
 #include "platform/standins.h"
@@ -92,62 +84,24 @@ static void parseResolution(char *cmd)
     }
 }
 
-static const char *skipProgramName(const char *cl)
-{
-    if (*cl == '"') {
-        cl++;
-        while (*cl && *cl != '"') {
-            cl++;
-        }
-        if (*cl) {
-            cl++;
-        }
-    } else {
-        while (*cl && *cl != ' ' && *cl != '\t') {
-            cl++;
-        }
-    }
-    while (*cl == ' ' || *cl == '\t') {
-        cl++;
-    }
-    return cl;
-}
-
 /*
- * Dev aid for automated runs (BMX_MUTE=1): mutes this process's audio session on the default output, so the
- * game's waveOut / DirectSound output (movies, menu music) stays silent. Windows remembers a session's mute
- * per executable, so every other run unmutes it again (else one muted run silences all later ones). COM is
- * left initialised.
+ * The text the original's WinMain gets as lpCmdLine: the arguments after the program name, joined by single
+ * spaces (an argument with a space or a tab, or an empty one, in quotes again), from the CRT's argv.
  */
-static void muteProcess(BOOL mute)
+static void commandLineText(char *out, size_t size, int argc, char **argv)
 {
-    IMMDeviceEnumerator *devices = NULL;
-    IMMDevice *device = NULL;
-    IAudioSessionManager *sessions = NULL;
-    ISimpleAudioVolume *volume = NULL;
+    size_t n = 0;
 
-    if (FAILED(CoInitializeEx(NULL, COINIT_APARTMENTTHREADED)) ||
-        FAILED(CoCreateInstance(&CLSID_MMDeviceEnumerator, NULL, CLSCTX_ALL, &IID_IMMDeviceEnumerator,
-                                (void **)&devices)) ||
-        FAILED(IMMDeviceEnumerator_GetDefaultAudioEndpoint(devices, eRender, eConsole, &device)) ||
-        FAILED(IMMDevice_Activate(device, &IID_IAudioSessionManager, CLSCTX_ALL, NULL, (void **)&sessions)) ||
-        FAILED(IAudioSessionManager_GetSimpleAudioVolume(sessions, NULL, FALSE, &volume)) ||
-        FAILED(ISimpleAudioVolume_SetMute(volume, mute, NULL))) {
-        bmxLog("audio session: could not set its mute\n");
-    } else {
-        bmxLog(mute ? "BMX_MUTE: audio session muted\n" : "audio session: unmuted\n");
-    }
-    if (volume) {
-        ISimpleAudioVolume_Release(volume);
-    }
-    if (sessions) {
-        IAudioSessionManager_Release(sessions);
-    }
-    if (device) {
-        IMMDevice_Release(device);
-    }
-    if (devices) {
-        IMMDeviceEnumerator_Release(devices);
+    out[0] = 0;
+    for (int i = 1; i < argc; i++) {
+        const int quote = argv[i][0] == 0 || strpbrk(argv[i], " \t") != NULL;
+        const int w = snprintf(out + n, size - n, "%s%s%s%s", i > 1 ? " " : "", quote ? "\"" : "", argv[i],
+                               quote ? "\"" : "");
+
+        if (w < 0 || (size_t)w >= size - n) {
+            return;
+        }
+        n += (size_t)w;
     }
 }
 
@@ -164,7 +118,10 @@ static void initGlobals(void)
     VAR(0x00697790, int) = 0;
 }
 
-int main(void)
+/* The exe's own base address, which is its HINSTANCE (the linker defines the symbol). */
+extern char __ImageBase;
+
+int main(int argc, char **argv)
 {
     char cmd[1024];
     BmxMsg msg;
@@ -180,15 +137,14 @@ int main(void)
     /* ---- WinMain ---- */
     initGlobals();
     /* Dev aids: BMX_NO_MOVIES=1 sets the original's own movie skip switch (0x67288c, never set by the game);
-     * BMX_MUTE=1 silences the process. */
+     * BMX_MUTE=1 is the audio stand-ins' (dsound.c, waveout.c: they output silence). */
     if (getenv("BMX_NO_MOVIES")) {
         VAR(0x0067288c, int) = 1;
     }
-    muteProcess(getenv("BMX_MUTE") != NULL);
     /* BMX_KEYS: scripted keyboard (keys.c). Such a run must not take the focus from what the user is doing:
      * its window is never focused or activated (window.c). */
     background = bmxKeysInstall();
-    snprintf(cmd, sizeof cmd, "%s", skipProgramName(GetCommandLineA()));
+    commandLineText(cmd, sizeof cmd, argc, argv);
     parseResolution(cmd);
     /* Without -r the mode comes from the config (P16, the device dialog's stand-in in src/driver/device.c);
      * a windowed one sets the window's size, which the game then renders at (it stays out of full screen). */
@@ -202,7 +158,7 @@ int main(void)
     if (!gHwnd) {
         return 0;
     }
-    gHinstance = GetModuleHandleA(NULL);
+    gHinstance = &__ImageBase;
     bmxWindowSetInstance(gHinstance);
     if (!attachPlugins(gHwnd)) {
         bmxWindowDestroy(gHwnd);
@@ -248,6 +204,6 @@ int main(void)
         }
     }
     bmxPlatformShutdown(); /* timers; BMX_INPUT_CHECK summary */
-    ExitProcess((UINT)-1); /* the original's _exit(-1) */
+    _exit(-1);             /* the original's own _exit(-1) */
     return 0;
 }

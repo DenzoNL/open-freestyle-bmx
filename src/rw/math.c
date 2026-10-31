@@ -959,6 +959,17 @@ void rwMatrixMultiplyDefault(RwMatrix *out, const RwMatrix *a, const RwMatrix *b
     }
 }
 
+/*
+ * The core's own x87 matrix product in _rwcseg: the routine the driver's camera begin update installs as
+ * RwMatrixMultiply's function (rwMatrixGlobals()->multiply). Same maths as rwMatrixMultiplyDefault, but on
+ * the x87 in the camera's precision mode and with its own order of additions (compat/x87.h).
+ */
+BMX_ADDR(0x0054b038)
+void rwMatrixMultiplyX87(RwMatrix *out, const RwMatrix *a, const RwMatrix *b)
+{
+    bmxX87MatrixMultiply((float *)out, (const float *)a, (const float *)b);
+}
+
 /* Default point transform of the engine: out[i] = in[i] * matrix (rows then position). Returns out. */
 BMX_ADDR(0x004d34d0)
 RwV3d *rwV3dTransformPointsDefault(RwV3d *out, const RwV3d *in, int32_t count, const RwMatrix *matrix)

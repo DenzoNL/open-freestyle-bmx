@@ -129,8 +129,9 @@ DirectSound -> SDL3 audio, the quit prompt's DirectDraw GDI flip.
      (_rwcseg 0x54b000, restored by 0x54b02e at end update) and routes RwMatrixMultiply to the x87 routine 0x54b038 for
      good. Our ported code runs SSE2, so float results of code that runs inside a camera update, and every
      RwMatrixMultiply after the first update, are not modelled yet. 0x54b038 trapped when first called; since
-     2026-10-29 the native loader keeps that routine (0x54b038..0x54b114, self-contained x87 code) as original code
-     as a stopgap (docs/NATIVE.md "First trap after the PNG reader").
+     2026-10-29 the native loader kept that routine (0x54b038..0x54b114, self-contained x87 code) as original code
+     as a stopgap (docs/NATIVE.md "First trap after the PNG reader"); since 2026-10-31 (S11) it is ported
+     (`rwMatrixMultiplyX87`, rw/math.c, inline x87 asm, oracle-tested) and no longer kept.
 2. Im2D + Im3D + render states: menus and text. **Done 2026-10-30**: the main menu draws (background, logo, rider
    artwork, the menu wheel with its translucent items) as in the original; docs/NATIVE.md "Step 2: the menu draws".
    - Correction to step 1: the D3D7 driver's Im2D entries are not no-ops. The device table's 0x4eb2c0..0x4eb2f0 are,
@@ -184,8 +185,8 @@ DirectSound -> SDL3 audio, the quit prompt's DirectDraw GDI flip.
        FISTP is `cvtss2si` in the current mode. Verified: the emulator honours PC/RC, the transform test fails
        without the mirroring and passes with it. Known limit: x87 intermediates keep their 15-bit exponent, so
        results that overflow or go denormal in single precision differ (test inputs stay in realistic ranges).
-       The native camera begin update now really switches the x87 to the camera mode (the kept original routine
-       0x54b038 runs in it, like in the original); game code ported to SSE2 still runs at nearest/double inside
+       The native camera begin update now really switches the x87 to the camera mode (the routine 0x54b038, now
+       ported as x87 asm, runs in it, like in the original); game code ported to SSE2 still runs at nearest/double inside
        the camera update (pre-existing open point).
      - Caps of the native device: dither; all z compares, blends and alpha compares; flat/Gouraud colour and alpha;
        vertex fog (FOGFLAT|FOGGOURAUD, as real cards of the time); perspective; filters nearest/linear only (no mip
