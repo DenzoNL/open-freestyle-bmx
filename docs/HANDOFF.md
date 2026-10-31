@@ -122,6 +122,7 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   tells the Im2D wrapper each packet's anchor; elements come from the layer-0 zover pools (glyph chains) and from
   zoverDrawText's glyph runs in the 3D list (docs/WIDESCREEN.md "WS5"). `hud = 0`, widescreen off and exact 4:3 stay
   byte-identical; sim hash equal. Try it with `widetest.ps1 -Hud 1` (`-HudAspect 0` for the full 21:9 width).
+- High fps (29.4 Hz tick kept, interpolated draws): design in docs/HIGHFPS.md, H1-H10 open; first slice HF0.
 - Golden traces: record sessions with `bmxtrace.orig` (docs/TRACING.md) if not done yet.
 
 ## Machine setup
