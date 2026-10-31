@@ -45,6 +45,8 @@ if(BMX_NATIVE32)
   # The music override (docs/MUSIC.md "Override"): musicgame.c reads the game's music stream like smoothmix.c;
   # the edit list is compiled in from data/music-edits.json; dr_flac (third_party) is built without warnings.
   set_source_files_properties(src/platform/musicgame.c PROPERTIES COMPILE_DEFINITIONS BMX_HOOK=1)
+  # BMX_SIM_HASH (docs/WIDESCREEN.md W10.5) reads the rider and camera state at their original addresses too.
+  set_source_files_properties(src/native/simhash.c PROPERTIES COMPILE_DEFINITIONS BMX_HOOK=1)
   set_source_files_properties(third_party/dr_flac/dr_flac.c PROPERTIES COMPILE_OPTIONS -w)
   add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/music_edits.c
     COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tools/gen_music_edits.py
@@ -121,6 +123,10 @@ if(BMX_NATIVE32)
   target_include_directories(bmxmovietest PRIVATE src)
   target_compile_options(bmxmovietest PRIVATE ${BMX_WARNINGS})
   target_link_libraries(bmxmovietest PRIVATE SDL3::SDL3 vfw32 msvfw32 gdi32)
+  # The widescreen maths (docs/WIDESCREEN.md W10.3): view window, 2D classifier and transforms, present rect.
+  add_executable(bmxwidetest tests/platform/test_wide.c src/driver/widemath.c)
+  target_include_directories(bmxwidetest PRIVATE src)
+  target_compile_options(bmxwidetest PRIVATE ${BMX_WARNINGS})
   # SDL3.dll next to the exe (copy it into the game folder with bmxnative.exe).
   add_custom_command(TARGET bmxnative POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
     $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:bmxnative>)

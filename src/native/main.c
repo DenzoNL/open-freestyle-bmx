@@ -149,8 +149,11 @@ int main(int argc, char **argv)
     /* Without -r the mode comes from the config (P16, the device dialog's stand-in in src/driver/device.c);
      * a windowed one sets the window's size, which the game then renders at (it stays out of full screen). */
     if (!(gResX != 0 && gResY != 0 && gResZ != 0) && bmxConfigInt("video.fullscreen", 1) == 0) {
-        gWidth = bmxConfigInt("video.width", gWidth);
-        gHeight = bmxConfigInt("video.height", gHeight);
+        int width, height;
+
+        bmxVideoSize(&width, &height, gWidth, gHeight); /* 0: the desktop size */
+        gWidth = width;
+        gHeight = height;
     }
 
     /* RegisterClassA + CreateWindowExA (WS_OVERLAPPEDWINDOW, gWidth x gHeight client area): SDL's window. */

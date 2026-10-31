@@ -82,7 +82,9 @@ original's pick bug: only the height and depth are compared and the last match w
 1366x768 here (PLATFORM.md 4e). Without `-r` there is no device dialog any more (since S10, P16): the mode comes
 from `bmxnative.ini` (`[video] width`, `height`, `depth`, `fullscreen`; exact match), by default 640x480x16 full
 screen, which is what Enter in the original dialog gave. `[video] fullscreen = 0` gives a window of width x height
-(the game renders at that size). `[ui] confirm_quit` (default 0, the user's call, PLAN.md Decisions): the main
+(the game renders at that size); `width = 0` / `height = 0` mean the desktop size. The widescreen options
+(`[video] widescreen`, `aspect`, `fov_scale`, `max_hfov`, `hud`, `menus`, `movies`, `scale_filter`; all off by
+default) are in docs/WIDESCREEN.md "Implementation status" and PLATFORM.md P19. `[ui] confirm_quit` (default 0, the user's call, PLAN.md Decisions): the main
 menu's QUIT quits without the "Do you want to quit the game?" box; `= 1` shows it as the original did.
 
 Environment (dev aids):
@@ -103,6 +105,7 @@ Environment (dev aids):
 | `BMX_TIMER_LOG=1` | log the sound timer's statistics (calls, interval mean / min / max / sd, late calls, callback time) whenever the timer is stopped and at `BMX_QUIT_FRAMES` |
 | `BMX_FILE_LOG=1` | log every sound file the game opens: reads, bytes, FNV-1a 64 hash of the bytes read |
 | `BMX_FILE_CHECK=1` | also repeat every file call (CreateFileA / ReadFile / SetFilePointer) through the real kernel32 and compare; logs `filecheck ok` / `MISMATCH` per file (implies `BMX_FILE_LOG`) |
+| `BMX_SIM_HASH=<file>` | write `<tick> <hash>` per controller poll: FNV-1a 64 of the simulation state (seed, pads, camera eye / look-at, the riders' trace fields, scores, run timer; src/native/simhash.c). Two runs of the same BMX_KEYS script must give the same file; used to show the widescreen seams are visual-only (docs/WIDESCREEN.md) |
 | `BMX_DEBUG_OUTPUT=1` | log the game's OutputDebugStringA text (dropped otherwise, as without a debugger) |
 | `SDL_GPU_DRIVER=vulkan` | SDL's own: pick the GPU backend (default here: direct3d12) |
 

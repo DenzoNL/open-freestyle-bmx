@@ -18,6 +18,7 @@
 #include <string.h>
 
 #include "driver/driver.h"
+#include "driver/wide.h"
 #include "platform/platform.h"
 #include "platform/standins.h"
 
@@ -313,6 +314,8 @@ int32_t BMX_WINAPI bmxStandDrawDibDraw(void *drawDib, void *dc, int32_t x, int32
         }
         return 0;
     }
+    /* [video] widescreen, movies = 0: the 4:3 picture pillarboxed (the target starts black). */
+    drvWideMovieRect(dst, gTargetWidth, gTargetHeight);
     if (!drawFrame(device, h, bits != NULL ? (const uint8_t *)bits : (const uint8_t *)(h + 1), src, dst)) {
         return 0;
     }
@@ -329,7 +332,7 @@ int32_t BMX_WINAPI bmxStandDrawDibDraw(void *drawDib, void *dc, int32_t x, int32
         shot = path;
         frame = bmxAviFrameOf(h, &name);
         bmxLog("movie: draw %d: frame %d of \"%s\" into (%d, %d, %d x %d) of %d x %d -> %s\n", gDraws, frame,
-               name, x, y, dst[2], dst[3], gTargetWidth, gTargetHeight, shot);
+               name, dst[0], dst[1], dst[2], dst[3], gTargetWidth, gTargetHeight, shot);
     }
     return drvGpuPresentMovie(gTarget, gTargetWidth, gTargetHeight, shot);
 }

@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "driver/driver.h"
+#include "driver/wide.h"
 #include "native/native.h"
 #include "platform/standins.h"
 #include "rw/rwd3d.h"
@@ -139,7 +140,7 @@ intptr_t BMX_WINAPI bmxStandDialogBoxParamA(void *instance, const char *name, vo
                                             intptr_t param)
 {
     const int fullscreen = bmxConfigInt("video.fullscreen", 1) != 0;
-    const int32_t width = bmxConfigInt("video.width", 640), height = bmxConfigInt("video.height", 480);
+    int width, height;
     const int32_t depth = bmxConfigInt("video.depth", 16);
     int32_t pick = -1, preselect = -1;
 
@@ -148,6 +149,7 @@ intptr_t BMX_WINAPI bmxStandDialogBoxParamA(void *instance, const char *name, vo
     (void)parent;
     (void)proc;
     (void)param;
+    bmxVideoSize(&width, &height, 640, 480); /* 0: the desktop size (docs/WIDESCREEN.md W1) */
     for (int32_t i = 0; i < drvState.numModes; i++) {
         const DrvVideoMode *const m = &drvState.modes[i];
 
@@ -345,6 +347,7 @@ static int systemStart(void)
         drvGpuStop();
         return 0;
     }
+    drvWideInstall2D(); /* [video] widescreen: the 2D funnel (docs/WIDESCREEN.md W8-A2) */
     initRenderStates();
     rwD3DContext = NULL;
     drvState.started = 1;

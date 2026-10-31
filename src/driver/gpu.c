@@ -13,6 +13,7 @@
 #include <SDL3/SDL.h>
 
 #include "driver/driver.h"
+#include "driver/wide.h"
 #include "native/native.h"
 #include "platform/platform.h"
 
@@ -281,16 +282,18 @@ static void saveShot(SDL_GPUTexture *texture, int32_t width, int32_t height, con
     SDL_ReleaseGPUTransferBuffer(gpuDevice, buffer);
 }
 
-/* Letterboxed destination of a width x height image in a w x h window. */
-static void letterbox(int32_t width, int32_t height, Uint32 w, Uint32 h, SDL_GPUBlitRegion *dst)
+/* Destination of a width x height image in a w x h window by `[video] scale_filter` (docs/WIDESCREEN.md W7):
+ * 0 letterboxed linear (vanilla), 1 letterboxed nearest, 2 integer scale. Returns the blit filter. */
+static SDL_GPUFilter letterbox(int32_t width, int32_t height, Uint32 w, Uint32 h, SDL_GPUBlitRegion *dst)
 {
-    const double scale = SDL_min((double)w / width, (double)h / height);
-    const Uint32 dw = (Uint32)(width * scale + 0.5), dh = (Uint32)(height * scale + 0.5);
+    uint32_t rect[4];
+    const int nearest = drvWidePresentRect(drvWideConfig()->scaleFilter, width, height, w, h, rect);
 
-    dst->x = (w - dw) / 2;
-    dst->y = (h - dh) / 2;
-    dst->w = dw;
-    dst->h = dh;
+    dst->x = rect[0];
+    dst->y = rect[1];
+    dst->w = rect[2];
+    dst->h = rect[3];
+    return nearest ? SDL_GPU_FILTER_NEAREST : SDL_GPU_FILTER_LINEAR;
 }
 
 /* Blits a target into the swapchain (black bars around it) and presents. */
@@ -319,10 +322,9 @@ static int presentTarget(struct SDL_GPUTexture *color, int32_t x, int32_t y, int
         blit.source.w = (Uint32)width;
         blit.source.h = (Uint32)height;
         blit.destination.texture = swapchain;
-        letterbox(width, height, w, h, &blit.destination);
+        blit.filter = letterbox(width, height, w, h, &blit.destination);
         blit.load_op = SDL_GPU_LOADOP_CLEAR;
         blit.clear_color.a = 1.0f;
-        blit.filter = SDL_GPU_FILTER_LINEAR;
         SDL_BlitGPUTexture(cmd, &blit);
     }
     if (!SDL_SubmitGPUCommandBuffer(cmd)) {

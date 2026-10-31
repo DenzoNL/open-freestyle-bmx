@@ -1,9 +1,10 @@
 # Widescreen, native resolution and HUD layout (P6 enhancement)
 
-Status 2026-10-31: **decided, not implemented.** The user took the recommendation (marked **rec**) for every
-decision W1..W11; for W9 the default stays vanilla (640x480 4:3) until a clean playtest, then decided with
-screenshots. Order: WS1-WS4 first. Scope: the native exe (`bmxnative.exe`, SDL3 driver) only; the hook
-DLL and the oracle tests stay as they are. Rules that apply (PLAN.md Decisions): vanilla stays vanilla; enhancements
+Status 2026-10-31: **WS1-WS4 implemented** (not committed; "Implementation status" at the end), WS5/WS6 open, the
+default stays vanilla until the user's playtest (WS7, `native-run2\widetest.ps1`). The user took the
+recommendation (marked **rec**) for every decision W1..W11; for W9 the default stays vanilla (640x480 4:3) until a
+clean playtest, then decided with screenshots. Order: WS1-WS4 first. Scope: the native exe (`bmxnative.exe`, SDL3
+driver) only; the hook DLL and the oracle tests stay as they are. Rules that apply (PLAN.md Decisions): vanilla stays vanilla; enhancements
 attach at seams, not as option checks inside faithful code; options are tagged visual-only or gameplay-changing.
 Everything here is meant to be visual-only.
 
@@ -273,3 +274,64 @@ Integers only (src/platform/config.c), `[video]`, all new keys added to `kKnownK
 | WS7 | User playtest, default decision (W9), docs (NATIVE.md, PLATFORM.md config list) | - | - |
 
 WS1-WS4 give a complete 16:9 / 21:9 mode with a centred HUD; WS5-WS6 are polish and can wait.
+
+## Implementation status (WS1-WS4, 2026-10-31)
+
+Code (native exe only; the hook DLL, the oracle tests and every ported function are unchanged):
+`src/driver/wide.h`, `widemath.c` (the maths, no SDL / game state), `wide.c` (the seams), `src/native/simhash.c`
+(BMX_SIM_HASH), small hooks in `driver/gpu.c` (present), `movie.c` (DrawDib rectangle), `device.c` (`width = 0`,
+the 2D install after rwD3DIm2DOpen), `raster.c` (`drvCameraCurrent`), `native/loader.c` (installs),
+`native/main.c` + `platform/window.c` (`bmxVideoSize`), `platform/config.c` (keys). Unit tests:
+`bmxwidetest` (tests/platform/test_wide.c, 93 checks).
+
+| Slice | State | Notes |
+|---|---|---|
+| WS1 | done | `[video]` keys `widescreen aspect fov_scale max_hfov hud menus movies scale_filter` (W9; `hud_aspect`, `ui_filter` come with WS5/WS6 and are still "unknown key"); `width = 0` / `height = 0` = the primary display's desktop size, full screen and windowed (`bmxVideoSize`); `scale_filter` 0 linear letterbox (unchanged), 1 nearest, 2 integer factor (linear letterbox when not even 1x fits) in `presentTarget` |
+| WS2 | done | `wideSetFov` in the zgl slot 0x561d98 (data pointer, written by the loader when `widescreen = 1`; log `wide: 1 slot`, else `wide: 0 slots`): calls the original, reads the window it set, applies W2-A (hor+ above 4:3, vert+ below, identity at exactly 4:3), then `fov_scale` and the `max_hfov` cap; RwCameraSetViewWindow only when something changed. BMX_SIM_HASH (below) |
+| WS3 | done | `wideIm2DPrimitive` wraps the engine device's fpIm2DRenderPrimitive at the device start. Only while the screen camera is in its update (camera raster = gZrwScreenW x H, not 4:3); classifier W6-A: untextured and the x extent reaching both edges (within 2 virtual pixels) = cover, stays stretched; textured full width = backdrop, pillarboxed unless `menus = 1`; everything else centred 4:3 unless `hud = 2` (`hud = 1` acts as 0 until WS5). Moved primitives are copied, mapped and **clipped to the 4:3 area** (finding 2 below). Movies: DrawDibDraw's destination mapped the same way (`movies = 0`), the target stays black around it |
+| WS4 | done | runs below; one fix (the clip) |
+| WS5, WS6 | open | |
+
+**Byte identity** (BMX_SHOT BMPs of the same BMX_KEYS run: ProQuest into Vail Trails, riding, pause, END RUN?,
+RUN FINISHED, view replay; frames 200..3200; build without the feature = 6e7f88a):
+- 640x480, `widescreen = 0` and `= 1`: identical to the old build. One caveat found on the way: frames 1300 and
+  1600 come out in one of two variants run to run (59 and 1 pixels differ), with the old and the new build alike and
+  with the option on and off alike; every run matched one of the two variants exactly. Pre-existing run-to-run
+  noise, not the feature (open point).
+- 1920x1080 stretched (`widescreen = 0`): 13/13 identical to the old build.
+- 1024x768 (exact 4:3), `widescreen = 1`: 12/12 identical to the old build.
+
+**Determinism** (W10.5): `BMX_SIM_HASH=<file>` writes `<tick> <hash>` per controller poll: FNV-1a 64 over the
+golden-trace recorder's fields (seed, pads, the selected camera's eye / look-at, all four riders' state, surface,
+state levels, flags, timer, position, velocity, forward, up, rotation, spin) plus each rider's combo score and
+gGameTimer. Two runs of the same build agree tick for tick. The same script with `widescreen = 1` at 1920x1080,
+3440x1440, 1920x1200, 3840x1080 and 1280x1024, and with the option off at 640x480 and 1920x1080, gave the same hash
+for every tick (1773..2173 ticks, menus, riding, pause, results and the replay included): the seams are
+visual-only as far as this coverage goes. (A hash of the whole 4 x 0xf70 rider array was tried and dropped: it
+differs between two runs of the same build from the first tick, so the struct holds process-specific bytes.)
+Golden-trace replays (W10.5's second half) were not run: traces need the hooked game (docs/TRACING.md).
+
+**Screenshot findings** (21:9 3440x1440 and 16:9 1920x1080 primary; also 16:10 1920x1200 and 32:9 3840x1080
+windowed, 5:4 1280x1024):
+1. Frontend, loading screen, movies: pillarboxed 4:3 with black sides; 5:4 letterboxes top and bottom (vert+).
+   Pause and results dim the whole width (cover rule works for the dim rect); HUD timer / score and the replay's
+   arrow sit in the centred 4:3 area; menus' text centred. No missing level geometry at the sides of the Vail Trails
+   start, the pause / results backgrounds or the replay cameras that were seen.
+2. **Fixed:** the game draws 2D partly or wholly off screen (the frontend's icon column slides out to the left when
+   it leaves; in vanilla the screen edge hides it). Mapped into the 4:3 area such primitives landed in the
+   pillarbox, and the loading screen (which never clears the camera) kept them there. Moved primitives are now
+   clipped to the 4:3 area on the CPU (`drvWideClipFan` for zrwprim's triangle fans, `drvWideClipLines` for its line
+   lists; attributes interpolated linearly, 2D has one rhw). zrwprimClipPoly only clips to the camera viewport, so
+   the clip is ours.
+3. FOV at 3440x1440 (hor+, 4:3 view inside): chase f 60 -> **114.4°** horizontal (66.0° vertical, as at 4:3);
+   f 55 -> 104.0°, replay view cams f 30 -> 54.7°, chase mode 3 f 70 -> 135.8°. At 1920x1080: 98.2 / 87.2 / 42.1 /
+   122.7. The image at 114° shows the usual rectilinear stretch towards the sides; `max_hfov` matters at 21:9 only
+   for the wider chase modes (a cap of 120 changes f 70 only; 105 would trim f 60 too), and `fov_scale` 90 gives
+   f 60 -> 108.8°. Worth trying in the playtest; not needed for correctness.
+4. Banding in the sky / grass is the 16-bit mode (depth 16, the default and vanilla), not the feature.
+5. The present filter (`scale_filter`) is not visible in BMX_SHOT frames (they are the camera raster); covered by the
+   unit tests only.
+
+**Open points:** the playtest (W10.6: all levels, replays, attract demo, cut-scenes with bars, the goal lists);
+WS5 / WS6; the run-to-run variation above; `hud = 1` and `menus = 2` act as 0 until WS5 / WS6; `-r<w>.<h>.<depth>`
+still overrides `[video]` (and has the original's pick bug).

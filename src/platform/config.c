@@ -38,9 +38,20 @@ static const char *const kKnownKeys[] = {
     "audio.smooth_resample", /* P9 note: 0 original mixer, 1 linear, 2 cubic resampling (smoothmix.c) */
     "audio.music_dir",       /* the music override: a folder with the user's FLACs (docs/MUSIC.md) */
     "video.width", /* P16: the mode without the device dialog (default 640 x 480 x 16 full screen) */
-    "video.height",          "video.depth",
+    "video.height",
+    "video.depth",
     "video.fullscreen", /* 0: a window of width x height (the game renders at that size) */
     "ui.confirm_quit",  /* 1: the main menu's QUIT asks "Do you want to quit the game?" (0: quits at once) */
+    /* docs/WIDESCREEN.md W9 (width / height 0: the desktop size) */
+    "video.widescreen",   /* 1: hor+ 3D, centred 4:3 HUD and menus, pillarboxed movies (0: a wide mode
+                             stretches) */
+    "video.aspect",       /* 0 stretch, 1 hor+ keeping the 4:3 view inside (default), 2 vert- */
+    "video.fov_scale",    /* percent on both view window axes (default 100) */
+    "video.max_hfov",     /* cap of the horizontal field of view in degrees (0: none) */
+    "video.hud",          /* 0 centred 4:3 (default), 2 stretch; 1 (edge anchored) is WS5, acts as 0 */
+    "video.menus",        /* 0 pillarbox (default), 1 stretch */
+    "video.movies",       /* 0 pillarbox (default), 1 stretch */
+    "video.scale_filter", /* present: 0 linear (default), 1 nearest, 2 integer scale */
 };
 
 static int known(const char *key)

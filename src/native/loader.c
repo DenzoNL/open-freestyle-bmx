@@ -10,6 +10,7 @@
 #include <bcrypt.h>
 
 #include "driver/driver.h"
+#include "driver/wide.h"
 #include "hook/hook.h"
 #include "native/native.h"
 #include "platform/music.h"
@@ -334,6 +335,9 @@ static int loadImage(const uint8_t *file, size_t size)
         }
         bmxLog("smooth: %u jumps\n", (unsigned)smoothCount);
     }
+    /* [video] widescreen: the hor+ wrapper in the zgl camera slot 0x561d98 (data, no jump; driver/wide.c). */
+    drvWideInstall();
+    bmxSimHashInstall();
     /* [audio] music_dir: the music override attaches at the DirectSound stand-in (no jump; musicgame.c). */
     bmxMusicInstall();
     if (pngCheck) {

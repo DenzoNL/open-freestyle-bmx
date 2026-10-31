@@ -35,6 +35,10 @@ void bmxPngCheckArm(void);
  */
 int bmxKeysInstall(void);
 
+/* BMX_SIM_HASH=<file> (src/native/simhash.c): a per-tick hash of the simulation state, one line per
+ * controller poll (docs/WIDESCREEN.md W10.5). */
+void bmxSimHashInstall(void);
+
 /* Install the vectored exception handler that reports int3 traps. */
 void bmxTrapInstall(void);
 

@@ -111,6 +111,11 @@ _Static_assert(sizeof(BmxMsg) == 0x1c, "MSG");
  * scripted run's window, never focused or activated.
  */
 void *bmxWindowCreate(const char *title, int width, int height, BmxWndProc proc, int background);
+/*
+ * `[video] width` x `height` (docs/WIDESCREEN.md W1): `fallbackW` x `fallbackH` when unset; 0 in either
+ * means the primary display's desktop size (in pixels) for that axis.
+ */
+void bmxVideoSize(int *width, int *height, int fallbackW, int fallbackH);
 /* The full screen style (D4: borderless over the desktop, the display mode unchanged). */
 void bmxWindowSetFullscreen(void *window);
 /* ShowWindow: shows it and delivers the activation (WM_ACTIVATE) at once, as Windows does. */

@@ -107,8 +107,15 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   the OS key state, Windows-only GetAsyncKeyState probe; the focus test with Enter held at start is the user's). The
   x87 RwMatrixMultiply routine 0x54b038 is ported (`rwMatrixMultiplyX87`, oracle-tested) and out of kTextKeep, which
   keeps only the thunk table, the RpWorldDestroy stub, and the dinput tables under BMX_INPUT_CHECK. **Next:** S12.
-- Widescreen / native resolution / HUD layout: design with open decisions W1-W11 in docs/WIDESCREEN.md (2026-10-31,
-  not implemented; the user picks the options and the default before slice WS1).
+- Widescreen / native resolution / HUD layout (docs/WIDESCREEN.md, the user took every recommendation): **WS1-WS4
+  done 2026-10-31** (native only; not committed at the time of writing). `[video] widescreen = 1` stores a hor+
+  wrapper into the zgl camera slot 0x561d98 and wraps the engine device's fpIm2DRenderPrimitive (classifier: full-
+  width untextured = cover, stays stretched; everything else mapped into the centred 4:3 area and clipped to it);
+  movies pillarboxed in the DrawDib stand-in; `width = height = 0` = desktop size; `scale_filter` for the present.
+  Off, and on at an exact 4:3 mode, BMX_SHOT frames are byte-identical to the build before; `BMX_SIM_HASH` per-tick
+  hashes are equal on / off at every aspect tried. Unit tests: `bmxwidetest`. Default stays vanilla (W9) until the
+  user's playtest: `native-run2\widetest.ps1` (default 3440x1440 21:9; `-Aspect 16:9` for 1920x1080). **Next:**
+  that playtest, then WS5 (HUD edge anchoring) and WS6 (ui_filter, blurred menu fill).
 - Golden traces: record sessions with `bmxtrace.orig` (docs/TRACING.md) if not done yet.
 
 ## Machine setup

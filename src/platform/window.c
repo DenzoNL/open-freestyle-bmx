@@ -272,6 +272,28 @@ static void applyMinMax(void)
     }
 }
 
+void bmxVideoSize(int *width, int *height, int fallbackW, int fallbackH)
+{
+    *width = bmxConfigInt("video.width", fallbackW);
+    *height = bmxConfigInt("video.height", fallbackH);
+    if (*width == 0 || *height == 0) {
+        const SDL_DisplayMode *desktop = NULL;
+
+        if (SDL_InitSubSystem(SDL_INIT_VIDEO)) {
+            desktop = SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
+        }
+        if (desktop == NULL) {
+            bmxLog("window: no desktop size (%s), using %dx%d\n", SDL_GetError(), fallbackW, fallbackH);
+            *width = *width == 0 ? fallbackW : *width;
+            *height = *height == 0 ? fallbackH : *height;
+        } else {
+            *width = *width == 0 ? desktop->w : *width;
+            *height = *height == 0 ? desktop->h : *height;
+        }
+        /* The subsystem stays up: the window needs it next. */
+    }
+}
+
 void *bmxWindowCreate(const char *title, int width, int height, BmxWndProc proc, int background)
 {
     SDL_WindowFlags flags = SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE;

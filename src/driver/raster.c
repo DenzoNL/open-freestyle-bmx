@@ -30,6 +30,11 @@ int drvCameraUpdating(void)
     return drvCurrentCamera != NULL;
 }
 
+RwCamera *drvCameraCurrent(void)
+{
+    return drvCurrentCamera;
+}
+
 static DrvCameraExt *cameraExt(const RwCamera *camera)
 {
     return (DrvCameraExt *)((uint8_t *)camera + drvCameraOffset);

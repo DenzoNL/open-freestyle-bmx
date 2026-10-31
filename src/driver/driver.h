@@ -112,6 +112,7 @@ int drvRasterCreate(void *out, void *raster, int32_t flags);
 int drvRasterDestroy(void *out, void *raster, int32_t in);
 int drvHintRenderFront2Back(void *out, void *inOut, int32_t in);
 int drvCameraUpdating(void);
+RwCamera *drvCameraCurrent(void); /* the camera between its begin and end update, else NULL */
 extern int32_t drvRenderOrderHint;
 extern RwRaster *drvContextRaster;
 int drvSetRasterContext(void *out, void *raster, int32_t in);

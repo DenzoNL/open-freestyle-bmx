@@ -348,6 +348,15 @@ pass need handling (GENERIC_READ, OPEN_EXISTING, FILE_BEGIN/CURRENT).
   that change gameplay must also go into replays (PLAN); none in this document do.
 - B: command line / environment only (as the dev aids today).
 
+  The `[video]` keys (config.c `kKnownKeys`; all integers): `width`, `height` (default 640 x 480; `0` = the
+  primary display's desktop size, docs/WIDESCREEN.md W1), `depth` (16), `fullscreen` (1; 0 = a window of width x
+  height, rendered at that size); the widescreen options of docs/WIDESCREEN.md W9 (WS1-WS3): `widescreen` (0; 1
+  installs the seams), `aspect` (1 hor+ keeping the 4:3 view inside, 0 stretch, 2 vert-), `fov_scale` (100, percent
+  of both view axes, 10..400), `max_hfov` (0 = none; cap of the horizontal FOV in degrees), `hud` (0 centred 4:3, 2
+  stretch; 1 = edge anchored is WS5 and acts as 0), `menus` (0 pillarbox, 1 stretch), `movies` (0 pillarbox, 1
+  stretch), `scale_filter` (0 linear letterbox, 1 nearest, 2 integer factor; the present, also without
+  widescreen). `-r<w>.<h>.<depth>` on the command line still wins over width / height / depth / fullscreen.
+
 ### 3.6 Timing
 
 timeGetTime (0x699838) and GetTickCount (0x6995fc) -> milliseconds from SDL_GetTicks plus a fixed non-zero base
