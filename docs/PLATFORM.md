@@ -1,7 +1,7 @@
 # Platform layer: Windows APIs -> SDL3 (P4, "Windows first")
 
-Status 2026-10-31: **decided, not implemented.** The user took the recommendation for every decision P1..P19
-(A unless said otherwise). Order: S1-S4, then input + d-pad (S5, S6), then the rest.
+Status 2026-10-31: **decided; S1-S4 implemented** (section 4a). The user took the recommendation for every decision
+P1..P19 (A unless said otherwise). Order: S1-S4 (done), then input + d-pad (S5, S6), then the rest.
 Goal: `bmxnative.exe` (src/native/) as a clean standalone
 Windows build whose game and engine code reach the OS only through SDL3 and our own code. The fixed 32-bit memory
 layout (image at 0x400000, docs/NATIVE.md) stays; Mac/Linux come after. Vanilla stays vanilla (PLAN.md Decisions):
@@ -351,6 +351,57 @@ an opt-in (power) seam in main.c, not in ported code.
 | S11 | Remove the remaining Win32 from main.c / keys.c / driver (WASAPI mute -> no audio device), import check in tools/check.sh | ~100 | Sonnet | `llvm-objdump -p bmxnative.exe`: only SDL3, UCRT, KERNEL32 (+ BCRYPT until an own SHA-256) |
 | S12 | Opt-in seams: profile saves + asset folder (P18), hot-plug (P5), remap (P8), window modes (P17) | ~400 | Sonnet | Each option off: S1..S10 checks unchanged; on: feature test |
 
+### 4a. Status of S1-S4 (2026-10-31, native-only, not committed)
+
+Code: `src/platform/` (hosted C, SDL3, no windows.h): `imports.c` (the table), `kernel.c` (S2), `winmm.c` (S3),
+`fileio.c` + `paths.c` (S4), `avi.c` (the AVISaveOptionsFree shim, moved out of loader.c), `standins.h` (the
+stand-in prototypes), `platform.h`. It is part of the `bmxnative` target and excluded from tools/check.sh's hook
+tidy list like src/native (tidy it with `-p build/native32`). Tests: `tests/platform/test_platform.c`, target
+`bmxplatformtest` (preset native32; hosted, no game image; compares the stand-ins with the real kernel32 / winmm).
+**The hook DLL is unchanged and does not use the stand-ins** (P2-A allows it; nothing in S1-S4 needs it, S5 will).
+
+- **S1 done.** `loader.c fillImports` asks, per slot: `bmxStandInFind(dll, name)` (src/platform/imports.c; entries
+  `{dll, name, fn}`, DLL name case-insensitive; keys.c adds its two through `bmxKeysStandIns` because only its
+  definitions know the stdcall decoration), then `bmxImportIsDead` (the 64 slots of 1b: all of ADVAPI32 and DDRAW,
+  49 KERNEL32, 9 USER32), else the real function. A dead slot gets a 16-byte stub (`push index; call deadSlot`) in a
+  VirtualAlloc'd page: calling it logs `DEAD IMPORT called: KERNEL32.dll!HeapAlloc ..., caller <addr>` and exits
+  with code 3. A DLL is loaded only when a slot needs the real function (or `bmxImportKeepsDll`: DINPUT.dll, whose
+  stand-in forwards and whose copy in the game folder may be the hook DLL, which must patch before our jumps).
+  The log has one line per DLL and a summary; today: `137 slots filled: 23 stand-ins, 64 dead, 50 real; real DLLs
+  still used: KERNEL32.dll USER32.dll WINMM.dll AVIFIL32.dll MSVFW32.dll` (KERNEL32: 3 real = LoadLibraryA /
+  GetProcAddress / FreeLibrary; ADVAPI32, DDRAW and DINPUT are no longer loaded for the dead / stand-in slots).
+  The stand-in count 23 = 11 (S2) + 5 (S3) + 4 (S4) + AVISaveOptionsFree + the two BMX_KEYS ones.
+- **S2 done** (`kernel.c`). timeGetTime and GetTickCount share one clock: milliseconds since process start plus a
+  fixed base (0x36ee80 = 1 h of "uptime"; `BMX_TIME_BASE=<n>` overrides it, e.g. `0xfffff000` runs the limiter
+  through the 32-bit wrap), 32-bit wrapping, never 0 at start. Resolution as Windows: timeGetTime 1 ms; GetTickCount
+  floor(k * 15.625) ms (the 64 Hz system tick, steps of 15/16 ms; the movie clock sees what it saw). main.c's frame
+  limiter now calls `bmxTimeGetTime` (it must share the clock with the game's own `gLastTick` writes). QPC / QPF are
+  SDL's (the real ones on Windows: same base, 10 MHz). Sleep = SDL_Delay. Critical sections: the first word of the
+  game's 24-byte CRITICAL_SECTION holds an SDL mutex (recursive); Enter/Leave on a zeroed section do nothing.
+  OutputDebugStringA is **dropped** unless `BMX_DEBUG_OUTPUT=1` sends it to the log (it goes to a debugger on Windows;
+  the game prints asset loads and every movie audio tick, thousands of lines; P17 said "-> bmxLog"). DebugBreak =
+  SDL_TriggerBreakpoint (an int3 like the original; the trap handler treats it like any other).
+- **S3 done** (`winmm.c`). timeGetDevCaps {1, 1000000}, timeBegin/EndPeriod OK and no effect, timeSetEvent starts an
+  SDL thread (SDL_THREAD_PRIORITY_TIME_CRITICAL, name "bmx-timer", up to 8 events, one thread each) calling
+  `proc(id, 0, user, 0, 0)` on absolute deadlines (resync instead of a burst when more than a period late; one-shot
+  and periodic), timeKillEvent joins the thread (so the callback is not running when it returns; from the callback
+  itself it only marks the event). The game's bmxSoundClose / reopen (movies, level loads) exercises kill + set
+  many times. `BMX_TIMER_LOG=1` logs per event at kill (and at BMX_QUIT_FRAMES): calls, mean / min / max / sd of the
+  interval, calls more than 2 ms late, mean callback time. Freeride run, real winchanPump: 4784 calls, mean 15.999 ms,
+  sd 0.03, 0 late, callback 0.036 ms. The test program also runs real winmm and the stand-in side by side (3 s each): mean 16.003 vs 16.000 ms, sd 0.50 vs 0.11 ms.
+- **S4 done** (`fileio.c`, `paths.c`). CreateFileA / ReadFile / SetFilePointer / CloseHandle on SDL_IOStream, read
+  only (GENERIC_READ + OPEN_EXISTING; anything else is refused and logged); the HANDLE is a pointer to our record;
+  Windows semantics kept (failed open = -1, read at the end = success with 0 bytes, seek failure = 0xFFFFFFFF).
+  `bmxPathResolve` is the identity and is used by the CreateFileA shim and crt.c's fopen. SDL quirk: SDL's Windows
+  `SDL_SeekIO` returns 0 (not -1) for a seek before the start, so failure is detected through the error string.
+  `BMX_FILE_LOG=1` logs per file at close (reads, bytes, FNV-1a 64 of the bytes read in order). **`BMX_FILE_CHECK=1`
+  (our addition) opens every file through the real kernel32 as well and repeats every call there, comparing
+  results, byte counts, bytes and positions**: this replaces "hash of every byte read, native vs hooked" (the hook
+  cannot log it) with an exact check against Windows in the same process; a game run (ProQuest into Vail Trails, with
+  the music stream read on the timer thread) shows `filecheck ok` for all 8 files.
+- Not done / deliberately left: LoadLibraryA / GetProcAddress / FreeLibrary stay real (S7), all window, input, movie
+  and waveOut slots stay real. A stand-in that "forwards when its option is off" is only BMX_KEYS's.
+
 S1-S4 are independent and small; S5/S6 answer the playtest note first if wanted. S7 and S8 are the large ones.
 
 ## 5. Windows behaviour that is hard to reproduce
@@ -364,6 +415,17 @@ S1-S4 are independent and small; S5/S6 answer the playtest note first if wanted.
 - **Timer-thread concurrency**: winchanPump runs on winmm's thread while the game thread changes channels (plain
   flag, no lock, in winchan.c). Races exist in the original too; P11-A keeps the same shape but not the same
   interleavings. Audio is not part of the deterministic simulation, so golden traces are unaffected.
+  **For the Opus review of S3 (src/platform/winmm.c):** (a) timeKillEvent joins the timer thread, so a callback that
+  waits for something the killing thread holds would deadlock (bmxSoundClose holds nothing; winmm's own kill waits for
+  a running callback too, believed but not verified); (b) a timer thread is created per event with its own
+  SDL_Mutex-guarded slot table (8 slots), slot reuse after kill, one-shot reaping, self-kill from the callback
+  (detached thread frees its slot): check the lock order and the `finished` / `detached` handshake; (c) the statistics
+  fields are written by the timer thread and read after the join, no lock; (d) the callback runs game code on a
+  thread SDL created: its x87 control word is Windows' default for a new thread, not the game thread's (matters only
+  if the main thread ever leaves the 53-bit default, SDL3-DRIVER.md open points), and `bmxLog` / the CRT layer's
+  malloc are called from it concurrently with the game thread; (e) TIME_CRITICAL priority plus absolute deadlines
+  with SDL_DelayPrecise (which spins for the last part) costs a little CPU on the timer's core; (f) the game's plain
+  flag gWinchanLock is unchanged (not atomic), as in the original.
 - **Timer resolution**: timeGetTime has 1 ms resolution only while the multimedia timer holds the system timer at
   1 ms (the game calls timeEndPeriod right after timeSetEvent); GetTickCount steps ~15.6 ms (movie clock). SDL clocks
   are finer: the frame limiter and movie frame choice can differ by a tick. Not part of the simulation (fixed tick).

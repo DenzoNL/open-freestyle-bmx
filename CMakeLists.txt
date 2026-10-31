@@ -39,7 +39,7 @@ if(BMX_NATIVE32)
   target_compile_options(bmx_game PRIVATE -ffreestanding -fno-builtin -fno-stack-protector
     -Wno-sign-compare) # enum constants are unsigned under the mingw target's ABI, int under msvc's
   enable_language(ASM)
-  file(GLOB BMX_NATIVE_SOURCES CONFIGURE_DEPENDS src/native/*.c)
+  file(GLOB BMX_NATIVE_SOURCES CONFIGURE_DEPENDS src/native/*.c src/platform/*.c)
   # range.S must be the first object on the link line: its block has to start the image.
   add_library(bmx_range OBJECT src/native/range.S)
   # The driver would put the C runtime start files (crt2.o, crtbegin.o) before it: pass them ourselves, after.
@@ -81,6 +81,12 @@ if(BMX_NATIVE32)
   target_link_options(bmxnative PRIVATE -Wl,--image-base=0x3f0000 -Wl,--section-alignment=0x10000
     -Wl,--disable-dynamicbase -Wl,--disable-high-entropy-va)
   target_link_libraries(bmxnative PRIVATE bcrypt winmm ole32 SDL3::SDL3)
+  # Checks of the platform stand-ins against Windows (tests/platform): hosted, no game image.
+  add_executable(bmxplatformtest tests/platform/test_platform.c src/platform/kernel.c src/platform/winmm.c
+    src/platform/fileio.c src/platform/paths.c)
+  target_include_directories(bmxplatformtest PRIVATE src)
+  target_compile_options(bmxplatformtest PRIVATE ${BMX_WARNINGS})
+  target_link_libraries(bmxplatformtest PRIVATE SDL3::SDL3)
   # SDL3.dll next to the exe (copy it into the game folder with bmxnative.exe).
   add_custom_command(TARGET bmxnative POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
     $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:bmxnative>)

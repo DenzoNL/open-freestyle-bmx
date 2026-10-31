@@ -26,6 +26,7 @@
 
 #include "driver/driver.h"
 #include "native/native.h"
+#include "platform/platform.h"
 
 enum { kMaxEvents = 256, kMaxEventKeys = 4, kDefaultHold = 2 };
 
@@ -313,7 +314,8 @@ static IDirectInput7A directInput = {&diVtbl};
 
 typedef HRESULT(WINAPI *DirectInputCreateExFn)(HINSTANCE, DWORD, REFIID, void **, IUnknown *);
 
-static HRESULT WINAPI directInputCreateEx(HINSTANCE instance, DWORD version, REFIID iid, void **out,
+/* The import table's stand-in for DINPUT.dll!DirectInputCreateEx (src/platform/imports.c). */
+HRESULT WINAPI bmxKeysDirectInputCreateEx(HINSTANCE instance, DWORD version, REFIID iid, void **out,
                                           IUnknown *outer)
 {
     DirectInputCreateExFn real;
@@ -323,8 +325,7 @@ static HRESULT WINAPI directInputCreateEx(HINSTANCE instance, DWORD version, REF
         return DI_OK;
     }
     /* The DINPUT.dll the import fill loaded (the game folder's hook DLL forwards to the system one). */
-    real =
-        (DirectInputCreateExFn)(void *)GetProcAddress(GetModuleHandleA("DINPUT.dll"), "DirectInputCreateEx");
+    real = (DirectInputCreateExFn)bmxRealProc("DINPUT.dll", "DirectInputCreateEx");
     return real != NULL ? real(instance, version, iid, out, outer) : DIERR_GENERIC;
 }
 
@@ -333,7 +334,8 @@ static HRESULT WINAPI directInputCreateEx(HINSTANCE instance, DWORD version, REF
  * the quit prompt's MB_SETFOREGROUND would take the focus. So with BMX_KEYS each box is logged and answered
  * at once: Yes for Yes/No (the quit prompt quits), Cancel for Yes/No/Cancel (an assert terminates), else OK.
  */
-static int WINAPI messageBoxA(HWND owner, const char *text, const char *caption, UINT type)
+/* The import table's stand-in for USER32.dll!MessageBoxA. */
+int WINAPI bmxKeysMessageBoxA(HWND owner, const char *text, const char *caption, UINT type)
 {
     const UINT buttons = type & MB_TYPEMASK;
     const int answer = buttons == MB_YESNO ? IDYES : buttons == MB_YESNOCANCEL ? IDCANCEL : IDOK;
@@ -345,13 +347,10 @@ static int WINAPI messageBoxA(HWND owner, const char *text, const char *caption,
     return answer;
 }
 
-void *bmxKeysImportShim(const char *name)
-{
-    if (strcmp(name, "DirectInputCreateEx") == 0) {
-        return (void *)directInputCreateEx;
-    }
-    if (strcmp(name, "MessageBoxA") == 0) {
-        return (void *)messageBoxA;
-    }
-    return NULL;
-}
+/* The import table entries of this file (src/platform/imports.c looks them up with the stand-ins of its own).
+ */
+const BmxStandIn bmxKeysStandIns[] = {
+    {"DINPUT.dll", "DirectInputCreateEx", (void *)bmxKeysDirectInputCreateEx},
+    {"USER32.dll", "MessageBoxA", (void *)bmxKeysMessageBoxA},
+};
+const size_t bmxKeysStandInCount = sizeof bmxKeysStandIns / sizeof bmxKeysStandIns[0];

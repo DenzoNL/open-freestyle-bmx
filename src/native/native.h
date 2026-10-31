@@ -30,11 +30,11 @@ void bmxPngCheckArm(void);
 
 /*
  * BMX_KEYS (src/native/keys.c): parse the key script; returns 1 when the keyboard is scripted. The import
- * shims (DirectInputCreateEx: the stand-in DirectInput; MessageBoxA: answered without a window) act only in a
- * scripted run and call the real function otherwise. bmxKeysImportShim returns NULL for other imports.
+ * table (src/platform/imports.c) points DirectInputCreateEx (the stand-in DirectInput) and MessageBoxA
+ * (answered without a window) at keys.c; both act only in a scripted run and call the real function
+ * otherwise.
  */
 int bmxKeysInstall(void);
-void *bmxKeysImportShim(const char *name);
 
 /* Install the vectored exception handler that reports int3 traps. */
 void bmxTrapInstall(void);

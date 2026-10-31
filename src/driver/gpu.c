@@ -15,6 +15,7 @@
 
 #include "driver/driver.h"
 #include "native/native.h"
+#include "platform/platform.h"
 
 static SDL_Window *gpuWindow;
 static SDL_GPUDevice *gpuDevice;
@@ -351,6 +352,7 @@ int drvGpuPresent(struct SDL_GPUTexture *color, int32_t x, int32_t y, int32_t wi
     }
     if (quit != NULL && shownFrames >= SDL_atoi(quit)) {
         bmxLog("driver: BMX_QUIT_FRAMES reached after %d frames\n", shownFrames);
+        bmxTimerShutdown(); /* joins the sound timer thread; logs its statistics with BMX_TIMER_LOG */
         ExitProcess(0);
     }
     return 1;

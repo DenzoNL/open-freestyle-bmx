@@ -16,6 +16,7 @@
 #include <mmdeviceapi.h>
 
 #include "native/native.h"
+#include "platform/platform.h"
 
 #define VAR(addr, type) (*(type *)(uintptr_t)(addr))
 
@@ -171,6 +172,7 @@ int main(void)
     int background;
 
     bmxLogOpen();
+    bmxPlatformInit();
     if (bmxLoadImage("NgBMX.exe") != 0) {
         return 1;
     }
@@ -249,10 +251,10 @@ int main(void)
             if (gRateA == gRateB) {
                 idle = 1;
             } else if (gLastTick == 0) {
-                gLastTick = timeGetTime();
+                gLastTick = bmxTimeGetTime();
                 idle = 1;
             } else {
-                const DWORD elapsed = timeGetTime() - gLastTick;
+                const DWORD elapsed = bmxTimeGetTime() - gLastTick;
                 /* The original divides on the x87 at 53-bit precision: double arithmetic on the floats. */
                 const double limit = (double)gRateC / (double)gRateA;
 
@@ -269,6 +271,7 @@ int main(void)
             }
         }
     }
+    bmxTimerShutdown();
     ExitProcess((UINT)-1); /* the original's _exit(-1) */
     return 0;
 }

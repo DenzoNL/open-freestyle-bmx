@@ -11,9 +11,9 @@ echo "== build (hook preset) (${SECONDS} s)"
 cmake --preset hook >/dev/null
 cmake --build --preset hook
 echo "== clang-tidy (${SECONDS} s)"
-# src/native, src/driver and src/png are only built by the native32 preset (hosted mingw, SDL3), not in build/hook's
+# src/native, src/platform, src/driver and src/png are only built by the native32 preset (hosted mingw, SDL3), not in build/hook's
 # compile database; tidy them with -p build/native32 (docs/NATIVE.md).
-mapfile -t units < <(git ls-files -co --exclude-standard 'src/*.c' 'tests/cases/*.c' ':!src/native/*' ':!src/driver/*' ':!src/png/*')
+mapfile -t units < <(git ls-files -co --exclude-standard 'src/*.c' 'tests/cases/*.c' ':!src/native/*' ':!src/platform/*' ':!src/driver/*' ':!src/png/*')
 # nixpkgs' clang-tidy wrapper puts the host libc on CPATH, which breaks the freestanding i686-windows
 # units on Linux (gnu/stubs-32.h). Use the unwrapped clang-tidy next to the flake's cross clang.
 tidy=(clang-tidy)

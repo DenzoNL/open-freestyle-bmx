@@ -12,6 +12,7 @@
 #include "driver/driver.h"
 #include "hook/hook.h"
 #include "native/native.h"
+#include "platform/platform.h"
 #include "png/png.h"
 
 /* Same value as tools/known_exe.txt. */
@@ -52,69 +53,108 @@ static int sha256Hex(const uint8_t *data, size_t size, char out[65])
 }
 
 /*
- * AVISaveOptionsFree (AVIFIL32): zmovieClose frees each stream's lpFormat with the CRT (zmemFree) and then
- * hands the AVICOMPRESSOPTIONS to this function, which GlobalFrees lpFormat and lpParms and clears them. In
- * the original the block comes from MSVC6's own heap and that GlobalFree fails harmlessly; with our CRT the
- * block is the process heap's and the second free is fatal (heap corruption). Only the clearing remains.
+ * Dead slots (docs/PLATFORM.md 1b): the original code that calls them is int3 in this exe. Each gets a stub
+ * in place of the real function, so the DLLs are not loaded for them; if one is called anyway the stub
+ * reports which function and from where, and the process stops. A stub is `push <slot index>; call deadSlot`:
+ * deadSlot then sees (index, caller's return address) as its two cdecl arguments.
  */
-static LONG WINAPI shimAviSaveOptionsFree(int count, void **options)
-{
-    for (int i = 0; i < count; i++) {
-        uint8_t *const o = options[i];
+enum { kMaxDeadSlots = 160, kDeadStubSize = 16 };
 
-        memset(o + 0x18, 0, 4); /* lpFormat */
-        memset(o + 0x20, 0, 4); /* lpParms */
-    }
-    return 0;
+static char deadNames[kMaxDeadSlots][64];
+static int deadCount;
+
+static void __attribute__((noreturn, cdecl)) deadSlot(uint32_t index, uint32_t callerRet)
+{
+    bmxLog("DEAD IMPORT called: %s (the native exe should never reach it), caller %08x\n",
+           index < kMaxDeadSlots ? deadNames[index] : "?", (unsigned)callerRet);
+    ExitProcess(3);
 }
 
-static const struct {
-    const char *name;
-    FARPROC fn;
-} kImportShims[] = {
-    {"AVISaveOptionsFree", (FARPROC)(void *)shimAviSaveOptionsFree},
-};
+static void *makeDeadStub(const char *dll, const char *name)
+{
+    static uint8_t *page;
+    uint8_t *stub;
+    int32_t rel;
+    const uint32_t index = (uint32_t)deadCount;
 
-/* Fills every import slot with the real Windows function (or its shim); reports the slot range for the thunk
- * scan. */
+    if (page == NULL) {
+        page = VirtualAlloc(NULL, kMaxDeadSlots * kDeadStubSize, MEM_COMMIT | MEM_RESERVE,
+                            PAGE_EXECUTE_READWRITE);
+    }
+    if (page == NULL || deadCount == kMaxDeadSlots) {
+        return NULL;
+    }
+    snprintf(deadNames[index], sizeof deadNames[index], "%s!%s", dll, name);
+    stub = page + index * kDeadStubSize;
+    rel = (int32_t)((uintptr_t)deadSlot - ((uintptr_t)stub + 10));
+    stub[0] = 0x68; /* push imm32 */
+    memcpy(stub + 1, &index, 4);
+    stub[5] = 0xE8; /* call rel32 */
+    memcpy(stub + 6, &rel, 4);
+    deadCount++;
+    return stub;
+}
+
+void *bmxRealProc(const char *dll, const char *name)
+{
+    const HMODULE module = LoadLibraryA(dll);
+
+    return module != NULL ? (void *)GetProcAddress(module, name) : NULL;
+}
+
+/* Fills every import slot (a stand-in from src/platform, a trap stub for a dead slot, else the real Windows
+ * function) and reports the slot range for the thunk scan. DLLs are loaded only for slots that need the real
+ * one. */
 static int fillImports(const IMAGE_NT_HEADERS32 *nt, uint32_t *iatLo, uint32_t *iatHi)
 {
     const IMAGE_DATA_DIRECTORY dir = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
     const IMAGE_IMPORT_DESCRIPTOR *imp =
         (const IMAGE_IMPORT_DESCRIPTOR *)(kBmxImageBase + dir.VirtualAddress);
-    int count = 0;
+    int count = 0, standIns = 0, dead = 0, real = 0;
+    char loaded[256] = "";
 
     *iatLo = 0xffffffffu;
     *iatHi = 0;
     for (; imp->Name; imp++) {
         const char *dllName = (const char *)(kBmxImageBase + imp->Name);
-        const HMODULE dll = LoadLibraryA(dllName);
+        HMODULE dll = NULL;
+        int dllStandIns = 0, dllDead = 0, dllReal = 0;
         const uint32_t *names =
             (const uint32_t *)(kBmxImageBase +
                                (imp->OriginalFirstThunk ? imp->OriginalFirstThunk : imp->FirstThunk));
         FARPROC *slots = (FARPROC *)(kBmxImageBase + imp->FirstThunk);
 
-        if (!dll) {
-            bmxLog("import: cannot load %s\n", dllName);
-            return -1;
+        if (bmxImportKeepsDll(dllName)) {
+            dll = LoadLibraryA(dllName);
+            if (!dll) {
+                bmxLog("import: cannot load %s\n", dllName);
+                return -1;
+            }
         }
         for (; *names; names++, slots++) {
             const int byOrdinal = (*names & 0x80000000u) != 0;
             const char *name = byOrdinal ? (const char *)(uintptr_t)(*names & 0xffff)
                                          : (const char *)(kBmxImageBase + *names + 2);
-            FARPROC fn = GetProcAddress(dll, name);
             const uint32_t slot = (uint32_t)(uintptr_t)slots;
+            FARPROC fn = NULL;
 
-            for (size_t s = 0; !byOrdinal && s < sizeof kImportShims / sizeof kImportShims[0]; s++) {
-                if (strcmp(name, kImportShims[s].name) == 0) {
-                    fn = kImportShims[s].fn;
+            if (!byOrdinal && bmxStandInFind(dllName, name) != NULL) {
+                fn = (FARPROC)bmxStandInFind(dllName, name);
+                dllStandIns++;
+            } else if (!byOrdinal && bmxImportIsDead(dllName, name)) {
+                fn = (FARPROC)makeDeadStub(dllName, name);
+                dllDead++;
+            } else {
+                if (!dll) {
+                    dll = LoadLibraryA(dllName);
                 }
+                if (!dll) {
+                    bmxLog("import: cannot load %s\n", dllName);
+                    return -1;
+                }
+                fn = GetProcAddress(dll, name);
+                dllReal++;
             }
-            /* BMX_KEYS's shims (src/native/keys.c). */
-            if (!byOrdinal && bmxKeysImportShim(name) != NULL) {
-                fn = (FARPROC)bmxKeysImportShim(name);
-            }
-
             if (!fn) {
                 bmxLog("import: %s!%s not found\n", dllName, byOrdinal ? "(ordinal)" : name);
                 return -1;
@@ -124,8 +164,17 @@ static int fillImports(const IMAGE_NT_HEADERS32 *nt, uint32_t *iatLo, uint32_t *
             *iatHi = slot + 4 > *iatHi ? slot + 4 : *iatHi;
             count++;
         }
+        bmxLog("imports: %-13s %3d stand-ins, %3d dead (trap stubs), %3d real\n", dllName, dllStandIns,
+               dllDead, dllReal);
+        if (dll != NULL && dllReal > 0) {
+            snprintf(loaded + strlen(loaded), sizeof loaded - strlen(loaded), " %s", dllName);
+        }
+        standIns += dllStandIns;
+        dead += dllDead;
+        real += dllReal;
     }
-    bmxLog("imports: %d slots filled\n", count);
+    bmxLog("imports: %d slots filled: %d stand-ins, %d dead, %d real; real DLLs still used:%s\n", count,
+           standIns, dead, real, loaded[0] ? loaded : " none");
     return 0;
 }
 

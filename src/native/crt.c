@@ -22,6 +22,7 @@
 #include <windows.h>
 
 #include "native/native.h"
+#include "platform/platform.h"
 
 /* ------------------------------------------------------------------------------------------------ */
 /* Memory                                                                                            */
@@ -854,7 +855,7 @@ static int crtSscanf(const char *s, const char *fmt, ...)
 
 static FILE *crtFopen(const char *name, const char *mode)
 {
-    return fopen(name, mode);
+    return fopen(bmxPathResolve(name), mode);
 }
 
 static int crtFclose(FILE *f)

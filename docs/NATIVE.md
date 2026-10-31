@@ -21,9 +21,11 @@ the original's memory layout at 0x400000..0x6b3000 before running any game code:
    our code. A vectored exception handler turns any `int3` hit into a report: address, the caller
    (return address on the stack), and the name from `data/functions.csv` or the labels when known,
    then exits cleanly. That report is the to-do list, in the order the game needs things.
-3. **Imports.** Walk the exe's import directory and fill its `.idata` slots with the real Windows
-   functions (`LoadLibraryA`/`GetProcAddress`) for now. Later they are replaced one by one by SDL3-backed
-   shims (window, input, timer, audio), which is what makes the exe portable.
+3. **Imports.** Walk the exe's import directory and fill its `.idata` slots: with our own stand-in
+   (`src/platform`, docs/PLATFORM.md) where there is one, with a trap stub when the slot is never reached natively
+   (the MSVC CRT, WinMain, the D3D7 driver), and with the real Windows function (`LoadLibraryA` / `GetProcAddress`,
+   DLLs loaded only when needed) for the rest. The real ones are replaced slice by slice by SDL3-backed stand-ins
+   (window, input, audio, movies), which is what makes the exe portable.
 4. **Entry.** `WinMain` (0x48a460) is not ported. `main` of bmxnative performs its job: command line
    (`-r`), the init sequence it calls, then the frame loop. Start from the original's control flow
    (work/bundles/0048a460.json) and call our ports; anything unported shows up as a trap report.
@@ -90,6 +92,11 @@ Environment (dev aids):
 | `BMX_KEYS=<script>` | scripted keyboard, see "Scripted input" below: e.g. `f300:enter,+150:enter,+100:up*400,+20:up+e*30` |
 | `BMX_DRIVER_TRACE=1` | log every SDL3 driver entry with its first arguments |
 | `BMX_PNG_CHECK=1` or `=<folder>` | compare our PNG reader with the original libpng on every PNG read (and on every `*.png` in the folder), see "PNG reader" |
+| `BMX_TIME_BASE=<n>` | the value timeGetTime / GetTickCount show at process start (default 0x36ee80; `0xfffff000` runs through the 32-bit wrap) |
+| `BMX_TIMER_LOG=1` | log the sound timer's statistics (calls, interval mean / min / max / sd, late calls, callback time) whenever the timer is stopped and at `BMX_QUIT_FRAMES` |
+| `BMX_FILE_LOG=1` | log every sound file the game opens: reads, bytes, FNV-1a 64 hash of the bytes read |
+| `BMX_FILE_CHECK=1` | also repeat every file call (CreateFileA / ReadFile / SetFilePointer) through the real kernel32 and compare; logs `filecheck ok` / `MISMATCH` per file (implies `BMX_FILE_LOG`) |
+| `BMX_DEBUG_OUTPUT=1` | log the game's OutputDebugStringA text (dropped otherwise, as without a debugger) |
 | `SDL_GPU_DRIVER=vulkan` | SDL's own: pick the GPU backend (default here: direct3d12) |
 
 Output goes to stderr and to `bmxnative.log` next to the exe. Note: a desktop capture (BitBlt / CopyFromScreen) of
@@ -97,13 +104,15 @@ the window shows black while the D3D12 swapchain is presented as an independent 
 `PW_RENDERFULLCONTENT` sees the real content.
 
 Sources: `src/native/loader.c` (hash check, image, imports, jumps), `trap.c` (exception handler, names),
-`main.c` (WinMain's job), `keys.c` (BMX_KEYS), `range.S` (see below), and the SDL3 render driver in `src/driver/` (docs/SDL3-DRIVER.md).
+`main.c` (WinMain's job), `keys.c` (BMX_KEYS), `range.S` (see below), the SDL3 render driver in `src/driver/` (docs/SDL3-DRIVER.md)
+and the platform stand-ins in `src/platform/` (docs/PLATFORM.md, "Platform layer" below).
 The game objects are compiled with `BMX_HOOK=1`, `-ffreestanding -fno-builtin` and the hook build's SSE2 flags; the
 loader is hosted C. The driver (object library `bmx_driver`) is hosted C with `BMX_HOOK=1` (RW globals at their
 original addresses) and is never part of the hook DLL. It is not in build/hook's compile database, so `tools/check.sh`
 leaves it out of clang-tidy; tidy it with `clang-tidy -p build/native32 src/driver/*.c` (clang-tidy 21). The same holds for
 the PNG reader in `src/png/` (object library `bmx_png`, freestanding, see "PNG reader instead of libpng") and
-`src/native/pngcheck.c`: `clang-tidy -p build/native32 src/png/*.c src/native/pngcheck.c`.
+`src/native/pngcheck.c`: `clang-tidy -p build/native32 src/png/*.c src/native/pngcheck.c`. `src/platform/*.c` and `tests/platform/test_platform.c` are
+left out of the hook tidy list too (`clang-tidy -p build/native32 src/platform/*.c tests/platform/test_platform.c`).
 
 ### Loader additions for the driver step (2026-10-29)
 
@@ -117,9 +126,9 @@ the PNG reader in `src/png/` (object library `bmx_png`, freestanding, see "PNG r
 - **Import shim `AVISaveOptionsFree`.** zmovieClose frees each stream's lpFormat with the CRT, then passes the options
   to `AVISaveOptionsFree`, which GlobalFrees it again. In the original that block is on MSVC6's own heap and the
   second free fails harmlessly; with our CRT on the process heap it was fatal (0xC0000374 heap corruption). The shim
-  only clears lpFormat / lpParms.
+  only clears lpFormat / lpParms (now in src/platform/avi.c, entered in the import table).
 - **The game folder's dinput.dll** (the hook DLL, when installed there) is loaded by the import fill as `DINPUT.dll`
-  and patches the range too; bmxnative's own jumps are written after it, so they win. It still installs its crash
+  (`bmxImportKeepsDll`, although the only slot is a stand-in) and patches the range too; bmxnative's own jumps are written after it, so they win. It still installs its crash
   handler and trace in the native process. Not a problem so far, but worth knowing.
 
 ### Design change found while building: the exe owns the range
@@ -458,6 +467,43 @@ The four audits pass (0; 5/2/8/0/11; 0; 0/0/0) and the full gate passed after th
 at the Vail Trails start look identical apart from the timer (no rider shadow in either). Every mode the PC menus
 offer has now run natively without a trap. Next steps: compare more native and hooked frames (docs/SDL3-DRIVER.md
 step 3), then the D7 screenshot diff (step 4).
+
+### Platform layer: import table, time, sound timer, sound files (S1-S4, 2026-10-31)
+
+docs/PLATFORM.md has the design and the status (4a). In the native exe: the loader fills each import slot from the
+table in `src/platform/imports.c` (stand-in, else trap stub for the 64 dead slots, else the real function); the log
+shows per DLL `N stand-ins, N dead (trap stubs), N real` and the DLLs still used (KERNEL32, USER32, WINMM, AVIFIL32,
+MSVFW32 today; ADVAPI32, DDRAW and, unscripted, DINPUT only when asked). A call of a dead slot prints
+`DEAD IMPORT called: <dll>!<name>, caller <addr>` and exits with code 3. The stand-ins: timeGetTime / GetTickCount /
+Sleep / QPC / QPF / OutputDebugStringA / DebugBreak / critical sections (kernel.c), the winmm timer functions on an
+SDL thread (winmm.c), the sound loader's CreateFileA / ReadFile / SetFilePointer / CloseHandle (fileio.c).
+
+Checks (all 2026-10-31, `-r640.480.16`, `BMX_MUTE=1`, from the copy `C:\Users\Dennis\Games\dmfbmx\native-run`):
+
+- `build/native32/bmxplatformtest.exe` (about 20 s; hosted, no game): time monotonic / 1 ms / tick steps 15-16 ms / same
+  base / wrap through zero / elapsed and QPC equal to the real functions; critical sections under 3 threads
+  (recursive, 600000 increments); the timer (62 calls per second, arguments, other thread, nothing after
+  timeKillEvent returns, one-shot, kill from the callback, slot reuse; a side-by-side of the real winmm timer and
+  ours: mean 16.003 vs 16.000 ms, sd 0.50 vs 0.11 ms, i.e. ours is at least as steady); the file shims against the real kernel32. 61152 checks, 0 failures.
+- ProQuest into Vail Trails and Freeride (Greenville) by `BMX_KEYS`, with `BMX_TIMER_LOG=1`, `BMX_FILE_LOG=1`: no
+  trap, no dead import, frames as before (frames 1000 / 1500 / 1990 of the ProQuest run are byte-identical (PNG
+  md5) to a build of the previous commit run the same way; a transition frame can differ between two runs of the same
+  build). The pump ran at mean 15.999 ms (sd 0.03-0.09 ms, 0 calls more than 2 ms late) over 3450-4784 calls.
+- `BMX_FILE_CHECK=1` in the same ProQuest run: SFXCOM / MUSIC / SPEECH / SFXMEN00 / SFXGAME / SFXLEV00 / SFXCHR00 and
+  the MUSIC stream (read on the timer thread): `filecheck ok` for all.
+- Cool Stuff intro movie with movies on (`MOVIES` run: ACCLAIM, ZAXIS and INTRO at startup, then the INTRO MOVIE from
+  the Cool Stuff list): all play for their real length (the log's `End Of Movie` comes 20 s, 19 s, 105 s and 105 s
+  after the start: the GetTickCount / timeGetTime clocks are right); the sound timer is stopped and restarted around
+  each movie (timer 1: 1646 calls, mean 15.999 ms, sd 0.055; timer 2 after the movie: 505 calls, mean 15.999 ms);
+  `PrintWindow` frames of the startup movies (ACCLAIM, ZAXIS) look right (a `PrintWindow` of the Cool Stuff movie
+  only shows the last swap chain frame: the GDI-drawn movie is not in it once the SDL window has presented).
+
+Comparisons with the hooked game that need it (not run, the hooked exe stays untouched while the user plays):
+(1) golden trace: record a session of the hooked game with `bmxtrace.orig` (docs/TRACING.md) and replay the same
+inputs natively once the replay exists; S1-S4 do not touch the simulation (a fixed tick), and the native frames above
+are identical to the previous commit's, so the expectation is "unchanged". (2) Pump interval of the hooked game: not
+needed, the test program compares our timer with the real winmm directly (mean 16.0 ms in both). (3) File bytes: not
+needed, `BMX_FILE_CHECK` compares with the real kernel32 in the same process.
 
 ### Open points from the CRT layer (2026-10-28)
 

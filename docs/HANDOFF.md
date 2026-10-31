@@ -55,8 +55,14 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   exit) and Cool Stuff's intro movie and credits with movies on also run without a trap. Two-player modes do not
   exist in the PC version (player count only ever 0 or 1). Native runs go from a copy of the game folder
   (`C:\Users\Dennis\Games\dmfbmx\native-run`, no dinput.dll) so the user can play the hooked game meanwhile.
-- Platform layer ("Windows first": DirectInput/DirectSound/winmm/VfW/USER32 -> SDL3 at the import slots): proposal
-  with decisions P1..P19 and slices S1..S12 in docs/PLATFORM.md, **awaiting the user's choices**, nothing implemented.
+- Platform layer S1-S4 done 2026-10-31 (docs/PLATFORM.md 4a, docs/NATIVE.md "Platform layer", src/platform/, native only,
+  hook DLL unchanged): the import table is `{dll, name, fn}` stand-ins + trap stubs for the 64 dead slots + the real
+  function for the rest; time (timeGetTime / GetTickCount with Windows' resolutions, base and wrap), Sleep, QPC,
+  critical sections, the winmm timer thread (16 ms pump on an SDL thread) and the sound loader's file calls run on
+  SDL3 / our code. Checks: `bmxplatformtest.exe` (against the real kernel32 / winmm), `BMX_FILE_CHECK=1`,
+  `BMX_TIMER_LOG=1`, scripted runs without a trap, frames identical to the previous build. Opus review wanted for
+  the timer thread's concurrency (PLATFORM.md 5, "Timer-thread concurrency"). **Next:** S5/S6 (SDL input stand-in,
+  d-pad), then S7 (DirectSound on SDL3 audio) and S8 (own AVI / Cinepak).
 - Golden traces: record sessions with `bmxtrace.orig` (docs/TRACING.md) if not done yet.
 
 ## Machine setup
