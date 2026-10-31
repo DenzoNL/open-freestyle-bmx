@@ -88,16 +88,6 @@ static uint32_t drawFlags(uint16_t flags)
     return result;
 }
 
-static uint32_t read32(const uint8_t *data, uint32_t offset)
-{
-    return *(const uint32_t *)(data + offset);
-}
-
-static uint16_t read16(const uint8_t *data, uint32_t offset)
-{
-    return *(const uint16_t *)(data + offset);
-}
-
 /* ---- text ----------------------------------------------------------------------------------------- */
 
 BMX_ADDR(0x00480240)
@@ -252,21 +242,17 @@ static ZrwDbgItem *queueItem(uint32_t type)
     return item;
 }
 
-static void putWord(ZrwDbgItem *item, uint32_t offset, uint32_t value)
+/* Stores a vector as raw words; the fourth word of the point is left alone. */
+static void putVec(ZrwDbgPoint *point, const ZVec3 *v)
 {
-    *(uint32_t *)((uint8_t *)item->data + offset) = value;
+    point->x = ((const uint32_t *)v)[0];
+    point->y = ((const uint32_t *)v)[1];
+    point->z = ((const uint32_t *)v)[2];
 }
 
-static void putVec(ZrwDbgItem *item, uint32_t offset, const ZVec3 *v)
+static void putColor(uint8_t *dest, const uint32_t *color)
 {
-    putWord(item, offset, ((const uint32_t *)v)[0]);
-    putWord(item, offset + 4, ((const uint32_t *)v)[1]);
-    putWord(item, offset + 8, ((const uint32_t *)v)[2]);
-}
-
-static void putHalf(ZrwDbgItem *item, uint32_t offset, uint16_t value)
-{
-    *(uint16_t *)((uint8_t *)item->data + offset) = value;
+    __builtin_memcpy(dest, color, 4);
 }
 
 BMX_ADDR(0x0047ff90)
@@ -277,10 +263,10 @@ void zrwDbgAddLine(const ZVec3 *a, const ZVec3 *b, const uint32_t *color, uint16
     if (item == NULL) {
         return;
     }
-    putVec(item, 0, a);
-    putVec(item, 0x10, b);
-    putWord(item, 0x20, *color);
-    putHalf(item, 0x24, flags);
+    putVec(&item->data.line.point[0], a);
+    putVec(&item->data.line.point[1], b);
+    putColor(item->data.line.color, color);
+    item->data.line.flags = flags;
 }
 
 BMX_ADDR(0x00480010)
@@ -291,10 +277,10 @@ void zrwDbgAddAxes(const ZMatrix *matrix, uint16_t mode, uint16_t flags)
     if (item == NULL) {
         return;
     }
-    putHalf(item, 0x40, mode);
-    putHalf(item, 0x42, flags);
+    item->data.axes.mode = mode;
+    item->data.axes.flags = flags;
     if (matrix != NULL) {
-        zmatrixCopyRotation((ZMatrix *)item->data, matrix);
+        zmatrixCopyRotation(&item->data.axes.matrix, matrix);
     }
 }
 
@@ -306,11 +292,11 @@ void zrwDbgAddTriangle(const ZVec3 *a, const ZVec3 *b, const ZVec3 *c, const uin
     if (item == NULL) {
         return;
     }
-    putVec(item, 0, a);
-    putVec(item, 0x10, b);
-    putVec(item, 0x20, c);
-    putWord(item, 0x30, *color);
-    putHalf(item, 0x34, flags);
+    putVec(&item->data.triangle.point[0], a);
+    putVec(&item->data.triangle.point[1], b);
+    putVec(&item->data.triangle.point[2], c);
+    putColor(item->data.triangle.color, color);
+    item->data.triangle.flags = flags;
 }
 
 BMX_ADDR(0x00480100)
@@ -323,10 +309,10 @@ void zrwDbgAddSphere(const ZVec3 *center, float radius, const uint32_t *color, u
         return;
     }
     memcpy(&radiusBits, &radius, 4);
-    putVec(item, 0, center);
-    putWord(item, 0x10, radiusBits);
-    putWord(item, 0x14, *color);
-    putHalf(item, 0x18, flags);
+    putVec(&item->data.sphere.center, center);
+    item->data.sphere.radius = radiusBits;
+    putColor(item->data.sphere.color, color);
+    item->data.sphere.flags = flags;
 }
 
 BMX_ADDR(0x00480170)
@@ -338,25 +324,27 @@ void zrwDbgAddBox(const uint32_t *corners, const ZMatrix *matrix, const uint32_t
         return;
     }
     for (uint32_t i = 0; i < 8; i++) {
-        putWord(item, i * 4, corners[i]);
+        ((uint32_t *)item->data.box.corner)[i] = corners[i];
     }
     if (matrix == NULL) {
-        zmatrixIdentity((ZMatrix *)((uint8_t *)item->data + 0x20));
+        zmatrixIdentity(&item->data.box.matrix);
     } else {
         for (uint32_t i = 0; i < 16; i++) {
-            putWord(item, 0x20 + i * 4, ((const uint32_t *)matrix)[i]);
+            ((uint32_t *)&item->data.box.matrix)[i] = ((const uint32_t *)matrix)[i];
         }
     }
-    putWord(item, 0x60, *color);
-    putHalf(item, 0x64, flags);
+    putColor(item->data.box.color, color);
+    item->data.box.flags = flags;
 }
 
 /* ---- shapes --------------------------------------------------------------------------------------- */
 
-/* A line from data[0] to data[0x10] in the colour at +0x20. */
+/* Draws a queued ZrwDbgLineData; the draw functions take the entry's data as bytes. */
 BMX_ADDR(0x0047ee80)
 void zrwDbgDrawLine(const uint8_t *data)
 {
+    const ZrwDbgLineData *line = (const ZrwDbgLineData *)data;
+
     if (gLineFresh != 0) {
         gLineFresh = 0;
         for (int i = 0; i < 2; i++) {
@@ -372,19 +360,20 @@ void zrwDbgDrawLine(const uint8_t *data)
         ZrwDbgVertex *const vertex = &gScratch.lineVerts[i];
 
         for (int c = 0; c < 4; c++) {
-            vertex->color[c] = data[0x20 + c];
+            vertex->color[c] = line->color[c];
         }
-        *(uint32_t *)&vertex->x = read32(data, (uint32_t)i * 0x10);
-        *(uint32_t *)&vertex->y = read32(data, (uint32_t)i * 0x10 + 4);
-        *(uint32_t *)&vertex->z = read32(data, (uint32_t)i * 0x10 + 8);
+        *(uint32_t *)&vertex->x = line->point[i].x;
+        *(uint32_t *)&vertex->y = line->point[i].y;
+        *(uint32_t *)&vertex->z = line->point[i].z;
     }
-    gZrwDrawPolys(drawFlags(read16(data, 0x24)), &gScratch.linePoly, 1, NULL, 0);
+    gZrwDrawPolys(drawFlags(line->flags), &gScratch.linePoly, 1, NULL, 0);
 }
 
 /* Three coloured lines: the matrix axes (or the camera's) drawn from a point. */
 BMX_ADDR(0x0047ef40)
 void zrwDbgDrawAxes(const uint8_t *data)
 {
+    const ZrwDbgAxesData *axes = (const ZrwDbgAxesData *)data;
     static const uint8_t axisColors[3][4] = {{0xff, 0, 0, 0xff}, {0, 0xff, 0, 0xff}, {0, 0, 0xff, 0xff}};
     const uint32_t *rows;
     ZVec3 position;
@@ -410,9 +399,9 @@ void zrwDbgDrawAxes(const uint8_t *data)
         gScratch.axesVerts[i].y = 0;
         gScratch.axesVerts[i].z = 0;
     }
-    if ((data[0x40] & 1) == 0) {
-        rows = (const uint32_t *)data;
-        memcpy(&position, data + 0x30, sizeof position);
+    if ((axes->mode & 1) == 0) {
+        rows = (const uint32_t *)&axes->matrix;
+        memcpy(&position, &axes->matrix.pos, sizeof position);
     } else {
         rows = (const uint32_t *)zobjCameraGetMatrix(gZrwDbgCameraObject(gZrwDbgGetCamera()), 0);
         position.x = 0;
@@ -433,14 +422,16 @@ void zrwDbgDrawAxes(const uint8_t *data)
         zvec3Scale((ZVec3 *)vertex, (const ZVec3 *)vertex, 0.5f);
         zvec3Add((ZVec3 *)vertex, (const ZVec3 *)vertex, &position);
     }
-    flags |= drawFlags(read16(data, 0x42));
+    flags |= drawFlags(axes->flags);
     gZrwDrawPolys(flags, &gScratch.axesPolys, 3, NULL, 0);
 }
 
-/* A triangle: corners at data[0], [0x10], [0x20], colour at +0x30. */
+/* Draws a queued ZrwDbgTriangleData. */
 BMX_ADDR(0x0047f230)
 void zrwDbgDrawTriangle(const uint8_t *data)
 {
+    const ZrwDbgTriangleData *triangle = (const ZrwDbgTriangleData *)data;
+
     if (gTriangleFresh != 0) {
         gTriangleFresh = 0;
         for (int i = 0; i < 3; i++) {
@@ -456,22 +447,23 @@ void zrwDbgDrawTriangle(const uint8_t *data)
         ZrwDbgVertex *const vertex = &gScratch.triVerts[i];
 
         for (int c = 0; c < 4; c++) {
-            vertex->color[c] = data[0x30 + c];
+            vertex->color[c] = triangle->color[c];
         }
-        *(uint32_t *)&vertex->x = read32(data, (uint32_t)i * 0x10);
-        *(uint32_t *)&vertex->y = read32(data, (uint32_t)i * 0x10 + 4);
-        *(uint32_t *)&vertex->z = read32(data, (uint32_t)i * 0x10 + 8);
+        *(uint32_t *)&vertex->x = triangle->point[i].x;
+        *(uint32_t *)&vertex->y = triangle->point[i].y;
+        *(uint32_t *)&vertex->z = triangle->point[i].z;
     }
-    gZrwDrawTriangle(drawFlags(read16(data, 0x34)), &gScratch.triPoly, 1, NULL, 0);
+    gZrwDrawTriangle(drawFlags(triangle->flags), &gScratch.triPoly, 1, NULL, 0);
 }
 
 /*
- * A wire sphere of radius data[0x10] around data[0] (colour at +0x14): the unit mesh is built once and
- * scaled by the matrix handed to the renderer.
+ * A wire sphere (ZrwDbgSphereData): the unit mesh is built once, with the colour of the sphere drawn first
+ * for each vertex, and scaled by the matrix handed to the renderer.
  */
 BMX_ADDR(0x0047f2f0)
 void zrwDbgDrawSphere(const uint8_t *data)
 {
+    const ZrwDbgSphereData *sphere = (const ZrwDbgSphereData *)data;
     ZMatrix matrix;
     ZVec3 scale;
     struct {
@@ -507,8 +499,8 @@ void zrwDbgDrawSphere(const uint8_t *data)
             const float z2 = (float)(zmathCos(lon) * (double)sin2);
 
             for (int c = 0; c < 4; c++) {
-                vertex[0].color[c] = data[0x14 + c];
-                vertex[1].color[c] = data[0x14 + c];
+                vertex[0].color[c] = sphere->color[c];
+                vertex[1].color[c] = sphere->color[c];
             }
             vertex[0].x = x1;
             vertex[0].y = cos1;
@@ -520,23 +512,24 @@ void zrwDbgDrawSphere(const uint8_t *data)
         }
     }
     zmatrixIdentity(&matrix);
-    memcpy(&radius, data + 0x10, 4);
+    memcpy(&radius, &sphere->radius, 4);
     scale.x = radius;
     scale.y = radius;
     scale.z = radius;
     zmatrixScaleDiagonal(&matrix, &matrix, &scale);
-    matrix.pos = *(const ZVec3 *)data;
+    matrix.pos = *(const ZVec3 *)&sphere->center;
     poly.head = 0;
     poly.verts = gSpherePointers;
     poly.count = kSphereVerts;
-    gZrwDrawSphere(drawFlags(read16(data, 0x18)), &poly, 1, &matrix, 0);
+    gZrwDrawSphere(drawFlags(sphere->flags), &poly, 1, &matrix, 0);
 }
 
-/* A wire box between the corners data[0] and data[0x10], transformed by the matrix at +0x20 (colour +0x60).
- */
+/* A wire box between the two corners of a ZrwDbgBoxData, transformed by its matrix. */
 BMX_ADDR(0x0047f530)
 void zrwDbgDrawBox(const uint8_t *data)
 {
+    const ZrwDbgBoxData *box = (const ZrwDbgBoxData *)data;
+
     if (gBoxFresh != 0) {
         gBoxFresh = 0;
         for (int i = 0; i < 8; i++) {
@@ -552,14 +545,15 @@ void zrwDbgDrawBox(const uint8_t *data)
     for (uint32_t i = 0; i < 8; i++) {
         ZrwDbgVertex *const vertex = &gScratch.boxVerts[i];
 
-        *(uint32_t *)&vertex->x = read32(data, (i & 1) != 0 ? 0 : 0x10);
-        *(uint32_t *)&vertex->y = read32(data, (i & 2) != 0 ? 4 : 0x14);
-        *(uint32_t *)&vertex->z = read32(data, (i & 4) != 0 ? 8 : 0x18);
+        /* Bit n of the corner index picks the min (set) or max (clear) coordinate of axis n. */
+        *(uint32_t *)&vertex->x = (i & 1) != 0 ? box->corner[0].x : box->corner[1].x;
+        *(uint32_t *)&vertex->y = (i & 2) != 0 ? box->corner[0].y : box->corner[1].y;
+        *(uint32_t *)&vertex->z = (i & 4) != 0 ? box->corner[0].z : box->corner[1].z;
         for (int c = 0; c < 4; c++) {
-            vertex->color[c] = data[0x60 + c];
+            vertex->color[c] = box->color[c];
         }
     }
-    gZrwDrawPolys(drawFlags(read16(data, 0x64)), &gScratch.boxPolys, 12, (const ZMatrix *)(data + 0x20), 0);
+    gZrwDrawPolys(drawFlags(box->flags), &gScratch.boxPolys, 12, &box->matrix, 0);
 }
 
 /* ---- life cycle ----------------------------------------------------------------------------------- */
@@ -614,7 +608,7 @@ int BMX_CDECL DebugUpdateFunction(void *arg)
         const ZrwDbgItem *item = &gItems[0];
 
         for (int left = gZrwDbgItemCount; left != 0; left--, item++) {
-            const uint8_t *const data = (const uint8_t *)item->data;
+            const uint8_t *const data = (const uint8_t *)&item->data;
 
             switch (item->type) {
             case kZrwDbgAxes:

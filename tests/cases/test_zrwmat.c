@@ -177,7 +177,7 @@ static ZrwMaterial *newMaterial(int max)
     m->refCount = (uint16_t)dt_range(1, 3);
     m->rwMaterial = dt_u32() % 3 == 0 ? NULL : (void *)(uintptr_t)(dt_u32() | 1);
     for (uint32_t i = 0; i < 6; i++) {
-        *(uint32_t *)(m->slots + i * 12) = (dt_u32() % 6 == 0) ? 0 : (dt_u32() | 1);
+        m->slots[i].texture = (dt_u32() % 6 == 0) ? NULL : (void *)(uintptr_t)(dt_u32() | 1);
     }
     return m;
 }

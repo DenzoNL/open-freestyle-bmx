@@ -58,7 +58,7 @@ ZrwColTriangle *zrwcolKeepNearestSub(void *arg, uint32_t sub, ZrwColTriangle *tr
     gZrwCol.bestUser = user;
     gZrwCol.bestSub = sub;
     gZrwCol.nearest = distance;
-    zmemCopy(gZrwCol.best, triangle, sizeof gZrwCol.best);
+    zmemCopy(&gZrwCol.best, triangle, sizeof gZrwCol.best);
     return triangle;
 }
 
@@ -73,20 +73,21 @@ ZrwColTriangle *zrwcolKeepNearest(void *arg, ZrwColTriangle *triangle, float dis
     gZrwCol.bestUser = user;
     gZrwCol.bestSub = 0;
     gZrwCol.nearest = distance;
-    zmemCopy(gZrwCol.best, triangle, sizeof gZrwCol.best);
+    zmemCopy(&gZrwCol.best, triangle, sizeof gZrwCol.best);
     return triangle;
 }
 
 /*
- * Whether the query wants this object: bit 1 and 2 of the flags select solid and non solid objects (both set
- * takes everything), bit 3 turns on the list of ids to skip (ended by 0).
+ * Whether the query wants this atomic: bit 1 and 2 of the flags select solid and non solid atomics (both set
+ * takes everything), bit 3 turns on the list of ids to skip (ended by 0). An id is the atomic's clump
+ * pointer.
  */
-static int objectWanted(const ZrwColPoly *poly, const int *excluded)
+static int objectWanted(const RpAtomic *atomic, const int *excluded)
 {
     const uint32_t flags = gZrwCol.flags;
 
     if ((flags & 6) != 6) {
-        const int solid = (poly->flags & 0x80) != 0;
+        const int solid = (atomic->object.object.flags & 0x80) != 0;
 
         if ((flags & 2) != 0 ? !solid : solid) {
             return 0;
@@ -94,7 +95,7 @@ static int objectWanted(const ZrwColPoly *poly, const int *excluded)
     }
     if ((flags & 8) != 0 && excluded != NULL && *excluded != 0) {
         for (const int *id = excluded; *id != 0; id++) {
-            if (*id == poly->id) {
+            if (*id == (int)(uintptr_t)atomic->clump) {
                 return 0;
             }
         }
@@ -103,29 +104,29 @@ static int objectWanted(const ZrwColPoly *poly, const int *excluded)
 }
 
 BMX_ADDR(0x004942a0)
-ZrwColPoly *zrwcolFilterNearest(void *arg, void *unused, ZrwColPoly *poly, void *unused2, const int *excluded)
+RpAtomic *zrwcolFilterNearest(void *arg, void *unused, RpAtomic *atomic, void *unused2, const int *excluded)
 {
     (void)unused;
     (void)unused2;
-    if (objectWanted(poly, excluded)) {
+    if (objectWanted(atomic, excluded)) {
         rwObjectIntersectTriangles(
-            (RpAtomic *)poly, arg,
-            BMX_FNPTR(RpIntersectionCallBackGeometryTriangle, 0x00494310, zrwcolKeepNearest), poly);
+            atomic, arg, BMX_FNPTR(RpIntersectionCallBackGeometryTriangle, 0x00494310, zrwcolKeepNearest),
+            atomic);
     }
-    return poly;
+    return atomic;
 }
 
 BMX_ADDR(0x00494750)
-ZrwColPoly *zrwcolFilterRecord(void *arg, void *unused, ZrwColPoly *poly, void *unused2, const int *excluded)
+RpAtomic *zrwcolFilterRecord(void *arg, void *unused, RpAtomic *atomic, void *unused2, const int *excluded)
 {
     (void)unused;
     (void)unused2;
-    if (objectWanted(poly, excluded)) {
+    if (objectWanted(atomic, excluded)) {
         rwObjectIntersectTriangles(
-            (RpAtomic *)poly, arg,
-            BMX_FNPTR(RpIntersectionCallBackGeometryTriangle, 0x004947c0, zrwcolRecordObjectHit), poly);
+            atomic, arg, BMX_FNPTR(RpIntersectionCallBackGeometryTriangle, 0x004947c0, zrwcolRecordObjectHit),
+            atomic);
     }
-    return poly;
+    return atomic;
 }
 
 /* Corner of a triangle in game space: x as is, y and z mirrored. */
@@ -138,17 +139,34 @@ static void gameCorner(float *out, float x, float y, float z)
     out[2] = -(float)(((double)z - gZrwWorldCenter.z) * inv);
 }
 
-/* Material user data of the material behind a handle of the world or of a model. */
-static uint32_t materialData(void *material)
+/* User data of the texture of a material (what zrwMatGetUserData reads), 0 without a texture. */
+static uint32_t materialData(RpMaterial *material)
 {
     void *data = RpMaterialGetTexture(material);
 
     return (data == NULL) ? 0 : zrwMatGetUserData(data);
 }
 
+/* Material of a world polygon: its material index is relative to the sector's window into the world list. */
+static RpMaterial *polygonMaterial(const RpWorldSector *sector, int32_t index)
+{
+    return RpWorldGetMaterial(gZrwWorld, (uint16_t)((uint16_t)sector->polygons[(uint32_t)index].matIndex +
+                                                    sector->matListWindowBase));
+}
+
+/* Material of a triangle of an atomic's geometry; the index is not range checked (a negative material is
+ * read as the unsigned 16 bit value, as the original does). */
+static RpMaterial *triangleMaterial(const RpAtomic *atomic, int32_t index)
+{
+    RpGeometry *geometry = atomic->geometry;
+
+    return RpGeometryGetMaterial(geometry,
+                                 (uint16_t)RpGeometryGetTriangles(geometry)[(uint32_t)index].matIndex);
+}
+
 BMX_ADDR(0x00494490)
-ZrwColTriangle *zrwcolRecordHit(void *arg, const ZrwColSector *sector, ZrwColTriangle *triangle,
-                                float distance, const ZrwColObject *object)
+ZrwColTriangle *zrwcolRecordHit(void *arg, const RpWorldSector *sector, ZrwColTriangle *triangle,
+                                float distance, RpAtomic *atomic)
 {
     ZrwColState *state = &gZrwCol;
     ZrwColHit *hit;
@@ -164,7 +182,7 @@ ZrwColTriangle *zrwcolRecordHit(void *arg, const ZrwColSector *sector, ZrwColTri
     state->cursor = hit + 1;
     state->count++;
     state->found = 1;
-    if (object == NULL) {
+    if (atomic == NULL) {
         hit->normal[0] = triangle->normal[0];
         hit->normal[1] = -triangle->normal[1];
         hit->normal[2] = -triangle->normal[2];
@@ -175,13 +193,11 @@ ZrwColTriangle *zrwcolRecordHit(void *arg, const ZrwColSector *sector, ZrwColTri
         }
         hit->distance = distance;
         hit->objectData = 0;
-        hit->materialData = materialData(RpWorldGetMaterial(
-            gZrwWorld,
-            (uint16_t)((uint16_t)sector->map[(uint32_t)triangle->index * 4] + (uint16_t)sector->base)));
+        hit->materialData = materialData(polygonMaterial(sector, triangle->index));
         return triangle;
     }
     {
-        const void *matrix = RwFrameGetLTM(object->frame);
+        const void *matrix = RwFrameGetLTM(RpAtomicGetFrame(atomic));
         float moved[3];
         float normal[3];
 
@@ -193,23 +209,16 @@ ZrwColTriangle *zrwcolRecordHit(void *arg, const ZrwColSector *sector, ZrwColTri
         hit->normal[1] = -normal[1];
         hit->normal[2] = -normal[2];
         hit->normal[0] = normal[0];
-        hit->objectData = zrwMdlGetUserData(object);
-        {
-            void *model = object->model;
-            const uint8_t *table = (const uint8_t *)RpGeometryGetTriangles(model);
-
-            hit->materialData = materialData(
-                RpGeometryGetMaterial(model, *(const uint16_t *)(table + (uint32_t)triangle->index * 8 + 6)));
-        }
+        hit->objectData = zrwMdlGetUserData(atomic);
+        hit->materialData = materialData(triangleMaterial(atomic, triangle->index));
     }
     return triangle;
 }
 
 BMX_ADDR(0x004947c0)
-ZrwColTriangle *zrwcolRecordObjectHit(void *arg, ZrwColTriangle *triangle, float distance,
-                                      const ZrwColObject *object)
+ZrwColTriangle *zrwcolRecordObjectHit(void *arg, ZrwColTriangle *triangle, float distance, RpAtomic *atomic)
 {
-    return zrwcolRecordHit(arg, NULL, triangle, distance, object);
+    return zrwcolRecordHit(arg, NULL, triangle, distance, atomic);
 }
 
 /* Game space to RenderWare space: scaled, y and z mirrored about the world centre. */
@@ -230,7 +239,7 @@ BMX_ADDR(0x00493e20)
 int zrwcolQueryLine(float *from, float *to, uint32_t flags, const int *excluded, ZrwColLineHit *out)
 {
     ZrwColLineVolume line;
-    const ZrwColTriangle *best = (const ZrwColTriangle *)gZrwCol.best;
+    const ZrwColTriangle *best = &gZrwCol.best;
     ZVec3 d;
 
     zvec3SubScalar((ZVec3 *)&gZrwColBox[0], (const ZVec3 *)&gZrwColBox[0], 0x1.4f8b58p-17f);
@@ -257,10 +266,9 @@ int zrwcolQueryLine(float *from, float *to, uint32_t flags, const int *excluded,
         return 0;
     }
     if (gZrwCol.bestUser != 0) {
-        const ZrwColObject *object = (const ZrwColObject *)(uintptr_t)gZrwCol.bestUser;
-        const void *matrix = RwFrameGetLTM(object->frame);
+        RpAtomic *atomic = (RpAtomic *)(uintptr_t)gZrwCol.bestUser;
+        const void *matrix = RwFrameGetLTM(RpAtomicGetFrame(atomic));
         float moved[3];
-        void *model;
 
         for (int i = 0; i < 3; i++) {
             RwV3dTransformPoints((RwV3d *)moved, (const RwV3d *)best->vertex[i], 1, matrix);
@@ -270,13 +278,10 @@ int zrwcolQueryLine(float *from, float *to, uint32_t flags, const int *excluded,
         out->hit.normal[1] = -moved[1];
         out->hit.normal[2] = -moved[2];
         out->hit.normal[0] = moved[0];
-        out->hit.objectData = zrwMdlGetUserData(object);
-        model = object->model;
-        out->hit.materialData = materialData(
-            RpGeometryGetMaterial(model, *(const uint16_t *)((const uint8_t *)RpGeometryGetTriangles(model) +
-                                                             (uint32_t)best->index * 8 + 6)));
+        out->hit.objectData = zrwMdlGetUserData(atomic);
+        out->hit.materialData = materialData(triangleMaterial(atomic, best->index));
     } else if (gZrwCol.bestSub != 0) {
-        const ZrwColSector *sector = (const ZrwColSector *)(uintptr_t)gZrwCol.bestSub;
+        const RpWorldSector *sector = (const RpWorldSector *)(uintptr_t)gZrwCol.bestSub;
 
         out->hit.normal[0] = best->normal[0];
         out->hit.normal[1] = -best->normal[1];
@@ -287,9 +292,7 @@ int zrwcolQueryLine(float *from, float *to, uint32_t flags, const int *excluded,
             gameCorner(out->hit.vertex[i], p[0], p[1], p[2]);
         }
         out->hit.objectData = 0;
-        out->hit.materialData = materialData(RpWorldGetMaterial(
-            gZrwWorld,
-            (uint16_t)((uint16_t)sector->map[(uint32_t)best->index * 4] + (uint16_t)sector->base)));
+        out->hit.materialData = materialData(polygonMaterial(sector, best->index));
     } else {
         zdebugFail("Error", kColFile, 0x25b, 0);
     }
@@ -336,9 +339,9 @@ static double edgeRatio(const float *a, float dxRounded, double dz, const float 
 BMX_ADDR(0x004947e0)
 uint8_t *zrwcolHitColor(ZrwColLineHit *hit)
 {
-    const ZrwColTriangle *best = (const ZrwColTriangle *)gZrwCol.best;
-    const ZrwColSector *sector;
-    const uint8_t *entry;
+    const ZrwColTriangle *best = &gZrwCol.best;
+    const RpWorldSector *sector;
+    const RpPolygon *polygon;
     uint8_t color[3][3];
     float *v0 = hit->hit.vertex[0];
     float *v1 = hit->hit.vertex[1];
@@ -368,10 +371,11 @@ uint8_t *zrwcolHitColor(ZrwColLineHit *hit)
     if (gZrwCol.bestSub == 0) {
         return gZrwColColor;
     }
-    sector = (const ZrwColSector *)(uintptr_t)gZrwCol.bestSub;
-    entry = sector->map + (uint32_t)best->index * 4;
+    sector = (const RpWorldSector *)(uintptr_t)gZrwCol.bestSub;
+    polygon = &sector->polygons[(uint32_t)best->index];
     for (int k = 0; k < 3; k++) {
-        zmemCopy(color[k], sector->prelit + (uint32_t)entry[1 + k] * 4, 3);
+        /* The first three bytes (r g b) of the vertex's prelit colour. */
+        zmemCopy(color[k], &sector->preLitLum[polygon->vertIndex[k]], 3);
     }
     if (!(v1[2] >= v0[2])) {
         swapCorners(v0, v1);

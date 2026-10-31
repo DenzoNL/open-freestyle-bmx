@@ -7,13 +7,20 @@
 #ifndef ZGE_COM_ZGLRW_ZRWMAT_H
 #define ZGE_COM_ZGLRW_ZRWMAT_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "compat/orig.h"
 #include "zge/zmem.h"
 
-/* Material record (0x74 bytes, from the free list in gZrwMat.pool). Texture slots are 12 bytes apart from
- * +0x2c; the last one (+0x68) overlaps `rwMaterial` at +0x70 with its third word. */
+/* One of the texture slots of a material: the texture handle and two words nothing uses. */
+typedef struct ZrwMatSlot {
+    void *texture; /* 0x00 */
+    uint32_t pad04[2];
+} ZrwMatSlot;
+
+/* Material record (0x74 bytes, from the free list in gZrwMat.pool). The last of the six texture slots (+0x68)
+ * ends in the word of `rwMaterial` at +0x70, so only its handle is usable. */
 typedef struct ZrwMaterial {
     uint32_t flags; /* 0x00 low two bits set while in use */
     uint32_t pad04;
@@ -23,12 +30,22 @@ typedef struct ZrwMaterial {
     uint16_t textureCount; /* 0x24 */
     uint16_t refCount;     /* 0x26 */
     uint8_t pad28[4];
-    uint8_t slots[0x44]; /* 0x2c texture handles (one per 12 bytes) */
-    void *rwMaterial;    /* 0x70 RpMaterial that follows the first texture */
+    union {
+        ZrwMatSlot slots[6]; /* 0x2c */
+        struct {
+            uint8_t pad2c[0x44];
+            void *rwMaterial; /* 0x70 RpMaterial that follows the first texture */
+        };
+    };
 } ZrwMaterial;
 
+_Static_assert(sizeof(ZrwMatSlot) == 12, "zrw material slot");
+_Static_assert(offsetof(ZrwMaterial, textureCount) == 0x24, "zrw material");
+_Static_assert(offsetof(ZrwMaterial, refCount) == 0x26, "zrw material");
+_Static_assert(offsetof(ZrwMaterial, slots) == 0x2c, "zrw material");
+
 _Static_assert(sizeof(ZrwMaterial) == 0x74, "zrw material");
-_Static_assert(__builtin_offsetof(ZrwMaterial, rwMaterial) == 0x70, "zrw material");
+_Static_assert(offsetof(ZrwMaterial, rwMaterial) == 0x70, "zrw material");
 
 /* Material definition chunk (MADF) as the loader keeps it: the chunk body starts at +8. */
 typedef struct ZrwMadf {
@@ -47,6 +64,13 @@ typedef struct ZrwMadf {
 
 _Static_assert(sizeof(ZrwMadf) == 0x98, "zrw madf");
 
+/* State of a search through the material pool (zrwmatFindByTextureHash), handed to zrwmatMatchHash. */
+typedef struct ZrwMatSearch {
+    uint32_t hash;      /* 0x00 texture hash to find */
+    int skip;           /* 0x04 matches to skip */
+    ZrwMaterial *found; /* 0x08 */
+} ZrwMatSearch;
+
 /* State of the material system (the first 0x24 bytes are cleared at initialisation). */
 typedef struct ZrwMatState {
     int initialized;    /* 0x00 */
@@ -55,10 +79,14 @@ typedef struct ZrwMatState {
     ZrwMadf *madf;      /* 0x0c the definition chunk last read (NULL when none) */
     ZrwMaterial *last;  /* 0x10 the material created last */
     void *hook;         /* 0x14 called with (material, arg) for each material read */
-    uint32_t findHash;  /* 0x18 search state of zrwmatFindByTextureHash */
-    int findSkip;       /* 0x1c matches to skip */
-    ZrwMaterial *found; /* 0x20 */
+    ZrwMatSearch find;  /* 0x18 search state of zrwmatFindByTextureHash */
 } ZrwMatState;
+
+_Static_assert(offsetof(ZrwMatState, pool) == 0x08, "zrw material state");
+_Static_assert(offsetof(ZrwMatState, madf) == 0x0c, "zrw material state");
+_Static_assert(offsetof(ZrwMatState, last) == 0x10, "zrw material state");
+_Static_assert(offsetof(ZrwMatState, hook) == 0x14, "zrw material state");
+_Static_assert(offsetof(ZrwMatState, find) == 0x18, "zrw material state");
 
 _Static_assert(sizeof(ZrwMatState) == 0x24, "zrw material state");
 
@@ -80,7 +108,7 @@ uint32_t zrwmatFindNode(void *object, uint32_t hash);
 void zrwmatNodeToWorld(void *object, uint32_t node, const float *local, float *out, int flag);
 /* Vector stored in a node's frame. */
 void zrwmatNodeVector(void *object, uint32_t node, float *out, int flag);
-/* Stores the skeleton at +0x30 of the object and hands it to the renderer. */
+/* Stores the skeleton in the object's word at +0x30 and hands it to the renderer. */
 void zrwmatSetSkeleton(void *object, void *skeleton);
 /* Matrix of a node of the object (the parent frame of an attached scene object). */
 void zrwmatNodeMatrix(void *object, uint32_t node, void *out, int flag);
@@ -109,8 +137,8 @@ void zrwmatSetColor(ZrwMaterial *material, void *unused, const void *color);
 void *zrwmatSetMaterialHook(void *hook);
 /* Creates a material around a texture loaded from `size` bytes of image data under the given name. */
 ZrwMaterial *zrwmatLoadSpriteTexture(void *data, uint32_t size, const char *name, int type);
-/* zmemFreeListForEach callback: 0 once the (arg[1]+1)th material whose first texture has hash arg[0] is
- * found (stored in arg[2]). */
+/* zmemFreeListForEach callback: 0 once the (skip + 1)th material whose first texture has the hash is found
+ * (stored in the search). */
 int zrwmatMatchHash(ZrwMaterial *material, uint32_t *state);
 /* The material with the given first texture hash, skipping `skip` matches; NULL when there is none. */
 ZrwMaterial *zrwmatFindByTextureHash(uint32_t hash, int skip);

@@ -10,6 +10,7 @@
 #include "dt_zmem.h"
 #include "rw/rwworld.h"
 #include "zge/com/zglrw/zrwtxr.h"
+#include "zge/com/zglrw/zrwworld.h"
 #include "zge/zfile.h"
 #include "zge/zlist.h"
 

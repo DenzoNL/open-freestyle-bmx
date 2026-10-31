@@ -18,7 +18,7 @@
 
 #include "platform/input.h"
 
-enum { kMaxChecked = 8, kMaxLines = 400 };
+enum { kMaxChecked = 8, kMaxLines = 3000, kRepeatLines = 3 };
 
 /* An extreme of the stick threshold: per axis (X, Y) and side (-, +). */
 typedef struct Threshold {
@@ -36,6 +36,13 @@ struct BmxCheckDevice {
     int lastRealSign[2], lastOurSign[2];
     BmxHresult lastResult[2]; /* previous (ours, real) of GetDeviceState */
     Threshold realLimit[2][2], ourLimit[2][2];
+    uint64_t stableReads, stableDiffs; /* lX / lY reads with raw value and DirectInput's value unchanged */
+    const char *lastMethod;            /* the last HRESULT difference and how often it repeated */
+    BmxHresult lastOurs, lastTheirs;
+    int repeats;
+    int32_t prevRaw[2], prevReal[2];
+    int16_t stableValue[2][256]; /* 8-bit sticks: DirectInput's value per raw value on still reads */
+    uint8_t stableSeen[2][256];
     uint8_t lastReal[256];      /* previous real keyboard state / buttons (edges) */
     uint8_t lastDiff[256 + 64]; /* per strict item: differed in the previous read */
 };
@@ -180,8 +187,20 @@ static void compareResult(BmxCheckDevice *c, const char *method, BmxHresult ours
     if (ours != real) {
         c->hresultMismatches++;
         gTotalHresult++;
-        line("device %d (%s) %s: ours 0x%08x, DirectInput 0x%08x", c->index, name(c), method, (unsigned)ours,
-             (unsigned)real);
+        /* the same difference again and again (a call the game repeats every poll): the first few only */
+        if (method == c->lastMethod && ours == c->lastOurs && real == c->lastTheirs) {
+            c->repeats++;
+        } else {
+            c->repeats = 0;
+        }
+        c->lastMethod = method;
+        c->lastOurs = ours;
+        c->lastTheirs = real;
+        if (c->repeats < kRepeatLines) {
+            line("device %d (%s) %s: ours 0x%08x, DirectInput 0x%08x%s", c->index, name(c), method,
+                 (unsigned)ours, (unsigned)real,
+                 c->repeats == kRepeatLines - 1 ? " (repeats not logged)" : "");
+        }
     }
 }
 
@@ -325,7 +344,7 @@ static int32_t snapshotRaw(const BmxPadSnapshot *pad, int a, int32_t *center)
     const int16_t v = pad->family == kBmxPadGeneric ? pad->axes[a] : (a == 0 ? pad->leftX : pad->leftY);
     const int32_t raw = bmxPadRawStick(pad->family, v, &logicalMax);
 
-    *center = logicalMax >> 1;
+    *center = (logicalMax + 1) >> 1;
     return raw;
 }
 
@@ -390,6 +409,26 @@ void bmxCheckJoyState(BmxCheckDevice *c, BmxHresult ours, const BmxDiJoyState *s
         if ((diff < 0 ? -diff : diff) > c->maxStickDiff) {
             c->maxStickDiff = diff < 0 ? -diff : diff;
         }
+        /* A still stick (our raw value and DirectInput's value both as in the previous read): the two read
+         * the same HID value, so the values must be equal. These pairs are the exact calibration data. */
+        if (c->bothOk > 1 && raw == c->prevRaw[a] && real.axis[a] == c->prevReal[a]) {
+            const int eightBit = center == 128 && raw >= 0 && raw < 256;
+
+            c->stableReads++;
+            if (state->axis[a] != real.axis[a]) {
+                c->stableDiffs++;
+                if (!eightBit || !c->stableSeen[a][raw]) {
+                    line("still stick %s at raw %d: DirectInput %d, ours %d", kAxis[a], (int)raw,
+                         (int)real.axis[a], (int)state->axis[a]);
+                }
+            }
+            if (eightBit) {
+                c->stableValue[a][raw] = (int16_t)real.axis[a];
+                c->stableSeen[a][raw] = 1;
+            }
+        }
+        c->prevRaw[a] = raw;
+        c->prevReal[a] = real.axis[a];
     }
     /* informational: the other axes (within 1% of 65535) and the POVs */
     for (int a = 2; a < kDiAxes; a++) {
@@ -433,6 +472,29 @@ static void summaryThreshold(const char *axis, const char *side, const Threshold
            axis, side, (int)real->zeroMax, (int)real->onMin, (int)ours->zeroMax, (int)ours->onMin);
 }
 
+/* DirectInput's value per raw value on still reads (8-bit sticks), 16 per line: raw:value. */
+static void summaryTable(const BmxCheckDevice *c, int a, const char *axis)
+{
+    char text[400];
+    int n = 0;
+
+    text[0] = 0;
+    for (int raw = 0; raw < 256; raw++) {
+        if (c->stableSeen[a][raw]) {
+            const size_t len = SDL_strlen(text);
+
+            SDL_snprintf(text + len, sizeof text - len, " %d:%d", raw, (int)c->stableValue[a][raw]);
+            if (++n % 16 == 0) {
+                bmxLog("inputcheck:   %s still raw:DirectInput%s\n", axis, text);
+                text[0] = 0;
+            }
+        }
+    }
+    if (text[0] != 0) {
+        bmxLog("inputcheck:   %s still raw:DirectInput%s\n", axis, text);
+    }
+}
+
 void bmxCheckSummary(void)
 {
     uint64_t persistent = 0;
@@ -460,6 +522,10 @@ void bmxCheckSummary(void)
             summaryThreshold("X", "+", &c->realLimit[0][1], &c->ourLimit[0][1]);
             summaryThreshold("Y", "-", &c->realLimit[1][0], &c->ourLimit[1][0]);
             summaryThreshold("Y", "+", &c->realLimit[1][1], &c->ourLimit[1][1]);
+            bmxLog("inputcheck:   still stick: %llu reads, %llu with a different lX / lY\n",
+                   (unsigned long long)c->stableReads, (unsigned long long)c->stableDiffs);
+            summaryTable(c, 0, "lX");
+            summaryTable(c, 1, "lY");
         }
     }
     bmxLog("inputcheck: RESULT %s: %llu mismatches, %llu HRESULT differences\n",

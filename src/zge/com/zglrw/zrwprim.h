@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 #include "compat/orig.h"
+#include "zge/com/zglrw/zrwcam.h"
 #include "zge/zmath.h"
 
 /* Screen space vertex (0x1c bytes). The clipping leaves z and the word at 0xc of a clipped vertex unset. */
@@ -98,7 +99,8 @@ void zrwprimDrawQuads(uint32_t flags, const ZrwPrimQuad *quads, int count, const
  */
 void zrwprimDrawLines(uint32_t flags, const ZrwPrimLine *lines, int count, const ZMatrix *xform);
 void zrwprimDrawPolys(uint32_t flags, const ZrwPrimPoly *polys, int count, const ZMatrix *xform);
-/* The camera record whose clip rectangle and enable bit the quad drawing consults (pcinput.c). */
-ORIG_FN(0x00493070, uint8_t *, zrwGetClipCamera, (void));
+/* The current camera (zrwCameraGetCurrent); the quad drawing clips against its viewport when state bit 0 is
+ * set. */
+ORIG_FN(0x00493070, ZrwCamera *, zrwGetClipCamera, (void));
 
 #endif

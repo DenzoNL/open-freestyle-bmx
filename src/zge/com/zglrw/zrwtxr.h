@@ -6,6 +6,7 @@
 #ifndef ZGE_COM_ZGLRW_ZRWTXR_H
 #define ZGE_COM_ZGLRW_ZRWTXR_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "compat/orig.h"
@@ -102,31 +103,5 @@ void *rwMatDestructor(void *material);
 uint32_t zrwMatGetUserData(const void *material);
 /* Registers the material plugin on RenderWare textures; 0 on failure. */
 int zrwMatRegisterPlugin(void);
-
-/* ---- world and particle callbacks, TODO(file): probably belong to zrwworld.c --------------------------- */
-
-#define gZrwWorldActive       ORIG_VAR(0x006741e4, int, gZrwWorldActive)
-#define gZrwWorldMaterials    ORIG_VAR(0x006741e8, ZList *, gZrwWorldMaterials)
-#define gZrwWorldPvsState     ORIG_VAR(0x00674204, uint32_t, gZrwWorldPvsState)
-#define gZrwPvsLoaded         ORIG_VAR(0x006976e4, int, gZrwPvsLoaded)
-#define gZrwPvsEnabled        ORIG_VAR(0x006976e8, int, gZrwPvsEnabled)
-#define gZrwWorldCenterScaled ORIG_VAR(0x006976d8, ZVec3, gZrwWorldCenterScaled)
-
-/* Releases the world: its materials and the PVS data, then creates the empty replacement world. */
-int zrwWorldReset(void);
-void *zrwWorldFindMaterial(int hash);
-int zrwWorldMaterialCount(void);
-void *zrwWorldGetMaterial(int index);
-int zrwWorldHasPvs(void);
-/* Camera dependent PVS setup; the second entry point (0x4974b0) is the tail of this function. */
-int zrwWorldSetupPvs(void);
-int zrwWorldSetPvsEnabled(int enabled);
-int zrwWorldLoadPvs(void);
-int zrwWorldRender(void);
-void zrwWorldNop(void);
-/* Particle systems: a list of particles (velocity vector at +0x24) and the time of the last step at +0x28. */
-void zrwParticleAccelerate(int enabled, uint32_t *system, const ZVec3 *acceleration);
-void zrwParticleNop(void);
-void zrwParticleFloorBounce(int enabled, uint32_t *system, const float *params);
 
 #endif

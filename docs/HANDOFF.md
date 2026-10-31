@@ -68,8 +68,9 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   its dead zone arithmetic, DIK scan codes, foreground semantics; BMX_KEYS is its scripted keyboard);
   `BMX_INPUT_CHECK=1` compares every call with the real dinput.dll in the same process; `bmxnative.ini`
   (`BMX_CONFIG`) with the opt-in `[input] dpad_steering = 1`. The S3 timer review fixed a double join / slot reuse
-  race and the timeKillEvent return codes. **Open:** the user's focused test with the DualSense (NATIVE.md test A /
-  B); unfocused, the game's whole call sequence already matches the real DirectInput (0 HRESULT differences, same
+  race and the timeKillEvent return codes. The user's first focused run found the pad dead in a level (a second
+  exclusive pad object was refused; DirectInput allows it within a process) and lX / lY one step off (centre 128,
+  not 127): both fixed, PLATFORM.md 4b. **Open:** the user's rerun of NATIVE.md test A; unfocused, the game's whole call sequence already matches the real DirectInput (0 HRESULT differences, same
   product name / GUID / type). **Next:** S7 (DirectSound on SDL3 audio), S8 (own AVI / Cinepak).
 - Golden traces: record sessions with `bmxtrace.orig` (docs/TRACING.md) if not done yet.
 

@@ -7,8 +7,8 @@
  * Vanilla: the first joystick SDL lists at start (no hot-plug); buttons numbered as DirectInput numbers them
  * for that pad family; lX / lY with the range the game sets (-127..127) and DirectInput's dead zone
  * arithmetic on the raw HID value; keys by physical position (DIK = scan code); foreground semantics (Acquire
- * fails and an acquired device reports DIERR_INPUTLOST while the window has no focus; the pad is exclusive,
- * so a second device object on it cannot acquire it).
+ * fails and an acquired device reports DIERR_INPUTLOST while the window has no focus; "exclusive" only
+ * shuts out other processes, so every device object of the game on the pad acquires and reads it).
  *
  * BMX_KEYS (src/native/keys.c) is a source of the same keyboard: the script's keys, focus ignored, no pad.
  * BMX_INPUT_CHECK=1 mirrors every call on the real DirectInput and compares (inputcheck.c).
@@ -45,7 +45,7 @@ void bmxDiAxisDefaults(BmxDiAxisProps *props)
 
 int32_t bmxDiCookAxis(int32_t raw, int32_t logicalMax, const BmxDiAxisProps *props)
 {
-    const int32_t center = logicalMax >> 1;
+    const int32_t center = (logicalMax + 1) >> 1; /* 128 for 0..255 (measured; Wine uses 127) */
     const int32_t sum = props->min + props->max;
     const int32_t phyCenter =
         props->min == 0 ? props->max >> 1 : (sum >= 0 ? (sum + 1) / 2 : -((1 - sum) / 2));
@@ -533,7 +533,6 @@ typedef struct Device {
 } Device;
 
 static Device gDevices[kMaxDevices];
-static Device *gPadOwner; /* the device object holding the pad exclusively */
 
 /* DIERR_INPUTLOST once, when an acquired device lost the focus (or its pad): DirectInput unacquires it. */
 static int lost(Device *d)
@@ -541,9 +540,6 @@ static int lost(Device *d)
     if (d->acquired &&
         (((d->coopFlags & kDisclForeground) && !focused()) || (!d->keyboard && !padConnected()))) {
         d->acquired = 0;
-        if (gPadOwner == d) {
-            gPadOwner = NULL;
-        }
         return 1;
     }
     return 0;
@@ -568,9 +564,6 @@ static uint32_t BMX_WINAPI devRelease(BmxDiDevice *self)
 
     if (--d->refs > 0) {
         return (uint32_t)d->refs;
-    }
-    if (gPadOwner == d) {
-        gPadOwner = NULL;
     }
     bmxCheckRelease(d->check);
     memset(d, 0, sizeof *d);
@@ -648,16 +641,10 @@ static BmxHresult acquire(Device *d)
     if ((d->coopFlags & kDisclForeground) && !focused()) {
         return kDiErrOtherAppHasPrio;
     }
-    if (!d->keyboard) {
-        if (!padConnected()) {
-            return kDiErrInputLost;
-        }
-        if ((d->coopFlags & kDisclExclusive) && gPadOwner != NULL) {
-            return kDiErrOtherAppHasPrio;
-        }
-        if (d->coopFlags & kDisclExclusive) {
-            gPadOwner = d;
-        }
+    /* Exclusive access only shuts out other processes: a second exclusive object on the same pad in this
+     * process acquires it too (measured, docs/PLATFORM.md 4b; the game's in-level pad is such an object). */
+    if (!d->keyboard && !padConnected()) {
+        return kDiErrInputLost;
     }
     d->acquired = 1;
     return kDiOk;
@@ -679,9 +666,6 @@ static BmxHresult BMX_WINAPI devUnacquire(BmxDiDevice *self)
 
     if (d->acquired) {
         d->acquired = 0;
-        if (gPadOwner == d) {
-            gPadOwner = NULL;
-        }
         r = kDiOk;
     }
     bmxCheckUnacquire(d->check, r);
@@ -1007,6 +991,5 @@ void bmxInputReset(void)
     padClose();
     memset(&gPad, 0, sizeof gPad);
     memset(gDevices, 0, sizeof gDevices);
-    gPadOwner = NULL;
     gStarted = gScripted = gDpadSteering = gDiRefs = 0;
 }

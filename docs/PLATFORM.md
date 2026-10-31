@@ -434,7 +434,8 @@ process, so P2's hook use is not needed for it).
   acquired), `SetCooperativeLevel` (validates the flag pairs), `SetProperty` (DIPROP_RANGE / DEADZONE / SATURATION
   per axis or device-wide, sizes checked: the game's fourth call, DIPROP_RANGE with a DIPROPDWORD, fails with
   DIERR_INVALIDPARAM as it does in DirectInput), `Acquire` (fails with DIERR_OTHERAPPHASPRIO while the window has no
-  focus, or for a second exclusive object on the pad while the first holds it; S_FALSE when already acquired),
+  focus; DI_OK, then S_FALSE when already acquired; "exclusive" does not shut out a second object of the same
+  process: every pad object of the game acquires and reads the pad, see the fix below),
   `Unacquire`, `Poll` (S_FALSE: HID devices need no polling), `GetDeviceState` (DIERR_NOTACQUIRED / DIERR_INPUTLOST
   once after the focus or the pad went away, the buffer untouched on failure), `GetDeviceInfo` (SDL's name, the
   product GUID `PIDVID` / "PIDVID" from VID/PID, type 0x10404 like DirectInput's), Release. Focus = SDL's keyboard
@@ -448,11 +449,11 @@ process, so P2's hook use is not needed for it).
     sticks, both triggers on Z. Everything else: SDL_Joystick raw buttons, axes in order into X, Y, Z, Rx, Ry, Rz,
     hat 0. POV 0 from the d-pad (hundredths of a degree, -1 centred), POVs 1-3 -1. Axis values: the raw HID value is
     recovered from SDL's (`r * 257 - 32768` for the Sony pads' 8-bit sticks under SDL's HIDAPI driver; `v + 32768`
-    for 16-bit pads) and cooked like DirectInput: centre = logical max / 2, dead zone and saturation as fractions of
+    for 16-bit pads) and cooked like DirectInput: centre = (logical max + 1) / 2 (128), dead zone and saturation as fractions of
     each half (MulDiv-rounded, MulDiv checked bit-exact against kernel32's), the rest scaled linearly onto the half
-    range with MulDiv. With the game's -127..127 and 10% that is: 8-bit stick 0 up to 13 steps from the centre, -1 /
-    +1 from 14; 16-bit 0 up to 3277. This follows Wine's dinput formula; DirectInput's own is not documented, so the
-    check measures the threshold (below).
+    range with MulDiv. With the game's -127..127 and 10% that is: 8-bit stick 0 for raw 115..141, -1 at
+    114, +1 at 142; 16-bit 0 within 3277 of 32768. This is Wine's dinput formula with the centre rounded up instead of
+    down (fitted to the user's check logs, below).
   - BMX_KEYS: `bmxKeysScripted()` / `bmxKeysFillState()` (keys.c) are the keyboard; no pad is listed and the focus
     is ignored, so scripted runs behave exactly as before (ProQuest into Vail Trails: no trap, the frame at 1450 is
     byte-identical between runs).
@@ -487,8 +488,26 @@ process, so P2's hook use is not needed for it).
   not in the hook build; transient vs persistent differences; Wine's cooking formula as the starting point (to be
   confirmed by the check); a lost pad is found again by SDL GUID; the d-pad log line; `bmxPlatformShutdown` replaces
   the two `bmxTimerShutdown` calls (main.c, driver/gpu.c).
-- Open: the user's focused check (keyboard, DualSense buttons and stick threshold, alt-tab, the d-pad option), an
-  Xbox pad if one is at hand; SDL's HIDAPI driver may set the DualSense's light bar / player LED on open (cosmetic,
+- **The user's focused run (tests A and B, 2026-10-31) and two fixes.** Keyboard and pad buttons matched, the pad
+  worked in the menus but was **dead in a level**: at the level load the game creates two more pad objects (player
+  1 and 2, both foreground exclusive); ours refused the first one's Acquire (DIERR_OTHERAPPHASPRIO, because the other
+  held the pad), while DirectInput gave DI_OK and then S_FALSE on every later call, and that object is the one the
+  game reads in a level (1795 HRESULT differences, 0 reads). Fix: no exclusivity between objects of the process.
+  Test: two exclusive (background, no focus needed) objects on the user's DualSense under BMX_INPUT_CHECK: both
+  DI_OK, then S_FALSE, both read, 0 differences. Second, lX / lY were often DirectInput's + 1 (DI 39 / ours 40,
+  threshold +14 vs +15 from our old centre 127): a search over centre (127, 127.5, 128, also on a 0..65535 scale),
+  dead zone and output rounding against the 45 distinct logged pairs {raw, DirectInput} finds exactly one model with
+  a single misfit: Wine's formula with centre 128 (raw 115..141 -> 0, 114 -> -1, 142 -> +1, 238 -> 108). The misfit,
+  raw 146 -> 5, cannot come from any integer raw under it (145 -> 4, 146 -> 6) and was logged while the stick jumped 9
+  steps between two polls, so the two sides most likely read different reports; the 44 other pairs are unit-test data.
+  To settle such cases the check now also compares on **still** reads (our raw value and DirectInput's value both
+  unchanged since the previous read: both certainly saw the same report) and prints, per 8-bit stick axis, the
+  table raw:DirectInput of every still value seen; it logs a repeated HRESULT difference only three times and allows
+  3000 lines (the dead-pad run had used up the old 400).
+- Open: the user's rerun of test A (expect `still stick: N reads, 0 with a different lX / lY` and no HRESULT
+  differences after the level load), an Xbox pad if one is at hand; DirectInput reports lRx / lRy as 32767 with the
+  DualSense's triggers at rest while ours give 0 (informational, the game does not read them: DirectInput's axis
+  assignment for the triggers is not what we assumed); SDL's HIDAPI driver may set the DualSense's light bar / player LED on open (cosmetic,
   DirectInput never did).
 
 S1-S6 are done apart from the user's real-pad check. S7 and S8 are the large ones.

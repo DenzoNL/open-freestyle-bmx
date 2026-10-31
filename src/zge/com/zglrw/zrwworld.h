@@ -6,9 +6,12 @@
 #ifndef ZGE_COM_ZGLRW_ZRWWORLD_H
 #define ZGE_COM_ZGLRW_ZRWWORLD_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "compat/orig.h"
+#include "zge/zlist.h"
+#include "zge/zmath.h"
 
 /* World interface, function pointers in the exe's data (0x5620e0..). */
 typedef int(BMX_CDECL *ZrwWorldLoadFn)(void *data, const char *directory);
@@ -55,9 +58,17 @@ typedef struct ZrwEffectType {
     void(BMX_CDECL *update)(struct ZrwEffectType *type, void *item, int arg); /* 0x20 */
 } ZrwEffectType;
 
+/* An effect record (0x100 bytes, made by ZrwEffectType.create); the world code only reads its type. */
+typedef struct ZrwEffectItem {
+    uint8_t pad00[0x2c];
+    ZrwEffectType *type; /* 0x2c */
+} ZrwEffectItem;
+
+_Static_assert(offsetof(ZrwEffectItem, type) == 0x2c, "effect item");
+
 /* Per-object record of the effect object (0x3c bytes, at +0x30 of it). */
 typedef struct ZrwEffectHost {
-    struct ZList *items; /* 0x00 effect records, each with its type at +0x2c */
+    struct ZList *items; /* 0x00 ZrwEffectItem records */
     void *updateNode;    /* 0x04 */
     uint32_t pad08[3];   /* 0x08 zero */
     uint32_t pad14;      /* 0x14 never set */
@@ -102,5 +113,52 @@ int zrwCreateWorld(void);
 int zrwWorldShutdown(void);
 /* Loads the world named `name` from a file image: materials chunk, stream, texture matching. */
 int zrwworldLoad(void *image, const char *name);
+
+/* ---- world reset, PVS, material list and particle steps (0x497200..0x497700) ------------------------ */
+
+#define gZrwWorldActive       ORIG_VAR(0x006741e4, int, gZrwWorldActive)
+#define gZrwWorldMaterials    ORIG_VAR(0x006741e8, ZList *, gZrwWorldMaterials)
+#define gZrwWorldPvsState     ORIG_VAR(0x00674204, uint32_t, gZrwWorldPvsState)
+#define gZrwPvsLoaded         ORIG_VAR(0x006976e4, int, gZrwPvsLoaded)
+#define gZrwPvsEnabled        ORIG_VAR(0x006976e8, int, gZrwPvsEnabled)
+#define gZrwWorldCenterScaled ORIG_VAR(0x006976d8, ZVec3, gZrwWorldCenterScaled)
+
+/* Releases the world: its materials and the PVS data, then creates the empty replacement world. */
+int zrwWorldReset(void);
+void *zrwWorldFindMaterial(int hash);
+int zrwWorldMaterialCount(void);
+void *zrwWorldGetMaterial(int index);
+int zrwWorldHasPvs(void);
+/* Camera dependent PVS setup; the second entry point (0x4974b0) is the tail of this function. */
+int zrwWorldSetupPvs(void);
+int zrwWorldSetPvsEnabled(int enabled);
+int zrwWorldLoadPvs(void);
+int zrwWorldRender(void);
+void zrwWorldNop(void);
+
+/* A particle (only the fields the two steps below touch are known). */
+typedef struct ZrwParticle {
+    uint8_t pad00[4];
+    ZVec3 position; /* 0x04 only y is used here */
+    uint8_t pad10[0x14];
+    ZVec3 velocity; /* 0x24 */
+} ZrwParticle;
+
+_Static_assert(offsetof(ZrwParticle, position) == 0x04, "particle");
+_Static_assert(offsetof(ZrwParticle, velocity) == 0x24, "particle");
+
+/* A particle system. */
+typedef struct ZrwParticleSystem {
+    ZList *particles; /* 0x00 list of ZrwParticle */
+    uint8_t pad04[0x24];
+    uint32_t lastStep; /* 0x28 time (zrwTimeGetTime) of the last acceleration step */
+} ZrwParticleSystem;
+
+_Static_assert(offsetof(ZrwParticleSystem, lastStep) == 0x28, "particle system");
+
+/* Particle steps: the system pointer is a ZrwParticleSystem (typed as words for the original's signature). */
+void zrwParticleAccelerate(int enabled, uint32_t *system, const ZVec3 *acceleration);
+void zrwParticleNop(void);
+void zrwParticleFloorBounce(int enabled, uint32_t *system, const float *params);
 
 #endif

@@ -43,18 +43,13 @@ typedef void *(BMX_CDECL *ZrwMatLoadFn)(const void *data, uint32_t size, const c
 #define gZrwTextureRetain ORIG_VAR(0x00562420, ZrwMatTextureFn, gZrwTextureRetain)
 #define gZrwTextureLoad   ORIG_VAR(0x005623fc, ZrwMatLoadFn, gZrwTextureLoad)
 
-typedef struct ZrwMatSearch {
-    uint32_t hash;
-    int skip;
-    ZrwMaterial *found;
-} ZrwMatSearch;
-
 typedef void(BMX_CDECL *ZrwMatEachFn)(void *payload, void *arg);
 typedef void *(BMX_CDECL *ZrwMatHookFn)(void *material, void *arg);
 
+/* Unchecked: callers test the index against textureCount (and that is at most six). */
 static void **textureSlot(ZrwMaterial *material, uint32_t index)
 {
-    return (void **)(material->slots + (size_t)index * 12);
+    return &material->slots[index].texture;
 }
 
 BMX_ADDR(0x00488fb0)
@@ -217,10 +212,11 @@ int zrwmatInitialize(void)
     if (gZrwMat.initialized != 0) {
         zdebugFail("Already initialized", kZrwMatFile, 0x114, 0);
     }
-    memset(&gZrwMat, 0, 0x24);
+    memset(&gZrwMat, 0, sizeof gZrwMat);
     gZrwMat.initialized = 1;
-    gZrwMat.pool = zmemFreeListCreate(
-        0x74, 0x100, BMX_FNPTR(ZMemDestroyFn, 0x00489530, (ZMemDestroyFn)zrwmatReleaseTexture));
+    gZrwMat.pool =
+        zmemFreeListCreate(sizeof(ZrwMaterial), 0x100,
+                           BMX_FNPTR(ZMemDestroyFn, 0x00489530, (ZMemDestroyFn)zrwmatReleaseTexture));
     gZrwMat.pad04 = 0;
     ziffSetupCallback(
         0x4954414d, BMX_FNPTR(int(BMX_CDECL *)(void *), 0x004892b0, (int(BMX_CDECL *)(void *))zrwmatReadMATI),
@@ -279,11 +275,11 @@ void zrwmatReleaseTexture(ZrwMaterial *material)
     int i = 0;
 
     if (material->textureCount != 0) {
-        void **slot = (void **)&material->slots[0];
+        ZrwMatSlot *slot = material->slots;
         do {
-            gZrwTextureDrop(*slot);
+            gZrwTextureDrop(slot->texture);
             i++;
-            slot += 3;
+            slot++;
         } while (i < (int)material->textureCount);
     }
     material->refCount--;
@@ -362,6 +358,7 @@ ZrwMaterial *zrwmatLoadSpriteTexture(void *data, uint32_t size, const char *name
 BMX_ADDR(0x004899a0)
 int zrwmatMatchHash(ZrwMaterial *material, uint32_t *state)
 {
+    ZrwMatSearch *search = (ZrwMatSearch *)state;
     void *texture;
     int skip;
 
@@ -371,11 +368,11 @@ int zrwmatMatchHash(ZrwMaterial *material, uint32_t *state)
     } else {
         texture = *textureSlot(material, 0);
     }
-    if ((uint32_t)gZrwTextureHash(texture) == state[0]) {
-        skip = (int)state[1];
-        state[1] = (uint32_t)(skip - 1);
+    if ((uint32_t)gZrwTextureHash(texture) == search->hash) {
+        skip = search->skip;
+        search->skip = (int)((uint32_t)skip - 1u);
         if (skip == 0) {
-            ((ZrwMaterial **)state)[2] = material;
+            search->found = material;
             return 0;
         }
     }
@@ -385,12 +382,12 @@ int zrwmatMatchHash(ZrwMaterial *material, uint32_t *state)
 BMX_ADDR(0x00489a00)
 ZrwMaterial *zrwmatFindByTextureHash(uint32_t hash, int skip)
 {
-    gZrwMat.findHash = hash;
-    gZrwMat.findSkip = skip;
-    gZrwMat.found = NULL;
+    gZrwMat.find.hash = hash;
+    gZrwMat.find.skip = skip;
+    gZrwMat.find.found = NULL;
     zmemFreeListForEach(gZrwMat.pool, BMX_FNPTR(ZrwMatEachFn, 0x004899a0, (ZrwMatEachFn)zrwmatMatchHash),
-                        &gZrwMat.findHash);
-    return gZrwMat.found;
+                        &gZrwMat.find);
+    return gZrwMat.find.found;
 }
 
 BMX_ADDR(0x00489a40)

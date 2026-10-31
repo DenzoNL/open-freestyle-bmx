@@ -25,8 +25,9 @@ void bmxDiAxisDefaults(BmxDiAxisProps *props);
 
 /*
  * The value DirectInput reports for a raw HID axis value in 0..logicalMax (the logical centre is
- * logicalMax / 2 rounded down): the dead zone and saturation are fractions (of 10000) of each half, the part
- * between them is scaled linearly onto the half of the range, with MulDiv's rounding.
+ * (logicalMax + 1) / 2: 128 for an 8-bit axis, fitted to DirectInput's values with a DualSense): the dead
+ * zone and saturation are fractions (of 10000) of each half, the part between them is scaled linearly onto
+ * the half of the range, with MulDiv's rounding.
  */
 int32_t bmxDiCookAxis(int32_t raw, int32_t logicalMax, const BmxDiAxisProps *props);
 

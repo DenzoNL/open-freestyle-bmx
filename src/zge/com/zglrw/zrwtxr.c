@@ -23,13 +23,8 @@
 
 static const char kZrwTxrFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwTxr.c";
 
-/* Other modules: the camera (pcinput.c), the world callbacks, the RAM disk file hook (zprofile.c), materials.
+/* Other modules: the RAM disk file hook (zprofile.c) and materials.
  */
-ORIG_FN(0x00492eb0, uint8_t *, zrwGetCurrentCamera, (void));
-ORIG_FN(0x00493060, void *, zrwCameraGetRwCamera, (const uint8_t *camera));
-/* The world's PVS progress callback (ported in zrwworld.c); only its address is used here. */
-ORIG_FN(0x00496620, int, zrwWorldPvsCallback, (int stage, float progress));
-ORIG_FN(0x004cd510, int, rwWorldPvsDefaultCallback, (int stage, float progress));
 ORIG_FN(0x00489ba0, void, zrwmatTextureLoadBegin, (void));
 ORIG_FN(0x00489be0, void, zrwmatTextureLoaded, (ZrwTexture * texture));
 
@@ -41,13 +36,6 @@ typedef void(BMX_CDECL *ZrwReleaseFn)(void *object);
 #define gZrwSetBounds       ORIG_VAR(0x00561484, ZrwSetBoundsFn, gZrwSetBounds)
 #define gZrwMaterialRelease ORIG_VAR(0x00561024, ZrwReleaseFn, gZrwMaterialRelease)
 #define gZrwTextureRelease  ORIG_VAR(0x00562400, ZrwReleaseFn, gZrwTextureRelease)
-/* Camera data: the capture size seen by the world's PVS and a 0 terminated list of the file names. */
-#define gZrwPvsKeys   ORIG_VAR(0x0056212c, const char *, gZrwPvsKeys)
-#define gZrwPvsBuffer ORIG_VAR(0x00674208, uint8_t, gZrwPvsBuffer)
-/* Defaults of the particle callbacks: gravity, and floor height with bounce factor. */
-#define gZrwDefaultGravity ORIG_VAR(0x005623c0, ZVec3, gZrwDefaultGravity)
-typedef float ZrwBounceParams[2];
-#define gZrwDefaultBounce ORIG_VAR(0x005623d0, ZrwBounceParams, gZrwDefaultBounce)
 /* File extensions handed to the RAM disk and registered with RenderWare. */
 typedef char ZrwExtension[4];
 #define kZrwExtBmp    ORIG_VAR(0x005625b4, ZrwExtension, kZrwExtBmp)
@@ -55,219 +43,6 @@ typedef char ZrwExtension[4];
 #define kZrwFormatBmp ORIG_VAR(0x0056276c, ZrwExtension, kZrwFormatBmp)
 #define kZrwFormatPng ORIG_VAR(0x00562768, ZrwExtension, kZrwFormatPng)
 #define kZrwFormatDds ORIG_VAR(0x00562764, ZrwExtension, kZrwFormatDds)
-
-/* ---- world and particle callbacks, TODO(file): probably belong to zrwworld.c ------------------------ */
-
-BMX_ADDR(0x00497200)
-int zrwWorldReset(void)
-{
-    float box[6] = {100.0f, 100.0f, 100.0f, -100.0f, -100.0f, -100.0f};
-    float bounds[8];
-    const float *origin, *extent;
-    void *world;
-
-    if (gZrwWorldActive == 0) {
-        return 1;
-    }
-    if (RpPVSQuery(gZrwWorld) != 0) {
-        RpPVSUnload(gZrwWorld);
-        gZrwPvsLoaded = 0;
-        gZrwPvsEnabled = 0;
-    }
-    if (gZrwWorld != NULL) {
-        RpWorldDestroy(gZrwWorld);
-        gZrwWorld = NULL;
-    }
-    world = RpWorldCreate((const RwBBox *)box);
-    if (world == NULL) {
-        return 0;
-    }
-    gZrwWorld = world;
-    origin = (const float *)RpWorldGetOrigin(world);
-    gZrwWorldCenter.x = origin[0];
-    gZrwWorldCenter.y = origin[1];
-    gZrwWorldCenterScaled.x = (float)((double)gZrwInvScale * gZrwWorldCenter.x);
-    gZrwWorldCenter.z = origin[2];
-    gZrwWorldCenterScaled.y = (float)((double)gZrwWorldCenter.y * gZrwInvScale);
-    gZrwWorldCenterScaled.z = (float)((double)gZrwWorldCenter.z * gZrwInvScale);
-    extent = (const float *)RpWorldGetBBox(gZrwWorld);
-    bounds[0] = (float)(((double)extent[3] - gZrwWorldCenter.x) * gZrwInvScale);
-    bounds[1] = (float)-(((double)extent[1] - gZrwWorldCenter.y) * gZrwInvScale);
-    bounds[2] = (float)-(((double)extent[2] - gZrwWorldCenter.z) * gZrwInvScale);
-    bounds[4] = (float)(((double)extent[0] - gZrwWorldCenter.x) * gZrwInvScale);
-    bounds[5] = (float)-(((double)extent[4] - gZrwWorldCenter.y) * gZrwInvScale);
-    bounds[6] = (float)-(((double)extent[5] - gZrwWorldCenter.z) * gZrwInvScale);
-    gZrwSetBounds(2, bounds, 0);
-    if (gZrwWorldMaterials != NULL) {
-        for (void *material = zlistFirst(gZrwWorldMaterials); material != NULL;
-             material = zlistFirst(gZrwWorldMaterials)) {
-            gZrwTextureRelease(gZrwMaterialTexture(material, 0));
-            gZrwMaterialRelease(material);
-            zlistRemoveCurrent(gZrwWorldMaterials);
-        }
-    }
-    gZrwWorldActive = 0;
-    return 1;
-}
-
-BMX_ADDR(0x00497400)
-void *zrwWorldFindMaterial(int hash)
-{
-    for (void *material = zlistFirst(gZrwWorldMaterials); material != NULL;
-         material = zlistNext(gZrwWorldMaterials)) {
-        if (hash == gZrwTextureHash(gZrwMaterialTexture(material, 0))) {
-            return material;
-        }
-    }
-    return NULL;
-}
-
-BMX_ADDR(0x00497450)
-int zrwWorldMaterialCount(void)
-{
-    return zlistCount(gZrwWorldMaterials);
-}
-
-BMX_ADDR(0x00497460)
-void *zrwWorldGetMaterial(int index)
-{
-    return zlistGet(gZrwWorldMaterials, index);
-}
-
-BMX_ADDR(0x00497480)
-int zrwWorldHasPvs(void)
-{
-    return RpPVSQuery(gZrwWorld) != 0;
-}
-
-/* Rebuilds the world's PVS for the size of the current camera. Returns 0 without a camera. */
-BMX_ADDR(0x004974a0)
-int zrwWorldSetupPvs(void)
-{
-    uint8_t *camera = zrwGetCurrentCamera();
-    void *rwCamera;
-    RwRaster *raster;
-    RwRaster *zRaster;
-    float farClip;
-
-    if (camera == NULL) {
-        return 0;
-    }
-    rwCamera = zrwCameraGetRwCamera(camera);
-    /* The original fetches both rasters first, before the PVS calls. */
-    raster = RwCameraGetRaster(rwCamera);
-    zRaster = RwCameraGetZRaster(rwCamera);
-    __builtin_memcpy(&farClip, camera + 0xb0, sizeof farClip);
-    gZrwWorldPvsState = rpPVSCountSectors(gZrwWorld);
-    RpPVSSetProgressCallBack(gZrwWorld, (RpPVSProgressCallBack)(uintptr_t)zrwWorldPvsCallback);
-    if (RpPVSQuery(gZrwWorld) != 0) {
-        RpPVSUnload(gZrwWorld);
-        gZrwPvsLoaded = 0;
-        gZrwPvsEnabled = 0;
-    }
-    if (RpPVSCreate(gZrwWorld, raster, zRaster, farClip, 0, (void *)(uintptr_t)rwWorldPvsDefaultCallback,
-                    NULL) != NULL) {
-        gZrwPvsLoaded = 1;
-        gZrwPvsEnabled = 1;
-    }
-    return 1;
-}
-
-BMX_ADDR(0x00497570)
-int zrwWorldSetPvsEnabled(int enabled)
-{
-    if (gZrwPvsLoaded != 0) {
-        gZrwPvsEnabled = enabled;
-        return 1;
-    }
-    if (enabled == 0) {
-        gZrwPvsEnabled = 0;
-        return 1;
-    }
-    gZdebugPrint("ZRWWORLD: No PVS data\n");
-    return 0;
-}
-
-BMX_ADDR(0x004975b0)
-int zrwWorldLoadPvs(void)
-{
-    uint8_t *values[1] = {&gZrwPvsBuffer};
-    uint32_t data = zfileDeviceControl(zfileDefaultDevice(), 1, (uint32_t)(uintptr_t)&gZrwPvsKeys,
-                                       (uint32_t)(uintptr_t)values);
-    void *stream;
-    int ok;
-
-    if (data == 0) {
-        return 0;
-    }
-    stream = RwStreamOpen(2, 2, (void *)(uintptr_t)data);
-    if (stream == NULL) {
-        return 0;
-    }
-    ok = RpWorldStreamWrite(gZrwWorld, stream) != NULL;
-    RwStreamClose(stream, NULL);
-    return ok != 0;
-}
-
-BMX_ADDR(0x00497620)
-int zrwWorldRender(void)
-{
-    if (gZrwWorld != NULL) {
-        RpWorldRender(gZrwWorld);
-    }
-    return 1;
-}
-
-BMX_ADDR(0x00497640)
-void zrwWorldNop(void) {}
-
-/* Particle system: +0 the list of particles, +0x28 the time of the last step. */
-BMX_ADDR(0x00497650)
-void zrwParticleAccelerate(int enabled, uint32_t *system, const ZVec3 *acceleration)
-{
-    const uint32_t now = gZrwTimeGetTime();
-    const double elapsed = (double)(uint32_t)(now - system[10]);
-    ZVec3 delta;
-    const ZVec3 *accel = acceleration != NULL ? acceleration : &gZrwDefaultGravity;
-
-    delta.x = (float)(elapsed * accel->x * 0x1.0624dep-10f);
-    delta.y = (float)(elapsed * accel->y * 0x1.0624dep-10f);
-    delta.z = (float)(elapsed * accel->z * 0x1.0624dep-10f);
-    if (enabled != 0 && system != NULL) {
-        ZList *list = (ZList *)(uintptr_t)system[0];
-
-        for (uint8_t *particle = zlistFirst(list); particle != NULL; particle = zlistNext(list)) {
-            zvec3Add((ZVec3 *)(particle + 0x24), (ZVec3 *)(particle + 0x24), &delta);
-        }
-    }
-}
-
-BMX_ADDR(0x004976f0)
-void zrwParticleNop(void) {}
-
-/* Particles whose y reaches the floor value are set onto it and have their velocity (+0x28) reflected. */
-BMX_ADDR(0x00497700)
-void zrwParticleFloorBounce(int enabled, uint32_t *system, const float *params)
-{
-    const float *p = params != NULL ? params : gZrwDefaultBounce;
-    const float floor = p[0];
-    const float bounce = p[1];
-
-    if (enabled != 0 && system != NULL) {
-        ZList *list = (ZList *)(uintptr_t)system[0];
-
-        for (uint8_t *particle = zlistFirst(list); particle != NULL; particle = zlistNext(list)) {
-            float *y = (float *)(particle + 8);
-
-            if ((double)*y >= (double)floor) {
-                float *velocity = (float *)(particle + 0x28);
-
-                *y = floor;
-                *velocity = (float)-((double)bounce * *velocity);
-            }
-        }
-    }
-}
 
 /* ---- raster and image helpers -------------------------------------------------------------------------- */
 
@@ -357,7 +132,7 @@ void zrwImageApplyColorKey(void *image)
         uint8_t *row = RwImageGetPixels(image);
         const uint32_t width = (uint32_t)RwImageGetWidth(image);
         const uint32_t height = (uint32_t)RwImageGetHeight(image);
-        const int32_t stride = *(int32_t *)((uint8_t *)image + 0x10);
+        const int32_t stride = ((const RwImage *)image)->stride;
 
         for (uint32_t y = height; y != 0; y--, row += stride) {
             uint8_t *pixel = row;

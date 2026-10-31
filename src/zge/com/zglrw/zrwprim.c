@@ -413,7 +413,7 @@ void zrwprimDrawPolys(uint32_t flags, const ZrwPrimPoly *polys, int count, const
 
             if (polys->count > gZrwPrim.im2dMax) {
                 gZrwPrim.im2dMax = (polys->count & ~0x1fu) + 0x20;
-                gZrwPrim.im2d = zmemResize(gZrwPrim.im2d, gZrwPrim.im2dMax * 0x20 + 0xf);
+                gZrwPrim.im2d = zmemResize(gZrwPrim.im2d, gZrwPrim.im2dMax * sizeof(ZrwIm2DVertex) + 0xf);
             }
             base = align16(gZrwPrim.im2d);
             n = polys->count;
@@ -439,7 +439,7 @@ void zrwprimDrawPolys(uint32_t flags, const ZrwPrimPoly *polys, int count, const
 
             if (polys->count > gZrwPrim.im3dMax) {
                 gZrwPrim.im3dMax = (polys->count & ~0x1fu) + 0x20;
-                gZrwPrim.im3d = zmemResize(gZrwPrim.im3d, gZrwPrim.im3dMax * 0x24 + 0xf);
+                gZrwPrim.im3d = zmemResize(gZrwPrim.im3d, gZrwPrim.im3dMax * sizeof(ZrwIm3DVertex) + 0xf);
             }
             base = align16(gZrwPrim.im3d);
             n = polys->count;
@@ -492,10 +492,10 @@ BMX_ADDR(0x0048d660)
 void zrwprimDrawQuads(uint32_t flags, const ZrwPrimQuad *quads, int count, const ZMatrix *xform)
 {
     if ((flags & 0x2000000) != 0) {
-        const uint8_t *camera = zrwGetClipCamera();
+        const ZrwCamera *camera = zrwGetClipCamera();
 
-        if ((camera[8] & 1) != 0) {
-            zrwprimClipPoly(flags, quads->texture, quads->vertices, 4, xform, (const float *)(camera + 0x94));
+        if ((camera->state & 1) != 0) {
+            zrwprimClipPoly(flags, quads->texture, quads->vertices, 4, xform, camera->viewport);
             return;
         }
     }

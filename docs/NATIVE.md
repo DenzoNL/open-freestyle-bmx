@@ -545,6 +545,10 @@ $env:BMX_INPUT_CHECK = "1"; $env:BMX_NO_MOVIES = "1"
 5. Alt-tab to another window for 3 s with a key held, back again, then press a few keys and buttons.
 6. Quit: arrow down to QUIT, Enter, Yes in the box. Then `copy save\SAVE.DAT.bak save\SAVE.DAT`.
 
+First run (2026-10-31): the pad was dead in a level (a second exclusive pad object was refused) and lX / lY were one
+step off; both fixed (PLATFORM.md 4b). In the rerun, also ride a level with the pad, and let the stick rest at a few
+positions for a second each (the summary's `lX still raw:DirectInput` table then holds exact pairs).
+
 Success: no `MISMATCH` line; `inputcheck: RESULT clean: 0 mismatches, 0 HRESULT differences` (a few HRESULT
 differences right at the alt-tab, i.e. SDL and DirectInput seeing the focus change one poll apart, are to be
 reported, not a failure in themselves); the four `X- / X+ / Y- / Y+ threshold` lines show the same numbers for

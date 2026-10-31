@@ -264,14 +264,14 @@ static void setup_keep(DtCtx *c)
 /* An object as the filters see it: the flag byte and id, and a list of ids to skip. */
 static void setup_filter(DtCtx *c)
 {
-    ZrwColPoly *poly = dt_alloc(sizeof *poly);
+    RpAtomic *poly = dt_alloc(sizeof *poly);
     int *excluded = dt_alloc(8 * sizeof *excluded);
 
     begin(c);
     random_state(2, 0);
     dt_fill(poly, sizeof *poly);
     gZrwCol.flags = (uint32_t)dt_range(0, 15);
-    poly->id = dt_range(1, 6);
+    poly->clump = (RpClump *)(uintptr_t)dt_range(1, 6);
     for (int i = 0; i < 5; i++) {
         excluded[i] = dt_range(1, 6);
     }
@@ -285,8 +285,8 @@ static void setup_filter(DtCtx *c)
 
 static void setup_record(DtCtx *c, int withObject)
 {
-    ZrwColSector *sector = dt_alloc(sizeof *sector);
-    ZrwColObject *object = dt_alloc(sizeof *object);
+    RpWorldSector *sector = dt_alloc(sizeof *sector);
+    RpAtomic *object = dt_alloc(sizeof *object);
     int capacity;
     float distance;
 
@@ -295,8 +295,8 @@ static void setup_record(DtCtx *c, int withObject)
     distance = rf();
     random_state(capacity, (dt_u32() % 3 == 0) ? capacity : dt_range(0, capacity - 1));
     dt_fill(sector, sizeof *sector);
-    sector->map = dt_alloc(64);
-    dt_fill((void *)sector->map, 64);
+    sector->polygons = dt_alloc(64);
+    dt_fill(sector->polygons, 64);
     dt_fill(object, sizeof *object);
     DT_ARG_PTR(c, 0, dt_alloc(8));
     DT_ARG_PTR(c, 1, sector);
@@ -318,7 +318,7 @@ static void setup_record_object(DtCtx *c)
 /* The same without the sector: 0x4947c0 passes NULL for it, and the object is always there. */
 static void setup_record_object_short(DtCtx *c)
 {
-    ZrwColObject *object = dt_alloc(sizeof *object);
+    RpAtomic *object = dt_alloc(sizeof *object);
     int capacity;
 
     begin(c);
@@ -372,8 +372,8 @@ static void setup_line_query(DtCtx *c)
     ZrwColLineHit *out = dt_alloc(sizeof *out);
     int *excluded = dt_alloc(4 * sizeof *excluded);
     ZrwColTriangle *best;
-    ZrwColSector *sector = dt_alloc(sizeof *sector);
-    ZrwColObject *object = dt_alloc(sizeof *object);
+    RpWorldSector *sector = dt_alloc(sizeof *sector);
+    RpAtomic *object = dt_alloc(sizeof *object);
 
     begin(c);
     dt_stub(0x0047ed10, NULL, (void *)ngFail);
@@ -387,10 +387,10 @@ static void setup_line_query(DtCtx *c)
             (dt_u32() % 4 == 0) ? dt_float_edgy(-300.0f, 300.0f) : dt_float(gZrwColBox[i], gZrwColBox[4 + i]);
     }
     best = random_triangle();
-    __builtin_memcpy(gZrwCol.best, best, sizeof gZrwCol.best);
+    __builtin_memcpy(&gZrwCol.best, best, sizeof gZrwCol.best);
     dt_fill(sector, sizeof *sector);
-    sector->map = dt_alloc(64);
-    dt_fill((void *)sector->map, 64);
+    sector->polygons = dt_alloc(64);
+    dt_fill(sector->polygons, 64);
     dt_fill(object, sizeof *object);
     switch (dt_u32() % 5) {
     case 0:
@@ -428,7 +428,7 @@ static float color_coordinate(const float *other)
 static void setup_hit_color(DtCtx *c)
 {
     ZrwColLineHit *hit = dt_alloc(sizeof *hit);
-    ZrwColSector *sector = dt_alloc(sizeof *sector);
+    RpWorldSector *sector = dt_alloc(sizeof *sector);
     uint8_t *map = dt_alloc(32);
     uint8_t *prelit = dt_alloc(64);
     ZrwColTriangle *best;
@@ -437,7 +437,7 @@ static void setup_hit_color(DtCtx *c)
     random_state(2, 0);
     best = random_triangle();
     best->index = dt_range(0, 7);
-    __builtin_memcpy(gZrwCol.best, best, sizeof gZrwCol.best);
+    __builtin_memcpy(&gZrwCol.best, best, sizeof gZrwCol.best);
     dt_fill(sector, sizeof *sector);
     dt_fill(map, 32);
     dt_fill(prelit, 64);
@@ -446,8 +446,8 @@ static void setup_hit_color(DtCtx *c)
             map[i] = (uint8_t)(map[i] % 16);
         }
     }
-    sector->map = map;
-    sector->prelit = prelit;
+    sector->polygons = (RpPolygon *)map;
+    sector->preLitLum = (uint32_t *)prelit;
     gZrwCol.bestSub = (dt_u32() % 8 == 0) ? 0 : (uint32_t)(uintptr_t)sector;
     dt_fill(hit, sizeof *hit);
     for (int i = 0; i < 3; i++) {

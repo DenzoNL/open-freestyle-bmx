@@ -6,6 +6,7 @@
 #ifndef ZGE_COM_ZGLRW_ZRWDBG_H
 #define ZGE_COM_ZGLRW_ZRWDBG_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "compat/orig.h"
@@ -22,12 +23,72 @@ enum {
     kZrwDbgMaxItems = 0x200,
 };
 
-/* Queued shape: type word and 0x68 bytes of shape specific data (see the zrwDbgAdd functions). */
+/* A point queued as raw float bits (the drawing copies them as words), and the unused fourth word. */
+typedef struct ZrwDbgPoint {
+    uint32_t x, y, z;
+    uint32_t pad0c;
+} ZrwDbgPoint;
+
+/* Shape data of the queue entries. The colour is r, g, b, a; `flags` bit 0 / 1 are the draw flag bits that
+ * drawFlags() expands. */
+typedef struct ZrwDbgLineData {
+    ZrwDbgPoint point[2]; /* 0x00 */
+    uint8_t color[4];     /* 0x20 */
+    uint16_t flags;       /* 0x24 */
+} ZrwDbgLineData;
+
+typedef struct ZrwDbgAxesData {
+    ZMatrix matrix; /* 0x00 rotation rows, position row (+0x30) is left as it was */
+    uint16_t mode;  /* 0x40 bit 0: draw the camera's axes instead */
+    uint16_t flags; /* 0x42 */
+} ZrwDbgAxesData;
+
+typedef struct ZrwDbgTriangleData {
+    ZrwDbgPoint point[3]; /* 0x00 */
+    uint8_t color[4];     /* 0x30 */
+    uint16_t flags;       /* 0x34 */
+} ZrwDbgTriangleData;
+
+typedef struct ZrwDbgSphereData {
+    ZrwDbgPoint center; /* 0x00 */
+    uint32_t radius;    /* 0x10 float bits */
+    uint8_t color[4];   /* 0x14 */
+    uint16_t flags;     /* 0x18 */
+} ZrwDbgSphereData;
+
+typedef struct ZrwDbgBoxData {
+    ZrwDbgPoint corner[2]; /* 0x00 min, max */
+    ZMatrix matrix;        /* 0x20 */
+    uint8_t color[4];      /* 0x60 */
+    uint16_t flags;        /* 0x64 */
+} ZrwDbgBoxData;
+
+/* Queued shape: the type and the shape specific data (see the zrwDbgAdd functions). */
 typedef struct ZrwDbgItem {
     uint32_t type;
-    uint32_t data[26];
+    union {
+        uint32_t words[26];
+        ZrwDbgLineData line;
+        ZrwDbgAxesData axes;
+        ZrwDbgTriangleData triangle;
+        ZrwDbgSphereData sphere;
+        ZrwDbgBoxData box;
+    } data;
 } ZrwDbgItem;
 
+_Static_assert(offsetof(ZrwDbgLineData, color) == 0x20, "debug line");
+_Static_assert(offsetof(ZrwDbgLineData, flags) == 0x24, "debug line");
+_Static_assert(offsetof(ZrwDbgAxesData, mode) == 0x40, "debug axes");
+_Static_assert(offsetof(ZrwDbgAxesData, flags) == 0x42, "debug axes");
+_Static_assert(offsetof(ZrwDbgTriangleData, color) == 0x30, "debug triangle");
+_Static_assert(offsetof(ZrwDbgTriangleData, flags) == 0x34, "debug triangle");
+_Static_assert(offsetof(ZrwDbgSphereData, radius) == 0x10, "debug sphere");
+_Static_assert(offsetof(ZrwDbgSphereData, color) == 0x14, "debug sphere");
+_Static_assert(offsetof(ZrwDbgSphereData, flags) == 0x18, "debug sphere");
+_Static_assert(offsetof(ZrwDbgBoxData, matrix) == 0x20, "debug box");
+_Static_assert(offsetof(ZrwDbgBoxData, color) == 0x60, "debug box");
+_Static_assert(offsetof(ZrwDbgBoxData, flags) == 0x64, "debug box");
+_Static_assert(offsetof(ZrwDbgItem, data) == 4, "debug item");
 _Static_assert(sizeof(ZrwDbgItem) == 0x6c, "debug item");
 
 /* Vertex of the immediate mode primitives (0x1c bytes). */

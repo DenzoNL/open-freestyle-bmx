@@ -384,6 +384,21 @@ static void testTimer(void)
 
 static const BmxDiAxisProps kGameStick = {-127, 127, 1000, 10000}; /* what pcinput.c sets on lX / lY */
 
+/*
+ * lX / lY pairs {raw HID value, DirectInput's value} from the user's BMX_INPUT_CHECK runs with a DualSense
+ * (USB), the game's range -127..127 and dead zone 10%. One logged pair, raw 146 -> 5, is left out: no integer
+ * raw value gives 5 under this mapping (145 -> 4, 146 -> 6) and it was logged while the stick moved 9 steps
+ * between two polls, so the two reads most likely saw different reports. The still-stick table of the next
+ * check run settles it.
+ */
+static const int32_t kDualSenseMeasured[][2] = {
+    {52, -70},  {54, -67},  {71, -49}, {73, -46}, {93, -24}, {94, -23}, {95, -22}, {99, -18},  {100, -17},
+    {101, -15}, {105, -11}, {108, -8}, {113, -2}, {114, -1}, {115, 0},  {116, 0},  {119, 0},   {121, 0},
+    {124, 0},   {129, 0},   {131, 0},  {132, 0},  {133, 0},  {134, 0},  {135, 0},  {136, 0},   {137, 0},
+    {138, 0},   {139, 0},   {141, 0},  {142, 1},  {143, 2},  {144, 3},  {145, 4},  {148, 8},   {153, 13},
+    {154, 14},  {158, 19},  {166, 28}, {176, 39}, {178, 41}, {179, 42}, {192, 57}, {235, 105}, {238, 108},
+};
+
 static void testDiArithmetic(void)
 {
     uint32_t seed = 12345;
@@ -416,13 +431,20 @@ static void testDiArithmetic(void)
               (int)previous);
         previous = v;
     }
-    /* 10% of the half (12.7 / 12.8 raw steps, MulDiv-rounded to 13) is dead; the next step is +-1 */
-    CHECK(bmxDiCookAxis(127 + 13, 255, &kGameStick) == 0 && bmxDiCookAxis(127 + 14, 255, &kGameStick) == 1,
-          "+ threshold: %d %d", (int)bmxDiCookAxis(140, 255, &kGameStick),
-          (int)bmxDiCookAxis(141, 255, &kGameStick));
-    CHECK(bmxDiCookAxis(127 - 13, 255, &kGameStick) == 0 && bmxDiCookAxis(127 - 14, 255, &kGameStick) == -1,
-          "- threshold: %d %d", (int)bmxDiCookAxis(114, 255, &kGameStick),
-          (int)bmxDiCookAxis(113, 255, &kGameStick));
+    /* The centre is 128; 10% of each half (12.7 / 12.8 raw steps, MulDiv-rounded to 13) is dead, the next
+     * step is +-1. DirectInput's values measured with the user's DualSense (BMX_INPUT_CHECK, 2026-10-31). */
+    CHECK(bmxDiCookAxis(141, 255, &kGameStick) == 0 && bmxDiCookAxis(142, 255, &kGameStick) == 1,
+          "+ threshold: %d %d", (int)bmxDiCookAxis(141, 255, &kGameStick),
+          (int)bmxDiCookAxis(142, 255, &kGameStick));
+    CHECK(bmxDiCookAxis(115, 255, &kGameStick) == 0 && bmxDiCookAxis(114, 255, &kGameStick) == -1,
+          "- threshold: %d %d", (int)bmxDiCookAxis(115, 255, &kGameStick),
+          (int)bmxDiCookAxis(114, 255, &kGameStick));
+    for (size_t i = 0; i < sizeof kDualSenseMeasured / sizeof kDualSenseMeasured[0]; i++) {
+        const int32_t v = bmxDiCookAxis(kDualSenseMeasured[i][0], 255, &kGameStick);
+
+        CHECK(v == kDualSenseMeasured[i][1], "raw %d: ours %d, DirectInput %d", (int)kDualSenseMeasured[i][0],
+              (int)v, (int)kDualSenseMeasured[i][1]);
+    }
     /* 16-bit (XInput pads): the same 10% */
     CHECK(bmxDiCookAxis(0, 65535, &kGameStick) == -127 && bmxDiCookAxis(65535, 65535, &kGameStick) == 127 &&
               bmxDiCookAxis(32767, 65535, &kGameStick) == 0,
@@ -795,6 +817,77 @@ static void testInputCheck(void)
     DestroyWindow(window);
 }
 
+/*
+ * Two exclusive device objects on the same pad, as the game creates them at a level load: both acquire
+ * (DI_OK, then S_FALSE when asked again) and both read, against the real dinput.dll under BMX_INPUT_CHECK.
+ * Background exclusive (9) instead of the game's foreground exclusive (5), so no focus is needed; exclusivity
+ * is the same.
+ */
+static void testTwoPads(void)
+{
+    static const BmxGuid kIidDevice7 = {
+        0x57d7c6bc, 0x2356, 0x11d3, {0x8e, 0x9d, 0, 0xc0, 0x4f, 0x68, 0x44, 0xae}};
+    const HWND window = CreateWindowExA(0, "STATIC", "bmxplatformtest", WS_OVERLAPPEDWINDOW, 0, 0, 64, 64,
+                                        NULL, NULL, GetModuleHandleA(NULL), NULL); /* never shown */
+    BmxDiDevice *pads[2] = {NULL, NULL};
+    BmxDi *di;
+    int created = 0;
+
+    _putenv("BMX_INPUT_CHECK=1");
+    gScripted = 0;
+    bmxInputReset();
+    di = createDi();
+    memset(&gGameJoystick, 0, sizeof gGameJoystick);
+    di->vtbl->enumDevices(di, 4, rememberJoystick, &gGameJoystick, 1);
+    for (int i = 0; i < 2; i++) {
+        if (di->vtbl->createDeviceEx(di, (const BmxGuid *)&gGameJoystick, &kIidDevice7, &pads[i], NULL) ==
+            0) {
+            BmxDiPropRange range = {{0x18, 0x10, 0, 1}, -127, 127};
+            BmxDiPropDword deadZone = {{0x14, 0x10, 0, 0}, 1000};
+
+            created++;
+            pads[i]->vtbl->setDataFormat(pads[i], (const BmxDiDataFormat *)&c_dfDIJoystick);
+            pads[i]->vtbl->setCooperativeLevel(pads[i], window, 9);
+            pads[i]->vtbl->setProperty(pads[i], kDiPropRange, &range.header);
+            range.header.obj = 4;
+            pads[i]->vtbl->setProperty(pads[i], kDiPropRange, &range.header);
+            pads[i]->vtbl->setProperty(pads[i], kDiPropDeadZone, &deadZone.header);
+        }
+    }
+    if (created == 2) {
+        for (int i = 0; i < 2; i++) {
+            CHECK(pads[i]->vtbl->acquire(pads[i]) == kDiOk, "pad object %d: first Acquire", i);
+        }
+        for (int i = 0; i < 2; i++) {
+            BmxDiJoyState joy;
+
+            CHECK(pads[i]->vtbl->acquire(pads[i]) == kDiNoEffect, "pad object %d: Acquire again", i);
+            pads[i]->vtbl->poll(pads[i]);
+            CHECK(pads[i]->vtbl->getDeviceState(pads[i], sizeof joy, &joy) == kDiOk, "pad object %d reads",
+                  i);
+            pads[i]->vtbl->poll(pads[i]);
+            CHECK(pads[i]->vtbl->getDeviceState(pads[i], sizeof joy, &joy) == kDiOk, "pad object %d reads",
+                  i);
+        }
+        for (int i = 0; i < 2; i++) {
+            pads[i]->vtbl->unacquire(pads[i]);
+            pads[i]->vtbl->release(pads[i]);
+        }
+        CHECK(bmxCheckDifferences() == 0, "two pads: %llu differences from the real DirectInput",
+              (unsigned long long)bmxCheckDifferences());
+        bmxCheckSummary();
+    } else {
+        printf("two pads test: no pad attached, skipped\n");
+        for (int i = 0; i < created; i++) {
+            pads[i]->vtbl->release(pads[i]);
+        }
+    }
+    di->vtbl->release(di);
+    _putenv("BMX_INPUT_CHECK=");
+    bmxInputReset();
+    DestroyWindow(window);
+}
+
 static void testConfig(void)
 {
     bmxConfigLoadText("# bmxnative.ini\n[input]\r\n  dpad_steering = 1 ; on\nnonsense\nunknown = 3\n",
@@ -883,6 +976,7 @@ int main(void)
     testKeyTable();
     testInputObjects();
     testInputCheck();
+    testTwoPads();
     testConfig();
     bmxPlatformShutdown();
     printf("%d checks, %d failures\n", checks, failures);

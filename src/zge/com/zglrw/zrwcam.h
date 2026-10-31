@@ -2,6 +2,7 @@
 #ifndef ZGE_COM_ZGLRW_ZRWCAM_H
 #define ZGE_COM_ZGLRW_ZRWCAM_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "compat/orig.h"
@@ -68,6 +69,17 @@ typedef struct ZrwCamera {
     float clipOffset;    /* 0xc4 distance between the far plane and the fog end */
 } ZrwCamera;
 
+_Static_assert(offsetof(ZrwCamera, state) == 0x08, "camera layout");
+_Static_assert(offsetof(ZrwCamera, rwCamera) == 0x0c, "camera layout");
+_Static_assert(offsetof(ZrwCamera, world) == 0x14, "camera layout");
+_Static_assert(offsetof(ZrwCamera, view) == 0x54, "camera layout");
+_Static_assert(offsetof(ZrwCamera, viewport) == 0x94, "camera layout");
+_Static_assert(offsetof(ZrwCamera, width) == 0xa4, "camera layout");
+_Static_assert(offsetof(ZrwCamera, nearClip) == 0xac, "camera layout");
+_Static_assert(offsetof(ZrwCamera, offsetX) == 0xb4, "camera layout");
+_Static_assert(offsetof(ZrwCamera, fov) == 0xbc, "camera layout");
+_Static_assert(offsetof(ZrwCamera, clearColor) == 0xc0, "camera layout");
+_Static_assert(offsetof(ZrwCamera, clipOffset) == 0xc4, "camera layout");
 _Static_assert(sizeof(ZrwCamera) == 0xc8, "camera layout");
 
 /* Creates a camera (flags bit 0: parallel projection, bit 1: no rasters); NULL on failure. */
