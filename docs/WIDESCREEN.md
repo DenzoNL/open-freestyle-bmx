@@ -1,6 +1,6 @@
 # Widescreen, native resolution and HUD layout (P6 enhancement)
 
-Status 2026-10-31: **WS1-WS5 implemented** (WS5 not committed; "Implementation status" at the end), WS6 open, the
+Status 2026-10-31: **WS1-WS6 implemented** (WS5 and WS6 not committed; "Implementation status" at the end), the
 default stays vanilla until the user's playtest (WS7, `native-run2\widetest.ps1`). The user took the
 recommendation (marked **rec**) for every decision W1..W11; for W9 the default stays vanilla (640x480 4:3) until a
 clean playtest, then decided with screenshots. Order: WS1-WS4 first. Scope: the native exe (`bmxnative.exe`, SDL3
@@ -286,12 +286,12 @@ the 2D install after rwD3DIm2DOpen), `raster.c` (`drvCameraCurrent`), `native/lo
 
 | Slice | State | Notes |
 |---|---|---|
-| WS1 | done | `[video]` keys `widescreen aspect fov_scale max_hfov hud menus movies scale_filter` (W9; `hud_aspect` came with WS5, `ui_filter` comes with WS6 and is still "unknown key"); `width = 0` / `height = 0` = the primary display's desktop size, full screen and windowed (`bmxVideoSize`); `scale_filter` 0 linear letterbox (unchanged), 1 nearest, 2 integer factor (linear letterbox when not even 1x fits) in `presentTarget` |
+| WS1 | done | `[video]` keys `widescreen aspect fov_scale max_hfov hud menus movies scale_filter` (W9; `hud_aspect` came with WS5, `ui_filter` with WS6); `width = 0` / `height = 0` = the primary display's desktop size, full screen and windowed (`bmxVideoSize`); `scale_filter` 0 linear letterbox (unchanged), 1 nearest, 2 integer factor (linear letterbox when not even 1x fits) in `presentTarget` |
 | WS2 | done | `wideSetFov` in the zgl slot 0x561d98 (data pointer, written by the loader when `widescreen = 1`; log `wide: 1 slot`, else `wide: 0 slots`): calls the original, reads the window it set, applies W2-A (hor+ above 4:3, vert+ below, identity at exactly 4:3), then `fov_scale` and the `max_hfov` cap; RwCameraSetViewWindow only when something changed. BMX_SIM_HASH (below) |
 | WS3 | done | `wideIm2DPrimitive` wraps the engine device's fpIm2DRenderPrimitive at the device start. Only while the screen camera is in its update (camera raster = gZrwScreenW x H, not 4:3); classifier W6-A: untextured and the x extent reaching both edges (within 2 virtual pixels) = cover, stays stretched; textured full width = backdrop, pillarboxed unless `menus = 1`; everything else centred 4:3 unless `hud = 2` (`hud = 1` acts as 0 until WS5). Moved primitives are copied, mapped and **clipped to the 4:3 area** (finding 2 below). Movies: DrawDibDraw's destination mapped the same way (`movies = 0`), the target stays black around it |
 | WS4 | done | runs below; one fix (the clip) |
 | WS5 | done | `hud = 1`, `hud_aspect` (below, "WS5: HUD edge anchoring") |
-| WS6 | open | |
+| WS6 | done | `ui_filter`, `menus = 2` (below, "WS6") |
 
 **Byte identity** (BMX_SHOT BMPs of the same BMX_KEYS run: ProQuest into Vail Trails, riding, pause, END RUN?,
 RUN FINISHED, view replay; frames 200..3200; build without the feature = 6e7f88a):
@@ -334,7 +334,7 @@ windowed, 5:4 1280x1024):
    unit tests only.
 
 **Open points:** the playtest (W10.6: all levels, replays, attract demo, cut-scenes with bars, the goal lists);
-WS6; the run-to-run variation above; `menus = 2` acts as 0 until WS6; `-r<w>.<h>.<depth>`
+the run-to-run variation above; `-r<w>.<h>.<depth>`
 still overrides `[video]` (and has the original's pick bug).
 
 ## WS5: HUD edge anchoring (2026-10-31, not committed)
@@ -419,3 +419,58 @@ in the centre; the "centred or which side" rule matches every element below.
 centred element by the unit tests and by its code (ovlCentreX 0x140). Not seen yet: hint lines with buttons, goal /
 status / flash messages, the icon sprite, physHudText, the balance meter. The playtest (W10.6) should look at them
 with `widetest.ps1 -Hud 1`. Default stays `hud = 0` (W9) until then.
+
+## WS6: ui_filter and the blurred menu fill (2026-10-31, not committed)
+
+**`[video] ui_filter`** (W7-A; 0 default): how the textured draws of the 2D funnel are sampled. 0 = the game's own
+(nearest for PSX quads, render flag 4). 1 = linear. 2 = sharp bilinear: nearest inside a texel and a linear ramp one
+output pixel wide at its edges (the pixel shader computes the pixels-per-texel from the screen space derivatives of
+the texel coordinate, so it needs no size from the CPU and works for glyphs, sprites and the 512 wide backdrops alike;
+a scale below 1 counts as 1). Only draws the game samples with nearest are changed (a draw the game already samples
+linearly stays); untextured draws and everything outside the funnel (3D, movies) are untouched. It is independent of
+`widescreen`: the funnel wrapper is also installed for `ui_filter != 0` (with `widescreen = 0` it only sets the
+sampling mode), and it applies at 4:3 too. At the exact 4:3 raster of the original (640x480) 1 and 2 are therefore not
+the vanilla bytes; only 0 is. The filter is in the camera raster, so BMX_SHOT frames show it (unlike `scale_filter`).
+
+**`scale_filter`:** no sharp variant: the design (W7) lists linear / nearest / integer only, and `ui_filter = 2` (applied
+at the raster) already gives the sharp look of the HUD on a scaled 640x480; a second shader for the present blit would
+mean replacing SDL_BlitGPUTexture with a pipeline for a case integer scaling covers. Not added.
+
+**`menus = 2`** (W5-C): a backdrop (textured, full width) is drawn twice: first the original vertices stretched over
+the whole screen with the blur mode (5 x 5 taps four texels apart on the linear sampler, triangular weights, darkened
+to 50 %), then, as with `menus = 0`, the 4:3 pillarboxed one on top. So the sides show the blurred, dimmed picture
+instead of black; no extra render pass or target. Loading and legal pictures (full-screen quads) get the same.
+Movies (`movies`) keep their black pillarbox. Covers (fades, dim rects) and the HUD are not affected.
+
+**Shaders.** `tl.hlsl` is compiled twice by tools/shaders.sh: `tl_ps` as before (the `UI` code is `#ifdef`ed out;
+its header is byte-identical to the committed one, so the 3D and default 2D shader is unchanged) and `ui_ps`
+(`-DUI`, DXIL + SPIR-V) used by the pipelines of draws with mode 2 or 3 (`PipelineKey.ui`). The fragment uniform
+`params.w` carries the mode, `fogColor.a` the blur's brightness. Mode 1 needs no shader: the sampler is linear.
+(A first attempt put the UI paths into `psMain` itself: the recompiled shader changed 658 scattered 3D pixels of a
+default frame, so the variant is separate.)
+
+**Code.** `drvDrawSetUiMode` (draw.c) is set around the next stage of the funnel by `drawNext` (wide.c);
+`drvWideBlurFill`, `drvWideSharpCoord` (the C twin of the shader's coordinate, for the unit tests) in widemath.c.
+
+**Verification** (3440x1440 borderless window, `widescreen = 1`, ProQuest into Vail Trails, frames 250 / 450 / 900 /
+1500 / 1710 = main menu, rider select, challenge screen with backdrop, riding, pause):
+- `bmxwidetest` 750 checks, 0 failures (new: the blur-fill rule, `drvWideSharpCoord`: identity at s = 1, flat at
+  the texel centre, the one-pixel ramp, continuity); `bmxmovietest` 0 failures.
+- Defaults vs the build before WS6: frames 250, 450, 900, 1710 byte-identical, frame 1500 (riding) differs in 658
+  scattered 3D pixels. Not the feature: the new build with the sampling code forced off (`mode = 0`) and with
+  `mode = uiMode` (a runtime 0) reproduces the old build's frame 1500 exactly, while the same code as shipped gives
+  the 658 pixel variant, deterministically over two runs. Identical default behaviour in all three, so this is the
+  known build-to-build variation of the 3D scene (the open point above), now seen as a difference between two builds
+  rather than between two runs. Open: finding its cause (probably uninitialised data in a 3D path).
+- Screenshots and crops: scratchpad `widescreen6\` (def, lin, sharp, blur; `crop_hud_timer.png`: the timer digits
+  nearest / linear / sharp at 5x; `crop_menu_text.png`: menu text). Linear blurs the 3 px per texel glyphs into
+  mush, sharp keeps the nearest crispness with smooth edges; the fill shows a dim, blurred backdrop at the sides.
+
+**Open (WS6).** `ui_filter` is not applied to the movies. The fill is stretched, so at 21:9 the picture is 2.3x
+wider than at 4:3 (blur hides it); a mirrored fill would continue the picture but is more code. MSL (Metal) is still
+not generated for any shader.
+
+Note (2026-10-31, merge of WS6): with defaults, the WS6 build's riding frame 1500 differed from the WS5
+build in 658 pixels, all on tree trunk and foliage edges, consistent per build. drvDrawSetUiMode(0) leaves
+sampler, shader and uniforms as before, so this is most likely wall-clock driven animation (frames depend
+slightly on each build's timing); HF0 (docs/HIGHFPS.md) measures the wall-clock dependencies to confirm.

@@ -202,6 +202,45 @@ static void testClassify(void)
         CHECK(drvWideMoves(&cfg, kDrvWideBackdrop) && !drvWideMoves(&cfg, kDrvWideOther));
         cfg.hud = 1; /* WS5 not yet: as 0 */
         CHECK(drvWideMoves(&cfg, kDrvWideOther));
+        /* WS6: the blurred fill goes behind backdrops only, and only with menus = 2 (the backdrop still
+         * moves). */
+        cfg.hud = 0;
+        CHECK(!drvWideBlurFill(&cfg, kDrvWideBackdrop));
+        cfg.menus = 1;
+        CHECK(!drvWideBlurFill(&cfg, kDrvWideBackdrop));
+        cfg.menus = 2;
+        CHECK(drvWideBlurFill(&cfg, kDrvWideBackdrop) && drvWideMoves(&cfg, kDrvWideBackdrop));
+        CHECK(!drvWideBlurFill(&cfg, kDrvWideOther) && !drvWideBlurFill(&cfg, kDrvWideCover));
+    }
+}
+
+static void testSharp(void)
+{
+    /* s = 1 is plain bilinear: the coordinate is unchanged. */
+    for (int i = 0; i < 32; i++) {
+        const float t = (float)i * 0.125f;
+
+        CHECK(fabsf(drvWideSharpCoord(t, 1.0f) - t) < 1e-6f);
+        CHECK(fabsf(drvWideSharpCoord(t, 0.25f) - t) < 1e-6f); /* below 1 counts as 1 */
+    }
+    /* s = 3: the centre of the texel is flat (nearest), the ramp is one output pixel (1/3 texel) wide at the
+     * edges, and the coordinate is continuous and monotonic across texel borders. */
+    CHECK(fabsf(drvWideSharpCoord(2.5f, 3.0f) - 2.5f) < 1e-6f);
+    CHECK(fabsf(drvWideSharpCoord(2.2f, 3.0f) - 2.0f) <
+          1e-6f); /* the texel's left half holds the left texel's centre */
+    CHECK(fabsf(drvWideSharpCoord(2.8f, 3.0f) - 3.0f) < 1e-6f);
+    CHECK(fabsf(drvWideSharpCoord(3.0f, 3.0f) - 3.0f) <
+          1e-6f); /* on the border: halfway between two centres */
+    {
+        float prev = drvWideSharpCoord(0.0f, 3.0f);
+
+        for (int i = 1; i < 500; i++) {
+            const float t = (float)i * 0.01f;
+            const float c = drvWideSharpCoord(t, 3.0f);
+
+            CHECK(c >= prev - 1e-6f && c - prev < 0.04f); /* no jumps (slope s at most) */
+            prev = c;
+        }
     }
 }
 
@@ -589,6 +628,7 @@ int main(void)
     testMap();
     testClip();
     testPresent();
+    testSharp();
     printf("bmxwidetest: %d checks, %d failures\n", gChecks, gFailures);
     return gFailures != 0;
 }

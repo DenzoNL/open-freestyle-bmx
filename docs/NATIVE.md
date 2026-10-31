@@ -83,7 +83,7 @@ original's pick bug: only the height and depth are compared and the last match w
 from `bmxnative.ini` (`[video] width`, `height`, `depth`, `fullscreen`; exact match), by default 640x480x16 full
 screen, which is what Enter in the original dialog gave. `[video] fullscreen = 0` gives a window of width x height
 (the game renders at that size); `width = 0` / `height = 0` mean the desktop size. The widescreen options
-(`[video] widescreen`, `aspect`, `fov_scale`, `max_hfov`, `hud`, `hud_aspect`, `menus`, `movies`, `scale_filter`;
+(`[video] widescreen`, `aspect`, `fov_scale`, `max_hfov`, `hud`, `hud_aspect`, `menus`, `movies`, `scale_filter`, `ui_filter`;
 all off by default) are in docs/WIDESCREEN.md "Implementation status" and PLATFORM.md P19. `hud = 1` (edge-anchored
 HUD, WS5) makes the loader write one more jump over a ported entry, like smooth_resample: the ported `ngifDrawList`
 to its copy `wideDrawList` (driver/wide.c, `drvWideJumps`; log `wide: 1 hud jumps`). `[ui] confirm_quit` (default 0, the user's call, PLAN.md Decisions): the main

@@ -24,9 +24,11 @@ typedef struct DrvWideConfig {
     int maxHfov;     /* max_hfov: cap of the horizontal field of view in degrees (0 = none) */
     int hud;         /* 0 centred 4:3, 1 edge anchored (WS5), 2 stretch */
     int hudAspect;   /* hud_aspect: width of the anchored HUD as aspect * 100 (0 = the full width) */
-    int menus;       /* 0 pillarbox, 1 stretch (2: blurred fill, WS6, not yet: as 0) */
+    int menus;       /* 0 pillarbox, 1 stretch, 2 pillarbox on a blurred, darkened fill (WS6) */
     int movies;      /* 0 pillarbox, 1 stretch */
     int scaleFilter; /* scale_filter: 0 linear, 1 nearest, 2 integer (present, independent of widescreen) */
+    int uiFilter;    /* ui_filter: 0 the game's sampling, 1 linear, 2 sharp bilinear (WS6; independent of
+                        widescreen) */
 } DrvWideConfig;
 
 /* The configuration from bmxnative.ini (read once). */
@@ -167,6 +169,18 @@ void drvWideMapRect(int32_t rect[4], int32_t w, int32_t h);
  * whole factor that fits, nearest, black border (linear letterbox when even 1x does not fit).
  */
 int drvWidePresentRect(int filter, int32_t width, int32_t height, uint32_t w, uint32_t h, uint32_t out[4]);
+
+/* Whether a primitive of that class gets the blurred fill drawn stretched behind it (menus = 2: backdrops).
+ */
+int drvWideBlurFill(const DrvWideConfig *cfg, int cls);
+
+/*
+ * The sharp-bilinear sampling coordinate (WS6, the C twin of sharpUv in shaders/tl.hlsl): for the texel
+ * coordinate `t` (texture coordinate * size) of a texture shown with `s` output pixels per texel, the
+ * coordinate a linear sampler is given: nearest inside a texel, a linear ramp one output pixel wide at its
+ * edges. s below 1 counts as 1 (plain bilinear).
+ */
+float drvWideSharpCoord(float t, float s);
 
 /* ---- wide.c: the seams ---- */
 

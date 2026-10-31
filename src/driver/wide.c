@@ -46,6 +46,11 @@ const DrvWideConfig *drvWideConfig(void)
         cfg.menus = bmxConfigInt("video.menus", 0);
         cfg.movies = bmxConfigInt("video.movies", 0);
         cfg.scaleFilter = bmxConfigInt("video.scale_filter", 0);
+        cfg.uiFilter = bmxConfigInt("video.ui_filter", 0);
+        if (cfg.uiFilter < 0 || cfg.uiFilter > 2) {
+            bmxLog("wide: ui_filter %d out of range (0..2), using 0\n", cfg.uiFilter);
+            cfg.uiFilter = 0;
+        }
         if (cfg.hudAspect < 0) {
             bmxLog("wide: hud_aspect %d out of range (0, or the aspect * 100), using 178\n", cfg.hudAspect);
             cfg.hudAspect = 178;
@@ -131,13 +136,25 @@ static int grow(int32_t need)
     return 1;
 }
 
+/* The next stage of the funnel; the textured draws it batches are sampled by `ui` (ui_filter, W7). */
+static int drawNext(int32_t type, void *vertices, int32_t numVertices, int ui)
+{
+    int result;
+
+    drvDrawSetUiMode(ui);
+    result = gIm2DNext(type, vertices, numVertices);
+    drvDrawSetUiMode(0);
+    return result;
+}
+
 static int BMX_CDECL wideIm2DPrimitive(int32_t type, void *vertices, int32_t numVertices)
 {
     const RwCamera *const camera = drvCameraCurrent();
+    const DrvWideConfig *const cfg = drvWideConfig();
     const DrvWideVertex *draw;
     int32_t w, h, n;
     float lo, hi;
-    int axis;
+    int axis, cls, ui;
 
     if (camera == NULL || numVertices <= 0 || vertices == NULL) {
         return gIm2DNext(type, vertices, numVertices);
@@ -145,14 +162,22 @@ static int BMX_CDECL wideIm2DPrimitive(int32_t type, void *vertices, int32_t num
     /* Only the game's screen camera (not a render-to-texture raster such as the roller's shadow). */
     w = camera->frameBuffer->width;
     h = camera->frameBuffer->height;
-    if (w != (int32_t)gZrwScreenW || h != (int32_t)gZrwScreenH || drvWideIs43(w, h)) {
+    if (w != (int32_t)gZrwScreenW || h != (int32_t)gZrwScreenH) {
         return gIm2DNext(type, vertices, numVertices);
     }
-    if (!drvWideMoves(drvWideConfig(),
-                      drvWideClassify(&((const RwD3DTLVertex *)vertices)->sx, sizeof(RwD3DTLVertex),
-                                      numVertices, rwD3DState.textureRaster != NULL, w, h)) ||
-        !grow(numVertices + 2)) {
-        return gIm2DNext(type, vertices, numVertices);
+    ui = cfg->uiFilter;
+    if (!cfg->enabled || drvWideIs43(w, h)) {
+        return drawNext(type, vertices, numVertices, ui);
+    }
+    cls = drvWideClassify(&((const RwD3DTLVertex *)vertices)->sx, sizeof(RwD3DTLVertex), numVertices,
+                          rwD3DState.textureRaster != NULL, w, h);
+    if (!drvWideMoves(cfg, cls) || !grow(numVertices + 2)) {
+        return drawNext(type, vertices, numVertices, ui);
+    }
+    if (drvWideBlurFill(cfg, cls)) {
+        /* menus = 2: the backdrop stretched over the whole screen, blurred and darkened, under the 4:3 one.
+         */
+        drawNext(type, vertices, numVertices, 3);
     }
     SDL_memcpy(gCopy, vertices, (size_t)numVertices * sizeof *gCopy);
     /* What lay beyond the 4:3 screen's edge stays hidden (the pillarbox, or the 3D around a centred HUD); an
@@ -178,20 +203,20 @@ static int BMX_CDECL wideIm2DPrimitive(int32_t type, void *vertices, int32_t num
             return 1; /* nothing left on screen */
         }
     }
-    return gIm2DNext(type, (void *)draw, n);
+    return drawNext(type, (void *)draw, n, ui);
 }
 
 void drvWideInstall2D(void)
 {
     RwDevice *const device = rwD3DEngineDevice;
 
-    if (!drvWideConfig()->enabled || device == NULL ||
+    if ((!drvWideConfig()->enabled && drvWideConfig()->uiFilter == 0) || device == NULL ||
         device->fpIm2DRenderPrimitive == (RwIm2DRenderPrimitiveFunc)wideIm2DPrimitive) {
         return;
     }
     gIm2DNext = device->fpIm2DRenderPrimitive;
     device->fpIm2DRenderPrimitive = (RwIm2DRenderPrimitiveFunc)wideIm2DPrimitive;
-    bmxLog("wide: Im2D funnel wrapped (fpIm2DRenderPrimitive)\n");
+    bmxLog("wide: Im2D funnel wrapped (fpIm2DRenderPrimitive); ui_filter %d\n", drvWideConfig()->uiFilter);
 }
 
 /* ---- HUD anchoring: the ngifDrawList copy ---- */

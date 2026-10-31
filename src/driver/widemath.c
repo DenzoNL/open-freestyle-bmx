@@ -535,3 +535,18 @@ int drvWideMapHud(float *xy, size_t stride, int32_t n, int32_t w, int32_t h, int
     *hi = (float)(off + inner);
     return 0;
 }
+
+int drvWideBlurFill(const DrvWideConfig *cfg, int cls)
+{
+    return cls == kDrvWideBackdrop && cfg->menus == 2;
+}
+
+float drvWideSharpCoord(float t, float s)
+{
+    const float centre = floorf(t) + 0.5f;
+    float x;
+
+    s = s < 1.0f ? 1.0f : s;
+    x = (t - centre) * s;
+    return centre + (x < -0.5f ? -0.5f : x > 0.5f ? 0.5f : x);
+}

@@ -50,9 +50,10 @@ static const char *const kKnownKeys[] = {
     "video.max_hfov",     /* cap of the horizontal field of view in degrees (0: none) */
     "video.hud",          /* 0 centred 4:3 (default), 1 edge anchored (WS5), 2 stretch */
     "video.hud_aspect",   /* width of the anchored HUD: aspect * 100 (default 178, 16:9); 0 = full width */
-    "video.menus",        /* 0 pillarbox (default), 1 stretch */
+    "video.menus",        /* 0 pillarbox (default), 1 stretch, 2 pillarbox on a blurred fill */
     "video.movies",       /* 0 pillarbox (default), 1 stretch */
     "video.scale_filter", /* present: 0 linear (default), 1 nearest, 2 integer scale */
+    "video.ui_filter",    /* 2D / HUD textures: 0 the game's nearest (default), 1 linear, 2 sharp bilinear */
 };
 
 static int known(const char *key)

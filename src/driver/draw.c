@@ -19,6 +19,7 @@
 
 #include "driver/shaders/tl_ps.h"
 #include "driver/shaders/tl_vs.h"
+#include "driver/shaders/ui_ps.h"
 
 /* D3DRENDERSTATETYPE / D3DTEXTURESTAGESTATETYPE values the backend reads. */
 enum {
@@ -47,6 +48,7 @@ enum {
 static uint32_t rs[kNumRs];
 static uint32_t tss[kNumTss];
 static RwRaster *boundTexture;
+static int uiMode; /* drvDrawSetUiMode */
 
 /* What a draw needs besides its vertices (compared by value to reuse pipelines and samplers). */
 typedef struct PipelineKey {
@@ -54,7 +56,8 @@ typedef struct PipelineKey {
     uint8_t blend, src, dst;
     uint8_t zTest, zWrite, zFunc, cull;
     uint8_t depth; /* the target has a z buffer */
-    uint8_t pad[3];
+    uint8_t ui;    /* the UI pixel shader (sharp bilinear, blurred fill) */
+    uint8_t pad[2];
 } PipelineKey;
 
 typedef struct PsUniforms {
@@ -73,7 +76,7 @@ typedef struct DrawCmd {
 } DrawCmd;
 
 static struct {
-    SDL_GPUShader *vs, *ps;
+    SDL_GPUShader *vs, *ps, *psUi;
     struct {
         PipelineKey key;
         SDL_GPUGraphicsPipeline *pipeline;
@@ -304,7 +307,7 @@ static SDL_GPUGraphicsPipeline *pipelineFor(const PipelineKey *key)
     attributes[2] = (SDL_GPUVertexAttribute){2, 0, SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4_NORM, 0x14};
     attributes[3] = (SDL_GPUVertexAttribute){3, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2, 0x18};
     info.vertex_shader = draw.vs;
-    info.fragment_shader = draw.ps;
+    info.fragment_shader = key->ui ? draw.psUi : draw.ps;
     info.vertex_input_state.vertex_buffer_descriptions = &buffer;
     info.vertex_input_state.num_vertex_buffers = 1;
     info.vertex_input_state.vertex_attributes = attributes;
@@ -349,9 +352,9 @@ static SDL_GPUGraphicsPipeline *pipelineFor(const PipelineKey *key)
 }
 
 /* Stage 0's sampler: D3DTFG_LINEAR (2) magnification filters, D3DTADDRESS_WRAP/MIRROR/CLAMP/BORDER (1..4). */
-static SDL_GPUSampler *samplerFor(void)
+static SDL_GPUSampler *samplerFor(int forceLinear)
 {
-    const int linear = tss[kTssMagFilter] == 2 || tss[kTssMinFilter] == 2;
+    const int linear = forceLinear || tss[kTssMagFilter] == 2 || tss[kTssMinFilter] == 2;
     const uint32_t address = tss[kTssAddress] >= 1 && tss[kTssAddress] <= 4 ? tss[kTssAddress] - 1 : 0;
     SDL_GPUSampler **slot = &draw.samplers[linear][address];
 
@@ -381,6 +384,7 @@ static void appendDraw(uint32_t type, const RwD3DTLVertex *vertices, uint32_t nu
     const uint32_t n = indices != NULL ? numIndices : numVertices;
     PipelineKey key;
     DrawCmd *cmd;
+    int mode;
 
     if (draw.color == NULL || n == 0 || numVertices == 0 || numVertices > 0x10000) {
         return;
@@ -436,12 +440,22 @@ static void appendDraw(uint32_t type, const RwD3DTLVertex *vertices, uint32_t nu
     key.zFunc = (uint8_t)rs[kRsZFunc];
     key.cull = (uint8_t)rs[kRsCullMode];
     key.depth = draw.depth != NULL;
+    /* The 2D funnel's sampling (drvDrawSetUiMode): the game's nearest sampling becomes linear (1) or sharp
+     * bilinear (2); the blurred fill (3) always. Draws the game already samples linearly are left alone. */
+    {
+        const int nearest = tss[kTssMagFilter] != 2 && tss[kTssMinFilter] != 2;
+
+        mode = boundTexture == NULL ? 0 : uiMode == 3 ? 3 : nearest ? uiMode : 0;
+    }
+    key.ui = mode == 2 || mode == 3;
     draw.draws = grow(draw.draws, &draw.capDraws, draw.numDraws + 1, sizeof *draw.draws);
     cmd = &draw.draws[draw.numDraws++];
     memset(cmd, 0, sizeof *cmd);
     cmd->pipeline = pipelineFor(&key);
     cmd->texture = boundTexture;
-    cmd->sampler = samplerFor();
+    cmd->sampler = samplerFor(mode != 0);
+    cmd->ps.params[3] = key.ui ? (float)mode : 0.0f;
+    cmd->ps.fogColor[3] = mode == 3 ? 0.5f : 1.0f;
     cmd->ps.ops[0] = (int32_t)tss[kTssColorOp];
     cmd->ps.ops[1] = (int32_t)tss[kTssAlphaOp];
     cmd->ps.ops[2] = boundTexture != NULL;
@@ -452,7 +466,6 @@ static void appendDraw(uint32_t type, const RwD3DTLVertex *vertices, uint32_t nu
     cmd->ps.fogColor[0] = (float)(rs[kRsFogColor] >> 16 & 0xff) / 255.0f;
     cmd->ps.fogColor[1] = (float)(rs[kRsFogColor] >> 8 & 0xff) / 255.0f;
     cmd->ps.fogColor[2] = (float)(rs[kRsFogColor] & 0xff) / 255.0f;
-    cmd->ps.fogColor[3] = 1.0f;
     cmd->firstIndex = first;
     cmd->numIndices = draw.numIndices - first;
     cmd->vertexOffset = (int32_t)draw.numVertices;
@@ -600,6 +613,13 @@ void drvDrawSetTarget(struct SDL_GPUTexture *color, struct SDL_GPUTexture *depth
     draw.scissor = (SDL_Rect){x, y, w, h};
 }
 
+/* How the 2D funnel's textured draws that follow are sampled (src/driver/wide.c): 0 as the game set it, 1
+ * linear, 2 sharp bilinear, 3 the blurred, darkened fill behind a pillarboxed backdrop. */
+void drvDrawSetUiMode(int mode)
+{
+    uiMode = mode;
+}
+
 /* A texture's CPU copy changed: draws already batched must see the old pixels, so flush them first. */
 void drvDrawTextureChanged(RwRaster *raster)
 {
@@ -656,7 +676,10 @@ int drvDrawStart(void)
     info.num_samplers = 1;
     info.num_uniform_buffers = 1;
     draw.ps = SDL_CreateGPUShader(device, &info);
-    if (draw.vs == NULL || draw.ps == NULL) {
+    info.code = dxil ? ui_ps_dxil : ui_ps_spirv;
+    info.code_size = dxil ? sizeof ui_ps_dxil : sizeof ui_ps_spirv;
+    draw.psUi = SDL_CreateGPUShader(device, &info);
+    if (draw.vs == NULL || draw.ps == NULL || draw.psUi == NULL) {
         bmxLog("driver: SDL_CreateGPUShader failed: %s\n", SDL_GetError());
         return 0;
     }
@@ -689,6 +712,7 @@ void drvDrawStop(void)
     }
     SDL_ReleaseGPUShader(device, draw.vs);
     SDL_ReleaseGPUShader(device, draw.ps);
+    SDL_ReleaseGPUShader(device, draw.psUi);
     SDL_ReleaseGPUTexture(device, draw.white);
     SDL_ReleaseGPUBuffer(device, draw.vertexBuffer);
     SDL_ReleaseGPUBuffer(device, draw.indexBuffer);

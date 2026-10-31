@@ -44,17 +44,71 @@ VSOutput vsMain(VSInput input)
 cbuffer PSUniforms : register(b0, space3)
 {
     int4 ops;        // colour op, alpha op (D3DTOP: 2 arg1 = texture, 3 arg2 = diffuse, 4 modulate), texture, alpha func
-    float4 params;   // alpha ref (0..1), fog on, specular on, unused
-    float4 fogColor;
+    float4 params;   // alpha ref (0..1), fog on, specular on, sampling mode (0 as bound, 2 sharp, 3 blur)
+    float4 fogColor; // alpha: brightness of the blur mode
 };
+
+// The UI variant (compiled with -DUI, used for the 2D funnel's draws when ui_filter or menus = 2 asks for it; the
+// plain psMain stays as it was, so default frames are byte identical).
+#ifdef UI
+// Sharp-bilinear (docs/WIDESCREEN.md W7): nearest inside a texel, linear over one output pixel at its edges.
+// The sampler is linear; s = output pixels per texel (at least 1) comes from the screen space derivatives.
+float2 sharpUv(float2 uv)
+{
+    uint tw, th;
+    tex.GetDimensions(tw, th);
+    float2 size = float2(tw, th);
+    float2 t = uv * size;
+    float2 dx = abs(ddx(t)), dy = abs(ddy(t));
+    float2 s = 1.0 / max(max(dx, dy), 1.0e-4);
+    s = max(s, 1.0);
+    float2 centre = floor(t) + 0.5;
+    return (centre + clamp((t - centre) * s, -0.5, 0.5)) / size;
+}
+
+// The fill behind a pillarboxed backdrop (menus = 2): 5 x 5 taps four texels apart on the linear sampler.
+float4 blurTexel(float2 uv)
+{
+    uint tw, th;
+    tex.GetDimensions(tw, th);
+    float2 step = 4.0 / float2(tw, th);
+    float4 sum = float4(0.0, 0.0, 0.0, 0.0);
+    float total = 0.0;
+    [unroll] for (int j = -2; j <= 2; j++)
+    {
+        [unroll] for (int i = -2; i <= 2; i++)
+        {
+            float w = (3.0 - abs(i)) * (3.0 - abs(j));
+            sum += w * tex.SampleLevel(smp, uv + float2(i, j) * step, 0);
+            total += w;
+        }
+    }
+    return sum / total;
+}
+#endif
 
 float4 psMain(VSOutput input) : SV_Target0
 {
     float4 diffuse = input.color;
+#ifdef UI
+    float2 uv = params.w == 2.0 ? sharpUv(input.uv) : input.uv;
+    float4 texel = float4(1.0, 1.0, 1.0, 1.0);
+    if (ops.z != 0)
+    {
+        texel = params.w == 3.0 ? blurTexel(uv) : tex.Sample(smp, uv);
+    }
+#else
     float4 texel = ops.z != 0 ? tex.Sample(smp, input.uv) : float4(1.0, 1.0, 1.0, 1.0);
+#endif
     float4 result;
     result.rgb = ops.x == 2 ? texel.rgb : ops.x == 3 ? diffuse.rgb : texel.rgb * diffuse.rgb;
     result.a = ops.y == 2 ? texel.a : ops.y == 3 ? diffuse.a : texel.a * diffuse.a;
+#ifdef UI
+    if (params.w == 3.0)
+    {
+        result.rgb *= fogColor.a;
+    }
+#endif
     if (params.z != 0.0)
     {
         result.rgb = saturate(result.rgb + input.specular.rgb);
