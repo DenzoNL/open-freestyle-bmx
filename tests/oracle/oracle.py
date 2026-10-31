@@ -468,6 +468,39 @@ def default_game_root(exe):
     return d.parent if d.name.lower() == "program_files" else d
 
 
+def times_path(dll):
+    """Per-case durations of the last parallel run, kept next to the test DLL (build dir, not in git)."""
+    return Path(dll).with_name("oracle-times.tsv")
+
+
+def load_times(dll):
+    try:
+        lines = times_path(dll).read_text().splitlines()
+    except OSError:
+        return {}
+    times = {}
+    for line in lines:
+        secs, _, name = line.partition("\t")
+        try:
+            times[name] = float(secs)
+        except ValueError:
+            pass
+    return times
+
+
+def balance(cases, count, times):
+    """Deals the cases to `count` workers, longest first, each to the least loaded worker (cases without a
+    recorded time count as 1 s). Every worker computes the same split from the same file."""
+    bins = [[] for _ in range(count)]
+    loads = [0.0] * count
+    order = sorted(range(len(cases)), key=lambda i: -times.get(cases[i].name, 1.0))
+    for i in order:
+        w = loads.index(min(loads))
+        bins[w].append(i)
+        loads[w] += times.get(cases[i].name, 1.0)
+    return [[cases[i] for i in sorted(b)] for b in bins]
+
+
 def run(exe, dll, only=None, iters_override=None, verbose=False, game_root=None, timing=False, shard=None):
     digest = hashlib.sha256(open(exe, "rb").read()).hexdigest()
     m = Machine(exe, dll, game_root or os.environ.get("BMX_GAME_DIR") or default_game_root(exe))
@@ -483,7 +516,7 @@ def run(exe, dll, only=None, iters_override=None, verbose=False, game_root=None,
     selected = [c for c in cases if not only or any(o in c.name for o in only)]
     if shard is not None:
         index, count = shard
-        selected = selected[index::count]
+        selected = balance(selected, count, load_times(dll))[index]
     for case in selected:
         if case.flags & F_NEEDS_ASSETS and not have_assets:
             skipped += 1
@@ -588,6 +621,7 @@ def run_parallel(a, jobs):
         base += ["-n", str(a.n)]
     if a.v:
         base.append("-v")
+    started = time.perf_counter()
     procs = [subprocess.Popen(base + ["--shard", f"{i}/{jobs}"], stdout=subprocess.PIPE, text=True) for i in range(jobs)]
     failed = skipped = total = 0
     digest = ""
@@ -607,12 +641,20 @@ def run_parallel(a, jobs):
             else:
                 print(line)
         ok = ok and p.returncode == 0
+    if not a.n:  # times with the cases' own iteration counts only
+        times = load_times(a.dll)
+        times.update((name, secs) for secs, name, _ in durations)
+        try:
+            times_path(a.dll).write_text("".join(f"{secs:.3f}\t{name}\n" for name, secs in sorted(times.items())))
+        except OSError:
+            pass
     if a.timing:
         for secs, name, iters in sorted(durations, reverse=True)[:25]:
             print(f"{secs:8.2f}s  {iters:5} iters  {1000 * secs / iters:7.2f} ms/iter  {name}")
     total -= skipped
     extra = f", {skipped} skipped without game assets" if skipped else ""
-    print(f"{total - failed}/{total} cases passed{extra} (exe sha256 {digest[:12]}, {jobs} workers)")
+    wall = time.perf_counter() - started
+    print(f"{total - failed}/{total} cases passed{extra} (exe sha256 {digest[:12]}, {jobs} workers, {wall:.0f} s)")
     return ok and failed == 0
 
 

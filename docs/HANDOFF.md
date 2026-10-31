@@ -55,6 +55,8 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   exit) and Cool Stuff's intro movie and credits with movies on also run without a trap. Two-player modes do not
   exist in the PC version (player count only ever 0 or 1). Native runs go from a copy of the game folder
   (`C:\Users\Dennis\Games\dmfbmx\native-run`, no dinput.dll) so the user can play the hooked game meanwhile.
+- Platform layer ("Windows first": DirectInput/DirectSound/winmm/VfW/USER32 -> SDL3 at the import slots): proposal
+  with decisions P1..P19 and slices S1..S12 in docs/PLATFORM.md, **awaiting the user's choices**, nothing implemented.
 - Golden traces: record sessions with `bmxtrace.orig` (docs/TRACING.md) if not done yet.
 
 ## Machine setup

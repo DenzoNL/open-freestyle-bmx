@@ -46,7 +46,7 @@ __declspec(dllimport) BOOL __stdcall VirtualProtect(void *addr, size_t size, DWO
 enum {
     kTraceVersion = 2,
     kTagTime = 'T',      /* timeGetTime on the game thread */
-    kTagTimeOther = 't', /* timeGetTime on another thread (sound): not replayable, kept for reference */
+    kTagTimeOther = 't', /* timeGetTime on another thread: only in traces from before 2026-10-31 */
     kTagFrame = 'F',
     kRiders = 4,
     kFlushEvery = 60, /* frames: at most ~1 s of trace is lost if the game crashes */
@@ -113,13 +113,14 @@ static uint32_t __stdcall traceTime(void)
     const uint32_t t = gRealTime();
     const DWORD thread = GetCurrentThreadId();
 
-    /* Once gameplay polls start, other threads' reads are dropped: the sound thread spins on
-     * timeGetTime (~280M reads, 1.4 GB per minute on Windows 11) and they can't be replayed anyway. */
-    if (gGameThread != 0 && thread != gGameThread) {
+    /* Only the polling thread's reads are kept, from the first poll on: before it the thread that loaded the
+     * DLL spins on timeGetTime (~280M reads, 1.4 GB per minute on Windows 11), and other threads' reads can't
+     * be replayed anyway. */
+    if (thread != gGameThread) {
         return t;
     }
     lock();
-    put8(thread == gGameThread ? kTagTime : kTagTimeOther);
+    put8(kTagTime);
     put32(t);
     unlock();
     return t;

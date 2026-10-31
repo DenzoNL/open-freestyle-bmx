@@ -5,12 +5,12 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root"
 mapfile -t sources < <(git ls-files -co --exclude-standard 'src/*.c' 'src/*.h' 'tests/cases/*.c' 'tests/cases/*.h')
-echo "== clang-format"
+echo "== clang-format (${SECONDS} s)"
 clang-format --dry-run -Werror "${sources[@]}"
-echo "== build (hook preset)"
+echo "== build (hook preset) (${SECONDS} s)"
 cmake --preset hook >/dev/null
 cmake --build --preset hook
-echo "== clang-tidy"
+echo "== clang-tidy (${SECONDS} s)"
 # src/native, src/driver and src/png are only built by the native32 preset (hosted mingw, SDL3), not in build/hook's
 # compile database; tidy them with -p build/native32 (docs/NATIVE.md).
 mapfile -t units < <(git ls-files -co --exclude-standard 'src/*.c' 'tests/cases/*.c' ':!src/native/*' ':!src/driver/*' ':!src/png/*')
@@ -22,10 +22,10 @@ if [[ -n ${OPENDMFBMX_CROSS_CLANG:-} && -x $(dirname "$OPENDMFBMX_CROSS_CLANG")/
         "--extra-arg=-resource-dir=$("$OPENDMFBMX_CROSS_CLANG" -print-resource-dir)")
 fi
 "${tidy[@]}" --quiet -p build/hook "${units[@]}"
-echo "== functions.csv"
+echo "== functions.csv (${SECONDS} s)"
 "${PYTHON:-python3}" -I tools/progress.py --check >/dev/null
 "${PYTHON:-python3}" -I -m py_compile tools/*.py tests/oracle/*.py
-echo "== differential tests"
+echo "== differential tests (${SECONDS} s)"
 if [[ -e ${BMX_EXE:-work/NgBMX.exe} ]]; then
     tests/oracle/run.sh ${BMX_JOBS:+-j "$BMX_JOBS"} # BMX_JOBS: fewer workers when the PC is in use
 else

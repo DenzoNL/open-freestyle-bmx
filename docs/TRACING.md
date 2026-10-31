@@ -35,7 +35,9 @@ Keep traces in `work/traces/` (gitignored). They contain no game assets, but the
 
 - Only `contrlerPoll` input is recorded. Keyboard input to the menus goes through other paths and isn't
   captured yet.
-- `timeGetTime` calls from other threads (sound) can't be replayed. Before the first controller poll they are kept, tagged `t`; after it they are dropped (the sound thread spins on it: 1.4 GB per minute otherwise).
+- Only the polling thread's `timeGetTime` calls from the first controller poll on are recorded. Before it a thread
+  spins on it (1.4 GB per minute otherwise); other threads' calls can't be replayed. Traces recorded before
+  2026-10-31 kept the earlier calls, tagged `t`; the dumper still reads them.
 - Rider checkpoints cover state, surface, state levels, flags, timer, position, velocity, forward, up,
   rotation and spin for all four rider slots; the camera checkpoint is eye and look-at of the selected
   camera.
