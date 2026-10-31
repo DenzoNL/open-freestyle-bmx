@@ -172,6 +172,8 @@ int main(int argc, char **argv)
     }
     bmxWindowShow(gHwnd); /* ShowWindow + UpdateWindow (WM_PAINT goes to DefWindowProc) */
     if (initApp(cmd)) {
+        const int guard = bmxHfGuardInstall(); /* BMX_HF_GUARD: measures the draws (dev aid) */
+
         while (!gQuit) {
             int idle = 0;
 
@@ -198,7 +200,11 @@ int main(int argc, char **argv)
                     idle = 1;
                 }
             }
-            if (idle) {
+            if (idle && guard != 0) {
+                if (!bmxHfGuardFrame()) {
+                    break;
+                }
+            } else if (idle) {
                 if (!onIdle()) {
                     break;
                 }

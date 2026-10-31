@@ -38,6 +38,16 @@ int bmxKeysInstall(void);
 /* BMX_SIM_HASH=<file> (src/native/simhash.c): a per-tick hash of the simulation state, one line per
  * controller poll (docs/WIDESCREEN.md W10.5). */
 void bmxSimHashInstall(void);
+/* The hash BMX_SIM_HASH writes per tick, of the current state (also used by BMX_HF_GUARD). */
+uint64_t bmxSimStateHash(void);
+
+/*
+ * BMX_HF_GUARD=1|2|3 (src/native/hfguard.c, docs/HIGHFPS.md "HF0 findings"): measures what each draw changes
+ * and how the loop paces. bmxHfGuardInstall returns the level (0: off); main.c then calls bmxHfGuardFrame
+ * for every tick instead of onIdle + zrwDrawFrame (returns 0 when onIdle ends the program).
+ */
+int bmxHfGuardInstall(void);
+int bmxHfGuardFrame(void);
 
 /* Install the vectored exception handler that reports int3 traps. */
 void bmxTrapInstall(void);

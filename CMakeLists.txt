@@ -47,6 +47,8 @@ if(BMX_NATIVE32)
   set_source_files_properties(src/platform/musicgame.c PROPERTIES COMPILE_DEFINITIONS BMX_HOOK=1)
   # BMX_SIM_HASH (docs/WIDESCREEN.md W10.5) reads the rider and camera state at their original addresses too.
   set_source_files_properties(src/native/simhash.c PROPERTIES COMPILE_DEFINITIONS BMX_HOOK=1)
+  # BMX_HF_GUARD (docs/HIGHFPS.md HF0) hashes the game's render and simulation state the same way.
+  set_source_files_properties(src/native/hfguard.c PROPERTIES COMPILE_DEFINITIONS BMX_HOOK=1)
   set_source_files_properties(third_party/dr_flac/dr_flac.c PROPERTIES COMPILE_OPTIONS -w)
   add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/music_edits.c
     COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tools/gen_music_edits.py

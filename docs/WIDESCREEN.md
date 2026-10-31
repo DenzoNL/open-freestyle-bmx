@@ -470,7 +470,22 @@ default frame, so the variant is separate.)
 wider than at 4:3 (blur hides it); a mirrored fill would continue the picture but is more code. MSL (Metal) is still
 not generated for any shader.
 
-Note (2026-10-31, merge of WS6): with defaults, the WS6 build's riding frame 1500 differed from the WS5
-build in 658 pixels, all on tree trunk and foliage edges, consistent per build. drvDrawSetUiMode(0) leaves
-sampler, shader and uniforms as before, so this is most likely wall-clock driven animation (frames depend
-slightly on each build's timing); HF0 (docs/HIGHFPS.md) measures the wall-clock dependencies to confirm.
+Note (2026-10-31, merge of WS6): the WS6 build's frame 1500 differed from WS5 on tree edges only; explained
+by the wall-clock far clip (HF0 note above), not by WS6.
+
+**Note (HF0, 2026-10-31): the frame variation explained.** The "f1600 variants" above, and riding frames that differ
+in a few hundred pixels on tree trunks and foliage between builds that draw the same way, come from wall-clock render
+state, not from the seams. No tree is animated by the clock: Vail Trails has no "ANIM" texture objects. The cause is
+ngiffxAdaptQuality 0x45c710, and the chain runs:
+1. It measures ticks per 100 ms of timeGetTime.
+2. It sets the camera's **far clip** to its quality value, and the fog distance follows (`far - clipOffset`), through
+   zrwSetParameter(5) -> zrwCameraSetClip 0x4929f0.
+3. The level load drops the far clip to 60. It then climbs in 100 ms steps and settles at 190.05 about 590 ticks
+   later: 188.92 at tick ~1500 and 190.05 at tick ~1524 in the ProQuest script.
+4. The tick each step lands on depends on where the 100 ms windows fall against the ticks. That differs by a tick
+   between runs and builds.
+5. Frames taken during the climb, such as f1500 and f1600, can therefore have another far clip and fog distance at
+   distant geometry.
+
+The fix for comparisons: diff frames after the settle (f1800 and later in that script). The BMX_HF_GUARD log line
+`quality (far clip)` shows the value per tick (docs/HIGHFPS.md "HF0 findings").

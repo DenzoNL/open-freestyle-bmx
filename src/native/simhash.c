@@ -43,7 +43,7 @@ static void mix32(uint32_t v)
     mix(&v, sizeof v);
 }
 
-static void simPoll(void)
+uint64_t bmxSimStateHash(void)
 {
     const CameraState *const cam = &gCameras[gCameraPlayer < 4 ? gCameraPlayer : 0];
 
@@ -80,7 +80,12 @@ static void simPoll(void)
         mix32(r->combo.score);
     }
     mix32(gGameTimer);
-    fprintf(gOut, "%u %016llx\n", (unsigned)gTick++, (unsigned long long)gHash);
+    return gHash;
+}
+
+static void simPoll(void)
+{
+    fprintf(gOut, "%u %016llx\n", (unsigned)gTick++, (unsigned long long)bmxSimStateHash());
     fflush(gOut); /* BMX_QUIT_FRAMES ends the process with _Exit */
 }
 

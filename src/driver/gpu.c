@@ -21,10 +21,22 @@ static SDL_Window *gpuWindow;
 static SDL_GPUDevice *gpuDevice;
 static int videoInited;
 static int shownFrames;
+static int measureAcquire;
+static uint64_t acquireNs;
 
 int drvGpuShownFrames(void)
 {
     return shownFrames;
+}
+
+void drvGpuMeasureAcquire(void)
+{
+    measureAcquire = 1;
+}
+
+uint64_t drvGpuAcquireNs(void)
+{
+    return acquireNs;
 }
 
 /* Whether `frame` is in BMX_SHOT_FRAME's comma separated list (frame 1 without the variable). */
@@ -302,15 +314,20 @@ static int presentTarget(struct SDL_GPUTexture *color, int32_t x, int32_t y, int
     SDL_GPUCommandBuffer *cmd;
     SDL_GPUTexture *swapchain = NULL;
     Uint32 w = 0, h = 0;
+    Uint64 start;
 
     drvDrawFlush();
     cmd = SDL_AcquireGPUCommandBuffer(gpuDevice);
     if (cmd == NULL) {
         return sdlFail("SDL_AcquireGPUCommandBuffer");
     }
+    start = measureAcquire ? SDL_GetTicksNS() : 0;
     if (!SDL_WaitAndAcquireGPUSwapchainTexture(cmd, gpuWindow, &swapchain, &w, &h)) {
         SDL_CancelGPUCommandBuffer(cmd);
         return sdlFail("SDL_WaitAndAcquireGPUSwapchainTexture");
+    }
+    if (measureAcquire) {
+        acquireNs += SDL_GetTicksNS() - start;
     }
     if (swapchain != NULL) {
         SDL_GPUBlitInfo blit;

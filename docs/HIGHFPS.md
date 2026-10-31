@@ -3,7 +3,8 @@
 Decided 2026-10-31: the user took the recommendation for every decision H1..H10 (default off until HF4 is clean
 and the user has played it). Order: HF0 first.
 
-Status 2026-10-31: **design, not decided, nothing implemented.** Scope: the native exe (`bmxnative.exe`) only; the hook
+Status 2026-10-31: **design decided, HF0 (measurement) done**, see "HF0 findings" at the end: it corrects P3 and P4
+and adds rules for HF1-HF3. Scope: the native exe (`bmxnative.exe`) only; the hook
 DLL and the oracle tests stay as they are. Rules that apply (PLAN.md Decisions): vanilla stays vanilla, enhancements
 attach at seams, options are tagged visual-only or gameplay-changing. Everything here is meant to be **visual-only**:
 the simulation keeps its tick and stays bit-identical (BMX_SIM_HASH equal with the option on and off).
@@ -49,10 +50,10 @@ RwRasterShowRaster. Lists are `gZrwUpdateLists` (0x672768, 9 lists, zrwRegisterU
 | 1 | zrwModelRender 0x48fbc0 (sky: moved to the camera, drawn) | its own frame, recomputed each draw |
 | 1 | ngifpsxUpdate 0x45fcf0 (screen-shake script: `gNgifScript` 0x5ab4f0 += 2 per call) | **yes, per draw** |
 | 2 | ngifFlushFrame 0x463860 / ngifFlushFrame2 0x4639a0 (draw the OT if pending, then clear pending) | **yes**: a second draw in the same tick shows no HUD |
-| 2 | zrwworldUpdateEffects 0x495bd0 -> each effect type's update (+0x20) | **yes**: particles (below) |
+| 2 | zrwworldUpdateEffects 0x495bd0 -> each effect type's +0x20, which is its **render** (ngiffx*Render) | no (HF0: the particle step is in the tick) |
 | 2 | zrollerShadowDraw 0x49b3d0 (draws the shadow, clears `ready`) | yes |
 | 2 | ngappDrawDebug 0x45a4d0 (debug faces) | no |
-| 5 | zrollerUpdateShadow 0x49b520 (ray probes around the rider, sets `ready`: drawn one draw later) | yes, render-only |
+| 5 | zrollerUpdateShadow 0x49b520 (ray probes around the rider, sets `ready`: drawn one draw later) | yes, **and simulation state** (HF0: gZrwColBox, RW lightFrame) |
 | 4 | zprofileUpdate 0x4a35f0, zrwdbg DebugUpdateFunction 0x47f660 | debug |
 
 **Wall time vs tick count.** Tick-counted: everything in the simulation (physics, camera easing, motion playback,
@@ -159,7 +160,7 @@ lerp in double. A pure maths file with unit tests (like `driver/widemath.c`).
 - **P2 HUD.** ngifFlushFrame clears `gNgifFlushPending` after the tick draw; without the re-arm the extra draws show
   no HUD (flicker). Check in HF0 that ngifDrawList (0x462350) / ngifDrawPrimitive do not modify packets (draw the OT
   twice in one frame, compare). The wide HUD copy (`wideDrawList`) works per draw already.
-- **P3 Particles.** The step is wall-time plus one `vel` per call, run from the draw: extra steps make particles fly
+- **P3 Particles.** (HF0: wrong premise, the step runs in the tick; see "HF0 findings".) The step is wall-time plus one `vel` per call, run from the draw: extra steps make particles fly
   faster. A4 steps once per tick and only draws in extra draws. Particles are then at tick N while the rider is at
   N-1+alpha: sparks lead the pegs by up to one tick. v2: draw a moving particle at lerp(prev, pos, alpha)
   (`prev` is the position before the last step; spark streaks need the step before that, one more field in our
@@ -271,3 +272,237 @@ path without motion, for byte-identity, H9.3), `BMX_HF_LOG=1` (draws per tick, m
 
 HF0-HF4 give a complete interpolated mode in levels; HF5 is polish. HF0 decides whether A4's filter list is complete:
 if the guard finds a mutator not listed here, it joins the filter before HF2 starts.
+
+## HF0 findings (2026-10-31)
+
+**Instrument.** `BMX_HF_GUARD=1..4` (src/native/hfguard.c, docs/NATIVE.md). When it is set, main.c hands each tick
+to `bmxHfGuardFrame`; when it is unset nothing changes.
+
+The sub-hashes only read memory:
+- `sim`: the BMX_SIM_HASH fields;
+- `rng`: the random seed;
+- `frames`: per active type 0 object, ZObj pos/rot, the ZrwModel inputs, and the floats and flags of every RwFrame
+  modelling and world matrix of its clump and collision clump;
+- `ties`: the atomic order in every world sector's two tie lists;
+- `colbox`: gZrwColBox;
+- `colstate`: gZrwCol;
+- `shadow`: the ready flag, the miss array and the vertex array;
+- `particles`: every effect emitter's bounds and time stamp, plus its live particles;
+- `hud`: both flush flags, gNgifPrim3D, gNgifScript and the 0x400 ordering table words;
+- `camera`: gNgCamera pos/rot;
+- `lightframe`: RwGlobals.lightFrame.
+
+What each level does:
+- **Level 1** hashes before and after every draw and times the loop.
+- **Level 2** runs the draw through a copy of zrwDrawFrame with a checkpoint after every step and list node, which
+  attributes each change.
+- **Level 3** also runs, in a level, a second draw per tick. That draw skips the shake node, re-arms the flush flags,
+  and runs no list 3 and no present. It then does an identity recompute of every model (zrwModelUpdate through its
+  slot, in pool order) plus a frame sync.
+- **Level 4** is level 3 with the tick's dirty frame order replayed before that sync.
+
+**Runs.**
+- From `native-run2` with `-r640.480.16`, `BMX_MUTE=1 BMX_NO_MOVIES=1 BMX_QUIT_FRAMES=3200`.
+- BMX_KEYS: Enter x10 into ProQuest / Vail Trails (riding from tick ~932), then pedalling, steering, hops and
+  E/S/F/D tricks.
+- BMX_SIM_HASH, plus BMX_SHOT frames 300, 1500, 1800, 2200, 2600 and 3000.
+- Display at 240 Hz.
+
+**Byte identity.**
+- The build with the guard compiled in and unset, against the build before (83d6985): all six frames
+  byte-identical, and the sim file identical (2173 ticks).
+- Every guard level 1-4 gave the same sim file and the same six frames as the run without the guard. That includes
+  levels 3 and 4, which double the shadow probes and re-tie atomics.
+
+### Q1. The limiter constants (from work/NgBMX.exe)
+
+- **The constants.** `gRateC` 0x54dbb8 = **1000.0f** (0x447a0000) and `gRateB` 0x54d05c = 0.0f.
+- **The tick condition.** WinMain 0x48a775..0x48a7cc computes `elapsed = timeGetTime() - gLastTick` as a uint32,
+  zero-extended to a qword for `FILD`. Then `FLD 1000.0; FDIV gRateA; FCOMPP; TEST AH,0x41; JZ skip` skips while
+  `1000 / limit > elapsed`.
+  - So a tick runs at **elapsed >= 34 ms (limit 30)** and **>= 17 ms (limit 60)**.
+  - Then `gLastTick += elapsed`.
+  - main.c's copy is exact.
+- **Measured.**
+  - In a level, over 2168 ticks: interval 33.99 ms mean (max 34.0-35.2 ms per run), i.e. 29.4 Hz.
+  - In the frontend, over 930 ticks: 16.99 ms, i.e. 58.8 Hz.
+- **Other wall-clock constants.**
+  - zrwOnIdle's `dt` is ms x 0x1.0624dep-10 (0.001). It only feeds the debug float.
+  - Its fps counter uses 1000 ms windows.
+  - ngiffxAdaptQuality uses 100 ms windows, thresholds 26 / 28 fps and a range of 60..200 (see "Wall-clock render
+    state" below).
+  - The skid animation steps every `1000 / fps` ms.
+
+### Q2. What a draw changes (guard levels 1/2)
+
+| Sub-hash | Changed by the draw? | Where (level 2) |
+|---|---|---|
+| sim, rng, particles, camera | **never** (3101 draws, up to 12 live particles in an emitter) | - |
+| frames | 2000 of 2168 level draws | `camBegin`: RwCameraBeginUpdate's rwFrameSyncDirtyList writes the world matrices (the same values RwFrameGetLTM computes on demand) |
+| ties | 568 of 2168 | `camBegin`: the sync calls WorldAtomicSync, which destroys and re-adds every synced atomic's ties with `linkFirst` |
+| colbox, colstate, lightframe | every level draw | node 0x49b520 zrollerUpdateShadow (36 zrwcolQueryLine probes) |
+| shadow | every level draw | 0x49b520 (probes), 0x49b3d0 (the draw clears `ready`) |
+| hud | every draw | 0x402207 ngifFlushFrame (level), 0x4020f4 ngifFlushFrame2 (frontend): the pending flag only |
+
+**The draw neither spawns particles nor advances the RNG.** The particle step is not in the draw at all:
+- The effect object's ops (0x562098) have `update` = 0x495a10 zobjPEmitObjectUpdate. zobjUpdateAll runs it in the
+  tick (list 8).
+- It calls each emitter class's +0x1c, which is zobjPEmitUpdate 0x4954b0 (ngiffxUpdateEmitter 0x45e4e0 for one
+  type).
+- List 2's zrwworldUpdateEffects calls +0x20. In all seven tables at 0x55c278 + 0x38n, +0x20 is a render function:
+  `ngiffx*Render` 0x45cc50, 0x45d420, 0x45d730, 0x45db20, 0x45e010, 0x45e2d0, 0x45eaa0.
+- Rendering reads timeGetTime only for the fade.
+- So the "+1 vel per call" quirk happens once per tick, and an extra draw cannot speed particles up.
+
+**The shadow probes leave state the physics reads.**
+- zrwcolQueryLine widens gZrwColBox by 1e-5 on every call, before anything else. The box still grows at these
+  magnitudes: it changed on every draw.
+- The box is read by every zrwcolQuerySphere (ngifzbsp, `zrwBBoxContainsPoint`) and by line queries with flag 0x20.
+- The probes also advance RwGlobals.lightFrame. That is the 16-bit collision tag object queries compare
+  `collisionTag` against, so the probes move its wrap point.
+- gZrwCol is scratch: each query rewrites it.
+- What matters is the **number** of probe calls per tick, not their inputs: the widening is unconditional.
+
+**Known mutators.**
+- Confirmed: the flush flags, the shadow's `ready` and the dirty-frame sync.
+- The shake script was not triggered in these runs (no change at 0x401a4b), so its effect stands as read from the
+  code.
+- No other draw-time mutator showed up. The ordering table, gNgifPrim3D and the shake script pointer never changed.
+
+### Q3. Collision and RenderWare's sector lists
+
+**Collision reads the tie lists.**
+- ngifzcollide calls zrwcolLineTest with flags 3 (world + solid objects); ngifzbsp calls zrwcolSphereTest with
+  flags 3.
+- Both go through `rwWorldIntersectObjects` -> `_rpCollWorldAtomics*`, which walks each sector's
+  `collAtomicsInWorldSector` in list order.
+- The order affects the results:
+  - zrwcolKeepNearest keeps the later of two hits at equal distance (`distance > nearest` rejects only farther
+    ones).
+  - zrwcolRecordHit appends sphere hits in walk order.
+- So the tie order is simulation-visible in principle. Only syncs set it (rwFrameSyncDirtyList, from the camera's
+  begin-update in the draw).
+- The shadow probes use flags 1 (world triangles only) and never walk the tie lists.
+
+**Recompute and sync order, measured.**
+- **Level 3** (identity recompute in pool order plus a sync):
+  - The frame floats and flags stay bit-identical (0 changes).
+  - The tie order **changed on 1999 of 2169 ticks**.
+  - The RwMatrix padding words differ, because zrwModelUpdate copies its shared scratch matrix.
+- **Level 4** (the same recompute, with the dirty list put back in the order the tick queued it, recorded after
+  onIdle):
+  - The ties changed **0 times** and the frames 0 times in 2169 ticks.
+  - One dirty root per tick is not in the tick's list. Level 4 appends it after the recorded ones, and the ties
+    still matched.
+- The sim hash stayed identical even with level 3's reordered ties. These runs never hit a case where the order
+  decides, but HF2 must not rely on that.
+
+### Q4. Drawing the HUD twice; the effects split
+
+- **Drawing the HUD twice is safe.**
+  - ngifDrawList and ngifDrawPrimitive only read the packets.
+  - Level 3 drew the ordering table a second time per tick with the flags re-armed, over 2169 ticks. The only `hud`
+    changes were the re-arm and the flush clearing it again. The OT words, gNgifPrim3D and the script pointer did not
+    change.
+  - One reader is not idempotent: ngifDrawAreaPrim 0x45fe50 (packet code 0xf8) advances gNgifPrim3D by 0x80 bytes per
+    draw. These runs never reached it, and ngifResetOrderTable resets the cursor every tick, so it is harmless.
+- **The effects split is clean:** the step is in the tick (zobjUpdateAll, class +0x1c), the draw in list 2 (+0x20
+  render).
+  - HF3 needs **no draw-only walk**: the effects node runs as it is in extra draws.
+  - Only the render fade moves with wall time, which is visual.
+
+### Q5. Pacing (level 1: the draw timed alone; 640x480 on the user's PC, 240 Hz display, BMX_KEYS window)
+
+| | ticks | interval | onIdle | draw (mean / max) | swapchain wait | slack (mean / min) |
+|---|---|---|---|---|---|---|
+| level | 2168 | 33.99 ms | 0.16 ms | 1.48 / 6.03 ms | 0.02 ms | 32.3 / 27.8 ms |
+| frontend | 930 | 16.99 ms | 0.47 ms | 1.01 / 43 ms (loading) | 0.37 ms | 15.5 ms |
+
+- **Draws per tick.** A 34 ms tick spans 4.1 refreshes at 120 Hz, 4.9 at 144, 5.6 at 165 and 8.2 at 240. That leaves
+  room for 3, 4, 4-5 and 7 extra draws per tick at ~1.5 ms each (6 ms worst seen).
+- **Deadline guard.** The worst draw is close to a 165 Hz period (6.06 ms), so HF1's guard matters from 165 Hz up.
+- **VSYNC.** At 30 presents per second, VSYNC presents did not block (0.02 ms). With 4-8 presents per tick they will,
+  so the deadline estimate must include the acquire, as H5 says.
+- **Resolution.** This 640x480 run does not show the GPU cost of larger modes. HF4 measures at the user's resolution.
+
+### Wall-clock render state (frames that differ between builds)
+
+**No tree or foliage model is animated by the wall clock.**
+- ngiffxFindSkidObjects finds **0 "ANIM" objects** in Vail Trails (the guard logs the count).
+- zrwModelRender and the world render read no clock.
+- The only clock readers in the draw are the particle renders' fade.
+
+**The wall-clock input that changes the picture is ngiffxAdaptQuality 0x45c710.** It runs in the tick, but
+timeGetTime drives it.
+- **What it sets.** It passes its quality to zrwSetParameter(5, camera, &q) (slot 0x561484 -> 0x48ab10), which calls
+  zrwSetClipPlane 0x4929f0 = zrwCameraSetClip. So **gFxQuality is the camera's far clip, and the fog distance is
+  `far - clipOffset`.**
+- **The climb.**
+  - At the level load the 100 ms window measures ~2.5 fps, so the far clip drops to 60.
+  - It then climbs one 100 ms step at a time (every third tick) towards 200, and stops at the first value within 10
+    of 200.
+  - Measured: **60 at tick 932, 188.92 at tick ~1500, 190.0521 at tick ~1524**, then fixed.
+- **Why runs differ.**
+  - The values are the same in every run.
+  - The tick each step lands on depends on the phase of the 100 ms windows against the ticks: the runs differed by
+    one tick (1499 vs 1500).
+  - So **frame 1500 of the ProQuest script falls in the middle of the climb.** A build or run whose load ends at a
+    different phase draws it with another far clip and fog distance.
+  - That shows on distant geometry at the fog / clip edge, which in Vail Trails is tree trunks and foliage.
+  - The same explains the earlier "f1600 variants" (docs/WIDESCREEN.md).
+- **Frames to compare.** Frames after the settle (tick ~1530, e.g. f1800) do not depend on it, unless a window
+  measures below 26 fps.
+- **Vanilla has the same sensitivity.** A single tick ~30 ms late makes a window of 3 ticks in ~130 ms (~23 fps).
+  The adapter then steps by (fps - 28) x 10 ≈ -50: a visible far-clip pop that takes ~20 s to recover.
+
+### Pitfalls: confirmed / ruled out
+
+- **P1 shake:** as read from the code (not triggered in the runs). The filter stays.
+- **P2 HUD:** confirmed. The re-arm works, and drawing the OT twice is clean (Q4).
+- **P3 particles:** **premise corrected.** The step is in the tick; draws only render. Particles sit at their tick
+  position, so "sparks lead the pegs by up to a tick" still holds for v1.
+- **P4 shadow:** **confirmed, and worse than assumed.** The probes write simulation-visible state (colbox,
+  lightFrame).
+- **P5 ties:** **confirmed** (Q3). The recompute must replay the tick's sync order.
+- **P6 LOD / PVS:** not hashed separately. Frames and ties covered what the simulation reads.
+- **P7 sound:** confirmed by reading.
+  - zsystemToListener 0x45a340 (zobjCameraGetMatrix(gNgCamera, 0)) has two callers:
+    - zsndSrcUpdate, via bmxSoundUpdateStreams <- action.c / ngapp.c;
+    - zsndSrcMeasure, via bmxSoundMeasure <- bmxSoundPlay*.
+  - Both run on the main thread, in the tick. The pump thread does not read the camera.
+- **P8 unknown mutators:** found **one**, the shadow probes' colbox / lightFrame. The particle question is resolved,
+  and nothing else changed.
+- **New P9, the far clip / fog adapter:** it is wall-clock state in the tick (see above). The scheduler must never
+  make a tick late, or the far clip pops in the interpolated mode where vanilla would not.
+
+### Plan changes for HF1-HF3
+
+**HF1**
+- The deadline guard is a correctness requirement, not polish: a tick late by tens of ms drops the far clip (P9) and
+  shifts the 100 ms windows.
+- Estimate the draw at the worst recent draw (~6 ms here), not the mean.
+- Compare against the pacing line of `BMX_HF_GUARD=1`.
+
+**HF2**
+- Restore by recompute is right for the matrices: floats and flags come out bit-identical. The padding words do not.
+  If byte-exact padding is wanted, restore the root modelling matrices raw (64 bytes per model).
+- **Record the dirty-frame list (head to tail) right after onIdle.** At the restore:
+  1. recompute the models;
+  2. relink the dirty list in the recorded order, with frames not in the record after them;
+  3. call rwFrameSyncDirtyList.
+
+  Without this the sector tie order differs on most ticks. hfguard.c's `recordDirty` / `replayDirty` is the tested
+  reference.
+- The first draw after a tick already runs with interpolated poses, so its sync reorders the ties. The replayed
+  restore sync puts the order back before the next tick.
+
+**HF3**
+- The effects node runs unchanged in extra draws: drop the "draw-only walk" item.
+- The shadow probe node 0x49b520 must not run extra times as it is. Two options:
+  - **rec:** in extra draws, save gZrwColBox (32 bytes), gZrwCol (0x50 bytes) and RwGlobals.lightFrame (2 bytes)
+    before the node and restore them after. The shadow then follows the interpolated rider, and the simulation sees
+    exactly one probe set per tick.
+  - Or skip the node in extra draws and re-arm `gZrwShadowReady`, so the shadow stays at the tick pose.
+- The first (real) draw's probes are the vanilla ones, so their count per tick does not change.
+- Re-arm the flush flags as planned, but capture them after onIdle, which is where the tick sets them.
+- **HF4:** run the guard at levels 1 and 2 on the interpolated build. Level 4's checks are the ones H9.4 asks for.

@@ -140,6 +140,9 @@ int drvGpuClear(struct SDL_GPUTexture *color, struct SDL_GPUTexture *depth, cons
 int drvGpuPresent(struct SDL_GPUTexture *color, int32_t x, int32_t y, int32_t width, int32_t height);
 struct SDL_GPUDevice *drvGpuDevice(void);
 int drvGpuShownFrames(void); /* frames presented so far (RwRasterShowRaster) */
+/* BMX_HF_GUARD: after drvGpuMeasureAcquire, the ns spent waiting for swapchain textures so far. */
+void drvGpuMeasureAcquire(void);
+uint64_t drvGpuAcquireNs(void);
 int drvGpuPresentMovie(struct SDL_GPUTexture *color, int32_t width, int32_t height, const char *shot);
 void drvGpuWindowSize(int32_t *width, int32_t *height);
 /* movie.c: releases the movie textures (before the GPU device goes). */

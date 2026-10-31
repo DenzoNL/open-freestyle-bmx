@@ -122,6 +122,20 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   tells the Im2D wrapper each packet's anchor; elements come from the layer-0 zover pools (glyph chains) and from
   zoverDrawText's glyph runs in the 3D list (docs/WIDESCREEN.md "WS5"). `hud = 0`, widescreen off and exact 4:3 stay
   byte-identical; sim hash equal. Try it with `widetest.ps1 -Hud 1` (`-HudAspect 0` for the full 21:9 width).
+- High fps (29.4 Hz tick kept, interpolated draws): design in docs/HIGHFPS.md (H1-H10 decided as recommended).
+  **HF0 done 2026-10-31** (not committed at the time of writing): the `BMX_HF_GUARD=1..4` dev aid
+  (src/native/hfguard.c; frames and sim hash unchanged with it unset). Findings, in docs/HIGHFPS.md "HF0 findings":
+  - The particle step runs in the tick; the draw only renders particles, and the RNG is untouched by the draw.
+  - The shadow probes in the draw write simulation state: they widen gZrwColBox and advance RW's lightFrame.
+  - Collision walks RenderWare's sector tie lists, and every frame sync re-ties the synced atomics. HF2's restore
+    must replay the tick's dirty-frame order; tested, this gives the same ties and frames.
+  - Drawing the HUD ordering table twice is clean.
+  - Pacing: a ~1.5 ms draw (6 ms worst) and ~32 ms of slack per 34 ms tick at 640x480.
+  - The far clip / fog distance is wall-clock driven (ngiffxAdaptQuality). It climbs from 60 to 190 during the first
+    ~20 s of a level, so mid-climb screenshots, such as frame 1500 of the ProQuest script, can differ between
+    builds.
+
+  Next: HF1 (scheduler), with the HF1-HF3 rule changes listed there.
 - Golden traces: record sessions with `bmxtrace.orig` (docs/TRACING.md) if not done yet.
 
 ## Machine setup
