@@ -68,7 +68,7 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   its dead zone arithmetic, DIK scan codes, foreground semantics; BMX_KEYS is its scripted keyboard);
   `BMX_INPUT_CHECK=1` compares every call with the real dinput.dll in the same process; `bmxnative.ini`
   (`BMX_CONFIG`) with the opt-ins `[input] dpad_steering = 1` and `[input] stick_8way = 1` (stick snaps to 8
-  directions, radial 10% dead zone, so pure down / up / left / right work; `inputtest.ps1 -Snap`; user test pending). The S3 timer review fixed a double join / slot reuse
+  directions, radial 10% dead zone, so pure down / up / left / right work; `inputtest.ps1 -Snap`; user test pending). New opt-in `[audio] smooth_resample = 0|1|2` (0 original mixer, 1 linear, 2 cubic): src/platform/smoothmix.c, a native-only copy of winchanMix that uses the position fraction, swapped in by a jump over the ported winchanMix (loader, `bmxSmoothJumps`); unit tests in tests/platform; compare by ear with `native-run\soundtest.ps1 -Smooth 0|1|2` (user test pending). The S3 timer review fixed a double join / slot reuse
   race and the timeKillEvent return codes. The user's first focused run found the pad dead in a level (a second
   exclusive pad object was refused; DirectInput allows it within a process) and lX / lY one step off (centre 128,
   not 127): both fixed, PLATFORM.md 4b. **Open:** the user's rerun of NATIVE.md test A; unfocused, the game's whole call sequence already matches the real DirectInput (0 HRESULT differences, same

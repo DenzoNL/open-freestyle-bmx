@@ -587,6 +587,8 @@ cursor sequence after every mix for 12 kinds of buffer, the mixer's output, real
 device); it mutes its own audio session first. `BMX_SOUND_CHECK=1` in the game (ProQuest, end run, main menu, Freeride;
 `BMX_MUTE=1`, `BMX_KEYS`, from native-run2): 28012 calls compared, `RESULT clean`.
 
+**Smoother resampling of the game's mixer (cubic by default).** The game mixes its effects itself (`winchanMix`, 22,050 Hz, no interpolation: the sample's position fraction is ignored, so 11,025 / 16,000 Hz effects have grit). `[audio] smooth_resample = 1` (linear) or `2` (cubic) in the ini makes the loader (`bmxSmoothJumps`, src/platform/smoothmix.c) jump from the ported `winchanMix` to the interpolating copy; `0` is the original; no key means cubic (the default since 2026-10-31, the user's call). The log shows `smooth: 1 jumps` when on. PLATFORM.md P9 note has the design and the checks. Compare by ear with `.\soundtest.ps1 -Smooth 0`, `-Smooth 1`, `-Smooth 2` (it writes a temporary ini through `BMX_CONFIG`; the other switches work as before). Scripted ProQuest run with 2, `BMX_MUTE=1`, `BMX_SOUND_CHECK=1`: no trap, `soundcheck: RESULT clean`, 0 resampler underruns.
+
 **Listening test (the user's).** Needs a build of this state (`cmake --build build/native32`), headphones or speakers at a
 normal level, and nothing else playing. PowerShell, a fresh window:
 

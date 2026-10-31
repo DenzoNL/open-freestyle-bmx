@@ -40,6 +40,8 @@ if(BMX_NATIVE32)
     -Wno-sign-compare) # enum constants are unsigned under the mingw target's ABI, int under msvc's
   enable_language(ASM)
   file(GLOB BMX_NATIVE_SOURCES CONFIGURE_DEPENDS src/native/*.c src/platform/*.c)
+  # The smooth resampling mixer reads the game's mixer state at its original addresses (like src/driver).
+  set_source_files_properties(src/platform/smoothmix.c PROPERTIES COMPILE_DEFINITIONS BMX_HOOK=1)
   # range.S must be the first object on the link line: its block has to start the image.
   add_library(bmx_range OBJECT src/native/range.S)
   # The driver would put the C runtime start files (crt2.o, crtbegin.o) before it: pass them ourselves, after.
@@ -82,9 +84,15 @@ if(BMX_NATIVE32)
     -Wl,--disable-dynamicbase -Wl,--disable-high-entropy-va)
   target_link_libraries(bmxnative PRIVATE bcrypt winmm ole32 SDL3::SDL3)
   # Checks of the platform stand-ins against Windows (tests/platform): hosted, no game image.
-  add_executable(bmxplatformtest tests/platform/test_platform.c src/platform/kernel.c src/platform/winmm.c
+  add_executable(bmxplatformtest $<TARGET_OBJECTS:bmx_range> ${BMX_CRT_STARTFILES} tests/platform/test_platform.c src/platform/kernel.c src/platform/winmm.c
     src/platform/fileio.c src/platform/paths.c src/platform/input.c src/platform/inputcheck.c
-    src/platform/config.c src/platform/dsound.c src/platform/soundcheck.c)
+    src/platform/config.c src/platform/dsound.c src/platform/soundcheck.c src/platform/smoothmix.c
+    src/bmx/pc/zge/sound/winchan.c)
+  # The real winchanMix (compared with the smooth mixer) keeps its state at the original addresses: the test
+  # owns that range like bmxnative does (range.S first, then the crt start files); the test unprotects it.
+  set_source_files_properties(src/bmx/pc/zge/sound/winchan.c PROPERTIES COMPILE_DEFINITIONS BMX_HOOK=1)
+  target_link_options(bmxplatformtest PRIVATE -nostartfiles -Wl,--image-base=0x3f0000
+    -Wl,--section-alignment=0x10000 -Wl,--disable-dynamicbase -Wl,--disable-high-entropy-va)
   target_include_directories(bmxplatformtest PRIVATE src)
   target_compile_options(bmxplatformtest PRIVATE ${BMX_WARNINGS})
   target_link_libraries(bmxplatformtest PRIVATE SDL3::SDL3 dinput dxguid ole32) # c_dfDIKeyboard / c_dfDIJoystick

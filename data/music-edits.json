@@ -1,0 +1,1136 @@
+[
+ {
+  "track_index": 0,
+  "title": "59 Times the Pain - Got It All In Sight",
+  "flac_file": "59 Times the Pain - Got It All in Sight.flac",
+  "flac_samples": 8028552,
+  "game_samples": 5990930,
+  "sample_rate": 44100,
+  "segments": [
+   {
+    "game_start": 5512,
+    "game_end": 1063378,
+    "flac_start": 454,
+    "flac_end": 1058335,
+    "offset_start": -5058,
+    "offset_end": -5043,
+    "speed": 1.000014,
+    "gain": 0.6807,
+    "corr": 0.9946,
+    "snr_db": 19.7,
+    "confidence": "high"
+   },
+   {
+    "game_start": 1063378,
+    "game_end": 1476650,
+    "flac_start": 1058306,
+    "flac_end": 1471584,
+    "offset_start": -5072,
+    "offset_end": -5066,
+    "speed": 1.000015,
+    "gain": 0.6793,
+    "corr": 0.9937,
+    "snr_db": 19.0,
+    "confidence": "high"
+   },
+   {
+    "game_start": 1476650,
+    "game_end": 1492754,
+    "flac_start": 625348,
+    "flac_end": 641452,
+    "offset_start": -851302,
+    "offset_end": -851302,
+    "speed": 1.0,
+    "gain": 0.6759,
+    "corr": 0.9799,
+    "snr_db": 14.0,
+    "confidence": "medium"
+   },
+   {
+    "game_start": 1492754,
+    "game_end": 3165566,
+    "flac_start": 1488136,
+    "flac_end": 3160972,
+    "offset_start": -4618,
+    "offset_end": -4594,
+    "speed": 1.000014,
+    "gain": 0.6802,
+    "corr": 0.9939,
+    "snr_db": 19.2,
+    "confidence": "high"
+   },
+   {
+    "game_start": 3165566,
+    "game_end": 3196834,
+    "flac_start": 1061587,
+    "flac_end": 1092855,
+    "offset_start": -2103979,
+    "offset_end": -2103979,
+    "speed": 1.0,
+    "gain": 0.6723,
+    "corr": 0.9769,
+    "snr_db": 13.4,
+    "confidence": "medium"
+   },
+   {
+    "game_start": 3196834,
+    "game_end": 4091570,
+    "flac_start": 3192240,
+    "flac_end": 4086989,
+    "offset_start": -4594,
+    "offset_end": -4581,
+    "speed": 1.000015,
+    "gain": 0.6807,
+    "corr": 0.9949,
+    "snr_db": 19.9,
+    "confidence": "high"
+   },
+   {
+    "game_start": 4091570,
+    "game_end": 4312565,
+    "flac_start": 4561560,
+    "flac_end": 4782558,
+    "offset_start": 469990,
+    "offset_end": 469993,
+    "speed": 1.000014,
+    "gain": 0.677,
+    "corr": 0.9925,
+    "snr_db": 18.3,
+    "confidence": "high"
+   },
+   {
+    "game_start": 4312565,
+    "game_end": 4753444,
+    "flac_start": 4906597,
+    "flac_end": 5347483,
+    "offset_start": 594032,
+    "offset_end": 594039,
+    "speed": 1.000016,
+    "gain": 0.6781,
+    "corr": 0.9943,
+    "snr_db": 19.4,
+    "confidence": "high"
+   },
+   {
+    "game_start": 4753444,
+    "game_end": 5358398,
+    "flac_start": 6297515,
+    "flac_end": 6902478,
+    "offset_start": 1544071,
+    "offset_end": 1544080,
+    "speed": 1.000015,
+    "gain": 0.6601,
+    "corr": 0.9938,
+    "snr_db": 19.1,
+    "confidence": "high"
+   },
+   {
+    "game_start": 5358398,
+    "game_end": 5990930,
+    "flac_start": 7376746,
+    "flac_end": 8009287,
+    "offset_start": 2018348,
+    "offset_end": 2018357,
+    "speed": 1.000014,
+    "gain": 0.67,
+    "corr": 0.9938,
+    "snr_db": 19.1,
+    "confidence": "high"
+   }
+  ],
+  "unmatched_game_ranges": [
+   {
+    "game_start": 0,
+    "game_end": 5512
+   }
+  ],
+  "fade_out": null,
+  "gain_linear": 0.6769,
+  "gain_db": -3.39,
+  "match": {
+   "duration_weighted_corr": 0.994,
+   "matched_fraction": 0.9991
+  }
+ },
+ {
+  "track_index": 1,
+  "title": "Cypress Hill - Dust",
+  "flac_file": "Cypress Hill - Dust.flac",
+  "flac_samples": 10441704,
+  "game_samples": 5314552,
+  "sample_rate": 44100,
+  "segments": [
+   {
+    "game_start": 0,
+    "game_end": 1353874,
+    "flac_start": 38536,
+    "flac_end": 1386066,
+    "offset_start": 38729,
+    "offset_end": 39122,
+    "speed": 0.995314,
+    "gain": 0.6128,
+    "corr": 0.7385,
+    "snr_db": 3.4,
+    "confidence": "medium (time-warped source, see notes)"
+   },
+   {
+    "game_start": 1353874,
+    "game_end": 5115694,
+    "flac_start": 5951154,
+    "flac_end": 9693667,
+    "offset_start": 4627036,
+    "offset_end": 4626441,
+    "speed": 0.994867,
+    "gain": 0.6797,
+    "corr": 0.8141,
+    "snr_db": 4.7,
+    "confidence": "medium (time-warped source, see notes)"
+   },
+   {
+    "game_start": 5115694,
+    "game_end": 5269472,
+    "flac_start": 10136836,
+    "flac_end": 10289848,
+    "offset_start": 5071826,
+    "offset_end": 5071825,
+    "speed": 0.995018,
+    "gain": 0.66,
+    "corr": 0.7869,
+    "snr_db": 4.2,
+    "confidence": "medium (time-warped source, see notes)"
+   }
+  ],
+  "unmatched_game_ranges": [
+   {
+    "game_start": 5269472,
+    "game_end": 5314552
+   }
+  ],
+  "fade_out": null,
+  "gain_linear": 0.66,
+  "gain_db": -3.61,
+  "match": {
+   "duration_weighted_corr": 0.7939,
+   "matched_fraction": 0.9915
+  }
+ },
+ {
+  "track_index": 2,
+  "title": "Deftones - Be Quiet and Drive (far away)",
+  "flac_file": "Deftones - Be Quiet and Drive (Far Away).flac",
+  "flac_samples": 13588680,
+  "game_samples": 5722462,
+  "sample_rate": 44100,
+  "segments": [
+   {
+    "game_start": 0,
+    "game_end": 4153079,
+    "flac_start": 1058270,
+    "flac_end": 5211408,
+    "offset_start": 1058270,
+    "offset_end": 1058329,
+    "speed": 1.000014,
+    "gain": 0.6743,
+    "corr": 0.9948,
+    "snr_db": 19.9,
+    "confidence": "high"
+   },
+   {
+    "game_start": 4153079,
+    "game_end": 5699408,
+    "flac_start": 7907476,
+    "flac_end": 9453828,
+    "offset_start": 3754397,
+    "offset_end": 3754420,
+    "speed": 1.000015,
+    "gain": 0.6501,
+    "corr": 0.9807,
+    "snr_db": 14.2,
+    "confidence": "medium"
+   }
+  ],
+  "unmatched_game_ranges": [
+   {
+    "game_start": 5699408,
+    "game_end": 5722462
+   }
+  ],
+  "fade_out": {
+   "start_game": 5517397,
+   "end_game": 5722462,
+   "len_s": 4.65,
+   "shape": "linear",
+   "final_ratio": 0.001
+  },
+  "gain_linear": 0.6678,
+  "gain_db": -3.51,
+  "match": {
+   "duration_weighted_corr": 0.991,
+   "matched_fraction": 0.996
+  }
+ },
+ {
+  "track_index": 3,
+  "title": "Dropkick Murphys - Never Alone",
+  "flac_file": "Dropkick Murphys - Never Alone.flac",
+  "flac_samples": 7682220,
+  "game_samples": 5791674,
+  "sample_rate": 44100,
+  "segments": [
+   {
+    "game_start": 0,
+    "game_end": 2297258,
+    "flac_start": -1894,
+    "flac_end": 2295396,
+    "offset_start": -1894,
+    "offset_end": -1862,
+    "speed": 1.000014,
+    "gain": 0.8755,
+    "corr": 0.996,
+    "snr_db": 21.0,
+    "confidence": "high"
+   },
+   {
+    "game_start": 2297258,
+    "game_end": 4634353,
+    "flac_start": 4680046,
+    "flac_end": 7017174,
+    "offset_start": 2382788,
+    "offset_end": 2382821,
+    "speed": 1.000014,
+    "gain": 0.8754,
+    "corr": 0.9959,
+    "snr_db": 20.8,
+    "confidence": "high"
+   },
+   {
+    "game_start": 4634353,
+    "game_end": 5488237,
+    "flac_start": 6408166,
+    "flac_end": 7262062,
+    "offset_start": 1773813,
+    "offset_end": 1773825,
+    "speed": 1.000014,
+    "gain": 0.8734,
+    "corr": 0.9944,
+    "snr_db": 19.6,
+    "confidence": "high"
+   },
+   {
+    "game_start": 5488237,
+    "game_end": 5776576,
+    "flac_start": 7379372,
+    "flac_end": 7667714,
+    "offset_start": 1891135,
+    "offset_end": 1891138,
+    "speed": 1.00001,
+    "gain": 0.8748,
+    "corr": 0.9951,
+    "snr_db": 20.1,
+    "confidence": "high"
+   }
+  ],
+  "unmatched_game_ranges": [
+   {
+    "game_start": 5776576,
+    "game_end": 5791674
+   }
+  ],
+  "fade_out": {
+   "start_game": 5761657,
+   "end_game": 5790322,
+   "len_s": 0.65,
+   "shape": "linear",
+   "final_ratio": 0.011
+  },
+  "gain_linear": 0.8751,
+  "gain_db": -1.16,
+  "match": {
+   "duration_weighted_corr": 0.9957,
+   "matched_fraction": 0.9974
+  }
+ },
+ {
+  "track_index": 4,
+  "title": "Pennywise - Greed",
+  "flac_file": "Pennywise - Greed.flac",
+  "flac_samples": 8614200,
+  "game_samples": 5780892,
+  "sample_rate": 44100,
+  "segments": [
+   {
+    "game_start": 0,
+    "game_end": 4017728,
+    "flac_start": 15450,
+    "flac_end": 4033235,
+    "offset_start": 15450,
+    "offset_end": 15507,
+    "speed": 1.000014,
+    "gain": 0.8456,
+    "corr": 0.9956,
+    "snr_db": 20.6,
+    "confidence": "high"
+   },
+   {
+    "game_start": 4017728,
+    "game_end": 4971186,
+    "flac_start": 6267269,
+    "flac_end": 7220741,
+    "offset_start": 2249541,
+    "offset_end": 2249555,
+    "speed": 1.000015,
+    "gain": 0.8458,
+    "corr": 0.9956,
+    "snr_db": 20.5,
+    "confidence": "high"
+   },
+   {
+    "game_start": 4971186,
+    "game_end": 5780892,
+    "flac_start": 7711251,
+    "flac_end": 8520968,
+    "offset_start": 2740065,
+    "offset_end": 2740076,
+    "speed": 1.000014,
+    "gain": 0.8455,
+    "corr": 0.9952,
+    "snr_db": 20.2,
+    "confidence": "high"
+   }
+  ],
+  "unmatched_game_ranges": [],
+  "fade_out": null,
+  "gain_linear": 0.8456,
+  "gain_db": -1.46,
+  "match": {
+   "duration_weighted_corr": 0.9955,
+   "matched_fraction": 1.0
+  }
+ },
+ {
+  "track_index": 5,
+  "title": "Rancid - Maxwell Murder",
+  "flac_file": "Rancid - Maxwell Murder.flac",
+  "flac_samples": 3786720,
+  "game_samples": 5809434,
+  "sample_rate": 44100,
+  "segments": [
+   {
+    "game_start": 0,
+    "game_end": 2827423,
+    "flac_start": 226126,
+    "flac_end": 3053589,
+    "offset_start": 226126,
+    "offset_end": 226166,
+    "speed": 1.000014,
+    "gain": 0.9287,
+    "corr": 0.9974,
+    "snr_db": 22.9,
+    "confidence": "high"
+   },
+   {
+    "game_start": 2827423,
+    "game_end": 2893324,
+    "flac_start": 2780807,
+    "flac_end": 2846708,
+    "offset_start": -46616,
+    "offset_end": -46616,
+    "speed": 1.0,
+    "gain": 0.9257,
+    "corr": 0.9966,
+    "snr_db": 21.7,
+    "confidence": "high"
+   },
+   {
+    "game_start": 2893324,
+    "game_end": 3505090,
+    "flac_start": 3119491,
+    "flac_end": 3731266,
+    "offset_start": 226167,
+    "offset_end": 226176,
+    "speed": 1.000015,
+    "gain": 0.9267,
+    "corr": 0.996,
+    "snr_db": 21.0,
+    "confidence": "high"
+   },
+   {
+    "game_start": 3505090,
+    "game_end": 4616974,
+    "flac_start": 1556115,
+    "flac_end": 2668015,
+    "offset_start": -1948975,
+    "offset_end": -1948959,
+    "speed": 1.000014,
+    "gain": 0.9267,
+    "corr": 0.9958,
+    "snr_db": 20.8,
+    "confidence": "high"
+   },
+   {
+    "game_start": 4616974,
+    "game_end": 4729773,
+    "flac_start": 2940795,
+    "flac_end": 3053597,
+    "offset_start": -1676179,
+    "offset_end": -1676176,
+    "speed": 1.000027,
+    "gain": 0.8976,
+    "corr": 0.9744,
+    "snr_db": 13.0,
+    "confidence": "medium"
+   },
+   {
+    "game_start": 4729773,
+    "game_end": 4872523,
+    "flac_start": 2780813,
+    "flac_end": 2923566,
+    "offset_start": -1948960,
+    "offset_end": -1948957,
+    "speed": 1.000021,
+    "gain": 0.9275,
+    "corr": 0.9977,
+    "snr_db": 23.4,
+    "confidence": "high"
+   },
+   {
+    "game_start": 4872523,
+    "game_end": 5135416,
+    "flac_start": 2720767,
+    "flac_end": 2983664,
+    "offset_start": -2151756,
+    "offset_end": -2151752,
+    "speed": 1.000015,
+    "gain": 0.9291,
+    "corr": 0.9971,
+    "snr_db": 22.3,
+    "confidence": "high"
+   },
+   {
+    "game_start": 5135416,
+    "game_end": 5798624,
+    "flac_start": 3110230,
+    "flac_end": 3773448,
+    "offset_start": -2025186,
+    "offset_end": -2025176,
+    "speed": 1.000015,
+    "gain": 0.9284,
+    "corr": 0.9969,
+    "snr_db": 22.1,
+    "confidence": "high"
+   }
+  ],
+  "unmatched_game_ranges": [
+   {
+    "game_start": 5798624,
+    "game_end": 5809434
+   }
+  ],
+  "fade_out": null,
+  "gain_linear": 0.9274,
+  "gain_db": -0.65,
+  "match": {
+   "duration_weighted_corr": 0.9964,
+   "matched_fraction": 0.9981
+  }
+ },
+ {
+  "track_index": 6,
+  "title": "Social Distortion - Don't Drag Me Down",
+  "flac_file": "Social Distortion - Don\u2019t Drag Me Down.flac",
+  "flac_samples": 10188276,
+  "game_samples": 5616172,
+  "sample_rate": 44100,
+  "segments": [
+   {
+    "game_start": 0,
+    "game_end": 2286480,
+    "flac_start": 237424,
+    "flac_end": 2523937,
+    "offset_start": 237424,
+    "offset_end": 237457,
+    "speed": 1.000014,
+    "gain": 0.5792,
+    "corr": 0.996,
+    "snr_db": 20.9,
+    "confidence": "high"
+   },
+   {
+    "game_start": 2286480,
+    "game_end": 3357739,
+    "flac_start": 5780930,
+    "flac_end": 6852205,
+    "offset_start": 3494450,
+    "offset_end": 3494466,
+    "speed": 1.000015,
+    "gain": 0.5775,
+    "corr": 0.996,
+    "snr_db": 21.0,
+    "confidence": "high"
+   },
+   {
+    "game_start": 3357739,
+    "game_end": 4880840,
+    "flac_start": 7084783,
+    "flac_end": 8607906,
+    "offset_start": 3727044,
+    "offset_end": 3727066,
+    "speed": 1.000014,
+    "gain": 0.5782,
+    "corr": 0.9943,
+    "snr_db": 19.4,
+    "confidence": "high"
+   },
+   {
+    "game_start": 4880840,
+    "game_end": 5616172,
+    "flac_start": 9307160,
+    "flac_end": 10042503,
+    "offset_start": 4426320,
+    "offset_end": 4426331,
+    "speed": 1.000015,
+    "gain": 0.5841,
+    "corr": 0.9926,
+    "snr_db": 18.3,
+    "confidence": "high"
+   }
+  ],
+  "unmatched_game_ranges": [],
+  "fade_out": null,
+  "gain_linear": 0.5793,
+  "gain_db": -4.74,
+  "match": {
+   "duration_weighted_corr": 0.9951,
+   "matched_fraction": 1.0
+  }
+ },
+ {
+  "track_index": 7,
+  "title": "Sublime - What I Got",
+  "flac_file": "Sublime - What I Got.flac",
+  "flac_samples": 7544040,
+  "game_samples": 5737122,
+  "sample_rate": 44100,
+  "segments": [
+   {
+    "game_start": 0,
+    "game_end": 158678,
+    "flac_start": 97680,
+    "flac_end": 256361,
+    "offset_start": 97680,
+    "offset_end": 97683,
+    "speed": 1.000019,
+    "gain": 1.6494,
+    "corr": 0.991,
+    "snr_db": 17.5,
+    "confidence": "high"
+   },
+   {
+    "game_start": 158426,
+    "game_end": 383600,
+    "flac_start": 145827,
+    "flac_end": 371004,
+    "offset_start": -12599,
+    "offset_end": -12596,
+    "speed": 1.000013,
+    "gain": 1.6214,
+    "corr": 0.9931,
+    "snr_db": 18.6,
+    "confidence": "high"
+   },
+   {
+    "game_start": 383600,
+    "game_end": 495213,
+    "flac_start": 260711,
+    "flac_end": 372327,
+    "offset_start": -122889,
+    "offset_end": -122886,
+    "speed": 1.000027,
+    "gain": 1.6135,
+    "corr": 0.9928,
+    "snr_db": 18.5,
+    "confidence": "high"
+   },
+   {
+    "game_start": 495213,
+    "game_end": 1574328,
+    "flac_start": 261128,
+    "flac_end": 1340264,
+    "offset_start": -234085,
+    "offset_end": -234064,
+    "speed": 1.000019,
+    "gain": 1.4595,
+    "corr": 0.965,
+    "snr_db": 11.6,
+    "confidence": "medium"
+   },
+   {
+    "game_start": 1574328,
+    "game_end": 1574489,
+    "flac_start": 5328511,
+    "flac_end": 5328672,
+    "offset_start": 3754183,
+    "offset_end": 3754183,
+    "speed": 1.0,
+    "gain": 0.8822,
+    "corr": 0.7318,
+    "snr_db": 8.1,
+    "confidence": "low"
+   },
+   {
+    "game_start": 1574489,
+    "game_end": 4256286,
+    "flac_start": 1782343,
+    "flac_end": 4464179,
+    "offset_start": 207854,
+    "offset_end": 207893,
+    "speed": 1.000015,
+    "gain": 1.2835,
+    "corr": 0.9812,
+    "snr_db": 14.3,
+    "confidence": "medium"
+   },
+   {
+    "game_start": 4256286,
+    "game_end": 4924353,
+    "flac_start": 6456555,
+    "flac_end": 7124632,
+    "offset_start": 2200269,
+    "offset_end": 2200279,
+    "speed": 1.000015,
+    "gain": 1.2884,
+    "corr": 0.979,
+    "snr_db": 13.8,
+    "confidence": "medium"
+   },
+   {
+    "game_start": 4924353,
+    "game_end": 5145966,
+    "flac_start": 6902913,
+    "flac_end": 7124530,
+    "offset_start": 1978560,
+    "offset_end": 1978564,
+    "speed": 1.000018,
+    "gain": 1.3352,
+    "corr": 0.9778,
+    "snr_db": 13.6,
+    "confidence": "medium"
+   },
+   {
+    "game_start": 5145966,
+    "game_end": 5367459,
+    "flac_start": 6903288,
+    "flac_end": 7124785,
+    "offset_start": 1757322,
+    "offset_end": 1757326,
+    "speed": 1.000018,
+    "gain": 1.3376,
+    "corr": 0.9764,
+    "snr_db": 13.3,
+    "confidence": "medium"
+   },
+   {
+    "game_start": 5367459,
+    "game_end": 5737122,
+    "flac_start": 7124800,
+    "flac_end": 7494468,
+    "offset_start": 1757341,
+    "offset_end": 1757346,
+    "speed": 1.000014,
+    "gain": 1.3434,
+    "corr": 0.9764,
+    "snr_db": 13.3,
+    "confidence": "medium"
+   }
+  ],
+  "unmatched_game_ranges": [],
+  "fade_out": null,
+  "gain_linear": 1.3307,
+  "gain_db": 2.48,
+  "match": {
+   "duration_weighted_corr": 0.9782,
+   "matched_fraction": 1.0
+  }
+ },
+ {
+  "track_index": 8,
+  "title": "Swingin' Utters - Stupid Lullabies",
+  "flac_file": "Swingin\u2019 Utters - Stupid Lullabies.flac",
+  "flac_samples": 6104616,
+  "game_samples": 5731940,
+  "sample_rate": 44100,
+  "segments": [
+   {
+    "game_start": 0,
+    "game_end": 5416743,
+    "flac_start": 41317,
+    "flac_end": 5458138,
+    "offset_start": 41317,
+    "offset_end": 41395,
+    "speed": 1.000014,
+    "gain": 0.873,
+    "corr": 0.996,
+    "snr_db": 21.0,
+    "confidence": "high"
+   },
+   {
+    "game_start": 5416743,
+    "game_end": 5710432,
+    "flac_start": 5659299,
+    "flac_end": 5952992,
+    "offset_start": 242556,
+    "offset_end": 242560,
+    "speed": 1.000014,
+    "gain": 0.7519,
+    "corr": 0.9525,
+    "snr_db": 10.3,
+    "confidence": "medium"
+   }
+  ],
+  "unmatched_game_ranges": [
+   {
+    "game_start": 5710432,
+    "game_end": 5731940
+   }
+  ],
+  "fade_out": {
+   "start_game": 5584323,
+   "end_game": 5729853,
+   "len_s": 3.3,
+   "shape": "linear",
+   "final_ratio": 0.001
+  },
+  "gain_linear": 0.873,
+  "gain_db": -1.18,
+  "match": {
+   "duration_weighted_corr": 0.9938,
+   "matched_fraction": 0.9962
+  }
+ },
+ {
+  "track_index": 9,
+  "title": "Primer 55 - Loose",
+  "flac_file": "Primer 55 - Loose.flac",
+  "flac_samples": 8035020,
+  "game_samples": 5483138,
+  "sample_rate": 44100,
+  "segments": [
+   {
+    "game_start": 0,
+    "game_end": 1335742,
+    "flac_start": 26634,
+    "flac_end": 1362396,
+    "offset_start": 26634,
+    "offset_end": 26654,
+    "speed": 1.000015,
+    "gain": 0.9005,
+    "corr": 0.9963,
+    "snr_db": 21.3,
+    "confidence": "high"
+   },
+   {
+    "game_start": 1335742,
+    "game_end": 1352697,
+    "flac_start": 1264234,
+    "flac_end": 1281189,
+    "offset_start": -71508,
+    "offset_end": -71508,
+    "speed": 1.0,
+    "gain": 0.894,
+    "corr": 0.9892,
+    "snr_db": 16.7,
+    "confidence": "high"
+   },
+   {
+    "game_start": 1352697,
+    "game_end": 1697381,
+    "flac_start": 1379351,
+    "flac_end": 1724040,
+    "offset_start": 26654,
+    "offset_end": 26659,
+    "speed": 1.000015,
+    "gain": 0.897,
+    "corr": 0.9953,
+    "snr_db": 20.3,
+    "confidence": "high"
+   },
+   {
+    "game_start": 1697381,
+    "game_end": 1707818,
+    "flac_start": 1761005,
+    "flac_end": 1771442,
+    "offset_start": 63624,
+    "offset_end": 63624,
+    "speed": 1.0,
+    "gain": 1.0617,
+    "corr": 0.9263,
+    "snr_db": 8.5,
+    "confidence": "medium"
+   },
+   {
+    "game_start": 1707818,
+    "game_end": 1891225,
+    "flac_start": 1734477,
+    "flac_end": 1917887,
+    "offset_start": 26659,
+    "offset_end": 26662,
+    "speed": 1.000016,
+    "gain": 0.9255,
+    "corr": 0.9947,
+    "snr_db": 19.7,
+    "confidence": "high"
+   },
+   {
+    "game_start": 1891225,
+    "game_end": 1907919,
+    "flac_start": 841949,
+    "flac_end": 858643,
+    "offset_start": -1049276,
+    "offset_end": -1049276,
+    "speed": 1.0,
+    "gain": 0.84,
+    "corr": 0.9491,
+    "snr_db": 10.0,
+    "confidence": "medium"
+   },
+   {
+    "game_start": 1907919,
+    "game_end": 2161431,
+    "flac_start": 1934581,
+    "flac_end": 2188096,
+    "offset_start": 26662,
+    "offset_end": 26665,
+    "speed": 1.000012,
+    "gain": 0.9112,
+    "corr": 0.9958,
+    "snr_db": 20.8,
+    "confidence": "high"
+   },
+   {
+    "game_start": 2161431,
+    "game_end": 2356794,
+    "flac_start": 1991827,
+    "flac_end": 2187192,
+    "offset_start": -169604,
+    "offset_end": -169602,
+    "speed": 1.00001,
+    "gain": 0.9122,
+    "corr": 0.9962,
+    "snr_db": 21.2,
+    "confidence": "high"
+   },
+   {
+    "game_start": 2356794,
+    "game_end": 2552366,
+    "flac_start": 1991923,
+    "flac_end": 2187498,
+    "offset_start": -364871,
+    "offset_end": -364868,
+    "speed": 1.000015,
+    "gain": 0.9109,
+    "corr": 0.9945,
+    "snr_db": 19.6,
+    "confidence": "high"
+   },
+   {
+    "game_start": 2552366,
+    "game_end": 2650793,
+    "flac_start": 2579038,
+    "flac_end": 2677465,
+    "offset_start": 26672,
+    "offset_end": 26672,
+    "speed": 1.0,
+    "gain": 0.8719,
+    "corr": 0.9573,
+    "snr_db": 10.8,
+    "confidence": "medium"
+   },
+   {
+    "game_start": 2650793,
+    "game_end": 2671108,
+    "flac_start": 6335754,
+    "flac_end": 6356069,
+    "offset_start": 3684961,
+    "offset_end": 3684961,
+    "speed": 1.0,
+    "gain": 0.7927,
+    "corr": 0.6629,
+    "snr_db": 2.5,
+    "confidence": "low"
+   },
+   {
+    "game_start": 2671108,
+    "game_end": 2688939,
+    "flac_start": 6334603,
+    "flac_end": 6352434,
+    "offset_start": 3663495,
+    "offset_end": 3663495,
+    "speed": 1.0,
+    "gain": 0.7303,
+    "corr": 0.6439,
+    "snr_db": 2.3,
+    "confidence": "low"
+   },
+   {
+    "game_start": 2688939,
+    "game_end": 2707457,
+    "flac_start": 2752797,
+    "flac_end": 2771315,
+    "offset_start": 63858,
+    "offset_end": 63858,
+    "speed": 1.0,
+    "gain": 0.7973,
+    "corr": 0.7212,
+    "snr_db": 3.1,
+    "confidence": "low"
+   },
+   {
+    "game_start": 2707457,
+    "game_end": 2722928,
+    "flac_start": 2752619,
+    "flac_end": 2768090,
+    "offset_start": 45162,
+    "offset_end": 45162,
+    "speed": 1.0,
+    "gain": 0.7867,
+    "corr": 0.799,
+    "snr_db": 4.4,
+    "confidence": "low"
+   },
+   {
+    "game_start": 2750488,
+    "game_end": 2944846,
+    "flac_start": 5319694,
+    "flac_end": 5514055,
+    "offset_start": 2569206,
+    "offset_end": 2569209,
+    "speed": 1.000015,
+    "gain": 0.9316,
+    "corr": 0.9953,
+    "snr_db": 20.2,
+    "confidence": "high"
+   },
+   {
+    "game_start": 2944846,
+    "game_end": 3519035,
+    "flac_start": 5709051,
+    "flac_end": 6283248,
+    "offset_start": 2764205,
+    "offset_end": 2764213,
+    "speed": 1.000014,
+    "gain": 0.8595,
+    "corr": 0.9428,
+    "snr_db": 9.5,
+    "confidence": "medium"
+   },
+   {
+    "game_start": 3519035,
+    "game_end": 3580796,
+    "flac_start": 316805,
+    "flac_end": 378566,
+    "offset_start": -3202230,
+    "offset_end": -3202230,
+    "speed": 1.0,
+    "gain": 0.888,
+    "corr": 0.8309,
+    "snr_db": 5.1,
+    "confidence": "low"
+   },
+   {
+    "game_start": 3580796,
+    "game_end": 4367144,
+    "flac_start": 6345010,
+    "flac_end": 7131369,
+    "offset_start": 2764214,
+    "offset_end": 2764225,
+    "speed": 1.000014,
+    "gain": 0.9002,
+    "corr": 0.9955,
+    "snr_db": 20.5,
+    "confidence": "high"
+   },
+   {
+    "game_start": 4367144,
+    "game_end": 4419423,
+    "flac_start": 7914409,
+    "flac_end": 7966688,
+    "offset_start": 3547265,
+    "offset_end": 3547265,
+    "speed": 1.0,
+    "gain": 0.9172,
+    "corr": 0.9864,
+    "snr_db": 15.7,
+    "confidence": "high"
+   },
+   {
+    "game_start": 4419423,
+    "game_end": 4512728,
+    "flac_start": 236536,
+    "flac_end": 329841,
+    "offset_start": -4182887,
+    "offset_end": -4182887,
+    "speed": 1.0,
+    "gain": 1.3803,
+    "corr": 0.9188,
+    "snr_db": 8.1,
+    "confidence": "medium"
+   },
+   {
+    "game_start": 4512728,
+    "game_end": 4607960,
+    "flac_start": 232065,
+    "flac_end": 327297,
+    "offset_start": -4280663,
+    "offset_end": -4280663,
+    "speed": 1.0,
+    "gain": 1.3962,
+    "corr": 0.9278,
+    "snr_db": 8.6,
+    "confidence": "medium"
+   },
+   {
+    "game_start": 4607960,
+    "game_end": 5349508,
+    "flac_start": 6391548,
+    "flac_end": 7133106,
+    "offset_start": 1783588,
+    "offset_end": 1783598,
+    "speed": 1.000013,
+    "gain": 0.9016,
+    "corr": 0.9956,
+    "snr_db": 20.5,
+    "confidence": "high"
+   },
+   {
+    "game_start": 5349508,
+    "game_end": 5462392,
+    "flac_start": 7914409,
+    "flac_end": 8027293,
+    "offset_start": 2564901,
+    "offset_end": 2564901,
+    "speed": 1.0,
+    "gain": 0.8992,
+    "corr": 0.9803,
+    "snr_db": 14.1,
+    "confidence": "medium"
+   }
+  ],
+  "unmatched_game_ranges": [
+   {
+    "game_start": 2722928,
+    "game_end": 2750488
+   },
+   {
+    "game_start": 5462392,
+    "game_end": 5483138
+   }
+  ],
+  "fade_out": null,
+  "gain_linear": 0.9045,
+  "gain_db": -0.87,
+  "match": {
+   "duration_weighted_corr": 0.9804,
+   "matched_fraction": 0.9912
+  }
+ }
+]

@@ -4,6 +4,8 @@
  *   # comment            ; comment
  *   [input]
  *   dpad_steering = 1    -> key "input.dpad_steering" (also stick_8way)
+ *   [audio]
+ *   smooth_resample = 2  -> key "audio.smooth_resample" (0 original, 1 linear, 2 cubic)
  *
  * Read once, on the first query. A missing file means every option at its default (vanilla). Values are
  * integers (decimal or 0x hex); unknown keys and bad lines are logged and ignored. Options that would change
@@ -25,8 +27,9 @@ static int gCount, gLoaded;
 
 /* The keys this build knows (all off by default). */
 static const char *const kKnownKeys[] = {
-    "input.dpad_steering", /* P7: the d-pad also sets the stick axes */
-    "input.stick_8way",    /* P7-B: the left stick snaps to 8 directions */
+    "input.dpad_steering",   /* P7: the d-pad also sets the stick axes */
+    "input.stick_8way",      /* P7-B: the left stick snaps to 8 directions */
+    "audio.smooth_resample", /* P9 note: 0 original mixer, 1 linear, 2 cubic resampling (smoothmix.c) */
 };
 
 static int known(const char *key)

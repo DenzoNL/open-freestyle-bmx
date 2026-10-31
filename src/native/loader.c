@@ -13,6 +13,7 @@
 #include "hook/hook.h"
 #include "native/native.h"
 #include "platform/platform.h"
+#include "platform/smoothmix.h"
 #include "png/png.h"
 
 /* Same value as tools/known_exe.txt. */
@@ -311,6 +312,23 @@ static int loadImage(const uint8_t *file, size_t size)
         writeJump(bmxPngJumps[i].orig, bmxPngJumps[i].impl);
     }
     bmxLog("png: %u jumps\n", (unsigned)bmxPngJumpCount);
+    /* [audio] smooth_resample: the opt-in interpolating mixer replaces the ported winchanMix (which
+     * winchanPump calls directly: the jump goes over our own function's entry in the exe's .text). */
+    {
+        uint32_t smoothCount;
+        const BmxHook *const smooth = bmxSmoothJumps(&smoothCount);
+
+        for (uint32_t i = 0; i < smoothCount; i++) {
+            DWORD prot;
+
+            if (!VirtualProtect((void *)(uintptr_t)smooth[i].orig, 5, PAGE_EXECUTE_READWRITE, &prot)) {
+                bmxLog("smooth: cannot patch %#x (error %lu)\n", (unsigned)smooth[i].orig, GetLastError());
+                return -1;
+            }
+            writeJump(smooth[i].orig, smooth[i].impl);
+        }
+        bmxLog("smooth: %u jumps\n", (unsigned)smoothCount);
+    }
     if (pngCheck) {
         bmxPngCheckArm();
     }

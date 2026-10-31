@@ -19,7 +19,12 @@
 #define DIRECTINPUT_VERSION 0x0700
 #include <dinput.h>
 
+/* The mixer's state is at the original's addresses: ORIG_VAR in its BMX_HOOK form. */
+#define BMX_HOOK 1
+#include "bmx/pc/zge/sound/winchan.h"
+#undef BMX_HOOK
 #include "platform/input.h"
+#include "platform/smoothmix.h"
 #include "platform/sound.h"
 #include "platform/standins.h"
 
@@ -1899,6 +1904,332 @@ static void testSound(void)
     DestroyWindow(window);
 }
 
+/* ---- smooth resampling mixer (src/platform/smoothmix.c) against the real winchanMix ---- */
+
+/* winchan.c's two loader calls; the mixer never makes them (the test sets the channels up by hand). */
+ZsdSample *winloadGetSample(uint16_t file, uint32_t index)
+{
+    return NULL;
+}
+
+WinloadSampleFile *winloadGetSampleFile(uint16_t file, uint32_t index)
+{
+    return NULL;
+}
+
+enum { kSmokeFrames = 600 };
+
+/* The mixer's state lives at the original's addresses: clear it all. */
+static void smoothReset(void)
+{
+    free(gWinchanEchoBuffer);
+    memset((void *)(uintptr_t)0x400000, 0, 0x2a0000);
+    gWinchanRate = 22050;
+    gWinchanEffectMaxFrames = 1000;
+    gWinchanEchoBuffer = (WinchanFrame *)calloc(1000, sizeof(WinchanFrame));
+}
+
+/* Channel 0 plays `sample` (voice v): length, step (20.12), start position and fraction. */
+static void smoothChannel(const ZsdSample *sample, const ZsdVoice *v, uint32_t length, uint32_t step,
+                          uint32_t position, uint32_t fraction)
+{
+    WinchanChannel *ch = &gWinchanChannels[0];
+
+    memset(ch, 0, sizeof *ch);
+    ch->state = kWinchanPlaying;
+    ch->voice = v;
+    ch->sample = sample;
+    ch->length = length;
+    ch->step = step;
+    ch->position = position;
+    ch->fraction = fraction;
+    ch->gainLeft = 2.0f; /* output = sample value */
+    ch->gainRight = 1.5f;
+    ch->level = 1.0f;
+}
+
+/* Renders frames with the real winchanMix (mode < 0) or the smooth one, from a saved state. */
+typedef struct SmokeState {
+    WinchanChannel ch;
+    int32_t flangerPos, echoPos;
+} SmokeState;
+
+static void smokeRender(int mode, const SmokeState *from, int16_t *out, uint32_t frames)
+{
+    gWinchanChannels[0] = *&from->ch;
+    gWinchanFlangerPos = from->flangerPos;
+    gWinchanEchoPos = from->echoPos;
+    memset(gWinchanEchoBuffer, 0, 1000 * sizeof(WinchanFrame));
+    memset(gWinchanFlangerLine, 0, sizeof gWinchanFlangerLine);
+    gWinchanFlangerPhase = 0;
+    gWinchanFlangerDelay = 0;
+    if (mode < 0) {
+        winchanMix((uint8_t *)out, frames * 4);
+    } else {
+        bmxSmoothMixMode((uint8_t *)out, frames * 4, mode);
+    }
+}
+
+/* One channel, effects off or on: the smooth mixer in `mode` against the original. */
+static void smoothIdentical(const char *what, const ZsdSample *sample, const ZsdVoice *v, uint32_t length,
+                            uint32_t step, uint32_t fraction, int mode, int withEffects)
+{
+    static int16_t a[kSmokeFrames * 2], b[kSmokeFrames * 2];
+    SmokeState s;
+
+    smoothChannel(sample, v, length, step, 1, fraction);
+    gWinchanEffectAFrames = withEffects ? 37 : 0;
+    gWinchanEffectAGain = 0.5f;
+    gWinchanEchoFeedback = 0.25f;
+    gWinchanEffectBTailStart = withEffects ? 3 : 0;
+    gWinchanEffectBTail = 0x40000;
+    gWinchanEffectBFrames = 5;
+    gWinchanEffectBGain = 0.5f;
+    for (int i = 0; i < 4096; i++) {
+        gWinchanLfoTable[i] = (uint16_t)(i < 2048 ? i * 2 : (4095 - i) * 2);
+    }
+    gWinchanChannels[0].gainLeft = 3.0f;
+    s.ch = gWinchanChannels[0];
+    s.flangerPos = 7;
+    s.echoPos = 11;
+    smokeRender(-1, &s, a, kSmokeFrames);
+    smokeRender(mode, &s, b, kSmokeFrames);
+    CHECK(memcmp(a, b, sizeof a) == 0, "%s mode %d step %#x frac %u effects %d", what, mode, (unsigned)step,
+          (unsigned)fraction, withEffects);
+}
+
+/* Magnitude of the DFT of the left channel at `hz` (rate 22050). */
+static double smoothMagnitude(const int16_t *out, uint32_t frames, double hz)
+{
+    double re = 0, im = 0;
+
+    for (uint32_t i = 0; i < frames; i++) {
+        const double ph = 2.0 * 3.14159265358979323846 * hz * (double)i / 22050.0;
+
+        re += (double)out[i * 2] * cos(ph);
+        im += (double)out[i * 2] * sin(ph);
+    }
+    return sqrt(re * re + im * im) / (double)frames;
+}
+
+static void smoothCheckBoundaries(void)
+{
+    ZsdVoice v;
+    ZsdSample s;
+    WinchanChannel ch;
+    int16_t d[8];
+    int16_t out[2];
+    int16_t stereo[16];
+    uint8_t bytes[8];
+
+    memset(&v, 0, sizeof v);
+    memset(&s, 0, sizeof s);
+    memset(&ch, 0, sizeof ch);
+    for (int i = 0; i < 8; i++) {
+        d[i] = (int16_t)(100 * (i + 1) * (i % 2 ? -1 : 1));
+        stereo[i * 2] = (int16_t)(40 * (i + 1));
+        stereo[i * 2 + 1] = (int16_t)(-80 * (i + 1));
+        bytes[i] = (uint8_t)(0x80 + 16 * (i + 1));
+    }
+    s.data = (const uint8_t *)d;
+    ch.sample = &s;
+    ch.length = 8;
+    s.loopStart = 2;
+
+    /* One shot: clamped at both ends. */
+    s.format = 0;
+    CHECK(bmxSmoothNeighbour(&ch, 8) == 7 && bmxSmoothNeighbour(&ch, 9) == 7, "one shot clamps at the end");
+    CHECK(bmxSmoothNeighbour(&ch, -1) == 0 && bmxSmoothNeighbour(&ch, 3) == 3, "one shot clamps at 0");
+    /* Loop: wraps by length - loopStart. */
+    s.format = 1;
+    CHECK(bmxSmoothNeighbour(&ch, 8) == 2 && bmxSmoothNeighbour(&ch, 9) == 3, "loop wraps to the loop start");
+    CHECK(bmxSmoothNeighbour(&ch, 1) == 1 && bmxSmoothNeighbour(&ch, 0) == 0, "loop: before the loop");
+    s.loopStart = 8; /* a loop of nothing: stays on the last frame */
+    CHECK(bmxSmoothNeighbour(&ch, 9) == 7, "empty loop clamps");
+    s.loopStart = 2;
+    /* Ping-pong: mirrors at length - 1, and at the loop start when running backwards. */
+    s.format = 1 | 8;
+    ch.step = 0x1000;
+    CHECK(bmxSmoothNeighbour(&ch, 8) == 6 && bmxSmoothNeighbour(&ch, 9) == 5, "ping-pong mirrors at the end");
+    CHECK(bmxSmoothNeighbour(&ch, 1) == 1, "ping-pong forward: before the loop start is real data");
+    ch.step = (uint32_t)-0x1000;
+    CHECK(bmxSmoothNeighbour(&ch, 1) == 3 && bmxSmoothNeighbour(&ch, 0) == 4, "ping-pong backwards mirrors");
+    CHECK(bmxSmoothNeighbour(&ch, 2) == 2, "ping-pong backwards: loop start itself");
+
+    /* Through the mixer (gain 2: the output is the interpolated value). */
+#define ONE(fmt, pos, frac, mode, expectL, expectR)                                                          \
+    do {                                                                                                     \
+        const int32_t el = (expectL), er = (expectR);                                                        \
+        s.format = (fmt);                                                                                    \
+        smoothChannel(&s, &v, 8, 0, (pos), (frac));                                                          \
+        gWinchanChannels[0].gainRight = 2.0f;                                                                \
+        bmxSmoothMixMode((uint8_t *)out, 4, (mode));                                                         \
+        CHECK(out[0] == el >> 1 && out[1] == er >> 1,                                                        \
+              "mixer format %d mode %d at %d: %d %d, expected %d %d", (fmt), (mode), (pos), out[0], out[1],  \
+              el >> 1, er >> 1);                                                                             \
+    } while (0)
+    /* d: 100 -200 300 -400 500 -600 700 -800. Loop: frame 7 and half way to frame 2 (300). */
+    ONE(1, 7, 0x800, 1, -800 + 300, -800 + 300);
+    /* Ping-pong at the end: the neighbour is frame 6 (700). */
+    ONE(1 | 8, 7, 0x800, 1, -800 + 700, -800 + 700);
+    /* One shot at the end: held. */
+    ONE(0, 7, 0x800, 1, -800 * 2, -800 * 2);
+    {
+        int16_t ramp[8] = {0, 100, 200, 300, 400, 500, 600, 700};
+
+        s.data = (const uint8_t *)ramp;
+        /* A line is interpolated exactly by both. */
+        ONE(0, 3, 0x400, 2, 2 * 325, 2 * 325);
+        ONE(0, 3, 0x400, 1, 2 * 325, 2 * 325);
+        s.data = (const uint8_t *)d;
+    }
+    /* Stereo 16 bit: left 40 x (i+1), right -80 x (i+1); frame 3 and a quarter. */
+    s.data = (const uint8_t *)stereo;
+    ONE(2, 3, 0x400, 1, 2 * 170, 2 * -340);
+    /* 8 bit mono: byte 0x80 + 16 x (i+1) is 256 x 16 x (i+1); frame 0 and half. */
+    s.data = bytes;
+    ONE(4, 0, 0x800, 1, 2 * 24 * 256, 2 * 24 * 256);
+    /* 8 bit stereo: frames (16, 32) and (48, 64) (x 256). */
+    ONE(4 | 2, 0, 0x800, 1, 2 * 32 * 256, 2 * 48 * 256);
+#undef ONE
+}
+
+static void testSmoothMix(void)
+{
+    ZsdVoice v;
+    ZsdSample s;
+    uint32_t count = 0;
+    static int16_t data[2205];
+    static int16_t outOrig[4410 * 2], outLin[4410 * 2], outCub[4410 * 2];
+    SmokeState st;
+    DWORD oldProtect;
+    /* The exe owns the range (src/native/range.S, as bmxnative does): make it writable. */
+    void *range = VirtualProtect((void *)(uintptr_t)0x400000, 0x2a0000, PAGE_READWRITE, &oldProtect)
+                      ? (void *)(uintptr_t)0x400000
+                      : NULL;
+
+    /* The option: off unless set to 1 or 2 (above 2 counts as cubic). */
+    bmxConfigLoadText("", "test");
+    (void)bmxSmoothJumps(&count);
+    CHECK(count == 1, "smooth_resample unset: cubic by default, the swap is installed");
+    bmxConfigLoadText("[audio]\nsmooth_resample = 0\n", "test");
+    (void)bmxSmoothJumps(&count);
+    CHECK(count == 0, "smooth_resample = 0: no swap");
+    for (int mode = 1; mode <= 2; mode++) {
+        const BmxHook *jumps;
+        char text[64];
+
+        snprintf(text, sizeof text, "[audio]\nsmooth_resample = %d\n", mode);
+        bmxConfigLoadText(text, "test");
+        jumps = bmxSmoothJumps(&count);
+        CHECK(count == 1 && jumps[0].impl == (void *)bmxSmoothMix &&
+                  jumps[0].orig == (uint32_t)(uintptr_t)winchanMix,
+              "smooth_resample = %d installs the swap over winchanMix", mode);
+    }
+    bmxConfigLoadText("[audio]\nsmooth_resample = 9\n", "test");
+    (void)bmxSmoothJumps(&count);
+    CHECK(count == 1, "smooth_resample above 2 counts as 2");
+    bmxConfigLoadText("", "test");
+
+    CHECK(range != NULL, "the original's address range belongs to the test exe");
+    if (range == NULL) {
+        return;
+    }
+    smoothReset();
+
+    /* Fraction 0 at step 0x1000 (and mode 0 at any step): identical to the original winchanMix, for every
+     * sample kind, with and without the echo and the flanger. */
+    {
+        static const struct {
+            const char *what;
+            uint16_t format;
+            uint32_t length;
+        } kinds[] = {
+            {"16 bit mono one shot", 0, 700},     {"16 bit mono loop", 1, 90},
+            {"16 bit mono ping-pong", 1 | 8, 90}, {"16 bit stereo loop", 1 | 2, 90},
+            {"8 bit mono loop", 1 | 4, 90},       {"8 bit stereo ping-pong", 1 | 2 | 4 | 8, 90},
+        };
+        static int16_t noise[2000];
+        uint32_t seed = 12345;
+
+        for (int i = 0; i < 2000; i++) {
+            seed = seed * 1664525u + 1013904223u;
+            noise[i] = (int16_t)(seed >> 16);
+        }
+        memset(&v, 0, sizeof v);
+        memset(&s, 0, sizeof s);
+        v.fade = 0x7f;
+        s.data = (const uint8_t *)noise;
+        s.loopStart = 20;
+        for (size_t k = 0; k < sizeof kinds / sizeof kinds[0]; k++) {
+            s.format = kinds[k].format;
+            for (int fx = 0; fx < 2; fx++) {
+                for (int mode = 0; mode <= 2; mode++) {
+                    smoothIdentical(kinds[k].what, &s, &v, kinds[k].length, 0x1000, 0, mode, fx);
+                }
+                smoothIdentical(kinds[k].what, &s, &v, kinds[k].length, 0x1800, 0x3c0, 0, fx);
+                smoothIdentical(kinds[k].what, &s, &v, kinds[k].length, 0x2000, 0, 2, fx);
+            }
+        }
+        /* An attack envelope (the level changes every frame). */
+        smoothChannel(&s, &v, 90, 0x1000, 1, 0);
+        gWinchanChannels[0].phase = kWinchanPhaseAttack;
+        gWinchanChannels[0].levelStep = 0.02f;
+        gWinchanChannels[0].phaseFrames = 40;
+        st.ch = gWinchanChannels[0];
+        st.flangerPos = 0;
+        st.echoPos = 0;
+        {
+            static int16_t a[kSmokeFrames * 2], b[kSmokeFrames * 2];
+
+            gWinchanEffectAFrames = 0;
+            gWinchanEffectBTailStart = 0;
+            smokeRender(-1, &st, a, kSmokeFrames);
+            smokeRender(2, &st, b, kSmokeFrames);
+            CHECK(memcmp(a, b, sizeof a) == 0, "envelope: same as the original");
+        }
+    }
+
+    /* A sine at 1 kHz in an 11,025 Hz sample, played at 22,050 Hz (step 0x800): the zero-order hold images it
+     * at 11025 - 1000 Hz; interpolation attenuates the image. */
+    smoothReset();
+    for (int i = 0; i < 2205; i++) {
+        data[i] = (int16_t)lrint(12000.0 * sin(2.0 * 3.14159265358979323846 * 1000.0 * i / 11025.0));
+    }
+    memset(&v, 0, sizeof v);
+    memset(&s, 0, sizeof s);
+    v.fade = 0x7f;
+    s.format = 1;
+    s.data = (const uint8_t *)data;
+    smoothChannel(&s, &v, 2205, 0x800, 0, 0);
+    st.ch = gWinchanChannels[0];
+    st.flangerPos = 0;
+    st.echoPos = 0;
+    smokeRender(-1, &st, outOrig, 4410);
+    smokeRender(1, &st, outLin, 4410);
+    smokeRender(2, &st, outCub, 4410);
+    {
+        const double f0 = 1000.0, image = 11025.0 - 1000.0;
+        const double o0 = smoothMagnitude(outOrig, 4410, f0), o1 = smoothMagnitude(outOrig, 4410, image);
+        const double l0 = smoothMagnitude(outLin, 4410, f0), l1 = smoothMagnitude(outLin, 4410, image);
+        const double c0 = smoothMagnitude(outCub, 4410, f0), c1 = smoothMagnitude(outCub, 4410, image);
+
+        printf("smooth: 1 kHz tone / image at %.0f Hz: original %.1f / %.1f, linear %.1f / %.1f, cubic %.1f "
+               "/ %.1f\n",
+               image, o0, o1, l0, l1, c0, c1);
+        CHECK(o1 > 0.1 * o0, "the original has an image");
+        CHECK(l1 < 0.5 * o1 && c1 < 0.5 * l1, "image energy: original %.1f, linear %.1f, cubic %.1f", o1, l1,
+              c1);
+        CHECK(l0 > 0.95 * o0 && c0 > 0.95 * o0, "the tone itself keeps its level");
+    }
+
+    smoothReset();
+    smoothCheckBoundaries();
+    free(gWinchanEchoBuffer);
+    gWinchanEchoBuffer = NULL;
+    VirtualProtect(range, 0x2a0000, oldProtect, &oldProtect);
+}
+
 int main(void)
 {
     SetEnvironmentVariableA("BMX_FILE_CHECK", "1"); /* every call above is also made through kernel32 */
@@ -1918,6 +2249,7 @@ int main(void)
     testTwoPads();
     testConfig();
     testSound();
+    testSmoothMix();
     bmxPlatformShutdown();
     printf("%d checks, %d failures\n", checks, failures);
     return failures != 0;

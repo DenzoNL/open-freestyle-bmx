@@ -127,6 +127,8 @@ round floats (so the hook build uses SSE2, not x87). Rules are in CONTRIBUTING.m
   `stick_8way` (bmxnative.ini `[input]`) default **on**: the original reads only the stick (axial 10% dead
   zone), which makes pure directions (backflip) very hard on a thumbstick. They act on the pad's lX/lY only,
   after `BMX_INPUT_CHECK` compares, so the game still sees DirectInput-shaped input; `= 0` gives vanilla.
+  Likewise `[audio] smooth_resample` defaults to 2 (cubic interpolation in a copy of the effects mixer
+  instead of the original zero-order hold); `= 0` gives the original mixer.
 
 ## Enhancement backlog (P6+, unordered)
 
@@ -142,6 +144,11 @@ round floats (so the hook build uses SSE2, not x87). Rules are in CONTRIBUTING.m
   rumble, key rebinding; crash fixes for original bugs found while porting (uninitialised stack in the
   device dialog, skid fps 0 divide, zrwEpicFail buffer overflow, NULL reads before checks) — anything
   that changes normal-play behaviour becomes an option instead.
+- PS1 blend modes (opt-in, ~2-3 days): the PC port collapses the PS1 semi-transparency modes in ngifpsx.c
+  blendFlags() to D3D7 states (mode 2 B-F becomes a multiply, mode 3 B+F/4 a full add, mode 0 a vertex-alpha
+  fake); the SDL3 driver can render the real maths (reverse subtract, quarter add) if the ABR is carried down as
+  a render state. Visible in overlay fades/bars and HUD text. (Checked 2026-10-31: looping sounds are culled and
+  vertex colours are PC-authored 0..255, so those PS1-vs-PC issues of other ports do not apply here.)
 - Graphics options: texture filtering, MSAA/anisotropic, shadow resolution, draw/fog distance, HUD
   anchoring for widescreen/ultrawide, UI scaling.
 - RTX Remix: hooks only D3D9 fixed-function. Try now on the original exe via a DX7→D3D9 wrapper
