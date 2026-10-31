@@ -2242,14 +2242,15 @@ typedef struct WaveApi {
     MMRESULT(WINAPI *restart)(HWAVEOUT);
     MMRESULT(WINAPI *reset)(HWAVEOUT);
     MMRESULT(WINAPI *close)(HWAVEOUT);
+    BOOL(WINAPI *peek)(MSG *, HWND, UINT, UINT, UINT); /* where the device's messages arrive */
 } WaveApi;
 
 enum { kWaveHeaders = 6, kWaveTrace = 96 };
 
 /* Waits up to `ms` for window messages from the device; each MM_WOM_* goes into the trace as message * 16 +
  * header index (+15: no header) when wParam is the device. Returns how many MM_WOM_DONE came. */
-static int wavePump(HWND window, HWAVEOUT device, WAVEHDR *headers, int ms, int stopAfter, uint32_t *trace,
-                    int *n)
+static int wavePump(const WaveApi *api, HWND window, HWAVEOUT device, WAVEHDR *headers, int ms, int stopAfter,
+                    uint32_t *trace, int *n)
 {
     const uint64_t end = SDL_GetTicks() + (uint64_t)ms;
     int done = 0;
@@ -2257,7 +2258,7 @@ static int wavePump(HWND window, HWAVEOUT device, WAVEHDR *headers, int ms, int 
     while (SDL_GetTicks() < end && (stopAfter == 0 || done < stopAfter)) {
         MSG msg;
 
-        if (!PeekMessageA(&msg, window, MM_WOM_OPEN, MM_WOM_DONE, PM_REMOVE)) {
+        if (!api->peek(&msg, window, MM_WOM_OPEN, MM_WOM_DONE, PM_REMOVE)) {
             SDL_Delay(1);
             continue;
         }
@@ -2297,7 +2298,7 @@ static int waveScript(const WaveApi *api, HWND window, uint32_t *trace)
     if (trace[0] != 0) {
         return n;
     }
-    wavePump(window, device, headers, 100, 0, trace, &n);
+    wavePump(api, window, device, headers, 100, 0, trace, &n);
     trace[n++] = api->write(device, &headers[0], sizeof headers[0]); /* not prepared */
     for (int i = 0; i < kWaveHeaders; i++) {
         trace[n++] = api->prepare(device, &headers[i], sizeof headers[i]);
@@ -2314,10 +2315,11 @@ static int waveScript(const WaveApi *api, HWND window, uint32_t *trace)
         uint32_t ignored[kWaveTrace];
         int none = 0;
 
-        trace[n++] = (uint32_t)wavePump(window, device, headers, 150, 0, ignored, &none); /* paused: none */
+        trace[n++] =
+            (uint32_t)wavePump(api, window, device, headers, 150, 0, ignored, &none); /* paused: none */
     }
     trace[n++] = api->restart(device);
-    trace[n++] = (uint32_t)wavePump(window, device, headers, 3000, 4, trace, &n);
+    trace[n++] = (uint32_t)wavePump(api, window, device, headers, 3000, 4, trace, &n);
     for (int i = 0; i < 4; i++) {
         trace[n++] = headers[i].dwFlags;
     }
@@ -2326,7 +2328,7 @@ static int waveScript(const WaveApi *api, HWND window, uint32_t *trace)
     trace[n++] = api->unprepare(device, &headers[4], sizeof headers[4]); /* still queued */
     trace[n++] = api->close(device);                                     /* still playing */
     trace[n++] = api->reset(device);
-    trace[n++] = (uint32_t)wavePump(window, device, headers, 1000, 2, trace, &n);
+    trace[n++] = (uint32_t)wavePump(api, window, device, headers, 1000, 2, trace, &n);
     trace[n++] = headers[4].dwFlags;
     trace[n++] = headers[5].dwFlags;
     for (int i = 0; i < kWaveHeaders; i++) {
@@ -2334,7 +2336,7 @@ static int waveScript(const WaveApi *api, HWND window, uint32_t *trace)
         trace[n++] = headers[i].dwFlags;
     }
     trace[n++] = api->close(device);
-    wavePump(window, device, headers, 200, 0, trace, &n);
+    wavePump(api, window, device, headers, 200, 0, trace, &n);
     return n;
 }
 
@@ -2352,6 +2354,7 @@ static void testWaveOut(void)
         (void *)bmxRealProc("WINMM.dll", "waveOutRestart"),
         (void *)bmxRealProc("WINMM.dll", "waveOutReset"),
         (void *)bmxRealProc("WINMM.dll", "waveOutClose"),
+        PeekMessageA,
     };
     const WaveApi ours = {
         "ours",
@@ -2363,6 +2366,7 @@ static void testWaveOut(void)
         (void *)bmxStandWaveOutRestart,
         (void *)bmxStandWaveOutReset,
         (void *)bmxStandWaveOutClose,
+        (void *)bmxStandPeekMessageA, /* our message queue (window.c) */
     };
     uint32_t a[kWaveTrace], b[kWaveTrace];
     int na, nb;
@@ -2389,6 +2393,257 @@ static void testWaveOut(void)
     DestroyWindow(window);
 }
 
+/* ---- the window, the message queue and message boxes (window.c) ---- */
+
+enum { kMaxRecorded = 64 };
+
+static struct {
+    uint32_t message[kMaxRecorded];
+    uintptr_t wParam[kMaxRecorded], lParam[kMaxRecorded];
+    int n;
+} gProcLog;
+
+/* A window procedure shaped like the game's: WM_GETMINMAXINFO locks the size, WM_DESTROY quits, the rest goes
+ * to DefWindowProc. */
+static intptr_t BMX_WINAPI testProc(void *window, uint32_t message, uintptr_t wParam, uintptr_t lParam)
+{
+    if (gProcLog.n < kMaxRecorded) {
+        gProcLog.message[gProcLog.n] = message;
+        gProcLog.wParam[gProcLog.n] = wParam;
+        gProcLog.lParam[gProcLog.n] = lParam;
+        gProcLog.n++;
+    }
+    switch (message) {
+    case WM_GETMINMAXINFO:
+        ((MINMAXINFO *)lParam)->ptMaxTrackSize.x = 640;
+        ((MINMAXINFO *)lParam)->ptMaxTrackSize.y = 480;
+        return 0;
+    case WM_DESTROY:
+        bmxStandClipCursor(NULL);
+        bmxStandPostQuitMessage(0);
+        return 0;
+    default:
+        return bmxStandDefWindowProcA(window, message, wParam, lParam);
+    }
+}
+
+static int procSaw(uint32_t message, uintptr_t wParam)
+{
+    for (int i = 0; i < gProcLog.n; i++) {
+        if (gProcLog.message[i] == message && gProcLog.wParam[i] == wParam) {
+            return i + 1;
+        }
+    }
+    return 0;
+}
+
+/* Message boxes are "shown" through this hook, which answers like a user (BMX_KEYS style) and records them.
+ */
+static struct {
+    int shown, answer;
+    char title[64], text[128];
+    int buttons, ids[3], defaultId, escapeId;
+    SDL_MessageBoxFlags flags;
+} gBox;
+
+static int boxHook(const SDL_MessageBoxData *box)
+{
+    gBox.shown++;
+    SDL_strlcpy(gBox.title, box->title, sizeof gBox.title);
+    SDL_strlcpy(gBox.text, box->message, sizeof gBox.text);
+    gBox.buttons = box->numbuttons;
+    gBox.flags = box->flags;
+    gBox.defaultId = gBox.escapeId = 0;
+    for (int i = 0; i < box->numbuttons && i < 3; i++) {
+        gBox.ids[i] = box->buttons[i].buttonID;
+        if ((box->buttons[i].flags & SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT) != 0) {
+            gBox.defaultId = box->buttons[i].buttonID;
+        }
+        if ((box->buttons[i].flags & SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT) != 0) {
+            gBox.escapeId = box->buttons[i].buttonID;
+        }
+    }
+    return gBox.answer;
+}
+
+static void testMessageBoxes(void)
+{
+    static const char quit[] = "Do you want to quit the game?";
+    static const char title[] = "Dave Mirra Freestyle BMX";
+
+    bmxWindowSetMessageBoxHook(boxHook);
+    /* [ui] confirm_quit off (the default): the quit prompt is answered Yes, no box. */
+    bmxConfigLoadText("", "test");
+    memset(&gBox, 0, sizeof gBox);
+    CHECK(bmxStandMessageBoxA(NULL, quit, title, 0x10124) == IDYES, "quit prompt answered Yes");
+    CHECK(gBox.shown == 0, "no box for the quit prompt with confirm_quit = 0");
+    /* Other boxes still show: the same text with another style, another text with the same style, an assert.
+     */
+    gBox.answer = IDNO;
+    CHECK(bmxStandMessageBoxA(NULL, quit, title, 4 /* MB_YESNO */) == IDNO && gBox.shown == 1,
+          "other style shown");
+    CHECK(bmxStandMessageBoxA(NULL, "Quit?", title, 0x10124) == IDNO && gBox.shown == 2, "other text shown");
+    gBox.answer = IDCANCEL;
+    CHECK(bmxStandMessageBoxA(NULL, "***ASSERT***", "Error", 0x42013) == IDCANCEL && gBox.shown == 3,
+          "assert box shown");
+    CHECK(gBox.buttons == 3 && gBox.ids[0] == IDYES && gBox.ids[1] == IDNO && gBox.ids[2] == IDCANCEL &&
+              gBox.defaultId == IDYES && gBox.escapeId == IDCANCEL &&
+              (gBox.flags & SDL_MESSAGEBOX_ERROR) != 0,
+          "assert box: Yes / No / Cancel, default Yes, Esc Cancel, error icon");
+    /* [ui] confirm_quit = 1: the box as in the original. */
+    bmxConfigLoadText("[ui]\nconfirm_quit = 1\n", "test");
+    memset(&gBox, 0, sizeof gBox);
+    gBox.answer = IDYES;
+    CHECK(bmxStandMessageBoxA(NULL, quit, title, 0x10124) == IDYES && gBox.shown == 1, "quit prompt shown");
+    CHECK(strcmp(gBox.text, quit) == 0 && strcmp(gBox.title, title) == 0, "quit prompt text \"%s\" / \"%s\"",
+          gBox.text, gBox.title);
+    CHECK(gBox.buttons == 2 && gBox.ids[0] == IDYES && gBox.ids[1] == IDNO && gBox.defaultId == IDNO &&
+              gBox.escapeId == 0 && (gBox.flags & SDL_MESSAGEBOX_INFORMATION) != 0,
+          "quit prompt: Yes / No, default No (MB_DEFBUTTON2), no Esc button");
+    gBox.answer = IDNO;
+    CHECK(bmxStandMessageBoxA(NULL, quit, title, 0x10124) == IDNO, "quit prompt: No");
+    gBox.answer = -1;
+    CHECK(bmxStandMessageBoxA(NULL, quit, title, 0x10124) == IDNO, "quit prompt closed: the default, No");
+    gBox.answer = -1;
+    CHECK(bmxStandMessageBoxA(NULL, "x", "y", 1 /* MB_OKCANCEL */) == IDCANCEL, "OK / Cancel closed: Cancel");
+    /* A scripted run (BMX_KEYS) answers without a box: Yes / No -> Yes, Yes / No / Cancel -> Cancel, else OK.
+     */
+    gScripted = 1;
+    memset(&gBox, 0, sizeof gBox);
+    CHECK(bmxStandMessageBoxA(NULL, quit, title, 0x10124) == IDYES, "scripted quit prompt");
+    CHECK(bmxStandMessageBoxA(NULL, "***ASSERT***", "Error", 0x42013) == IDCANCEL, "scripted assert");
+    CHECK(bmxStandMessageBoxA(NULL, "error", "Error", 0x42010) == IDOK, "scripted error");
+    CHECK(gBox.shown == 0, "no box in a scripted run");
+    gScripted = 0;
+    bmxConfigLoadText("", "test");
+    bmxWindowSetMessageBoxHook(NULL);
+    printf("message boxes: quit prompt skipped by default, shown with confirm_quit = 1\n");
+}
+
+/* The queue on its own (no window): filters, order, WM_QUIT last, posting from another thread. */
+static int SDLCALL postFromThread(void *data)
+{
+    for (int i = 0; i < 100; i++) {
+        bmxWindowPost(data, MM_WOM_DONE, 1, (uintptr_t)i);
+    }
+    return 0;
+}
+
+static void testMessageQueue(void)
+{
+    void *const token = (void *)(uintptr_t)0x1234;
+    BmxMsg msg;
+    SDL_Thread *thread;
+    int got = 0, inOrder = 1;
+
+    while (bmxStandPeekMessageA(&msg, NULL, 0, 0, PM_REMOVE)) {
+    }
+    CHECK(!bmxStandPeekMessageA(&msg, NULL, 0, 0, PM_REMOVE), "empty");
+    bmxWindowPost(token, 0x400, 7, 8);
+    bmxWindowPost(token, MM_WOM_OPEN, 1, 0);
+    CHECK(bmxStandPeekMessageA(&msg, token, MM_WOM_OPEN, MM_WOM_DONE, PM_NOREMOVE) &&
+              msg.message == MM_WOM_OPEN,
+          "filtered peek: 0x%x", msg.message);
+    CHECK(bmxStandPeekMessageA(&msg, (void *)(uintptr_t)0x999, 0, 0, PM_REMOVE) == 0, "other window: none");
+    CHECK(bmxStandPeekMessageA(&msg, NULL, 0, 0, PM_REMOVE) && msg.message == 0x400 && msg.window == token &&
+              msg.wParam == 7 && msg.lParam == 8,
+          "first in, first out");
+    bmxStandPostQuitMessage(5);
+    CHECK(bmxStandPeekMessageA(&msg, NULL, 0, 0, PM_REMOVE) && msg.message == MM_WOM_OPEN, "then the second");
+    CHECK(bmxStandPeekMessageA(&msg, token, MM_WOM_OPEN, MM_WOM_DONE, PM_REMOVE) && msg.message == WM_QUIT &&
+              msg.wParam == 5,
+          "WM_QUIT once the queue is empty (any filter)");
+    CHECK(!bmxStandPeekMessageA(&msg, NULL, 0, 0, PM_REMOVE), "WM_QUIT only once");
+    thread = SDL_CreateThread(postFromThread, "post", token);
+    while (got < 100) {
+        if (bmxStandPeekMessageA(&msg, token, MM_WOM_DONE, MM_WOM_DONE, PM_REMOVE)) {
+            inOrder &= msg.lParam == (uintptr_t)got;
+            got++;
+        }
+    }
+    SDL_WaitThread(thread, NULL);
+    CHECK(inOrder, "messages from another thread in order");
+    printf("message queue: ok\n");
+}
+
+/* The window on SDL (never shown): creation messages, the title, the instance, the cursor counter, a focus
+ * change, the script's keys as WM_KEYDOWN, close -> WM_CLOSE -> WM_DESTROY -> WM_QUIT. */
+static void testWindow(void)
+{
+    void *window;
+    BmxMsg msg;
+    SDL_Event e;
+    int keys = 0, quit = 0;
+    int maxW = 0, maxH = 0;
+
+    memset(&gProcLog, 0, sizeof gProcLog);
+    window = bmxWindowCreate("RenderWare Application", 640, 480, testProc, 1);
+    CHECK(window != NULL, "window");
+    if (window == NULL) {
+        return;
+    }
+    CHECK(gProcLog.n >= 2 && gProcLog.message[0] == WM_GETMINMAXINFO && gProcLog.message[1] == WM_CREATE,
+          "WM_GETMINMAXINFO, WM_CREATE");
+    SDL_GetWindowMaximumSize(bmxWindowSdl(window), &maxW, &maxH);
+    CHECK(maxW == 640 && maxH == 480, "size lock %dx%d", maxW, maxH);
+    CHECK(bmxWindowNative(window) != NULL && bmxWindowNative(window) != window, "HWND behind the token");
+    CHECK(bmxStandSetWindowTextA(window, "Dave Mirra Freestyle BMX") == 1 &&
+              strcmp(SDL_GetWindowTitle(bmxWindowSdl(window)), "Dave Mirra Freestyle BMX") == 0,
+          "title");
+    bmxWindowSetInstance((void *)GetModuleHandleA(NULL));
+    CHECK(bmxStandGetWindowLongA(window, GWL_HINSTANCE) == (intptr_t)GetModuleHandleA(NULL), "GWL_HINSTANCE");
+    CHECK(bmxStandShowCursor(0) == -1 && bmxStandShowCursor(1) == 0, "ShowCursor counter");
+    {
+        int32_t rect[4] = {0, 0, 640, 480};
+
+        CHECK(bmxStandAdjustWindowRect(rect, 0xcf0000, 0) == 1 && rect[2] == 640 && rect[3] == 480,
+              "AdjustWindowRect: client sizes");
+    }
+    /* Focus gained: WM_ACTIVATE WA_ACTIVE, sent inside PeekMessage. The script's held keys (DIK 0x1e and
+     * 0xc8, see bmxKeysFillState above) come as posted WM_KEYDOWN with their scan codes. */
+    gScripted = 1;
+    SDL_zero(e);
+    e.type = SDL_EVENT_WINDOW_FOCUS_GAINED;
+    e.window.windowID = SDL_GetWindowID(bmxWindowSdl(window));
+    SDL_PushEvent(&e);
+    SDL_Delay(2);
+    while (bmxStandPeekMessageA(&msg, NULL, 0, 0, PM_REMOVE)) {
+        if (msg.message == WM_KEYDOWN && msg.window == window) {
+            keys |= msg.lParam == 0x001e0001 ? 1 : msg.lParam == 0x01480001 ? 2 : 4;
+            bmxStandTranslateMessage(&msg);
+            bmxStandDispatchMessageA(&msg);
+        }
+    }
+    gScripted = 0;
+    CHECK(procSaw(WM_ACTIVATE, WA_ACTIVE), "WM_ACTIVATE WA_ACTIVE");
+    CHECK(keys == 3, "script keys as WM_KEYDOWN (A: 0x001e0001, Up: 0x01480001): mask %d", keys);
+    CHECK(procSaw(WM_KEYDOWN, 0), "WM_KEYDOWN dispatched to the procedure");
+    /* Close: WM_CLOSE, whose default destroys the window: WM_ACTIVATE inactive, WM_DESTROY, WM_NCDESTROY;
+     * the procedure's PostQuitMessage gives WM_QUIT. */
+    SDL_zero(e);
+    e.type = SDL_EVENT_WINDOW_CLOSE_REQUESTED;
+    e.window.windowID = SDL_GetWindowID(bmxWindowSdl(window));
+    SDL_PushEvent(&e);
+    SDL_Delay(2);
+    for (int i = 0; i < 10 && !quit; i++) {
+        quit = bmxStandPeekMessageA(&msg, NULL, 0, 0, PM_REMOVE) && msg.message == WM_QUIT;
+    }
+    {
+        const int close = procSaw(WM_CLOSE, 0), inactive = procSaw(WM_ACTIVATE, WA_INACTIVE);
+        const int destroy = procSaw(WM_DESTROY, 0), ncdestroy = procSaw(WM_NCDESTROY, 0);
+
+        CHECK(close && inactive > close && destroy > inactive && ncdestroy > destroy,
+              "close order: WM_CLOSE %d, WM_ACTIVATE 0 %d, WM_DESTROY %d, WM_NCDESTROY %d", close, inactive,
+              destroy, ncdestroy);
+    }
+    CHECK(quit, "WM_QUIT after the close");
+    gProcLog.n = 0;
+    bmxWindowPost(window, 0x400, 0, 0);
+    CHECK(!bmxStandPeekMessageA(&msg, NULL, 0, 0, PM_REMOVE) && gProcLog.n == 0,
+          "a destroyed window: nothing");
+    printf("window: creation, activation, script keys and close as Windows sends them\n");
+}
+
 int main(void)
 {
     SetEnvironmentVariableA("BMX_FILE_CHECK", "1"); /* every call above is also made through kernel32 */
@@ -2410,6 +2665,9 @@ int main(void)
     testSound();
     testSmoothMix();
     testWaveOut();
+    testMessageBoxes();
+    testMessageQueue();
+    testWindow();
     bmxPlatformShutdown();
     printf("%d checks, %d failures\n", checks, failures);
     return failures != 0;

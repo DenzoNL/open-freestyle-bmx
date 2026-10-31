@@ -129,6 +129,9 @@ round floats (so the hook build uses SSE2, not x87). Rules are in CONTRIBUTING.m
   after `BMX_INPUT_CHECK` compares, so the game still sees DirectInput-shaped input; `= 0` gives vanilla.
   Likewise `[audio] smooth_resample` defaults to 2 (cubic interpolation in a copy of the effects mixer
   instead of the original zero-order hold); `= 0` gives the original mixer.
+- **Exception (2026-10-31, the user's call):** `[ui] confirm_quit` defaults to **0**: the main menu's QUIT no
+  longer asks "Do you want to quit the game?" (the MessageBoxA stand-in answers Yes to exactly that box);
+  `= 1` shows it as the original did. Every other message box (asserts, errors) still shows.
 
 ## Enhancement backlog (P6+, unordered)
 

@@ -90,9 +90,23 @@ void *BMX_WINAPI bmxStandGetDC(void *window);
 int32_t BMX_WINAPI bmxStandReleaseDC(void *window, void *dc);
 int32_t BMX_WINAPI bmxStandGetClientRect(void *window, int32_t *rect);
 
-/* The BMX_KEYS stand-in for MessageBoxA (src/native/keys.c, with the Windows types): a table of its own,
- * since only the definition knows the stdcall argument sizes that decorate the symbols. */
-extern const BmxStandIn bmxKeysStandIns[];
-extern const size_t bmxKeysStandInCount;
+/* window.c: USER32, the window and its message queue (MSG is the 32-bit struct). */
+int32_t BMX_WINAPI bmxStandPeekMessageA(void *out, void *window, uint32_t min, uint32_t max, uint32_t remove);
+int32_t BMX_WINAPI bmxStandTranslateMessage(const void *msg);
+intptr_t BMX_WINAPI bmxStandDispatchMessageA(const void *msg);
+intptr_t BMX_WINAPI bmxStandDefWindowProcA(void *window, uint32_t message, uintptr_t wParam,
+                                           uintptr_t lParam);
+int32_t BMX_WINAPI bmxStandAdjustWindowRect(const int32_t *rect, uint32_t style, int32_t menu);
+int32_t BMX_WINAPI bmxStandClipCursor(const void *rect);
+void BMX_WINAPI bmxStandPostQuitMessage(int32_t code);
+int32_t BMX_WINAPI bmxStandShowCursor(int32_t show);
+int32_t BMX_WINAPI bmxStandSetWindowTextA(void *window, const char *text);
+intptr_t BMX_WINAPI bmxStandGetWindowLongA(void *window, int32_t index);
+int32_t BMX_WINAPI bmxStandMessageBoxA(void *owner, const char *text, const char *caption, uint32_t type);
+
+/* src/driver/device.c: DialogBoxParamA, the device dialog's replacement (P16: picks the mode, returns IDOK).
+ */
+intptr_t BMX_WINAPI bmxStandDialogBoxParamA(void *instance, const char *name, void *parent, void *proc,
+                                            intptr_t param);
 
 #endif

@@ -75,6 +75,19 @@ const BmxStandIn bmxStandIns[] = {
     STAND("WINMM.dll", "waveOutReset", bmxStandWaveOutReset),
     STAND("WINMM.dll", "waveOutClose", bmxStandWaveOutClose),
     STAND("WINMM.dll", "sndPlaySoundA", bmxStandSndPlaySoundA),
+    /* S10: the window, its message queue and message boxes on SDL3; the device dialog picks the mode */
+    STAND("USER32.dll", "PeekMessageA", bmxStandPeekMessageA),
+    STAND("USER32.dll", "TranslateMessage", bmxStandTranslateMessage),
+    STAND("USER32.dll", "DispatchMessageA", bmxStandDispatchMessageA),
+    STAND("USER32.dll", "DefWindowProcA", bmxStandDefWindowProcA),
+    STAND("USER32.dll", "AdjustWindowRect", bmxStandAdjustWindowRect),
+    STAND("USER32.dll", "ClipCursor", bmxStandClipCursor),
+    STAND("USER32.dll", "PostQuitMessage", bmxStandPostQuitMessage),
+    STAND("USER32.dll", "ShowCursor", bmxStandShowCursor),
+    STAND("USER32.dll", "SetWindowTextA", bmxStandSetWindowTextA),
+    STAND("USER32.dll", "GetWindowLongA", bmxStandGetWindowLongA),
+    STAND("USER32.dll", "MessageBoxA", bmxStandMessageBoxA),
+    STAND("USER32.dll", "DialogBoxParamA", bmxStandDialogBoxParamA),
 };
 
 const size_t bmxStandInCount = sizeof bmxStandIns / sizeof bmxStandIns[0];
@@ -86,19 +99,14 @@ void *bmxStandInFind(const char *dll, const char *name)
             return bmxStandIns[i].fn;
         }
     }
-    for (size_t i = 0; i < bmxKeysStandInCount; i++) {
-        if (SDL_strcasecmp(bmxKeysStandIns[i].dll, dll) == 0 && strcmp(bmxKeysStandIns[i].name, name) == 0) {
-            return bmxKeysStandIns[i]
-                .fn; /* BMX_KEYS: acts in a scripted run, forwards to the real one else */
-        }
-    }
     return NULL;
 }
 
 /*
  * Slots only original code that is int3 in the native exe calls (docs/PLATFORM.md 1b): the MSVC CRT (replaced
- * by src/native/crt.c), WinMain 0x48a460 (main.c does its job), the CD check 0x48aa10 (nothing calls it) and
- * the D3D7 driver (src/driver). Every ADVAPI32 and DDRAW import is dead.
+ * by src/native/crt.c), WinMain 0x48a460 (main.c does its job), the CD check 0x48aa10 (nothing calls it),
+ * the D3D7 driver (src/driver) and, since S10, the device dialog's procedure (zrwDialogProc 0x48a330 and its
+ * helpers: DialogBoxParamA's stand-in never runs it). Every ADVAPI32 and DDRAW import is dead.
  */
 static const char *const kDeadKernel32[] = {
     "CompareStringA",
@@ -154,7 +162,8 @@ static const char *const kDeadKernel32[] = {
 
 static const char *const kDeadUser32[] = {
     "ClientToScreen", "CreateWindowExA", "DestroyWindow", "LoadCursorA",  "RegisterClassA",
-    "SetWindowLongA", "SetWindowPos",    "ShowWindow",    "UpdateWindow",
+    "SetWindowLongA", "SetWindowPos",    "ShowWindow",    "UpdateWindow", "EndDialog",
+    "GetDlgItem",     "SendMessageA",    "SetFocus",
 };
 
 static int inList(const char *const *list, size_t n, const char *name)

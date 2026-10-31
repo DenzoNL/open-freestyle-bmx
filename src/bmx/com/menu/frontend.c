@@ -87,8 +87,8 @@ static void menuFramePiece(FramePoly *p, uint32_t *table, uint32_t tex, const ui
 BMX_ADDR(0x0043bf30)
 void menuDrawFrame(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint8_t color, int full)
 {
-    const uint8_t *sprite = zprimAssetData(gMenuFrameSprite);
-    const uint32_t tex = *(const uint32_t *)(sprite + 0x20);
+    const ZPrimSet *sprite = zprimAssetData(gMenuFrameSprite);
+    const uint32_t tex = (uint32_t)sprite->frames[0].texture; /* a picture: frame 0's texture handle */
     FramePoly *p = (FramePoly *)gPrimCursor;
     uint32_t *table = ngifGetOrderTable();
 

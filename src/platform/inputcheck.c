@@ -17,6 +17,7 @@
 #include <string.h>
 
 #include "platform/input.h"
+#include "platform/platform.h"
 
 enum { kMaxChecked = 8, kMaxLines = 3000, kRepeatLines = 3 };
 
@@ -215,7 +216,7 @@ void bmxCheckSetCooperativeLevel(BmxCheckDevice *c, void *window, uint32_t flags
 {
     if (c != NULL) {
         compareResult(c, "SetCooperativeLevel", ours,
-                      c->real->vtbl->setCooperativeLevel(c->real, window, flags));
+                      c->real->vtbl->setCooperativeLevel(c->real, bmxWindowNative(window), flags));
     }
 }
 

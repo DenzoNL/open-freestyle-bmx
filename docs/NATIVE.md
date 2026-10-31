@@ -77,8 +77,13 @@ build copies `SDL3.dll` next to `bmxnative.exe`; nothing has to be copied into t
 
 Command line: like the original, the first word is the scene database (`Scene.Txt` by default) and `-r<w>.<h>.<depth>`
 skips the device dialog by picking the full screen mode with that height and depth. `-r...` alone would become the
-scene path (`zsceneLoadDatabase` fails with "Database not found:-r640"), so pass `Scene.Txt` first. Without `-r` the
-original's device dialog comes up (D6).
+scene path (`zsceneLoadDatabase` fails with "Database not found:-r640"), so pass `Scene.Txt` first. Note the
+original's pick bug: only the height and depth are compared and the last match wins, so `-r1024.768.16` gives
+1366x768 here (PLATFORM.md 4e). Without `-r` there is no device dialog any more (since S10, P16): the mode comes
+from `bmxnative.ini` (`[video] width`, `height`, `depth`, `fullscreen`; exact match), by default 640x480x16 full
+screen, which is what Enter in the original dialog gave. `[video] fullscreen = 0` gives a window of width x height
+(the game renders at that size). `[ui] confirm_quit` (default 0, the user's call, PLAN.md Decisions): the main
+menu's QUIT quits without the "Do you want to quit the game?" box; `= 1` shows it as the original did.
 
 Environment (dev aids):
 
@@ -389,10 +394,15 @@ A second shim, for `USER32.dll!MessageBoxA` (the slot 0x6997bc), answers the gam
 without it the main menu's QUIT hung the run in "Do you want to quit the game?" (and its `MB_SETFOREGROUND` would take
 the focus). It logs the text and answers Yes for Yes/No (the quit prompt quits: exit code -1 like the original's
 `_exit(-1)`), Cancel for Yes/No/Cancel (an assert terminates) and OK otherwise. Unscripted runs get the real box.
+(Since S10 this answering is part of the MessageBoxA stand-in, src/platform/window.c; unscripted runs get an SDL
+box, and the quit prompt none unless `[ui] confirm_quit = 1`. The script's key edges also reach the window
+procedure as WM_KEYDOWN / WM_KEYUP.)
 
 A scripted run also does not take the focus: the window is created with `WS_EX_NOACTIVATE`, shown with
 `SW_SHOWNOACTIVATE` and put at the bottom of the z order, and SDL gets `SDL_WINDOW_ACTIVATE_WHEN_SHOWN=0` /
-`..._RAISED=0`. Checked by polling `GetForegroundWindow` during a run: unchanged. The game does not pause when it is
+`..._RAISED=0`. Checked by polling `GetForegroundWindow` during a run: unchanged. (Since S10: an SDL window with
+`SDL_WINDOW_NOT_FOCUSABLE`, the same hints, the real SetWindowPos for the z order, and a borderless window of the
+mode's size instead of full screen.) The game does not pause when it is
 not active (WM_ACTIVATE only acquires / unacquires the devices, which the stand-in ignores).
 
 Script: comma separated events `<when>:<keys>[*<hold>]`. `<when>` is `f<N>` (shown frame N) or `+<N>` (N frames after
@@ -665,6 +675,52 @@ and keeps the log as `movietest.log`. Window focused, keyboard or pad:
 If you can, watch the same in the original (hooked or vanilla) to compare the picture and the sound. Report anything
 that looks or sounds different, and the lines the script prints (`waveout: close ...`, `avi: ...`, `Movie : Key
 Abort`, any TRAP). Expected: for each movie `written` = `played` + `dropped` and the `avi:` bytes equal `written`.
+
+### Window and messages on SDL3 (S10, 2026-10-31)
+
+docs/PLATFORM.md 4e has the design and the status. SDL creates and owns the window; src/platform/window.c is the
+message queue that feeds the game's window procedure (zrwMainWndProc): WM_ACTIVATE from SDL's focus, WM_CLOSE ->
+WM_DESTROY -> WM_QUIT from the close box / Alt+F4, WM_KEYDOWN / WM_KEYUP from SDL's keys (or the BMX_KEYS script),
+the movies' MM_WOM_* from waveout.c. MessageBoxA is SDL_ShowMessageBox (answered without a window in a BMX_KEYS
+run; the main menu's quit prompt is skipped unless `[ui] confirm_quit = 1`). The device dialog is gone (P16): the
+mode comes from `-r` or `[video]` (see "Build and run"). The loader now reports `137 slots filled: 69 stand-ins, 68
+dead, 0 real; real DLLs still used: none`, and bmxnative.exe no longer imports USER32 or WINMM. Log lines:
+`window: ...` (creation, full screen, focus gained / lost, destroyed, message boxes), `driver: mode N of M: ...`,
+`driver: no device dialog (P16): mode N ...`.
+
+Finding: the window procedure's Esc quit can never fire in the shipped game: the key lock (zrwSetParameter(0x14))
+is set at the start of ngifInitialize, before the first message is pumped. Esc during a startup movie aborts the
+movie through DirectInput; in menus it is the game's own back key.
+
+Scripted checks: PLATFORM.md 4e (ProQuest and riding, QUIT with and without the box, window close, movies, Esc,
+full screen and windowed at 640x480 and 1024x768 from the config, the sound check). Not checkable without the
+focus: alt-tab, a real close click, the real full screen, BMX_INPUT_CHECK in a game run. That is the user's test:
+
+**Focus test** (`C:\Users\Dennis\Games\dmfbmx\native-run\focustest.ps1`; PowerShell, after building the main
+checkout, or `-ExeDir <worktree>\build\native32`):
+
+```powershell
+cd C:\Users\Dennis\Games\dmfbmx\native-run
+.\focustest.ps1                  # full screen 640x480 (the default mode without -r)
+.\focustest.ps1 -Mode win640     # then windowed; also -Mode fs1024 / win1024
+.\focustest.ps1 -Confirm         # once with the quit prompt shown as in the original
+```
+
+It runs with BMX_INPUT_CHECK and BMX_SOUND_CHECK (`-NoCheck` turns them off), movies off, the mode from a temporary
+ini, and restores the save. In each run:
+
+1. Enter through ProQuest into Vail Trails and ride with Up (sound on).
+2. Hold Up and Alt+Tab away for about 3 s (release Up while away), then come back. Expected: the sound is silent
+   while away and the rider gets no input; back in the game the sound returns and Up works at once. Twice; in full
+   screen also with the Windows key. The log shows `window: focus lost (WM_ACTIVATE WA_INACTIVE)` / `focus gained`.
+3. Click another window, then click back into the game: input works again.
+4. Close: windowed with the X, full screen with Alt+F4. The game ends at once (`window: destroyed (WM_CLOSE ->
+   WM_DESTROY), WM_QUIT posted`). In one run quit through the main menu's QUIT instead: no box by default, the box
+   with `-Confirm` (No keeps playing, Yes quits; the sound should go silent while the box is open).
+
+Report what you saw and heard and the printed lines; expected `inputcheck: RESULT clean`, `soundcheck: RESULT
+clean`, the chosen `driver: mode ...` (640x480x16 full screen, 1024x768x16 full screen, or the windowed mode 0 with
+`window: 640x480` / `1024x768`), and no TRAP.
 
 ### Open points from the CRT layer (2026-10-28)
 

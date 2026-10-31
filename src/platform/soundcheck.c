@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "platform/platform.h"
 #include "platform/sound.h"
 
 enum { kMaxLines = 300, kSteps = 8, kLocks = 4 };
@@ -137,7 +138,8 @@ static void compareHr(const char *what, int index, BmxHresult ours, BmxHresult r
 void bmxSoundCheckCooperative(BmxDs *real, void *window, uint32_t level, BmxHresult ours)
 {
     if (real != NULL) {
-        compareHr("SetCooperativeLevel", -1, ours, real->vtbl->setCooperativeLevel(real, window, level));
+        compareHr("SetCooperativeLevel", -1, ours,
+                  real->vtbl->setCooperativeLevel(real, bmxWindowNative(window), level));
     }
 }
 

@@ -7,8 +7,7 @@
  * One SDL audio stream per open device, in the file's own format (SDL converts and resamples to the device).
  * Its get-callback (SDL's audio thread) hands the queued buffers to SDL in order; a buffer whose last byte
  * has gone is marked WHDR_DONE and MM_WOM_DONE is posted to the window, as winmm does. MM_WOM_OPEN /
- * MM_WOM_CLOSE are posted too. The window messages still go through the real PostMessageA until the message
- * queue is ours (slice S10).
+ * MM_WOM_CLOSE are posted too, into the game's message queue (window.c, slice S10).
  *
  * BMX_MUTE=1: the bytes are consumed at the same pace but SDL gets silence. Each close logs the bytes
  * written, played and dropped by a reset, with FNV-1a 64 hashes (to compare with what AVIStreamRead returned,
@@ -82,9 +81,6 @@ typedef struct WaveOut {
 
 static const uint32_t kWaveMagic = 0x564f5657;
 
-typedef int32_t(BMX_WINAPI *PostMessageFn)(uint32_t window, uint32_t message, uint32_t wParam,
-                                           uint32_t lParam);
-
 static uint64_t fnv(uint64_t hash, const uint8_t *p, uint32_t n)
 {
     for (uint32_t i = 0; i < n; i++) {
@@ -93,19 +89,11 @@ static uint64_t fnv(uint64_t hash, const uint8_t *p, uint32_t n)
     return hash;
 }
 
-/* The window callback (CALLBACK_WINDOW): a posted message, as winmm's. */
+/* The window callback (CALLBACK_WINDOW): a posted message, as winmm's, into the game's queue (window.c). */
 static void postMessage(const WaveOut *w, uint32_t message, uint32_t lParam)
 {
-    static PostMessageFn post;
-
-    if (w->window == 0) {
-        return;
-    }
-    if (post == NULL) {
-        post = (PostMessageFn)bmxRealProc("USER32.dll", "PostMessageA");
-    }
-    if (post != NULL) {
-        post(w->window, message, (uint32_t)(uintptr_t)w, lParam);
+    if (w->window != 0) {
+        bmxWindowPost((void *)(uintptr_t)w->window, message, (uintptr_t)w, lParam);
     }
 }
 

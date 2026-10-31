@@ -107,16 +107,13 @@ int drvGpuFullscreenSizes(int32_t (*sizes)[2], int max)
     return n;
 }
 
-/* The GPU device on the game's window (RwEngineOpen's HWND), which stays the game's (its WndProc runs). */
-int drvGpuStart(void *hwnd)
+/* The GPU device on the game's window (RwEngineOpen's handle: the SDL window src/platform/window.c made). */
+int drvGpuStart(void *window)
 {
-    SDL_PropertiesID props = SDL_CreateProperties();
-
-    SDL_SetPointerProperty(props, SDL_PROP_WINDOW_CREATE_WIN32_HWND_POINTER, hwnd);
-    gpuWindow = SDL_CreateWindowWithProperties(props);
-    SDL_DestroyProperties(props);
+    gpuWindow = bmxWindowSdl(window);
     if (gpuWindow == NULL) {
-        return sdlFail("SDL_CreateWindowWithProperties(HWND)");
+        bmxLog("driver: the window handle %p is not the game's SDL window\n", window);
+        return 0;
     }
     gpuDevice = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL |
                                         SDL_GPU_SHADERFORMAT_DXBC | SDL_GPU_SHADERFORMAT_MSL,
@@ -156,10 +153,7 @@ void drvGpuStop(void)
         SDL_DestroyGPUDevice(gpuDevice);
         gpuDevice = NULL;
     }
-    if (gpuWindow != NULL) {
-        SDL_DestroyWindow(gpuWindow);
-        gpuWindow = NULL;
-    }
+    gpuWindow = NULL; /* the window is the platform's (window.c) */
 }
 
 /* A render target: RGBA8 colour (depth >= 0) or a depth texture (depth < 0). */
@@ -307,8 +301,6 @@ static int presentTarget(struct SDL_GPUTexture *color, int32_t x, int32_t y, int
     SDL_GPUTexture *swapchain = NULL;
     Uint32 w = 0, h = 0;
 
-    /* The game's own message loop dispatches the window's messages; drop the events SDL queued from them. */
-    SDL_FlushEvents(SDL_EVENT_FIRST, SDL_EVENT_LAST);
     drvDrawFlush();
     cmd = SDL_AcquireGPUCommandBuffer(gpuDevice);
     if (cmd == NULL) {

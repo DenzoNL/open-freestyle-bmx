@@ -4,7 +4,8 @@
  * (src/platform/input.c). With BMX_KEYS its keyboard reports the script's keys at the current shown frame
  * (bmxKeysFillState), it lists no pad and ignores the focus: nothing real is read, the run is the same
  * whether the window has the focus or not, and keys the user presses in another program (or a game pad) never
- * reach it. Modal message boxes are answered by a shim as well (messageBoxA below).
+ * reach it. The script's key edges also reach the window procedure as WM_KEYDOWN / WM_KEYUP, and modal
+ * message boxes are answered without a window (both in src/platform/window.c).
  *
  * BMX_KEYS="f300:enter,+100:enter,+20:down*10,f900:left+e" is a comma separated list of events:
  *   f<N>       press at shown frame N (RwRasterShowRaster count, as BMX_SHOT_FRAME / BMX_QUIT_FRAMES)
@@ -211,28 +212,3 @@ void bmxKeysFillState(uint8_t *state, uint32_t size)
         }
     }
 }
-
-/*
- * A scripted run cannot answer a modal message box (the quit prompt, an assert, an application error), and
- * the quit prompt's MB_SETFOREGROUND would take the focus. So with BMX_KEYS each box is logged and answered
- * at once: Yes for Yes/No (the quit prompt quits), Cancel for Yes/No/Cancel (an assert terminates), else OK.
- */
-/* The import table's stand-in for USER32.dll!MessageBoxA. */
-int WINAPI bmxKeysMessageBoxA(HWND owner, const char *text, const char *caption, UINT type)
-{
-    const UINT buttons = type & MB_TYPEMASK;
-    const int answer = buttons == MB_YESNO ? IDYES : buttons == MB_YESNOCANCEL ? IDCANCEL : IDOK;
-
-    if (!scripted) {
-        return MessageBoxA(owner, text, caption, type);
-    }
-    bmxLog("BMX_KEYS: message box \"%s\" answered %d\n", text != NULL ? text : "", answer);
-    return answer;
-}
-
-/* The import table entries of this file (src/platform/imports.c looks them up with the stand-ins of its own).
- */
-const BmxStandIn bmxKeysStandIns[] = {
-    {"USER32.dll", "MessageBoxA", (void *)bmxKeysMessageBoxA},
-};
-const size_t bmxKeysStandInCount = sizeof bmxKeysStandIns / sizeof bmxKeysStandIns[0];

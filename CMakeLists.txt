@@ -86,7 +86,7 @@ if(BMX_NATIVE32)
   # Checks of the platform stand-ins against Windows (tests/platform): hosted, no game image.
   add_executable(bmxplatformtest $<TARGET_OBJECTS:bmx_range> ${BMX_CRT_STARTFILES} tests/platform/test_platform.c src/platform/kernel.c src/platform/winmm.c
     src/platform/fileio.c src/platform/paths.c src/platform/input.c src/platform/inputcheck.c
-    src/platform/config.c src/platform/dsound.c src/platform/soundcheck.c src/platform/smoothmix.c src/platform/waveout.c
+    src/platform/config.c src/platform/dsound.c src/platform/soundcheck.c src/platform/smoothmix.c src/platform/waveout.c src/platform/window.c
     src/bmx/pc/zge/sound/winchan.c)
   # The real winchanMix (compared with the smooth mixer) keeps its state at the original addresses: the test
   # owns that range like bmxnative does (range.S first, then the crt start files); the test unprotects it.

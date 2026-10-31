@@ -90,6 +90,15 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   0 pixels differ; waveOut's results, flags and messages equal winmm's (bmxplatformtest); bytes queued = bytes read.
   The game's import slots now load only USER32 for real. **Open:** the user's watch test (`native-run2\movietest.ps1`).
   **Next:** S10 (SDL-owned window, message queue, message boxes).
+- Platform layer S10 done 2026-10-31 (docs/PLATFORM.md 4e, docs/NATIVE.md "Window and messages on SDL3", native
+  only): SDL owns the window (src/platform/window.c); our message queue feeds zrwMainWndProc (WM_ACTIVATE from SDL's
+  focus, close -> WM_CLOSE -> WM_DESTROY -> WM_QUIT, WM_KEYDOWN, the movies' MM_WOM_*); MessageBoxA on
+  SDL_ShowMessageBox; no device dialog (P16: `-r` or `[video]` in bmxnative.ini, default 640x480x16 full screen);
+  `[ui] confirm_quit` defaults to 0 (the user's call: QUIT without the box). The import table needs no real DLL
+  (`69 stand-ins, 68 dead, 0 real`) and bmxnative.exe no longer imports USER32 / WINMM. Findings: `-r` matches only
+  height and depth (original bug, kept: `-r1024.768.16` gives 1366x768; use `[video]`); the Esc quit of the window
+  procedure is unreachable in the shipped game (key lock before the first pump). **Open:** the user's focus test
+  (`native-run\focustest.ps1`). **Next:** S11 (PLATFORM.md 4e lists the remaining Win32 of main.c / keys.c / gpu.c).
 - Golden traces: record sessions with `bmxtrace.orig` (docs/TRACING.md) if not done yet.
 
 ## Machine setup

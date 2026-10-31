@@ -17,12 +17,13 @@
 
 #include "native/native.h"
 #include "platform/platform.h"
+#include "platform/standins.h"
 
 #define VAR(addr, type) (*(type *)(uintptr_t)(addr))
 
 /* Globals of the original's window code (all in the exe's .data). */
-#define gHwnd       VAR(0x00697780, HWND)
-#define gHinstance  VAR(0x00697784, HINSTANCE)
+#define gHwnd       VAR(0x00697780, void *)
+#define gHinstance  VAR(0x00697784, void *)
 #define gFullscreen VAR(0x00697788, int)
 #define gAppTitle   VAR(0x00697794, const char *)
 #define gWidth      VAR(0x00697798, int)
@@ -31,8 +32,7 @@
 #define gResY       VAR(0x006977a4, int)
 #define gResZ       VAR(0x006977a8, int)
 #define gQuit       VAR(0x006977ac, int)
-#define gLastTick   VAR(0x0067275c, DWORD)
-#define gClassName  VAR(0x005611d4, const char *)
+#define gLastTick   VAR(0x0067275c, uint32_t)
 #define gRateA      VAR(0x0069771c, float)
 #define gRateB      VAR(0x0054d05c, float)
 #define gRateC      VAR(0x0054dbb8, float)
@@ -43,9 +43,9 @@ typedef int(__cdecl *IntFnPtr)(void *);
 #define initApp       ((IntFnPtr)0x0048b450)
 #define onIdle        ((IntFn)0x0048b570)
 #define drawCall      ((IntFn)0x0048b690)
-#define mainWndProc   ((WNDPROC)0x0048a800)
+#define mainWndProc   ((BmxWndProc)0x0048a800)
 
-enum { kWindowStyle = 0xcf0000 };
+enum { kWmQuit = 0x12 };
 
 /* The original's "-r X.Y.Z" option; it edits the command line in place, and InitApp gets the edited text. */
 static void parseResolution(char *cmd)
@@ -167,10 +167,7 @@ static void initGlobals(void)
 int main(void)
 {
     char cmd[1024];
-    const HINSTANCE inst = GetModuleHandleA(NULL);
-    WNDCLASSA wc;
-    RECT r;
-    MSG msg;
+    BmxMsg msg;
     int background;
 
     bmxLogOpen();
@@ -189,63 +186,42 @@ int main(void)
     }
     muteProcess(getenv("BMX_MUTE") != NULL);
     /* BMX_KEYS: scripted keyboard (keys.c). Such a run must not take the focus from what the user is doing:
-     * the window is shown without activation at the bottom of the z order, and SDL is told not to activate
-     * it either. */
+     * its window is never focused or activated (window.c). */
     background = bmxKeysInstall();
-    if (background) {
-        SetEnvironmentVariableA("SDL_WINDOW_ACTIVATE_WHEN_SHOWN", "0");
-        SetEnvironmentVariableA("SDL_WINDOW_ACTIVATE_WHEN_RAISED", "0");
-    }
     snprintf(cmd, sizeof cmd, "%s", skipProgramName(GetCommandLineA()));
     parseResolution(cmd);
-
-    memset(&wc, 0, sizeof wc);
-    wc.style = 0x2000; /* CS_OWNDC */
-    wc.lpfnWndProc = mainWndProc;
-    wc.hInstance = inst;
-    wc.hCursor = LoadCursorA(NULL, IDC_ARROW);
-    wc.lpszClassName = gClassName;
-    if (RegisterClassA(&wc)) {
-        r.left = 0;
-        r.top = 0;
-        r.right = gWidth;
-        r.bottom = gHeight;
-        AdjustWindowRect(&r, kWindowStyle, FALSE);
-        gHwnd = CreateWindowExA(background ? WS_EX_NOACTIVATE : 0, gClassName, gAppTitle, kWindowStyle,
-                                (int)0x80000000, (int)0x80000000, r.right - r.left, r.bottom - r.top, NULL,
-                                NULL, inst, NULL);
-    } else {
-        gHwnd = NULL;
+    /* Without -r the mode comes from the config (P16, the device dialog's stand-in in src/driver/device.c);
+     * a windowed one sets the window's size, which the game then renders at (it stays out of full screen). */
+    if (!(gResX != 0 && gResY != 0 && gResZ != 0) && bmxConfigInt("video.fullscreen", 1) == 0) {
+        gWidth = bmxConfigInt("video.width", gWidth);
+        gHeight = bmxConfigInt("video.height", gHeight);
     }
+
+    /* RegisterClassA + CreateWindowExA (WS_OVERLAPPEDWINDOW, gWidth x gHeight client area): SDL's window. */
+    gHwnd = bmxWindowCreate(gAppTitle, gWidth, gHeight, mainWndProc, background);
     if (!gHwnd) {
         return 0;
     }
-    gHinstance = inst;
+    gHinstance = GetModuleHandleA(NULL);
+    bmxWindowSetInstance(gHinstance);
     if (!attachPlugins(gHwnd)) {
-        DestroyWindow(gHwnd);
+        bmxWindowDestroy(gHwnd);
         return 0;
     }
     if (gFullscreen) {
-        SetWindowLongA(gHwnd, GWL_STYLE, (LONG)0x80000000);
-        SetWindowPos(gHwnd, NULL, 0, 0, 0, 0, background ? 0x27 | SWP_NOACTIVATE : 0x27);
+        bmxWindowSetFullscreen(gHwnd); /* SetWindowLongA(WS_POPUP) + SetWindowPos(SWP_FRAMECHANGED) */
     }
-    if (background) {
-        ShowWindow(gHwnd, SW_SHOWNOACTIVATE);
-        SetWindowPos(gHwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-    } else {
-        ShowWindow(gHwnd, SW_SHOWDEFAULT);
-    }
-    UpdateWindow(gHwnd);
+    bmxWindowShow(gHwnd); /* ShowWindow + UpdateWindow (WM_PAINT goes to DefWindowProc) */
     if (initApp(cmd)) {
         while (!gQuit) {
             int idle = 0;
 
-            if (PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE)) {
-                if (msg.message == WM_QUIT) {
+            if (bmxStandPeekMessageA(&msg, NULL, 0, 0, 1)) {
+                if (msg.message == kWmQuit) {
                     break;
                 }
-                TranslateMessage(&msg);
-                DispatchMessageA(&msg);
+                bmxStandTranslateMessage(&msg);
+                bmxStandDispatchMessageA(&msg);
                 continue;
             }
             if (gRateA == gRateB) {
@@ -254,7 +230,7 @@ int main(void)
                 gLastTick = bmxTimeGetTime();
                 idle = 1;
             } else {
-                const DWORD elapsed = bmxTimeGetTime() - gLastTick;
+                const uint32_t elapsed = bmxTimeGetTime() - gLastTick;
                 /* The original divides on the x87 at 53-bit precision: double arithmetic on the floats. */
                 const double limit = (double)gRateC / (double)gRateA;
 

@@ -60,7 +60,7 @@ enum {
 
 /* Driver state shared by device.c, raster.c and gpu.c. */
 typedef struct DrvState {
-    void *hwnd;              /* the game's window (RwEngineOpen's parameter) */
+    void *window;            /* the game's window (RwEngineOpen's parameter, window.c's token) */
     int32_t currentMode;     /* index into modes, -1 when none */
     int32_t numModes;        /* modes[0] is the windowed desktop mode */
     DrvVideoMode modes[128]; /* video modes of the only sub system */
@@ -131,7 +131,7 @@ int drvGpuInitVideo(void);
 void drvGpuQuitVideo(void);
 int drvGpuDesktopMode(DrvVideoMode *mode);
 int drvGpuFullscreenSizes(int32_t (*sizes)[2], int max);
-int drvGpuStart(void *hwnd);
+int drvGpuStart(void *window);
 void drvGpuStop(void);
 struct SDL_GPUTexture *drvGpuCreateTarget(int32_t width, int32_t height, int depth);
 void drvGpuReleaseTexture(struct SDL_GPUTexture *texture);

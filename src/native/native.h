@@ -30,9 +30,8 @@ void bmxPngCheckArm(void);
 
 /*
  * BMX_KEYS (src/native/keys.c): parse the key script; returns 1 when the keyboard is scripted. The
- * DirectInput stand-in (src/platform/input.c) then reads its keyboard from the script (bmxKeysFillState); the
- * import table points MessageBoxA at keys.c (answered without a window in a scripted run, the real one
- * otherwise).
+ * DirectInput stand-in (src/platform/input.c) then reads its keyboard from the script (bmxKeysFillState), and
+ * src/platform/window.c turns its key edges into key messages and answers message boxes without a window.
  */
 int bmxKeysInstall(void);
 

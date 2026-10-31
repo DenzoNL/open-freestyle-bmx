@@ -6,6 +6,10 @@
  *   dpad_steering = 1    -> key "input.dpad_steering" (also stick_8way)
  *   [audio]
  *   smooth_resample = 2  -> key "audio.smooth_resample" (0 original, 1 linear, 2 cubic)
+ *   [video]
+ *   width = 640          -> the mode when the command line has no -r (also height, depth, fullscreen)
+ *   [ui]
+ *   confirm_quit = 0     -> 1: the quit prompt as in the original
  *
  * Read once, on the first query. A missing file means every option at its default (vanilla). Values are
  * integers (decimal or 0x hex); unknown keys and bad lines are logged and ignored. Options that would change
@@ -30,6 +34,10 @@ static const char *const kKnownKeys[] = {
     "input.dpad_steering",   /* P7: the d-pad also sets the stick axes */
     "input.stick_8way",      /* P7-B: the left stick snaps to 8 directions */
     "audio.smooth_resample", /* P9 note: 0 original mixer, 1 linear, 2 cubic resampling (smoothmix.c) */
+    "video.width", /* P16: the mode without the device dialog (default 640 x 480 x 16 full screen) */
+    "video.height",          "video.depth",
+    "video.fullscreen", /* 0: a window of width x height (the game renders at that size) */
+    "ui.confirm_quit",  /* 1: the main menu's QUIT asks "Do you want to quit the game?" (0: quits at once) */
 };
 
 static int known(const char *key)

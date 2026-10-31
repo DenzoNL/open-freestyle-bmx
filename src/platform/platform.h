@@ -82,6 +82,51 @@ void bmxConfigLoadText(const char *text, const char *origin);
 /* The frame number and stream name ("INTRO.AVI Video #1") of a DIB AVIStreamGetFrame handed out, or -1. */
 int32_t bmxAviFrameOf(const void *dib, const char **streamName);
 
+/* ---- the window and its message queue (window.c, P15) ---- */
+
+/* The game's window procedure (zrwMainWndProc 0x48a800): WNDPROC. */
+typedef intptr_t(BMX_WINAPI *BmxWndProc)(void *window, uint32_t message, uintptr_t wParam, uintptr_t lParam);
+struct SDL_Window;
+struct SDL_MessageBoxData;
+
+/* MSG (32-bit): what PeekMessageA fills. */
+typedef struct BmxMsg {
+    void *window;
+    uint32_t message;
+    uintptr_t wParam;
+    uintptr_t lParam;
+    uint32_t time;
+    int32_t x, y;
+} BmxMsg;
+
+#if defined(__i386__)
+_Static_assert(sizeof(BmxMsg) == 0x1c, "MSG");
+#endif
+
+/*
+ * Creates the game's window (hidden, `width` x `height` client size) and sends the procedure WM_GETMINMAXINFO
+ * and WM_CREATE; returns the handle the game keeps (an opaque token), NULL on failure. `background`: a
+ * scripted run's window, never focused or activated.
+ */
+void *bmxWindowCreate(const char *title, int width, int height, BmxWndProc proc, int background);
+/* The full screen style (D4: borderless over the desktop, the display mode unchanged). */
+void bmxWindowSetFullscreen(void *window);
+/* ShowWindow: shows it and delivers the activation (WM_ACTIVATE) at once, as Windows does. */
+void bmxWindowShow(void *window);
+/* DestroyWindow: WM_ACTIVATE (inactive), WM_DESTROY, WM_NCDESTROY; the window is hidden. */
+void bmxWindowDestroy(void *window);
+/* What GetWindowLongA(GWL_HINSTANCE) returns. */
+void bmxWindowSetInstance(void *instance);
+/* Posts a message (any thread), as PostMessageA. */
+int bmxWindowPost(void *window, uint32_t message, uintptr_t wParam, uintptr_t lParam);
+/* The HWND behind the token, for the dev checks that hand it to real DLLs (other values unchanged). */
+void *bmxWindowNative(void *window);
+/* The SDL window behind the token (the driver's swapchain), NULL for anything else. */
+struct SDL_Window *bmxWindowSdl(void *window);
+/* Test hook: shows message boxes instead of SDL_ShowMessageBox; returns the button id (-1: closed). */
+typedef int (*BmxMessageBoxHook)(const struct SDL_MessageBoxData *box);
+void bmxWindowSetMessageBoxHook(BmxMessageBoxHook hook);
+
 /* ---- paths (paths.c) ---- */
 
 /* The host path for a path as the game spells it (relative to the install folder, backslashes). Identity

@@ -1,9 +1,10 @@
 # Platform layer: Windows APIs -> SDL3 (P4, "Windows first")
 
-Status 2026-10-31: **decided; S1-S9 implemented** (sections 4a, 4b, 4c, 4d; S5's check with real pads, S7's
-listening test and S9's watch test are the user's). The user took the recommendation for every decision
-P1..P19 (A unless said otherwise). Order: S1-S4 (done, S3 reviewed), input + d-pad (S5, S6: done), DirectSound (S7:
-done), movies (S8, S9: done), then the rest (S10 window and message queue next).
+Status 2026-10-31: **decided; S1-S10 implemented** (sections 4a-4e; S5's check with real pads, S7's
+listening test, S9's watch test and S10's focus test are the user's). The user took the recommendation for every
+decision P1..P19 (A unless said otherwise). Order: S1-S4 (done, S3 reviewed), input + d-pad (S5, S6: done), DirectSound
+(S7: done), movies (S8, S9: done), window and message queue (S10: done; no real DLL is left in the import table),
+then S11 (the native exe's own Win32, 4e lists it) and S12.
 Goal: `bmxnative.exe` (src/native/) as a clean standalone
 Windows build whose game and engine code reach the OS only through SDL3 and our own code. The fixed 32-bit memory
 layout (image at 0x400000, docs/NATIVE.md) stays; Mac/Linux come after. Vanilla stays vanilla (PLAN.md Decisions):
@@ -84,7 +85,8 @@ relative to the working directory (the install folder): `bin\audio\*.ZSD`, `bin\
 
 loader.c (VirtualProtect, BCryptHash, LoadLibraryA/GetProcAddress for the imports), trap.c (vectored exception
 handler), main.c (window class, CreateWindowExA, message loop, WASAPI mute for `BMX_MUTE`), keys.c (dinput.h
-types), driver/gpu.c (wraps the game's HWND for SDL), range.S (the .orig section). The loader/trap/range parts are
+types), driver/gpu.c (wraps the game's HWND for SDL), range.S (the .orig section). (Since S10 the window, its
+messages and gpu.c's wrapping are SDL's; 4e lists what is left for S11.) The loader/trap/range parts are
 the fixed-layout machinery and stay Windows-specific until the 64-bit step; the rest is in scope here.
 
 ## 2. The cut: stand-ins at the import slots (P1)
@@ -317,6 +319,11 @@ and keeps the current mode): **untested**; all native runs used `-r640.480.16`.
   Win32's display-counter semantics mapped to SDL_ShowCursor/HideCursor; ClipCursor(NULL) is a no-op.
 - MessageBoxA -> SDL_ShowMessageBox with the same buttons and return codes (IDYES 6, IDNO 7, IDCANCEL 2, IDOK 1);
   keys.c's scripted answers move into it. OutputDebugStringA -> bmxLog; DebugBreak -> SDL_TriggerBreakpoint.
+- **The quit prompt (the user's call, 2026-10-31, PLAN.md Decisions):** `[ui] confirm_quit` defaults to 0: the
+  MessageBoxA stand-in answers Yes at once to exactly zrwConfirmQuit's box (text "Do you want to quit the game?",
+  type 0x10124 = MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2 | MB_SETFOREGROUND), so QUIT quits without a box;
+  `= 1` shows it through SDL_ShowMessageBox as the original did. Any other text or type (asserts, errors) still
+  shows. It sits at the MessageBoxA seam (src/platform/window.c), not in zrwConfirmQuit.
 
 ### 3.5 Files, saves, registry
 
@@ -739,6 +746,119 @@ waveOut messages still go through the real PostMessageA until S10; BMX_KEYS got 
 Open: the user's watch test (docs/NATIVE.md "Movies on our decoder and SDL3"): picture, sound, lip sync, abort.
 main.c's WASAPI session mute (BMX_MUTE) is now redundant for the movies (both stand-ins output silence) and can go
 in S11.
+
+### 4e. Status of S10 (2026-10-31, native-only, not committed; the focus test is the user's)
+
+Code: `src/platform/window.c` (the window, the message queue, the USER32 stand-ins, message boxes), the
+DialogBoxParamA stand-in in `src/driver/device.c` (it needs the driver's mode list), `src/native/main.c` (WinMain's
+job on our stand-ins), `[video]` / `[ui]` keys in config.c. zrwzgl.c, pcinput.c, ngapp.c and zmovie.c are unchanged;
+**the hook DLL is unchanged**.
+
+- **The cut.** All 28 USER32 slots: 15 stand-ins (PeekMessageA, TranslateMessage, DispatchMessageA, DefWindowProcA,
+  AdjustWindowRect, ClipCursor, PostQuitMessage, ShowCursor, SetWindowTextA, GetWindowLongA, MessageBoxA,
+  DialogBoxParamA; GetDC / ReleaseDC / GetClientRect from S9), 13 dead (the 9 of WinMain / the D3D7 driver, plus the
+  dialog procedure's EndDialog, GetDlgItem, SendMessageA, SetFocus). The loader says `137 slots filled: 69
+  stand-ins, 68 dead, 0 real; real DLLs still used: none`, and `llvm-objdump -p bmxnative.exe` lists SDL3.dll,
+  bcrypt.dll, ole32.dll, KERNEL32.dll and the UCRT (no USER32, no WINMM).
+- **Entry (WinMain 0x48a460).** It stays unported (int3); main.c follows it step by step, now on our stand-ins: the
+  globals at 0x697780 (memset 0x34, title "RenderWare Application", 640 x 480), `-r` parsed in place exactly like
+  the original (InitApp gets the edited text), the window (RegisterClassA + CreateWindowExA -> bmxWindowCreate),
+  gHinstance, zrwAttachPlugins (RwEngineOpen with the window, the device selection, RwEngineStart: the GPU device
+  claims the SDL window), the full screen style, ShowWindow + UpdateWindow (bmxWindowShow), zrwInitApp, the
+  PeekMessage loop with the busy-wait frame limiter, `_exit(-1)`. The "already running" box (hPrevInstance != 0)
+  never happens on Win32 and is left out. A config `[video] fullscreen = 0` without `-r` sets the window size
+  (gWidth / gHeight, 0x697798) before the window is made, which is also the size the game renders at.
+- **The `-r` mode pick bug (original, kept).** zrwSelectDevice stores the wanted width into the mode it is
+  comparing (0x489e2a `MOV [ESP+0x10],EAX`) before the compare, so only height, depth and the full screen flag are
+  checked and the last match wins. On this machine `-r640.480.16` gives 640x480x16 only because no other 480-line
+  mode is listed; `-r1024.768.16` gives **1366x768x16** (logged as `driver: mode 11 of 35: 1366x768x16 full screen`).
+  The port is faithful (ported code, vanilla); the config path picks the exact mode, so `[video]` is the way to get
+  1024x768. A `BMX_FIX` in zrwSelectDevice would be the alternative if wanted.
+- **No device dialog (P16).** Without `-r`, zrwSelectDevice calls DialogBoxParamA(0x68): the stand-in sets
+  gZglVideoMode (0x672758) and returns IDOK. `[video] fullscreen = 1` (default) picks the full screen mode `width`
+  x `height` x `depth` exactly (default 640 x 480 x 16, the dialog's own preselection, so the default equals Enter
+  in the vanilla dialog); `fullscreen = 0` the windowed mode 0; a size not in the list falls back to the
+  preselection (logged). The dialog procedure is never run. The chosen mode is logged at device start.
+- **The window (P15, P17).** SDL_CreateWindow (hidden, resizable) at the client size; the handle the game keeps in
+  gZrwWindow is an opaque token (the SDL_Window pointer), which only our stand-ins and the driver take back. The
+  procedure gets WM_GETMINMAXINFO (its size lock becomes SDL's maximum / minimum size; AdjustWindowRect is the
+  identity, SDL sizes are client sizes) and WM_CREATE at creation. Full screen = SDL's desktop full screen (D4:
+  the mode is rendered at its size and letterboxed, the display mode is not changed); in a BMX_KEYS run a borderless
+  window of the same size instead, so a scripted run never covers the user's screen. bmxWindowShow shows it and pumps
+  at once, so WM_ACTIVATE arrives during "ShowWindow" as on Windows (before zrwInitApp: DirectInput is not up yet,
+  the call does nothing, as in the original). ShowCursor keeps the display counter (hidden below 0); ClipCursor(NULL)
+  is a no-op; SetWindowTextA sets SDL's title; GetWindowLongA(GWL_HINSTANCE) gives gHinstance (DirectInputCreateEx,
+  and the real one under BMX_INPUT_CHECK, gets the module handle as before).
+- **The message queue.** PeekMessageA pumps SDL (at most once per millisecond: the main loop polls it in its busy
+  wait) and turns SDL's events into the procedure's messages: focus gained / lost -> WM_ACTIVATE WA_ACTIVE /
+  WA_INACTIVE, sent at once (SDL's keyboard focus, which the DirectInput and DirectSound stand-ins already used, is
+  updated by then); a close request (close box, Alt+F4) -> WM_CLOSE, sent; DefWindowProcA(WM_CLOSE) does
+  DestroyWindow's part: WM_ACTIVATE inactive, WM_DESTROY (the procedure's ClipCursor + PostQuitMessage), WM_NCDESTROY,
+  the window hidden; key events -> posted WM_KEYDOWN / WM_KEYUP (WM_SYSKEY* with Alt or F10) with Windows' lParam
+  (scan code from the DIK table, extended bit, previous state); in a BMX_KEYS run the script's key edges instead.
+  bmxWindowPost (any thread; a spin lock) takes waveout.c's MM_WOM_OPEN / DONE / CLOSE, so zrwPlayMovie's loop refills
+  exactly as before. Posted messages come before key messages; WM_QUIT comes when nothing else is queued, whatever
+  the filter (as documented for PeekMessage). The driver no longer flushes SDL's events at every present.
+- **Esc-quit is unreachable in the shipped game.** zrwMainWndProc quits on WM_KEYDOWN Esc (the only 0x80 entry of the
+  key table 0x54dce8) until gZrwKeysLocked (0x6977b0) is set, and ngifInitialize sets it (zrwSetParameter(0x14)) at
+  its start, inside zrwInitApp, before the first message is ever pumped (the startup movies' loop or the main loop).
+  So no Esc reaches the procedure unlocked; ours behaves the same (checked below). Not a port difference.
+- **Message boxes.** MessageBoxA -> SDL_ShowMessageBox: the buttons of the MB_ type in Windows' order (OK, OK /
+  Cancel, Abort / Retry / Ignore, Yes / No / Cancel, Yes / No, Retry / Cancel, Cancel / Try Again / Continue) with
+  Windows' return codes, MB_DEFBUTTONn as the Enter default, Cancel (or OK alone) on Esc, the icon (hand -> error,
+  exclamation -> warning, else information), the owner as parent; a box closed without a button gives the Esc button
+  (or the default). A BMX_KEYS run answers without a window as keys.c did (Yes / No -> Yes, Yes / No / Cancel ->
+  Cancel, else OK; keys.c's shim is gone). The quit prompt: P17's `[ui] confirm_quit` note above. SDL's box is
+  modal: the timer and audio threads run on; SDL's focus (hence the DirectSound focus mute) follows it live, the
+  procedure's WM_ACTIVATE pair comes after the box closes.
+- **Dev checks.** BMX_INPUT_CHECK and BMX_SOUND_CHECK hand the window to the real dinput.dll / dsound.dll:
+  `bmxWindowNative` gives them the HWND behind the token.
+
+Checks (all 2026-10-31, from `native-run2`, `BMX_MUTE=1`, the save restored after each run, all without a trap or a
+dead import):
+
+- ProQuest into Vail Trails and riding (`-r640.480.16`, frame 1500 shows the rider at 1:50); QUIT from the main menu
+  with the default config (`window: quit prompt answered Yes without a box`, exit code -1) and with
+  `confirm_quit = 1` (`BMX_KEYS: message box "Do you want to quit the game?" answered 6`, exit -1); window close
+  (WM_CLOSE posted to the window from outside, as the close box does: `window: destroyed (WM_CLOSE -> WM_DESTROY),
+  WM_QUIT posted`, exit -1); movies on (`t3000:esc` aborts ACCLAIM through DirectInput (`Movie : Key Abort`, no
+  quit), ZAXIS and INTRO play to the end with 292 MM_WOM_DONE through our queue and the same bytes as S9's run
+  (INTRO 243 buffers, 7938000 bytes), Esc in the main menu then: no quit); Esc in a level opens PAUSE; full screen
+  1024x768x16 from the config (exact mode 5), windowed 640x480 and 1024x768 from the config (mode 0, the window and
+  the camera raster at that size), all riding at frame 1500; `-r1024.768.16` (the pick bug above).
+- `BMX_SOUND_CHECK=1` ProQuest run: `soundcheck: 13292 calls compared, 0 differences`, `RESULT clean`.
+  BMX_INPUT_CHECK is off in scripted runs and needs the focus: the user's test (below); its cooperative-level path
+  with a real HWND is in bmxplatformtest.
+- `bmxplatformtest`: 262192 checks, 0 failures; new: the waveOut script now reads our queue (still equal to winmm's:
+  61 results, flags and messages); message boxes (quit prompt skipped with the option off, shown with it on: Yes /
+  No, default No, no Esc button, answers Yes / No / closed; other texts and styles and the assert box shown;
+  scripted answers); the queue (filters, order, WM_QUIT last and only once, 100 posts from another thread in order);
+  the window (WM_GETMINMAXINFO then WM_CREATE, the size lock, the HWND, the title, GWL_HINSTANCE, the cursor counter,
+  AdjustWindowRect, focus -> WM_ACTIVATE, the script's keys as WM_KEYDOWN with lParam 0x001e0001 / 0x01480001,
+  close -> WM_CLOSE, WM_ACTIVATE 0, WM_DESTROY, WM_NCDESTROY, WM_QUIT; nothing for a destroyed window).
+  `bmxmovietest`: 18826111 checks, 0 failures.
+- The user's test: `native-run\focustest.ps1` (docs/NATIVE.md "Window and messages on SDL3").
+
+Decisions beyond the document: the token is the SDL_Window pointer; the dialog stand-in lives in the driver; a
+windowed config sets the window and render size; BMX_KEYS runs get a borderless window for "full screen" and are put
+at the bottom of the z order through the real SetWindowPos (loaded at run time, no import); the script's keys also
+become WM_KEYDOWN / WM_KEYUP; PeekMessage pumps SDL at most once per millisecond; focus by SDL's keyboard focus (no
+WA_CLICKACTIVE: the procedure treats it as a deactivation, and the game's poll re-acquires anyway); log lines for
+focus changes, the close and the chosen mode; the `-r` pick bug kept.
+
+**What S11 has left** (Win32 in the native exe's own code; the import table needs no real DLL any more):
+main.c: GetModuleHandleA (gHinstance), GetCommandLineA, ExitProcess, and the WASAPI session mute for BMX_MUTE
+(ole32 / mmdevapi; both stand-ins already output silence, so it can go); keys.c: `windows.h` + `dinput.h` for the
+DIK constants only (no calls); driver/gpu.c: `windows.h` for MAX_PATH and ExitProcess (BMX_QUIT_FRAMES);
+window.c: the real SetWindowPos for BMX_KEYS runs (dev aid, through bmxRealProc); CMakeLists links winmm, which
+nothing imports any more. The dev checks (BMX_INPUT_CHECK, BMX_SOUND_CHECK, BMX_FILE_CHECK) load the real DLLs on
+purpose. loader.c / trap.c / range.S / crt.c are the fixed-layout machinery (KERNEL32, bcrypt until an own
+SHA-256). USER32.dll is still in the process because SDL3.dll imports it.
+
+- **Open (S10 focus test 2026-10-31): a key already held when the window gains focus.** DirectInput reads the
+  keyboard's real state, so a key held at activation (the Enter that started the run) reads as down; SDL only
+  tracks key events, so ours reads it as up until it is pressed again (one run: DIK 0x1c for 0.18 s, 178
+  mismatches, nothing else). Fix later: seed the stand-in keyboard from the real key state on WM_ACTIVATE.
 
 ## 5. Windows behaviour that is hard to reproduce
 

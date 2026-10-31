@@ -8,6 +8,7 @@
 
 #include "driver/driver.h"
 #include "native/native.h"
+#include "platform/standins.h"
 #include "rw/rwd3d.h"
 #include "rw/rwim.h"
 #include "rw/rwplugins.h"
@@ -119,6 +120,56 @@ static void buildModeList(void)
         addMode(sizes[i][0], sizes[i][1], 32, kDrvModeExclusive);
     }
     drvState.currentMode = 0;
+}
+
+/*
+ * The device dialog's replacement (docs/PLATFORM.md P16, slice S10): zrwSelectDevice (0x489d70) calls
+ * DialogBoxParamA(resource 0x68) when the command line has no `-r<w>.<h>.<depth>`. Instead of the dialog,
+ * this stand-in sets the mode the dialog would have returned and answers IDOK:
+ * - `[video] fullscreen = 1` (default): the full screen mode `[video] width` x `height` x `depth` (default
+ *   640 x 480 x 16, the dialog's own preselection, i.e. what pressing Enter in the vanilla dialog gives);
+ * - `[video] fullscreen = 0`: the windowed mode (index 0; main.c made the window width x height, and the game
+ *   renders at that size since it never enters full screen);
+ * - a size the list does not have: the dialog's preselection (the last 640 x 480 x 16 mode), logged.
+ * The dialog procedure (zrwDialogProc 0x48a330) is never run; its USER32 slots are dead.
+ */
+#define gZglVideoMode ORIG_VAR(0x00672758, uint32_t, gZglVideoMode)
+
+intptr_t BMX_WINAPI bmxStandDialogBoxParamA(void *instance, const char *name, void *parent, void *proc,
+                                            intptr_t param)
+{
+    const int fullscreen = bmxConfigInt("video.fullscreen", 1) != 0;
+    const int32_t width = bmxConfigInt("video.width", 640), height = bmxConfigInt("video.height", 480);
+    const int32_t depth = bmxConfigInt("video.depth", 16);
+    int32_t pick = -1, preselect = -1;
+
+    (void)instance;
+    (void)name;
+    (void)parent;
+    (void)proc;
+    (void)param;
+    for (int32_t i = 0; i < drvState.numModes; i++) {
+        const DrvVideoMode *const m = &drvState.modes[i];
+
+        if (m->width == 640 && m->height == 480 && m->depth == 16) {
+            preselect = i; /* zrwDialogInit: the last 640x480x16, whatever its flags */
+        }
+        if (fullscreen && (m->flags & kDrvModeExclusive) != 0 && m->width == width && m->height == height &&
+            m->depth == depth) {
+            pick = i;
+        }
+    }
+    if (!fullscreen && drvState.numModes > 0 && (drvState.modes[0].flags & kDrvModeExclusive) == 0) {
+        pick = 0;
+    }
+    if (pick < 0) {
+        bmxLog("driver: no %s mode %dx%dx%d, using the dialog's preselection\n",
+               fullscreen ? "full screen" : "windowed", (int)width, (int)height, (int)depth);
+        pick = preselect >= 0 ? preselect : drvState.currentMode;
+    }
+    gZglVideoMode = (uint32_t)pick;
+    bmxLog("driver: no device dialog (P16): mode %d from the config's [video] or the default\n", (int)pick);
+    return 1;
 }
 
 /* 0x4dd270: RwRasterRegisterPlugin (in the driver's part of the exe, but plain RW). */
@@ -256,7 +307,7 @@ static void initRenderStates(void)
 /* rwDEVICESYSTEMOPEN (0x4ecce0): the window handle, the sub systems and the mode list. */
 static int systemOpen(void *const *openParams)
 {
-    drvState.hwnd = *openParams;
+    drvState.window = *openParams;
     if (!drvGpuInitVideo()) {
         return 0;
     }
@@ -277,11 +328,14 @@ static int systemStart(void)
 {
     const DrvVideoMode *mode;
 
-    if (drvState.currentMode < 0 || !drvGpuStart(drvState.hwnd)) {
+    if (drvState.currentMode < 0 || !drvGpuStart(drvState.window)) {
         drvSetError(_rwerror(kDrvErrDevice, "Failed to create the SDL3 GPU device"));
         return 0;
     }
     mode = &drvState.modes[drvState.currentMode];
+    bmxLog("driver: mode %d of %d: %dx%dx%d%s\n", (int)drvState.currentMode, (int)drvState.numModes,
+           (int)mode->width, (int)mode->height, (int)mode->depth,
+           (mode->flags & kDrvModeExclusive) != 0 ? " full screen" : " windowed");
     drvState.cameraDepth = mode->depth == 16 ? 16 : 32;
     drvState.cameraFormat = mode->depth == 16 ? kDrvFormat565 : kDrvFormat888;
     drvState.zDepth = 16;

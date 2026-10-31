@@ -521,13 +521,14 @@ void guiLoadBackdrop(uint16_t id, int arg)
         zprimAssetFree(gGuiScreen.backdrop);
     }
     gGuiScreen.backdrop = handle;
-    uint8_t *asset = zprimAssetData(handle);
-    if (*(void **)(asset + 0x20) != NULL) {
-        guiFreeBackdropSprites(*(void **)(asset + 0x20));
+    /* A backdrop is a one frame picture; frame 0's texture handle (+0x20) holds the sprite sheet. */
+    ZPrimSet *pic = zprimAssetData(handle);
+    uint8_t *asset = (uint8_t *)pic;
+    if (pic->frames[0].texture != 0) {
+        guiFreeBackdropSprites((void *)(uintptr_t)pic->frames[0].texture);
     }
-    *(int *)(asset + 0x20) =
-        zprimCreateTexture(*(uint16_t *)(asset + 4), *(uint16_t *)(asset + 6), *(uint16_t *)(asset + 0x10),
-                           asset + *(int *)(asset + 8), (const uint16_t *)(asset + *(int *)(asset + 0xc)));
+    pic->frames[0].texture = zprimCreateTexture(pic->width, pic->height, pic->bpp, asset + pic->pixelOffset,
+                                                (const uint16_t *)(asset + pic->paletteOffset));
     zprimAssetRelease(handle);
     zmemdmmOptimize();
 }
