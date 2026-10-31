@@ -49,6 +49,8 @@ if(BMX_NATIVE32)
   set_source_files_properties(src/native/simhash.c PROPERTIES COMPILE_DEFINITIONS BMX_HOOK=1)
   # BMX_HF_GUARD (docs/HIGHFPS.md HF0) hashes the game's render and simulation state the same way.
   set_source_files_properties(src/native/hfguard.c PROPERTIES COMPILE_DEFINITIONS BMX_HOOK=1)
+  # The interpolated draws (docs/HIGHFPS.md HF1-HF3) capture and rebuild the game's poses the same way.
+  set_source_files_properties(src/native/hfinterp.c PROPERTIES COMPILE_DEFINITIONS BMX_HOOK=1)
   set_source_files_properties(third_party/dr_flac/dr_flac.c PROPERTIES COMPILE_OPTIONS -w)
   add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/music_edits.c
     COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tools/gen_music_edits.py
@@ -129,6 +131,10 @@ if(BMX_NATIVE32)
   add_executable(bmxwidetest tests/platform/test_wide.c src/driver/widemath.c)
   target_include_directories(bmxwidetest PRIVATE src)
   target_compile_options(bmxwidetest PRIVATE ${BMX_WARNINGS})
+  # The high frame rate maths (docs/HIGHFPS.md H9.5): limiter, draw scheduler, lerp / nlerp, skip rules.
+  add_executable(bmxhftest tests/platform/test_hf.c src/native/hfmath.c)
+  target_include_directories(bmxhftest PRIVATE src)
+  target_compile_options(bmxhftest PRIVATE ${BMX_WARNINGS})
   # SDL3.dll next to the exe (copy it into the game folder with bmxnative.exe).
   add_custom_command(TARGET bmxnative POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
     $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:bmxnative>)

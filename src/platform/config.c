@@ -54,6 +54,10 @@ static const char *const kKnownKeys[] = {
     "video.movies",       /* 0 pillarbox (default), 1 stretch */
     "video.scale_filter", /* present: 0 linear (default), 1 nearest, 2 integer scale */
     "video.ui_filter",    /* 2D / HUD textures: 0 the game's nearest (default), 1 linear, 2 sharp bilinear */
+    /* docs/HIGHFPS.md H8 */
+    "video.interpolate", /* 1: extra draws between the 30 Hz ticks in levels, one tick behind (0: vanilla) */
+    "video.max_fps",     /* draws per second with interpolate = 1 (0: the display's refresh rate) */
+    "video.vsync",       /* 1: present with vsync (default), 0: immediate (mailbox when not supported) */
 };
 
 static int known(const char *key)

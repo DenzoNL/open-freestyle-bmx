@@ -48,6 +48,23 @@ uint64_t bmxSimStateHash(void);
  */
 int bmxHfGuardInstall(void);
 int bmxHfGuardFrame(void);
+/*
+ * The guard with `[video] interpolate = 1` (hfinterp.c runs the loop): per level tick, and around every extra
+ * draw. The summary counts the sub-hashes an extra draw changed (frames, ties and the shadow are render state
+ * there: the draw syncs the interpolated poses; the restore before the next tick puts them back).
+ */
+void bmxHfGuardInterpTick(void);
+void bmxHfGuardExtraBefore(void);
+void bmxHfGuardExtraAfter(void);
+
+/*
+ * `[video] interpolate = 1` (src/native/hfinterp.c, docs/HIGHFPS.md HF1-HF3): bmxHfInstall reads the
+ * config (and BMX_HF_ALPHA / BMX_HF_LOG) and returns 1 when the mode is on; main.c then calls bmxHfStep
+ * instead of its own limiter, onIdle and zrwDrawFrame (returns 0 when onIdle ends the program). `guard`:
+ * the BMX_HF_GUARD level (0: off).
+ */
+int bmxHfInstall(int guard);
+int bmxHfStep(void);
 
 /* Install the vectored exception handler that reports int3 traps. */
 void bmxTrapInstall(void);

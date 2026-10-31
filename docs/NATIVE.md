@@ -88,6 +88,12 @@ all off by default) are in docs/WIDESCREEN.md "Implementation status" and PLATFO
 HUD, WS5) makes the loader write one more jump over a ported entry, like smooth_resample: the ported `ngifDrawList`
 to its copy `wideDrawList` (driver/wide.c, `drvWideJumps`; log `wide: 1 hud jumps`). `[ui] confirm_quit` (default 0, the user's call, PLAN.md Decisions): the main
 menu's QUIT quits without the "Do you want to quit the game?" box; `= 1` shows it as the original did.
+High frame rate (docs/HIGHFPS.md, HF1-HF3, off by default): `[video] interpolate = 1` hands main.c's loop to
+`bmxHfStep` (src/native/hfinterp.c): in levels the 30 Hz tick keeps the original limiter, and extra draws in between
+show the models and the camera interpolated one tick behind (log `hf: interpolate on, ...`; `hf: off` otherwise).
+`max_fps` caps the draws per second (0 = the display's refresh rate), `vsync = 0` presents immediately (mailbox
+where immediate is missing; log `driver: vsync off`). Extra draws present without counting a shown frame, so
+`BMX_KEYS`, `BMX_SHOT_FRAME` and `BMX_QUIT_FRAMES` keep counting ticks.
 
 Environment (dev aids):
 
@@ -108,7 +114,9 @@ Environment (dev aids):
 | `BMX_FILE_LOG=1` | log every sound file the game opens: reads, bytes, FNV-1a 64 hash of the bytes read |
 | `BMX_FILE_CHECK=1` | also repeat every file call (CreateFileA / ReadFile / SetFilePointer) through the real kernel32 and compare; logs `filecheck ok` / `MISMATCH` per file (implies `BMX_FILE_LOG`) |
 | `BMX_SIM_HASH=<file>` | write `<tick> <hash>` per controller poll: FNV-1a 64 of the simulation state (seed, pads, camera eye / look-at, the riders' trace fields, scores, run timer; src/native/simhash.c). Two runs of the same BMX_KEYS script must give the same file; used to show the widescreen seams are visual-only (docs/WIDESCREEN.md) |
-| `BMX_HF_GUARD=1..4` | dev aid for the high frame rate work (src/native/hfguard.c, docs/HIGHFPS.md "HF0 findings"). **1:** sub-hashes of the simulation and render state before and after every draw, per-tick pacing (interval, onIdle, draw, swapchain wait, slack per level / frontend), and a log line whenever the far clip (ngiffxAdaptQuality) changes. **2:** the draw runs through a copy of zrwDrawFrame with a checkpoint per step and list node, so each change is attributed to a node. **3:** in a level, also a second draw per tick (no present) plus an identity recompute and sync of every model. **4:** as 3, with the tick's dirty frame order replayed. Summaries every 900 ticks and at `BMX_QUIT_FRAMES`. Levels 3 and 4 change the run (extra syncs and probes) |
+| `BMX_HF_GUARD=1..4` | dev aid for the high frame rate work (src/native/hfguard.c, docs/HIGHFPS.md "HF0 findings"). **1:** sub-hashes of the simulation and render state before and after every draw, per-tick pacing (interval, onIdle, draw, swapchain wait, slack per level / frontend), and a log line whenever the far clip (ngiffxAdaptQuality) changes. **2:** the draw runs through a copy of zrwDrawFrame with a checkpoint per step and list node, so each change is attributed to a node. **3:** in a level, also a second draw per tick (no present) plus an identity recompute and sync of every model. **4:** as 3, with the tick's dirty frame order replayed. Summaries every 900 ticks and at `BMX_QUIT_FRAMES`. Levels 3 and 4 change the run (extra syncs and probes). **With `[video] interpolate = 1`** (any level value) the guard instead hashes the state around every extra draw (summary: per sub-hash, how many extra draws changed it) and checks every restore against the capture (`hf:   guard: N restores checked, M differ`) |
+| `BMX_HF_ALPHA=<a>` | with `interpolate = 1`: draw every frame at alpha a instead of the clock's (1 = always the tick pose: BMX_SHOT frames are then byte-identical to `interpolate = 0`, docs/HIGHFPS.md H9.3) |
+| `BMX_HF_LOG=1` | with `interpolate = 1`: every 900 level ticks and at `BMX_QUIT_FRAMES`, draws per tick, late ticks, extra draws / sleeps that ended past a tick's due time, skipped interpolations by reason, and per-tick motion histograms of objects and the camera (the H6 thresholds); the first 400 skips by a rule are logged one by one |
 | `BMX_DEBUG_OUTPUT=1` | log the game's OutputDebugStringA text (dropped otherwise, as without a debugger) |
 | `SDL_GPU_DRIVER=vulkan` | SDL's own: pick the GPU backend (default here: direct3d12) |
 

@@ -21,12 +21,20 @@ static SDL_Window *gpuWindow;
 static SDL_GPUDevice *gpuDevice;
 static int videoInited;
 static int shownFrames;
+static int uncounted;
 static int measureAcquire;
 static uint64_t acquireNs;
 
 int drvGpuShownFrames(void)
 {
     return shownFrames;
+}
+
+/* The high frame rate mode's extra draws (src/native/hfinterp.c) present without counting a shown frame, so
+ * BMX_KEYS / BMX_SHOT_FRAME / BMX_QUIT_FRAMES keep counting ticks (and take no screenshot). */
+void drvGpuSetUncounted(int on)
+{
+    uncounted = on;
 }
 
 void drvGpuMeasureAcquire(void)
@@ -119,6 +127,27 @@ int drvGpuFullscreenSizes(int32_t (*sizes)[2], int max)
     return n;
 }
 
+/* `[video] vsync = 0` (docs/HIGHFPS.md H5): immediate presents, mailbox where immediate is not supported.
+ * With 1 (the default) nothing is set: SDL GPU's default, VSYNC. */
+static void setPresentMode(void)
+{
+    SDL_GPUPresentMode mode = SDL_GPU_PRESENTMODE_IMMEDIATE;
+
+    if (bmxConfigInt("video.vsync", 1) != 0) {
+        return;
+    }
+    if (!SDL_WindowSupportsGPUPresentMode(gpuDevice, gpuWindow, mode)) {
+        mode = SDL_GPU_PRESENTMODE_MAILBOX;
+    }
+    if (!SDL_WindowSupportsGPUPresentMode(gpuDevice, gpuWindow, mode) ||
+        !SDL_SetGPUSwapchainParameters(gpuDevice, gpuWindow, SDL_GPU_SWAPCHAINCOMPOSITION_SDR, mode)) {
+        bmxLog("driver: vsync = 0: no immediate or mailbox present mode (%s), keeping vsync\n",
+               SDL_GetError());
+        return;
+    }
+    bmxLog("driver: vsync off (%s)\n", mode == SDL_GPU_PRESENTMODE_IMMEDIATE ? "immediate" : "mailbox");
+}
+
 /* The GPU device on the game's window (RwEngineOpen's handle: the SDL window src/platform/window.c made). */
 int drvGpuStart(void *window)
 {
@@ -142,6 +171,7 @@ int drvGpuStart(void *window)
     }
     bmxLog("driver: SDL %d.%d.%d, GPU driver %s\n", SDL_MAJOR_VERSION, SDL_MINOR_VERSION, SDL_MICRO_VERSION,
            SDL_GetGPUDeviceDriver(gpuDevice));
+    setPresentMode();
     if (!drvDrawStart()) {
         drvGpuStop();
         return 0;
@@ -385,6 +415,9 @@ int drvGpuPresent(struct SDL_GPUTexture *color, int32_t x, int32_t y, int32_t wi
 
     if (!presentTarget(color, x, y, width, height)) {
         return 0;
+    }
+    if (uncounted) {
+        return 1;
     }
     shownFrames++;
     if (shot != NULL && isShotFrame(shotFrame, shownFrames)) {

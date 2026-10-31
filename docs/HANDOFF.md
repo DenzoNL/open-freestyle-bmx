@@ -135,7 +135,18 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
     ~20 s of a level, so mid-climb screenshots, such as frame 1500 of the ProQuest script, can differ between
     builds.
 
-  Next: HF1 (scheduler), with the HF1-HF3 rule changes listed there.
+  **HF1-HF3 done 2026-11-01** (not committed at the time of writing; docs/HIGHFPS.md "HF1-HF3 implementation",
+  "HF4 runs"): `[video] interpolate = 1` (default 0), `max_fps` (0 = display refresh), `vsync` (1). In levels the
+  30 Hz tick keeps the original limiter; extra draws in between (only when the worst recent draw still ends before
+  the tick is due; the loop sleeps otherwise) show every model object and the renderer camera's view interpolated
+  one tick behind (src/native/hfinterp.c, maths in hfmath.c, `bmxhftest`). Restore before each tick by recompute plus
+  the recorded dirty-list order; extra draws skip the shake node, re-arm the HUD flush flags, wrap the shadow probes
+  in a save / restore of gZrwColBox / gZrwCol / lightFrame and present uncounted. Runs: `interpolate = 0` frames
+  and sim hash identical to 91cb83d; `interpolate = 1` at 120 / 144 / 240 Hz, vsync on / off, 3440x1440: sim hash
+  identical tick for tick (riding, pause, END RUN?, results, replay); `BMX_HF_ALPHA=1` frames identical; the guard
+  saw no simulation state change from 10942 extra draws and every restore exact. Skip thresholds: objects 500 units
+  / 90 degrees per tick, camera 256 / 60. **Next:** the user's playtest, `native-run2\fpstest.ps1` (`-Widescreen`
+  for 3440x1440, `-MaxFps`, `-Vsync 0`, `-Off`), then the default decision (H8) and HF5.
 - Golden traces: record sessions with `bmxtrace.orig` (docs/TRACING.md) if not done yet.
 
 ## Machine setup

@@ -3,8 +3,10 @@
 Decided 2026-10-31: the user took the recommendation for every decision H1..H10 (default off until HF4 is clean
 and the user has played it). Order: HF0 first.
 
-Status 2026-10-31: **design decided, HF0 (measurement) done**, see "HF0 findings" at the end: it corrects P3 and P4
-and adds rules for HF1-HF3. Scope: the native exe (`bmxnative.exe`) only; the hook
+Status 2026-11-01: **HF0-HF3 done, HF4 runs done** (not committed at the time of writing), see "HF1-HF3
+implementation" and "HF4 runs" at the end. `[video] interpolate` stays 0 by default until the user's playtest
+(HF6, `native-run2\fpstest.ps1`). Earlier: HF0 (measurement) corrected P3 and P4 and added rules for HF1-HF3, see
+"HF0 findings". Scope: the native exe (`bmxnative.exe`) only; the hook
 DLL and the oracle tests stay as they are. Rules that apply (PLAN.md Decisions): vanilla stays vanilla, enhancements
 attach at seams, options are tagged visual-only or gameplay-changing. Everything here is meant to be **visual-only**:
 the simulation keeps its tick and stays bit-identical (BMX_SIM_HASH equal with the option on and off).
@@ -506,3 +508,164 @@ timeGetTime drives it.
 - The first (real) draw's probes are the vanilla ones, so their count per tick does not change.
 - Re-arm the flush flags as planned, but capture them after onIdle, which is where the tick sets them.
 - **HF4:** run the guard at levels 1 and 2 on the interpolated build. Level 4's checks are the ones H9.4 asks for.
+
+## Slice status
+
+| Slice | Status |
+|---|---|
+| HF0 | done 2026-10-31 (`BMX_HF_GUARD`, findings above) |
+| HF1 | done 2026-11-01: `[video] interpolate / max_fps / vsync`, the scheduler, the uncounted present |
+| HF2 | done 2026-11-01: capture / apply / restore, nlerp / lerp, skip rules, `bmxhftest` |
+| HF3 | done 2026-11-01: `hfDrawFrame` |
+| HF4 | runs done 2026-11-01 (below); thresholds set; open: the user's display / resolution pacing, a bail run |
+| HF5 | not started (particles at lerp, FOV and shake interpolation) |
+| HF6 | open: the user's playtest (`native-run2\fpstest.ps1`), then the default (H8) |
+
+## HF1-HF3 implementation (2026-11-01)
+
+**Code.** `src/native/hfinterp.c` (loop, capture / apply / restore, `hfDrawFrame`), `src/native/hfmath.c/.h` (pure:
+limiter, due time, scheduler, lerp / nlerp, angles, skip rules), `tests/platform/test_hf.c` (`bmxhftest`). Seams:
+main.c calls `bmxHfStep` instead of its own loop body when `bmxHfInstall` says the mode is on (the off path is
+untouched: `hf: off`); `drvGpuSetUncounted` in driver/gpu.c; `setPresentMode` in drvGpuStart (only with `vsync = 0`);
+`bmxTimeNs` / `bmxTimeMsAt` in platform/kernel.c (bmxTimeGetTime is now `bmxTimeMsAt(elapsedNs())`, the same value);
+three keys in config.c; `BMX_HF_GUARD` hooks in hfguard.c.
+
+**HF1, the loop.**
+- Outside a level (gNgMode != 2, a limit other than 30, or the debug PVS light on) `bmxHfStep` is the original loop:
+  `hfLimiterTick` (the original arithmetic on the same clock, unit-tested against a verbatim copy of main.c's code),
+  busy waiting, onIdle + zrwDrawFrame. Movies have their own loops and are not affected.
+- In a level the tick condition is the same; between ticks an extra draw starts when its slot has come (last draw
+  + 1 / max_fps) and the worst of the last 64 draw durations (start to end of present, the swapchain wait included)
+  plus a 1.5 ms margin ends before the tick is due (`hfTickDueNs`: the instant the millisecond clock reaches
+  `gLastTick + 34`). Otherwise the loop sleeps (`SDL_DelayNS`) to the next slot or to 2 ms before the tick, and spins
+  the last 2 ms on the limiter.
+- `max_fps = 0` takes the refresh rate of the window's display (SDL_GetCurrentDisplayMode).
+- `vsync = 0` asks SDL for IMMEDIATE, else MAILBOX (log `driver: vsync off (immediate)`); `vsync = 1` sets nothing
+  (SDL GPU's default VSYNC, as before). It applies with `interpolate = 0` too.
+
+**HF2, capture / apply / restore.**
+- **Which objects:** exactly those zobjUpdateAll (0x487020) updated in the tick, in its order: active non-attached
+  objects of the pool, then their active children (zobjApplyParent) and grandchildren (zobjRefresh). Type 0 with a
+  model are captured: ZObj pos / rot, ZrwModel position / rotation / scale, and the offset / rotation of every
+  matched part of the active LOD (the ZrwPartDef nodes zactorSyncPose writes). Key for the previous capture:
+  ZObj, ZrwModel, clump, LOD, model flags and the part def pointers.
+- **The camera** (a change from H3-A): not the ZObj camera's pos / rot, but the view the tick's zobjCameraDraw handed
+  to the renderer camera, `ZrwCamera.view` (rotation and eye). Apply interpolates eye (lerp) and rotation
+  (zquatFromMatrix, nlerp, zquatToMatrix) and calls `gZrwCamSetView` (0x561da0) directly; the camera object and its
+  matrix cache are never touched (the sound listener reads them in the tick). Why: the first version wrote pos / rot
+  and invalidated the cache, and with `BMX_HF_ALPHA=1` the pause, END RUN?, results and replay frames differed from
+  vanilla in 1000-6000 scattered pixels: there the tick leaves the cache's view stale against pos / rot, and the
+  renderer gets the cached view. Taking the view from the renderer camera reproduces it exactly.
+- **Rotation maths:** the game's rotations are quaternions (ZQuat x, y, z, w) everywhere that is interpolated, so
+  nlerp: sign flip on a negative dot, normalised in double, stored as float. Positions and scale lerp in double. At
+  alpha 0 / 1 the inputs' bits come back unchanged (no renormalisation).
+- **Apply** (before every draw, the real one included): the values at alpha written raw into the fields (no setter,
+  no `moved` hooks), then `gZrwVtUpdate` (zrwModelUpdate through its slot) for every captured model in capture
+  order, then the camera view.
+- **Restore** (before the next tick): the tick's values written back, every captured model recomputed through the
+  slot (all of them, so the dirty list holds the same set the tick queued), the captured view handed to the renderer
+  camera, the dirty list relinked in the order recorded after onIdle (frames not in the record after them;
+  hfguard.c's tested `replayDirty`), then `rwFrameSyncDirtyList`.
+- **Alpha** = (draw start - tick start) / 34 ms, clamped to [0, 1]: the real draw right after a tick shows
+  about tick N - 1, the last extra draw about N - 0.2.
+
+**HF2, skip rules (H6).** An object is drawn at the tick pose for that tick when it has no previous capture with
+the same key (`new`), when the previous capture is unusable (`global`: first level tick, back from the frontend or
+loading, or a tick interval over 2 x 34 ms), or when its model position moved more than `objectJump` or its root
+rotation (model or ZObj) turned more than `objectTurn` in the tick. A part that turned more than `objectTurn` keeps
+its tick rotation (the bike wheels at speed: interpolating them the short way would turn them backwards). The camera
+keeps the tick view on `cameraJump`, `cameraTurn`, or a move while the selected camera state's `eyeVel` is zero
+(cameraUpdate's jump to the goals). Thresholds below ("HF4 runs").
+
+**HF3, `hfDrawFrame`** (a copy of zrwDrawFrame 0x48b690 for extra draws):
+- the screen shake node (0x401a4b, ngifpsxUpdate) is skipped;
+- the two flush flags are re-armed to their values after onIdle, before list 0;
+- the shadow probe node (0x49b520, zrollerUpdateShadow) runs inside a save / restore of `gZrwColBox` (32 bytes),
+  `gZrwCol` (0x50) and `RwGlobals.lightFrame`. Chosen over skipping it because the shadow then follows the drawn
+  (interpolated) rider instead of stepping at 30 Hz under a smooth rider, while the simulation still sees exactly one
+  probe set per tick (the real draw's, at the vanilla count; the widening does not depend on the probes' inputs).
+  The probes use flags 1 (world triangles only), so no atomic's collisionTag is written.
+- the effects node runs unchanged (HF0 Q4); list 4 (zprofile / zrwdbg debug nodes) is skipped; lists 0 and 3 run;
+- the present goes through `RwRasterShowRaster` with `drvGpuSetUncounted(1)`: `drvGpuShownFrames` (BMX_KEYS frames,
+  BMX_SHOT_FRAME, BMX_QUIT_FRAMES) counts ticks only, and no screenshot is taken from an extra draw.
+- A failing node leaves its list as the original's runListAt does; with gZrwDebugLightOn set there are no extra
+  draws.
+
+## HF4 runs (2026-11-01)
+
+Setup: from `native-run2`, `-r640.480.16` (one run at 3440x1440 windowed, `widescreen = 1`, `hud = 1`),
+`BMX_MUTE=1 BMX_NO_MOVIES=1 BMX_QUIT_FRAMES=4000`, `nice -n 19`, the display at 240 Hz, the user possibly gaming.
+BMX_KEYS: ProQuest into Vail Trails, riding with steering, hops and E/S/F/D tricks from frame 1500, Esc at 2700
+(PAUSE), end run, yes (END RUN?), RUN FINISHED, down, down, view replay (replay cameras from ~3350):
+
+```
+f300:enter,+150:enter x9,f1500:up*400,+100:up+left*20,+40:up+e*10,+60:up*200,+20:right*15,+30:up+s*10,+80:up*300,
++20:f*8,+40:up+d*10,+60:up*300,f2700:esc,f2780:up,f2840:enter,f2920:down,f2980:enter,f3150:down,f3250:down,f3350:enter
+```
+
+BMX_SHOT frames 300 (menu), 1500 (riding, mid far-clip climb), 1800, 2200, 2600 (riding), 2760 (PAUSE), 2960 (END
+RUN?), 3100 (RUN FINISHED), 3500, 3900 (replay). Base: the build of 91cb83d. BMX_SIM_HASH: 2973 ticks.
+
+| Run | Sim hash vs base | Frames vs base |
+|---|---|---|
+| `interpolate = 0` (three runs over the slices, the last on the final build) | identical | 10 / 10 identical |
+| `interpolate = 1`, max_fps 144 | identical | differ (interpolated), f300 identical |
+| `interpolate = 1`, max_fps 120 | identical | differ (interpolated) |
+| `interpolate = 1`, max_fps 144, `vsync = 0` | identical | differ (interpolated) |
+| `interpolate = 1`, max_fps 0 (240 Hz) | identical | differ (interpolated) |
+| `interpolate = 1`, 3440x1440 `widescreen = 1`, `hud = 1`, max_fps 0 | identical | (other size) |
+| `interpolate = 1`, max_fps 144, `BMX_HF_GUARD=1` | identical | differ (interpolated) |
+| `interpolate = 1`, max_fps 144, `BMX_HF_ALPHA=1` (four runs, the last on the final build) | identical | **10 / 10 identical** |
+| `interpolate = 1`, max_fps 144, `vsync = 0`, `BMX_HF_ALPHA=1` (three runs) | identical | 10 / 10 identical to `interpolate = 0, vsync = 0`; see "vsync = 0" below |
+
+**Guard** (`BMX_HF_GUARD=1` with `interpolate = 1`, 10942 extra draws in 2971 level ticks): sim, rng, colbox,
+colstate, particles, hud, camera (the camera object) and lightframe were changed by **0** extra draws; only the
+render state changed (frames: the sync of the interpolated poses, ties, the shadow). Every one of the 2970 restores
+gave back the capture bit for bit (object pos / rot, model fields, the floats and flags of every clump and collision
+clump frame, the part defs, the camera object's pos / rot and valid cache matrices, the renderer camera's view and
+world matrices and the floats of its RwCamera frame).
+
+**Pacing** (640x480; draws per tick = the real one plus the extras):
+
+| max_fps | draws per tick (ticks) | extra draws past the due time | late ticks (> 1 ms) |
+|---|---|---|---|
+| 120 | 4: 2828, 3: 77 | 0 | 11 of 2971 (max 10.4 ms: one sleep woke 10.4 ms late) |
+| 144 | 5: 2268, 4: 637 | 0 | 10 (max 5.4 ms) |
+| 144, vsync 0 | 5: 2256, 4: 649 | 1 (1.5 ms) | 15 (max 4.1 ms) |
+| 0 (240 Hz) | 7: 2698, 6: 188, 8: 19 | 0 | 10 (max 9.3 ms) |
+| 0, 3440x1440 | 7: 2622, 6: 99, 3-5: 174 | 0 | 6 (max 11.0 ms: a sleep woke 11 ms late) |
+
+64 ticks per run have the real draw only (the first level ticks, before two captures exist, and ticks after a
+long draw); the worst single draw is 26-29 ms (the first one in a level). Late ticks are rare and come from late wake-ups of `SDL_DelayNS`
+(`nice -n 19` with other load on the machine), not from draws; none is near the ~30 ms that would move the far clip
+(P9), and the far clip path of the vanilla runs was reproduced (the BMX_HF_ALPHA=1 frames at f1500, mid-climb, are
+identical).
+
+**Thresholds** (per-tick motion of every matched object and the camera over the whole run; game units):
+- Objects: 229032 of 246499 below 1/16 (static props), riding up to 64, the Vail Trails train cars 40 (up to 80
+  when it speeds up); above that only teleports: the respawn after the level intro (4634 units) and the train
+  wrapping (11960), both >= 2048. **objectJump = 500.**
+- Object root turns: up to 33 degrees per tick in riding and tricks (spins are ~24); the respawn turns 89 degrees.
+  **objectTurn = 90** (H6). Part turns up to 90 occur (886 part turns per run were above 90 and kept their tick
+  rotation).
+- Camera: chase and replay cameras move up to 128 per tick; replay view changes and the level intro move 512 to
+  over 4096. **cameraJump = 256.** Turns: below 10 degrees except one each in 20-30, 30-45, 45-60, 60-90 and four
+  above 90 (cuts). **cameraTurn = 60** (H6). The `eyeVel` cut rule never fired in these runs (the cuts were caught by
+  the jump / turn rules); it stays as a backstop.
+- Skips per run: 63 object jumps (train wraps, respawn), 8 camera jumps, 174 object / 2 camera global skips.
+
+**vsync = 0.** With `vsync = 0` the frames from f1500 on differ from the (vsync) base in 1-85 scattered pixels on
+distant foliage at the fog edge, with `interpolate = 0` as well, and come in two variants run to run (two
+`interpolate = 0` runs differed from each other by 51-83 pixels). The far clip path is the same (190.0521 from tick
+592). It is the present mode, not the seam: `interpolate = 0, vsync = 0` and `interpolate = 1, vsync = 0,
+BMX_HF_ALPHA=1` gave the same variant and then 10 / 10 identical frames; three alpha-1 runs with vsync 0 were
+identical to each other. (All `vsync = 1` runs are byte-identical to the base.) Open: why the present mode reaches
+the camera raster (likely the known uninitialised-data variation of the 3D scene, docs/WIDESCREEN.md WS6).
+
+**Open (HF4).**
+- The user's playtest at 3440x1440 on the real display (VRR or not), a pad, a bail and respawn, the attract demo, a
+  Session run; the scripted runs had no bail.
+- Late wake-ups: if the playtest log shows late ticks, raise the 2 ms spin window (`kSpinNs`) or sleep in smaller
+  steps.
+- `vsync = 1` at max_fps above the refresh rate: draws wait in the swapchain acquire and the worst-draw estimate
+  grows to a refresh period, which lowers the extra draws per tick (by design; `max_fps = 0` avoids it).

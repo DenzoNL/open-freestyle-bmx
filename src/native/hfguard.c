@@ -17,6 +17,11 @@
  *
  * Sub-hashes only read memory (no getters that sync or move list cursors). Summaries every 900 ticks and
  * before BMX_QUIT_FRAMES ends the process.
+ *
+ * With `[video] interpolate = 1` (HF1-HF3) the levels above do not run: hfinterp.c owns the loop and calls
+ * bmxHfGuardInterpTick per level tick and bmxHfGuardExtraBefore / After around every extra draw. The summary
+ * then counts, per sub-hash, the extra draws that changed it (frames, ties and shadow are render state
+ * there); hfinterp.c itself checks that every restore gives back the captured poses, frames and camera.
  */
 #include <SDL3/SDL.h>
 #include <stdio.h>
@@ -607,6 +612,67 @@ int bmxHfGuardFrame(void)
         summary();
     }
     return ok;
+}
+
+/* ---- with [video] interpolate = 1 (hfinterp.c) ---- */
+
+static Hashes gExtraBefore;
+static uint32_t gExtraDraws;
+static uint32_t gExtraChanges[kSubs];
+static uint32_t gExtraFirst[kSubs];
+
+/* Sub-hashes an extra draw changes legitimately: the frame sync of the interpolated poses (frames, ties;
+ * put back by the restore) and the shadow's render state. */
+static int extraRenderState(int sub)
+{
+    return sub == kFrames || sub == kTies || sub == kShadow;
+}
+
+static void interpSummary(void)
+{
+    bmxLog("hfguard: interpolated: %u level ticks, %u extra draws\n", (unsigned)gTicks,
+           (unsigned)gExtraDraws);
+    for (int i = 0; i < kSubs; i++) {
+        bmxLog("hfguard:   %-10s changed by an extra draw %6u times%s", kSubName[i],
+               (unsigned)gExtraChanges[i], extraRenderState(i) ? " (render state)" : "");
+        if (gExtraChanges[i] != 0) {
+            bmxLog(" (first at tick %u)", (unsigned)gExtraFirst[i]);
+        }
+        bmxLog("\n");
+    }
+}
+
+void bmxHfGuardInterpTick(void)
+{
+    const char *const quit = getenv("BMX_QUIT_FRAMES");
+
+    gTicks++;
+    if (gFxQuality != gLastQuality) {
+        bmxLog("hfguard: tick %u quality (far clip) %.4f fps %.2f\n", (unsigned)gTicks, (double)gFxQuality,
+               (double)gFxFps);
+        gLastQuality = gFxQuality;
+    }
+    if ((quit != NULL && drvGpuShownFrames() + 1 >= strtol(quit, NULL, 10)) || gTicks % 900 == 0) {
+        interpSummary();
+    }
+}
+
+void bmxHfGuardExtraBefore(void)
+{
+    hashAll(&gExtraBefore);
+}
+
+void bmxHfGuardExtraAfter(void)
+{
+    Hashes now;
+
+    hashAll(&now);
+    gExtraDraws++;
+    for (int i = 0; i < kSubs; i++) {
+        if (now.h[i] != gExtraBefore.h[i] && gExtraChanges[i]++ == 0) {
+            gExtraFirst[i] = gTicks;
+        }
+    }
 }
 
 int bmxHfGuardInstall(void)

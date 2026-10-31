@@ -173,6 +173,7 @@ int main(int argc, char **argv)
     bmxWindowShow(gHwnd); /* ShowWindow + UpdateWindow (WM_PAINT goes to DefWindowProc) */
     if (initApp(cmd)) {
         const int guard = bmxHfGuardInstall(); /* BMX_HF_GUARD: measures the draws (dev aid) */
+        const int hf = bmxHfInstall(guard);    /* [video] interpolate = 1: docs/HIGHFPS.md */
 
         while (!gQuit) {
             int idle = 0;
@@ -183,6 +184,12 @@ int main(int argc, char **argv)
                 }
                 bmxStandTranslateMessage(&msg);
                 bmxStandDispatchMessageA(&msg);
+                continue;
+            }
+            if (hf) {
+                if (!bmxHfStep()) {
+                    break;
+                }
                 continue;
             }
             if (gRateA == gRateB) {

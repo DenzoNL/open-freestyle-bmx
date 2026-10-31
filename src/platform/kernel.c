@@ -57,9 +57,19 @@ static uint64_t elapsedNs(void)
     return (c / gFrequency) * 1000000000ull + (c % gFrequency) * 1000000000ull / gFrequency;
 }
 
+uint64_t bmxTimeNs(void)
+{
+    return elapsedNs();
+}
+
+uint32_t bmxTimeMsAt(uint64_t ns)
+{
+    return gBase + (uint32_t)(ns / 1000000ull);
+}
+
 uint32_t bmxTimeGetTime(void)
 {
-    return gBase + (uint32_t)(elapsedNs() / 1000000ull);
+    return bmxTimeMsAt(elapsedNs());
 }
 
 uint32_t bmxGetTickCount(void)

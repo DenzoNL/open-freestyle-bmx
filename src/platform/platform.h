@@ -55,6 +55,10 @@ void bmxPlatformInit(void);
 /* The milliseconds the game's timeGetTime and GetTickCount see (32-bit, wrapping). */
 uint32_t bmxTimeGetTime(void);
 uint32_t bmxGetTickCount(void);
+/* The clock behind bmxTimeGetTime in ns since the origin, and the millisecond value it shows at such an
+ * instant (bmxTimeGetTime() == bmxTimeMsAt(bmxTimeNs()); the high frame rate scheduler, hfinterp.c). */
+uint64_t bmxTimeNs(void);
+uint32_t bmxTimeMsAt(uint64_t ns);
 /* Test hook: the value both clocks show at the origin. */
 void bmxTimeSetBase(uint32_t base);
 

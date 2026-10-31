@@ -356,7 +356,11 @@ pass need handling (GENERIC_READ, OPEN_EXISTING, FILE_BEGIN/CURRENT).
   stretch; 1 = edge anchored, WS5; `hud_aspect` bounds it, aspect · 100, default 178), `menus` (0 pillarbox, 1 stretch, 2 pillarbox on a blurred, darkened fill: WS6), `movies` (0 pillarbox, 1
   stretch), `scale_filter` (0 linear letterbox, 1 nearest, 2 integer factor; the present, also without
   widescreen), `ui_filter` (0 the game's nearest sampling of 2D / HUD textures, 1 linear, 2 sharp bilinear; also
-  without widescreen). `-r<w>.<h>.<depth>` on the command line still wins over width / height / depth / fullscreen.
+  without widescreen); the high frame rate options of docs/HIGHFPS.md H8 (HF1-HF3): `interpolate` (0; 1 draws
+  between the 30 Hz ticks in levels, interpolated one tick behind; visual-only, the sleeping wait is used in that
+  mode only), `max_fps` (0 = the display's refresh rate; draws per second with `interpolate = 1`), `vsync` (1; 0 =
+  immediate presents, mailbox where immediate is missing; applies to every present). `-r<w>.<h>.<depth>` on the
+  command line still wins over width / height / depth / fullscreen.
 
 ### 3.6 Timing
 
