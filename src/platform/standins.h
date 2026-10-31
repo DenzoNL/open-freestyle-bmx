@@ -41,6 +41,12 @@ int32_t BMX_WINAPI bmxStandCloseHandle(void *file);
 int32_t BMX_WINAPI bmxStandDirectInputCreateEx(void *instance, uint32_t version, const void *iid, void **out,
                                                void *outer);
 
+/* dsound.c: DirectSound on SDL3 audio, and the DLL loading that hands it to the game. */
+void *BMX_WINAPI bmxStandLoadLibraryA(const char *name);
+void *BMX_WINAPI bmxStandGetProcAddress(void *module, const char *name);
+int32_t BMX_WINAPI bmxStandFreeLibrary(void *module);
+int32_t BMX_WINAPI bmxStandDirectSoundCreate(const void *guid, void **out, void *outer);
+
 /* avi.c */
 int32_t BMX_WINAPI bmxStandAVISaveOptionsFree(int count, void **options);
 

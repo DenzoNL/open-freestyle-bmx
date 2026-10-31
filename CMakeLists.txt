@@ -84,10 +84,10 @@ if(BMX_NATIVE32)
   # Checks of the platform stand-ins against Windows (tests/platform): hosted, no game image.
   add_executable(bmxplatformtest tests/platform/test_platform.c src/platform/kernel.c src/platform/winmm.c
     src/platform/fileio.c src/platform/paths.c src/platform/input.c src/platform/inputcheck.c
-    src/platform/config.c)
+    src/platform/config.c src/platform/dsound.c src/platform/soundcheck.c)
   target_include_directories(bmxplatformtest PRIVATE src)
   target_compile_options(bmxplatformtest PRIVATE ${BMX_WARNINGS})
-  target_link_libraries(bmxplatformtest PRIVATE SDL3::SDL3 dinput dxguid) # c_dfDIKeyboard / c_dfDIJoystick
+  target_link_libraries(bmxplatformtest PRIVATE SDL3::SDL3 dinput dxguid ole32) # c_dfDIKeyboard / c_dfDIJoystick
   # SDL3.dll next to the exe (copy it into the game folder with bmxnative.exe).
   add_custom_command(TARGET bmxnative POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
     $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:bmxnative>)

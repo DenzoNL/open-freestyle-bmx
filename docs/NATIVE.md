@@ -86,7 +86,8 @@ Environment (dev aids):
 |---|---|
 | `BMX_TRAP_SKIP=N` | log the first N traps and fake a `return 1` from each instead of stopping (a survey; state is bogus after the first skip) |
 | `BMX_NO_MOVIES=1` | sets the original's own movie skip switch (0x67288c, which the game never sets): no ACCLAIM/ZAXIS/INTRO.AVI |
-| `BMX_MUTE=1` | mutes this process's audio session (WASAPI) before the game opens waveOut / DirectSound |
+| `BMX_MUTE=1` | mutes this process's audio session (WASAPI) before the game opens waveOut (movies), and the DirectSound stand-in outputs silence (it still mixes, so the cursors run as in an audible run) |
+| `BMX_SOUND_CHECK=1` | repeat every DirectSound call of the game on the real dsound.dll and compare (log lines `soundcheck:`, last line `soundcheck: RESULT clean\|DIFFERENCES`); the real buffers get no data, so nothing is heard twice |
 | `BMX_QUIT_FRAMES=N` | exit after N shown frames (`RwRasterShowRaster`) |
 | `BMX_SHOT=<file.bmp>`, `BMX_SHOT_FRAME=N[,M...]` | save the shown camera raster of frame N (default 1; a list saves each, a `%d` in the file name becomes the frame number) as a BMP (GPU readback) |
 | `BMX_KEYS=<script>` | scripted keyboard, see "Scripted input" below: e.g. `f300:enter,+150:enter,+100:up*400,+20:up+e*30` |
@@ -475,7 +476,7 @@ step 3), then the D7 screenshot diff (step 4).
 docs/PLATFORM.md has the design and the status (4a). In the native exe: the loader fills each import slot from the
 table in `src/platform/imports.c` (stand-in, else trap stub for the 64 dead slots, else the real function); the log
 shows per DLL `N stand-ins, N dead (trap stubs), N real` and the DLLs still used (KERNEL32, USER32, WINMM, AVIFIL32,
-MSVFW32 today; ADVAPI32, DDRAW and, unscripted, DINPUT only when asked). A call of a dead slot prints
+MSVFW32 today; ADVAPI32, DDRAW and, unscripted, DINPUT only when asked; since S7 KERNEL32 has no real slot left). A call of a dead slot prints
 `DEAD IMPORT called: <dll>!<name>, caller <addr>` and exits with code 3. The stand-ins: timeGetTime / GetTickCount /
 Sleep / QPC / QPF / OutputDebugStringA / DebugBreak / critical sections (kernel.c), the winmm timer functions on an
 SDL thread (winmm.c), the sound loader's CreateFileA / ReadFile / SetFilePointer / CloseHandle (fileio.c).
@@ -571,6 +572,52 @@ selection like the stick (in test A it did nothing: vanilla). Freeride (or ProQu
 right steers, up / down act like the stick's up / down, the left stick still works; each d-pad change logs
 `input: d-pad 0x8 -> lX -127, lY 0` (0x1 up, 0x2 right, 0x4 down, 0x8 left). The check still ends `RESULT clean`
 (it compares the values before the d-pad is applied). Quit as above, restore the save, `Remove-Item Env:BMX_CONFIG`.
+
+### DirectSound on SDL3 (S7, 2026-10-31)
+
+docs/PLATFORM.md 4c has the design, the measurements and the status. Since S7 every run plays the game's sound through
+the stand-in DirectSound (src/platform/dsound.c): `LoadLibraryA("DSOUND.DLL")` gives our module, `DirectSoundCreate`
+our device, and our own mixer plays the buffers into one SDL audio stream (log line `sound: SDL audio "wasapi" on
+"<device>": mixing at 48000 Hz in 10 ms quanta ...`; at exit `sound: N quanta mixed, ..., 0 resampler underruns`). The
+play / write cursors, the lock rules, the volume / pan law and the focus muting are dsound.dll's as measured on this
+machine. The movies' sound (waveOut) is still Windows' (S9).
+
+Checks: `bmxplatformtest.exe` compares the stand-in with the real dsound.dll in the same process (the API script, the
+cursor sequence after every mix for 12 kinds of buffer, the mixer's output, real-time steps and levels through the SDL
+device); it mutes its own audio session first. `BMX_SOUND_CHECK=1` in the game (ProQuest, end run, main menu, Freeride;
+`BMX_MUTE=1`, `BMX_KEYS`, from native-run2): 28012 calls compared, `RESULT clean`.
+
+**Listening test (the user's).** Needs a build of this state (`cmake --build build/native32`), headphones or speakers at a
+normal level, and nothing else playing. PowerShell, a fresh window:
+
+```powershell
+cd C:\Users\Dennis\Games\dmfbmx\native-run
+.\soundtest.ps1
+```
+
+The script backs up `save\SAVE.DAT`, runs `bmxnative.exe Scene.Txt -r640.480.16` with movies off, the sound timer log and
+`BMX_SOUND_CHECK=1` (silent on the real side; `-NoCheck` turns it off), restores the save afterwards and keeps the log as
+`soundtest.log`. Play with the keyboard or the pad, window focused:
+
+1. Main menu: the menu music starts with the menu; moving the selection gives the menu sounds. Listen for crackles,
+   dropouts, stutter, a wrong pitch or speed (everything is resampled from 22050 / 44100 Hz to the device rate), left /
+   right swapped.
+2. Options -> audio: move the music and effects volume sliders; the levels follow, music and effects separately.
+3. ProQuest into a level (Vail Trails): the level's music, the announcer / speech if any, riding, pedalling, tricks,
+   landings and bails, grinds; sounds that come from one side should come from that side.
+4. Pause (Esc) and continue, then end run: music and effects pause / stop and resume as in the original.
+5. Alt-tab to another window for a few seconds and back: the sound goes silent while the game is in the background
+   and returns (DirectSound does this to the original; measured, not guessed). Please also note what the original does
+   in the same moment if you can compare.
+6. Back to the main menu, QUIT, Yes. While the "Are you sure" box is open, ours is silent (the box takes the focus);
+   if you know whether the original keeps playing there, say so.
+
+If you can, play the same steps in the original game (the hooked or a vanilla install: it uses the real DirectSound)
+right before or after, to compare loudness, the music / effects balance and the stereo picture by ear.
+
+Report: anything that sounds different from the original (what, where), and the lines the script prints at the end
+(`sound: ... underruns`, `soundcheck: ... differences`, `soundcheck: RESULT ...`). Expected: no audible difference,
+`0 resampler underruns`, `RESULT clean`.
 
 ### Open points from the CRT layer (2026-10-28)
 

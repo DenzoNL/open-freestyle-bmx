@@ -36,6 +36,10 @@ const BmxStandIn bmxStandIns[] = {
     STAND("KERNEL32.dll", "CloseHandle", bmxStandCloseHandle),
     /* S5: DirectInput (keyboard and pad on SDL3; BMX_KEYS is a source of its keyboard) */
     STAND("DINPUT.dll", "DirectInputCreateEx", bmxStandDirectInputCreateEx),
+    /* S7: DirectSound (LoadLibraryA("DSOUND.DLL") / GetProcAddress("DirectSoundCreate") give our own) */
+    STAND("KERNEL32.dll", "LoadLibraryA", bmxStandLoadLibraryA),
+    STAND("KERNEL32.dll", "GetProcAddress", bmxStandGetProcAddress),
+    STAND("KERNEL32.dll", "FreeLibrary", bmxStandFreeLibrary),
     /* Moved here from the loader */
     STAND("AVIFIL32.dll", "AVISaveOptionsFree", bmxStandAVISaveOptionsFree),
 };

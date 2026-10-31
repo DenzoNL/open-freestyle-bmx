@@ -1,7 +1,7 @@
 /*
  * Checks of the platform stand-ins (src/platform) against Windows itself, as a small hosted program (preset
- * native32, target bmxplatformtest; it does not load the game): time, critical sections, the winmm timer and
- * the file shims. Exit code 0 when all pass.
+ * native32, target bmxplatformtest; it does not load the game): time, critical sections, the winmm timer, the
+ * file shims, DirectInput and DirectSound. Exit code 0 when all pass.
  */
 #include <SDL3/SDL.h>
 #include <math.h>
@@ -10,12 +10,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define COBJMACROS
 #include <windows.h>
+
+#include <audiopolicy.h>
+#include <mmdeviceapi.h>
 
 #define DIRECTINPUT_VERSION 0x0700
 #include <dinput.h>
 
 #include "platform/input.h"
+#include "platform/sound.h"
 #include "platform/standins.h"
 
 static int failures, checks;
@@ -1058,6 +1063,842 @@ static void testFiles(void)
     free(got);
 }
 
+/* ---- DirectSound (S7) ---- */
+
+/*
+ * Against the real dsound.dll in this process, with a hidden window (never focused: buffers without
+ * DSBCAPS_GLOBALFOCUS are silent on both sides) and this process's audio session muted. Data written to the
+ * buffers is silence unless the session is muted.
+ */
+
+static const GUID kClsidDeviceEnumerator = {
+    0xbcde0395, 0xe52f, 0x467c, {0x8e, 0x3d, 0xc4, 0x57, 0x92, 0x91, 0x69, 0x2e}};
+static const GUID kIidDeviceEnumerator = {
+    0xa95664d2, 0x9614, 0x4f35, {0xa7, 0x46, 0xde, 0x8d, 0xb6, 0x36, 0x17, 0xe6}};
+static const GUID kIidSessionManager = {
+    0xbfa971f1, 0x4d5e, 0x40bb, {0x93, 0x5e, 0x96, 0x70, 0x39, 0xbf, 0xbe, 0xe4}};
+static const GUID kIidMeter = {0xc02216f6, 0x8c67, 0x4b5b, {0x9d, 0x00, 0xd0, 0x08, 0xe7, 0x3e, 0x00, 0x64}};
+
+/* IAudioMeterInformation: QueryInterface, AddRef, Release, GetPeakValue, GetMeteringChannelCount,
+ * GetChannelsPeakValues, QueryHardwareSupport. */
+typedef struct Meter {
+    struct {
+        void *qi, *addRef, *release, *peak, *count;
+        HRESULT(STDMETHODCALLTYPE *channelPeaks)(struct Meter *self, UINT32 count, float *peaks);
+    } *vtbl;
+} Meter;
+
+static Meter *gMeter;
+
+/* Mutes this process's audio session (like main.c's BMX_MUTE) and gets its peak meter; 0 when not muted. */
+static int muteSession(void)
+{
+    IMMDeviceEnumerator *devices = NULL;
+    IMMDevice *device = NULL;
+    IAudioSessionManager *sessions = NULL;
+    ISimpleAudioVolume *volume = NULL;
+    IAudioSessionControl *control = NULL;
+    BOOL muted = FALSE;
+
+    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+    if (FAILED(CoCreateInstance(&kClsidDeviceEnumerator, NULL, CLSCTX_ALL, &kIidDeviceEnumerator,
+                                (void **)&devices)) ||
+        FAILED(IMMDeviceEnumerator_GetDefaultAudioEndpoint(devices, eRender, eConsole, &device)) ||
+        FAILED(IMMDevice_Activate(device, &kIidSessionManager, CLSCTX_ALL, NULL, (void **)&sessions)) ||
+        FAILED(IAudioSessionManager_GetSimpleAudioVolume(sessions, NULL, FALSE, &volume)) ||
+        FAILED(ISimpleAudioVolume_SetMute(volume, TRUE, NULL)) ||
+        FAILED(ISimpleAudioVolume_GetMute(volume, &muted))) {
+        return 0;
+    }
+    if (SUCCEEDED(IAudioSessionManager_GetAudioSessionControl(sessions, NULL, 0, &control))) {
+        IAudioSessionControl_QueryInterface(control, &kIidMeter, (void **)&gMeter);
+    }
+    return muted;
+}
+
+static BmxDs *createReal(void)
+{
+    const BmxDirectSoundCreateFn create =
+        (BmxDirectSoundCreateFn)bmxRealProc("DSOUND.dll", "DirectSoundCreate");
+    BmxDs *ds = NULL;
+
+    return create != NULL && create(NULL, &ds, NULL) == 0 ? ds : NULL;
+}
+
+static BmxDs *createOurs(void)
+{
+    BmxDs *ds = NULL;
+
+    return bmxStandDirectSoundCreate(NULL, (void **)&ds, NULL) == 0 ? ds : NULL;
+}
+
+static BmxDsBuffer *makeBuffer(BmxDs *ds, uint32_t rate, uint16_t bits, uint16_t channels, uint32_t bytes,
+                               uint32_t flags)
+{
+    const uint16_t align = (uint16_t)(channels * bits / 8);
+    const BmxWaveFormat f = {1, channels, rate, rate * align, align, bits, 0};
+    BmxDsBufferDesc d = {sizeof d, flags, bytes, 0, &f, {0, 0, 0, {0}}};
+    BmxDsBuffer *b = NULL;
+
+    ds->vtbl->createSoundBuffer(ds, &d, &b, NULL);
+    return b;
+}
+
+/* Fills the whole buffer with silence (or a pattern). */
+static void fillBuffer(BmxDsBuffer *b, int bits, int16_t left, int16_t right)
+{
+    void *p1, *p2;
+    uint32_t n1, n2;
+
+    if (b->vtbl->lock(b, 0, 0, &p1, &n1, &p2, &n2, kDsbLockEntireBuffer) != 0) {
+        return;
+    }
+    if (bits == 8) {
+        memset(p1, 0x80 + (left >> 8), n1);
+    } else {
+        for (uint32_t i = 0; i + 4 <= n1; i += 4) {
+            memcpy((uint8_t *)p1 + i, &left, 2);
+            memcpy((uint8_t *)p1 + i + 2, &right, 2);
+        }
+    }
+    b->vtbl->unlock(b, p1, n1, p2, n2);
+}
+
+typedef struct Record {
+    int count;
+    const char *label[400];
+    int64_t value[400];
+} Record;
+
+static void rec(Record *r, const char *label, int64_t value)
+{
+    if (r->count < 400) {
+        r->label[r->count] = label;
+        r->value[r->count++] = value;
+    }
+}
+
+/* Lock + Unlock, recording the result, the parts and the first part's offset. */
+static void lockRec(Record *r, BmxDsBuffer *b, const uint8_t *base, uint32_t offset, uint32_t bytes,
+                    uint32_t flags, const char *label)
+{
+    void *p1 = (void *)1, *p2 = (void *)1;
+    uint32_t n1 = 77, n2 = 77;
+    const BmxHresult hr = b->vtbl->lock(b, offset, bytes, &p1, &n1, &p2, &n2, flags);
+
+    rec(r, label, hr);
+    rec(r, "  p1 offset / null", p1 == NULL ? -1 : (int64_t)((const uint8_t *)p1 - base));
+    rec(r, "  n1", n1);
+    rec(r, "  p2 null", p2 == NULL);
+    rec(r, "  n2", n2);
+    if (hr == 0) {
+        rec(r, "  unlock", b->vtbl->unlock(b, p1, n1, p2, n2));
+    }
+}
+
+/* The same calls on a DirectSound object, real or ours; every result into r. */
+static void soundApiScript(BmxDs *ds, HWND window, Record *r)
+{
+    BmxDsBuffer *primary = NULL, *primary2 = NULL, *b, *nb, *dup = NULL;
+    BmxWaveFormat f;
+    BmxDsbCaps caps = {sizeof caps, 0, 0, 0, 0};
+    uint32_t n = 0, status = 0, play = 0, write = 0, freq = 0;
+    int32_t v = 0;
+    void *p1, *p2, *q1, *q2;
+    uint32_t n1, n2, m1, m2;
+    const uint8_t *base;
+    BmxDsBufferDesc pd = {sizeof pd, kDsbPrimary, 0, 0, NULL, {0, 0, 0, {0}}};
+
+    rec(r, "coop NULL window", ds->vtbl->setCooperativeLevel(ds, NULL, 1));
+    rec(r, "coop level 0", ds->vtbl->setCooperativeLevel(ds, window, 0));
+    rec(r, "coop level 5", ds->vtbl->setCooperativeLevel(ds, window, 5));
+    rec(r, "coop normal", ds->vtbl->setCooperativeLevel(ds, window, 1));
+    /* the primary buffer as winchanInit uses it */
+    pd.bufferBytes = 100;
+    rec(r, "primary with bytes", ds->vtbl->createSoundBuffer(ds, &pd, &primary, NULL));
+    rec(r, "  out NULL", primary == NULL);
+    pd.bufferBytes = 0;
+    rec(r, "primary", ds->vtbl->createSoundBuffer(ds, &pd, &primary, NULL));
+    rec(r, "primary again", ds->vtbl->createSoundBuffer(ds, &pd, &primary2, NULL));
+    rec(r, "  same object", primary == primary2);
+    if (primary2 != NULL) {
+        rec(r, "  release", primary2->vtbl->release(primary2));
+    }
+    if (primary == NULL) {
+        return;
+    }
+    primary->vtbl->getCaps(primary, &caps);
+    rec(r, "primary caps flags", caps.flags);
+    rec(r, "primary caps bytes", caps.bufferBytes);
+    memset(&f, 0, sizeof f);
+    rec(r, "primary GetFormat", primary->vtbl->getFormat(primary, &f, sizeof f, &n));
+    rec(r, "  written", n);
+    rec(r, "  rate", f.samplesPerSec);
+    rec(r, "  bits", f.bitsPerSample);
+    rec(r, "  channels", f.channels);
+    f = (BmxWaveFormat){1, 2, 22050, 88200, 4, 16, 0};
+    rec(r, "SetFormat at normal", primary->vtbl->setFormat(primary, &f));
+    rec(r, "coop priority", ds->vtbl->setCooperativeLevel(ds, window, 2));
+    f.blockAlign = 3;
+    rec(r, "SetFormat bad align", primary->vtbl->setFormat(primary, &f));
+    f.blockAlign = 4;
+    f.avgBytesPerSec = 1;
+    rec(r, "SetFormat bad avg", primary->vtbl->setFormat(primary, &f));
+    f.avgBytesPerSec = 88200;
+    rec(r, "SetFormat 22050/16/2", primary->vtbl->setFormat(primary, &f));
+    memset(&f, 0, sizeof f);
+    primary->vtbl->getFormat(primary, &f, sizeof f, &n);
+    rec(r, "  rate", f.samplesPerSec);
+    rec(r, "  bits", f.bitsPerSample);
+    rec(r, "coop normal", ds->vtbl->setCooperativeLevel(ds, window, 1));
+    rec(r, "primary GetStatus", primary->vtbl->getStatus(primary, &status));
+    rec(r, "  status", status);
+    rec(r, "primary Play once", primary->vtbl->play(primary, 0, 0, 0));
+    rec(r, "primary Play looping", primary->vtbl->play(primary, 0, 0, 1));
+    primary->vtbl->getStatus(primary, &status);
+    rec(r, "  status", status);
+    rec(r, "primary GetCurrentPosition", primary->vtbl->getCurrentPosition(primary, &play, &write));
+    rec(r, "primary Lock", primary->vtbl->lock(primary, 0, 4, &p1, &n1, &p2, &n2, 0));
+    rec(r, "primary SetVolume", primary->vtbl->setVolume(primary, -100));
+    rec(r, "primary SetCurrentPosition", primary->vtbl->setCurrentPosition(primary, 0));
+
+    /* secondary buffers: invalid descriptions */
+    rec(r, "create 3 bytes", makeBuffer(ds, 22050, 16, 2, 3, 0xe0) == NULL);
+    nb = makeBuffer(ds, 22050, 16, 2, 6, 0xe0);
+    rec(r, "create 6 bytes", nb != NULL);
+    if (nb != NULL) {
+        nb->vtbl->getCaps(nb, &caps);
+        rec(r, "  rounded to", caps.bufferBytes);
+        rec(r, "  release", nb->vtbl->release(nb));
+    }
+    rec(r, "create 0x10000000 bytes", makeBuffer(ds, 22050, 16, 2, 0x10000000, 0xe0) == NULL);
+    rec(r, "create 99 Hz", makeBuffer(ds, 99, 16, 2, 8816, 0xe0) == NULL);
+    rec(r, "create 200001 Hz", makeBuffer(ds, 200001, 16, 2, 8816, 0xe0) == NULL);
+    rec(r, "create 6 channels", makeBuffer(ds, 22050, 16, 6, 8820, 0xe0) == NULL);
+    {
+        BmxDsBufferDesc d = {sizeof d, 0xe0, 8816, 0, NULL, {0, 0, 0, {0}}};
+        const BmxWaveFormat bad = {1, 2, 22050, 1, 4, 16, 0};
+
+        nb = (BmxDsBuffer *)1;
+        rec(r, "create no format", ds->vtbl->createSoundBuffer(ds, &d, &nb, NULL));
+        rec(r, "  out NULL", nb == NULL);
+        d.format = &bad;
+        rec(r, "create bad avg", ds->vtbl->createSoundBuffer(ds, &d, &nb, NULL));
+        d.size = 0x10;
+        rec(r, "create desc size 0x10", ds->vtbl->createSoundBuffer(ds, &d, &nb, NULL));
+    }
+    nb = makeBuffer(ds, 22050, 16, 2, 8816, 0);
+    rec(r, "no-control SetVolume", nb->vtbl->setVolume(nb, -100));
+    rec(r, "no-control SetPan", nb->vtbl->setPan(nb, 0));
+    rec(r, "no-control SetFrequency", nb->vtbl->setFrequency(nb, 1000));
+    rec(r, "no-control GetVolume", nb->vtbl->getVolume(nb, &v));
+    nb->vtbl->getCaps(nb, &caps);
+    rec(r, "no-control caps flags", caps.flags);
+    rec(r, "  release", nb->vtbl->release(nb));
+
+    /* the mixer's output buffer of winchanInit */
+    b = makeBuffer(ds, 22050, 16, 2, 8816, 0xe0);
+    b->vtbl->getCaps(b, &caps);
+    rec(r, "caps flags", caps.flags);
+    rec(r, "caps bytes", caps.bufferBytes);
+    memset(&f, 0, sizeof f);
+    rec(r, "GetFormat", b->vtbl->getFormat(b, &f, sizeof f, &n));
+    rec(r, "  written", n);
+    rec(r, "  rate / bits / ch / align",
+        f.samplesPerSec * 1000000 + f.bitsPerSample * 1000 + f.channels * 10 + f.blockAlign);
+    rec(r, "GetFormat size query", b->vtbl->getFormat(b, NULL, 0, &n));
+    rec(r, "  written", n);
+    rec(r, "GetFormat 16 bytes", b->vtbl->getFormat(b, &f, 16, &n));
+    rec(r, "GetStatus", b->vtbl->getStatus(b, &status));
+    rec(r, "  status", status);
+    b->vtbl->lock(b, 0, 0, &p1, &n1, &p2, &n2, kDsbLockEntireBuffer);
+    base = p1;
+    rec(r, "lock entire: n1", n1);
+    rec(r, "  unlock", b->vtbl->unlock(b, p1, n1, p2, n2));
+    lockRec(r, b, base, 0, 8816, 0, "lock 0 8816");
+    lockRec(r, b, base, 0, 0, 0, "lock 0 0");
+    lockRec(r, b, base, 100, 0, kDsbLockEntireBuffer, "lock 100 entire");
+    lockRec(r, b, base, 8000, 1000, 0, "lock 8000 1000 (wraps)");
+    lockRec(r, b, base, 8816, 4, 0, "lock at the end");
+    lockRec(r, b, base, 0, 8817, 0, "lock too long");
+    lockRec(r, b, base, 1, 3, 0, "lock unaligned");
+    lockRec(r, b, base, 8812, 8816, 0, "lock 8812 whole");
+    lockRec(r, b, base, 2000, 100, kDsbLockFromWriteCursor, "lock from write cursor (stopped)");
+    rec(r, "lock A", b->vtbl->lock(b, 0, 100, &p1, &n1, &p2, &n2, 0));
+    rec(r, "lock B overlapping", b->vtbl->lock(b, 50, 100, &q1, &m1, &q2, &m2, 0));
+    rec(r, "lock C apart", b->vtbl->lock(b, 200, 100, &q1, &m1, &q2, &m2, 0));
+    rec(r, "unlock C", b->vtbl->unlock(b, q1, m1, q2, m2));
+    rec(r, "unlock wrong pointer", b->vtbl->unlock(b, (uint8_t *)p1 + 4, 96, NULL, 0));
+    rec(r, "unlock more bytes", b->vtbl->unlock(b, p1, 200, NULL, 0));
+    rec(r, "unlock fewer bytes", b->vtbl->unlock(b, p1, 10, NULL, 0));
+    rec(r, "unlock again", b->vtbl->unlock(b, p1, n1, NULL, 0));
+    rec(r, "unlock NULL 0", b->vtbl->unlock(b, NULL, 0, NULL, 0));
+    rec(r, "unlock NULL 1000", b->vtbl->unlock(b, NULL, 1000, NULL, 0));
+    rec(r, "lock wrapping, no second pointer", b->vtbl->lock(b, 8000, 1000, &p1, &n1, NULL, NULL, 0));
+    rec(r, "  n1", n1);
+    rec(r, "  unlock without the second part", b->vtbl->unlock(b, p1, n1, NULL, 0));
+    rec(r, "lock the second part's bytes", b->vtbl->lock(b, 0, 100, &q1, &m1, &q2, &m2, 0));
+    rec(r, "unlock the second part", b->vtbl->unlock(b, (void *)base, 184, NULL, 0));
+    rec(r, "lock them again", b->vtbl->lock(b, 0, 100, &q1, &m1, &q2, &m2, 0));
+    rec(r, "  unlock", b->vtbl->unlock(b, q1, m1, q2, m2));
+    rec(r, "lock 0 100", b->vtbl->lock(b, 0, 100, &p1, &n1, &p2, &n2, 0));
+    rec(r, "unlock with a second part it does not have",
+        b->vtbl->unlock(b, p1, n1, (uint8_t *)p1 + 1000, 50));
+    rec(r, "unlock", b->vtbl->unlock(b, p1, n1, NULL, 0));
+    rec(r, "SetCurrentPosition 101", b->vtbl->setCurrentPosition(b, 101));
+    b->vtbl->getCurrentPosition(b, &play, &write);
+    rec(r, "  play", play);
+    rec(r, "  write", write);
+    rec(r, "SetCurrentPosition 8816", b->vtbl->setCurrentPosition(b, 8816));
+    rec(r, "SetCurrentPosition 4000", b->vtbl->setCurrentPosition(b, 4000));
+    b->vtbl->getCurrentPosition(b, &play, &write);
+    rec(r, "  play", play);
+    rec(r, "  write", write);
+    rec(r, "GetCurrentPosition NULL NULL", b->vtbl->getCurrentPosition(b, NULL, NULL));
+    rec(r, "SetVolume 1", b->vtbl->setVolume(b, 1));
+    rec(r, "SetVolume -10001", b->vtbl->setVolume(b, -10001));
+    rec(r, "SetVolume -10000", b->vtbl->setVolume(b, -10000));
+    b->vtbl->getVolume(b, &v);
+    rec(r, "  read back", v);
+    rec(r, "SetVolume -1234", b->vtbl->setVolume(b, -1234));
+    b->vtbl->getVolume(b, &v);
+    rec(r, "  read back", v);
+    rec(r, "SetPan 10001", b->vtbl->setPan(b, 10001));
+    rec(r, "SetPan -9906", b->vtbl->setPan(b, -9906));
+    b->vtbl->getPan(b, &v);
+    rec(r, "  read back", v);
+    b->vtbl->getFrequency(b, &freq);
+    rec(r, "GetFrequency", freq);
+    rec(r, "SetFrequency 99", b->vtbl->setFrequency(b, 99));
+    rec(r, "SetFrequency 100", b->vtbl->setFrequency(b, 100));
+    rec(r, "SetFrequency 200001", b->vtbl->setFrequency(b, 200001));
+    rec(r, "SetFrequency 200000", b->vtbl->setFrequency(b, 200000));
+    b->vtbl->getFrequency(b, &freq);
+    rec(r, "  read back", freq);
+    rec(r, "SetFrequency 0", b->vtbl->setFrequency(b, 0));
+    b->vtbl->getFrequency(b, &freq);
+    rec(r, "  read back", freq);
+    rec(r, "Restore", b->vtbl->restore(b));
+    rec(r, "Initialize", b->vtbl->initialize(b, ds, NULL));
+    rec(r, "Play reserved 1", b->vtbl->play(b, 1, 0, 1));
+    rec(r, "Play priority 1", b->vtbl->play(b, 0, 1, 1));
+    rec(r, "Play flags 8", b->vtbl->play(b, 0, 0, 8));
+    rec(r, "Play looping", b->vtbl->play(b, 0, 0, 1));
+    b->vtbl->getStatus(b, &status);
+    rec(r, "  status", status);
+    rec(r, "Play once while playing", b->vtbl->play(b, 0, 0, 0));
+    b->vtbl->getStatus(b, &status);
+    rec(r, "  status", status);
+    rec(r, "Stop", b->vtbl->stop(b));
+    rec(r, "Stop again", b->vtbl->stop(b));
+    b->vtbl->getStatus(b, &status);
+    rec(r, "  status", status);
+    rec(r, "AddRef", b->vtbl->addRef(b));
+    rec(r, "Release", b->vtbl->release(b));
+    {
+        static const BmxGuid kIidBuffer = {
+            0x279afa85, 0x4981, 0x11ce, {0xa5, 0x21, 0x00, 0x20, 0xaf, 0x0b, 0xe5, 0x60}};
+        static const BmxGuid kIidOther = {1, 2, 3, {4, 5, 6, 7, 8, 9, 10, 11}};
+        void *out = NULL;
+
+        rec(r, "QueryInterface buffer", b->vtbl->queryInterface(b, &kIidBuffer, &out));
+        rec(r, "  same object", out == (void *)b);
+        if (out != NULL) {
+            rec(r, "  release", b->vtbl->release(b));
+        }
+        rec(r, "QueryInterface other", b->vtbl->queryInterface(b, &kIidOther, &out));
+        rec(r, "  out NULL", out == NULL);
+    }
+    /* duplicates share the data, not the state */
+    b->vtbl->setVolume(b, -500);
+    b->vtbl->setCurrentPosition(b, 1000);
+    rec(r, "DuplicateSoundBuffer", ds->vtbl->duplicateSoundBuffer(ds, b, &dup));
+    if (dup != NULL) {
+        dup->vtbl->getCurrentPosition(dup, &play, &write);
+        rec(r, "  play", play);
+        dup->vtbl->getVolume(dup, &v);
+        rec(r, "  volume", v);
+        dup->vtbl->getStatus(dup, &status);
+        rec(r, "  status", status);
+        rec(r, "  lock", dup->vtbl->lock(dup, 0, 4, &p1, &n1, &p2, &n2, 0));
+        rec(r, "  same data", p1 == base);
+        rec(r, "  original locks the same bytes", b->vtbl->lock(b, 0, 4, &q1, &m1, &q2, &m2, 0));
+        dup->vtbl->unlock(dup, p1, n1, p2, n2);
+        rec(r, "  release", dup->vtbl->release(dup));
+    }
+    rec(r, "DuplicateSoundBuffer primary", ds->vtbl->duplicateSoundBuffer(ds, primary, &dup));
+    rec(r, "buffer Release", b->vtbl->release(b));
+    rec(r, "primary Stop", primary->vtbl->stop(primary));
+    primary->vtbl->getStatus(primary, &status);
+    rec(r, "  status", status);
+    rec(r, "primary Release", primary->vtbl->release(primary));
+    rec(r, "device Release", ds->vtbl->release(ds));
+}
+
+static void testSoundApi(HWND window)
+{
+    static Record real, ours;
+    BmxDs *ds = createReal();
+    int differences = 0;
+
+    CHECK(ds != NULL, "real DirectSoundCreate");
+    if (ds == NULL) {
+        return;
+    }
+    soundApiScript(ds, window, &real);
+    ds = createOurs();
+    soundApiScript(ds, window, &ours);
+    CHECK(real.count == ours.count, "%d vs %d results", real.count, ours.count);
+    for (int i = 0; i < real.count && i < ours.count; i++) {
+        if (real.value[i] != ours.value[i]) {
+            differences++;
+            printf("dsound api: %-36s DirectSound %#llx, ours %#llx\n", real.label[i],
+                   (unsigned long long)real.value[i], (unsigned long long)ours.value[i]);
+        }
+    }
+    CHECK(differences == 0, "%d of %d results differ from dsound.dll", differences, real.count);
+    printf("dsound api: %d results compared\n", real.count);
+}
+
+/* The cursor sequence of one play: the distinct (play, write) pairs in frames, real (polled) or ours (per
+ * offline mix). */
+typedef struct Scenario {
+    const char *name;
+    uint32_t rate;
+    uint16_t bits, channels;
+    uint32_t bytes, start, flags;
+} Scenario;
+
+enum { kPairs = 12 };
+
+static int realCursorSequence(BmxDs *ds, const Scenario *s, uint32_t pairs[kPairs][3])
+{
+    BmxDsBuffer *b = makeBuffer(ds, s->rate, s->bits, s->channels, s->bytes, 0xe0);
+    const uint32_t align = s->channels * s->bits / 8u;
+    const uint64_t t0 = SDL_GetTicksNS();
+    uint32_t p, w, st, lp = UINT32_MAX, lw = UINT32_MAX;
+    int k = 0;
+
+    fillBuffer(b, s->bits, 0, 0);
+    b->vtbl->setCurrentPosition(b, s->start);
+    b->vtbl->play(b, 0, 0, s->flags);
+    while (k < kPairs && SDL_GetTicksNS() - t0 < 400000000ull) {
+        b->vtbl->getCurrentPosition(b, &p, &w);
+        b->vtbl->getStatus(b, &st);
+        if (p != lp || w != lw) {
+            pairs[k][0] = p / align;
+            pairs[k][1] = w / align;
+            pairs[k][2] = st;
+            k++;
+            lp = p;
+            lw = w;
+            if (st == 0) {
+                /* dsound.dll resets the position a moment after the status: read it once settled */
+                SDL_Delay(20);
+                b->vtbl->getCurrentPosition(b, &p, &w);
+                pairs[k - 1][0] = p / align;
+                pairs[k - 1][1] = w / align;
+                break;
+            }
+        }
+    }
+    b->vtbl->release(b);
+    return k;
+}
+
+static int ourCursorSequence(BmxDs *ds, const Scenario *s, uint32_t pairs[kPairs][3])
+{
+    BmxDsBuffer *b = makeBuffer(ds, s->rate, s->bits, s->channels, s->bytes, 0xe0);
+    const uint32_t align = s->channels * s->bits / 8u;
+    uint32_t p, w, st, lp = UINT32_MAX, lw = UINT32_MAX;
+    int k = 0;
+
+    fillBuffer(b, s->bits, 0, 0);
+    b->vtbl->setCurrentPosition(b, s->start);
+    b->vtbl->play(b, 0, 0, s->flags);
+    for (int mix = 0; mix < 40 && k < kPairs; mix++) {
+        b->vtbl->getCurrentPosition(b, &p, &w);
+        b->vtbl->getStatus(b, &st);
+        if (p != lp || w != lw) {
+            pairs[k][0] = p / align;
+            pairs[k][1] = w / align;
+            pairs[k][2] = st;
+            k++;
+            lp = p;
+            lw = w;
+            if (st == 0) {
+                break;
+            }
+        }
+        bmxSoundMixOffline(NULL);
+    }
+    b->vtbl->release(b);
+    return k;
+}
+
+static void printPairs(const char *who, uint32_t pairs[kPairs][3], int n)
+{
+    printf("  %-11s", who);
+    for (int i = 0; i < n; i++) {
+        printf(" %u/%u%s", (unsigned)pairs[i][0], (unsigned)pairs[i][1], pairs[i][2] ? "" : "(stopped)");
+    }
+    printf("\n");
+}
+
+/* The cursor model against dsound.dll: the sequence of (play, write) after each 10 ms mix, exactly. */
+static void testSoundCursors(HWND window, uint32_t rate)
+{
+    static const Scenario kScenarios[] = {
+        {"winchan ring 22050/16/2 8816", 22050, 16, 2, 8816, 0, 1},
+        {"same from 1000", 22050, 16, 2, 8816, 1000, 1},
+        {"half the size", 22050, 16, 2, 4408, 0, 1},
+        {"once from 1000", 22050, 16, 2, 4408, 1000, 0},
+        {"device rate, small", 48000, 16, 2, 8816, 0, 1},
+        {"stream 44100/8/1 64K", 44100, 8, 1, 65536, 0, 1},
+        {"stream 44100/16/2 64K", 44100, 16, 2, 65536, 0, 1},
+        {"tiny 2000", 22050, 16, 2, 2000, 0, 1},
+        {"stream 11025/16/1 from 2", 11025, 16, 1, 65536, 2, 1},
+        {"stream 16000/16/1", 16000, 16, 1, 65536, 0, 1},
+        {"96000 (down)", 96000, 16, 2, 65536, 0, 1},
+        {"8000/8/1", 8000, 8, 1, 65536, 0, 1},
+    };
+    BmxDs *real = createReal(), *ours;
+
+    if (real == NULL) {
+        CHECK(0, "real DirectSoundCreate");
+        return;
+    }
+    real->vtbl->setCooperativeLevel(real, window, 1);
+    bmxSoundReset();
+    bmxSoundUseOffline(rate);
+    ours = createOurs();
+    ours->vtbl->setCooperativeLevel(ours, window, 1);
+    for (size_t i = 0; i < sizeof kScenarios / sizeof kScenarios[0]; i++) {
+        const Scenario *s = &kScenarios[i];
+        uint32_t a[kPairs][3], b[kPairs][3];
+        int na, nb, same;
+
+        if (rate != 48000 && s->rate == 48000) {
+            continue;
+        }
+        na = realCursorSequence(real, s, a);
+        nb = ourCursorSequence(ours, s, b);
+        same = na == nb && memcmp(a, b, sizeof a[0] * (size_t)na) == 0;
+        CHECK(same, "cursor sequence of \"%s\" differs", s->name);
+        printf("dsound cursors %s: %s\n", s->name, same ? "identical" : "DIFFERENT");
+        if (!same) {
+            printPairs("DirectSound", a, na);
+            printPairs("ours", b, nb);
+        }
+    }
+    /* SetCurrentPosition while playing: the cursors restart there, the write cursor without the lookahead. */
+    {
+        BmxDsBuffer *rb = makeBuffer(real, 22050, 16, 2, 8816, 0xe0),
+                    *ob = makeBuffer(ours, 22050, 16, 2, 8816, 0xe0);
+        uint32_t rp, rw, op, ow;
+
+        rb->vtbl->play(rb, 0, 0, 1);
+        ob->vtbl->play(ob, 0, 0, 1);
+        SDL_Delay(55);
+        for (int i = 0; i < 6; i++) {
+            bmxSoundMixOffline(NULL);
+        }
+        rb->vtbl->setCurrentPosition(rb, 400);
+        ob->vtbl->setCurrentPosition(ob, 400);
+        rb->vtbl->getCurrentPosition(rb, &rp, &rw);
+        ob->vtbl->getCurrentPosition(ob, &op, &ow);
+        CHECK(rp == 400 && rw == 400 && op == 400 && ow == 400, "after SetCurrentPosition: %u/%u, ours %u/%u",
+              (unsigned)rp, (unsigned)rw, (unsigned)op, (unsigned)ow);
+        /* two of dsound.dll's mixes, two of ours */
+        for (uint32_t last = rw, changes = 0, t = 0; changes < 2 && t < 100; t++) {
+            rb->vtbl->getCurrentPosition(rb, &rp, &rw);
+            if (rw != last) {
+                changes++;
+                last = rw;
+            } else {
+                SDL_Delay(1);
+            }
+        }
+        bmxSoundMixOffline(NULL);
+        bmxSoundMixOffline(NULL);
+        ob->vtbl->getCurrentPosition(ob, &op, &ow);
+        CHECK(rp == 400 && op == 400 && rw >= 400 + 4 * 440 && rw <= 400 + 4 * 443 && ow >= 400 + 4 * 440 &&
+                  ow <= 400 + 4 * 443,
+              "two mixes after SetCurrentPosition: %u/%u, ours %u/%u", (unsigned)rp, (unsigned)rw,
+              (unsigned)op, (unsigned)ow);
+        printf("dsound cursors after SetCurrentPosition while playing, two mixes: DirectSound %u/%u, ours "
+               "%u/%u\n",
+               (unsigned)rp, (unsigned)rw, (unsigned)op, (unsigned)ow);
+        /* Stop keeps the play cursor, for both cursors */
+        rb->vtbl->stop(rb);
+        ob->vtbl->stop(ob);
+        rb->vtbl->getCurrentPosition(rb, &rp, &rw);
+        ob->vtbl->getCurrentPosition(ob, &op, &ow);
+        CHECK(rp == rw && op == ow && op == 400, "after Stop: %u/%u, ours %u/%u", (unsigned)rp, (unsigned)rw,
+              (unsigned)op, (unsigned)ow);
+        rb->vtbl->release(rb);
+        ob->vtbl->release(ob);
+    }
+    ours->vtbl->release(ours);
+    real->vtbl->release(real);
+}
+
+/* What the mixer makes of the buffers (offline, at the device rate). */
+static double mixMean(int channel, int quanta, float *out)
+{
+    double sum = 0;
+    const uint32_t q = bmxSoundQuantum();
+
+    for (int i = 0; i < quanta; i++) {
+        bmxSoundMixOffline(out);
+        for (uint32_t j = 0; j < q; j++) {
+            sum += out[2 * j + channel];
+        }
+    }
+    return sum / (quanta * (double)q);
+}
+
+static void testSoundMix(HWND window, uint32_t rate)
+{
+    float *out;
+    BmxDs *ds;
+    BmxDsBuffer *b;
+    float l, r;
+
+    bmxSoundReset();
+    bmxSoundUseOffline(rate);
+    ds = createOurs();
+    ds->vtbl->setCooperativeLevel(ds, window, 1);
+    out = calloc(2 * (size_t)bmxSoundQuantum(), sizeof(float));
+    bmxSoundForceFocus(1);
+    b = makeBuffer(ds, rate, 16, 2, rate * 4, 0xe0);
+    fillBuffer(b, 16, 8192, -4096);
+    b->vtbl->play(b, 0, 0, 1);
+    CHECK(fabs(mixMean(0, 3, out) - 0.25) < 1e-6 && fabs(mixMean(1, 3, out) + 0.125) < 1e-6,
+          "16-bit stereo: %f %f", mixMean(0, 1, out), mixMean(1, 1, out));
+    b->vtbl->setVolume(b, -600);
+    b->vtbl->setPan(b, 1000);
+    bmxDsGains(-600, 1000, &l, &r);
+    /* -16 dB and -6 dB as dsound.dll applies them: -15.9 dB and -5.9 dB, truncated to 1/65536 */
+    CHECK(l == (float)(10507.0 / 65536) && r == (float)(33226.0 / 65536), "gains %f %f", (double)l,
+          (double)r);
+    CHECK(fabs(mixMean(0, 2, out) - 0.25 * l) < 1e-6 && fabs(mixMean(1, 2, out) + 0.125 * r) < 1e-6,
+          "volume and pan: %f %f", mixMean(0, 1, out), mixMean(1, 1, out));
+    b->vtbl->setVolume(b, -10000);
+    CHECK(mixMean(0, 1, out) == 0 && mixMean(1, 1, out) == 0, "silent at -10000");
+    b->vtbl->setVolume(b, 0);
+    b->vtbl->setPan(b, 0);
+    /* no focus: silent (DSBCAPS_GLOBALFOCUS would play on), the cursor runs */
+    bmxSoundForceFocus(0);
+    {
+        uint32_t p0, p1, w;
+
+        b->vtbl->getCurrentPosition(b, &p0, &w);
+        CHECK(mixMean(0, 2, out) == 0, "unfocused buffer is silent");
+        b->vtbl->getCurrentPosition(b, &p1, &w);
+        CHECK(p1 == p0 + 2 * 4 * bmxSoundQuantum(), "cursor runs unfocused: %u -> %u", (unsigned)p0,
+              (unsigned)p1);
+    }
+    b->vtbl->stop(b);
+    b->vtbl->release(b);
+    b = makeBuffer(ds, rate, 16, 2, rate * 4, 0xe0 | kDsbGlobalFocus);
+    fillBuffer(b, 16, 8192, -4096);
+    b->vtbl->play(b, 0, 0, 1);
+    CHECK(fabs(mixMean(0, 3, out) - 0.25) < 1e-6, "global focus plays unfocused");
+    b->vtbl->release(b);
+    bmxSoundForceFocus(1);
+    /* 8-bit mono resampled: both channels, value (v - 128) / 128 */
+    b = makeBuffer(ds, 11025, 8, 1, 11025, 0xe0);
+    fillBuffer(b, 8, 0x40 << 8, 0);
+    b->vtbl->play(b, 0, 0, 1);
+    mixMean(0, 2, out);
+    CHECK(fabs(mixMean(0, 4, out) - 0.5) < 1e-3 && fabs(mixMean(1, 4, out) - 0.5) < 1e-3, "8-bit mono: %f %f",
+          mixMean(0, 1, out), mixMean(1, 1, out));
+    b->vtbl->release(b);
+    /* a 1 kHz sine at 22050 Hz keeps its level through the resampler */
+    {
+        void *p1, *p2;
+        uint32_t n1, n2;
+        double sum = 0;
+        const uint32_t q = bmxSoundQuantum();
+
+        b = makeBuffer(ds, 22050, 16, 2, 22050 * 4, 0xe0);
+        b->vtbl->lock(b, 0, 0, &p1, &n1, &p2, &n2, kDsbLockEntireBuffer);
+        for (uint32_t i = 0; i < n1 / 4; i++) {
+            const int16_t v = (int16_t)lrint(16384.0 * sin(2.0 * 3.14159265358979 * 1000.0 * i / 22050.0));
+
+            memcpy((uint8_t *)p1 + 4 * i, &v, 2);
+            memcpy((uint8_t *)p1 + 4 * i + 2, &v, 2);
+        }
+        b->vtbl->unlock(b, p1, n1, p2, n2);
+        b->vtbl->play(b, 0, 0, 1);
+        for (int k = 0; k < 3; k++) {
+            bmxSoundMixOffline(out);
+        }
+        for (int k = 0; k < 20; k++) {
+            bmxSoundMixOffline(out);
+            for (uint32_t j = 0; j < q; j++) {
+                sum += (double)out[2 * j] * out[2 * j];
+            }
+        }
+        sum = sqrt(sum / (20.0 * q));
+        CHECK(fabs(sum - 0.5 / sqrt(2.0)) < 0.005, "sine RMS %f (expected %f)", sum, 0.5 / sqrt(2.0));
+        b->vtbl->release(b);
+    }
+    /* a non-looping buffer stops at the mix that reaches its end, at position 0, and is silent then */
+    {
+        uint32_t st = 1, p, w;
+        int mixes = 0;
+
+        b = makeBuffer(ds, 22050, 16, 2, 4408, 0xe0);
+        fillBuffer(b, 16, 8192, 8192);
+        b->vtbl->setCurrentPosition(b, 1000);
+        b->vtbl->play(b, 0, 0, 0);
+        while (st != 0 && mixes < 20) {
+            bmxSoundMixOffline(out);
+            mixes++;
+            b->vtbl->getStatus(b, &st);
+        }
+        b->vtbl->getCurrentPosition(b, &p, &w);
+        CHECK((rate != 48000 || mixes == 4) && p == 0 && w == 0, "non-looping end after %d mixes at %u/%u",
+              mixes, (unsigned)p, (unsigned)w);
+        CHECK(mixMean(0, 1, out) == 0, "silent after the end");
+        b->vtbl->release(b);
+    }
+    bmxSoundForceFocus(-1);
+    ds->vtbl->release(ds);
+    free(out);
+    bmxSoundReset();
+}
+
+/* Real time, our SDL device against dsound.dll: the cursor steps every 10 ms, and (when the session meter is
+ * there) the level of a GLOBALFOCUS tone through each with a volume and pan. Muted session only. */
+static void playTone(BmxDs *ds, int32_t volume, int32_t pan, float peaks[2], double *stepMs, uint32_t *lead)
+{
+    BmxDsBuffer *b = makeBuffer(ds, 22050, 16, 2, 22050 * 4, 0xe0 | kDsbGlobalFocus);
+    void *p1, *p2;
+    uint32_t n1, n2, p, w, lp = UINT32_MAX;
+    uint64_t t0, first = 0, last = 0;
+    int steps = 0;
+
+    b->vtbl->lock(b, 0, 0, &p1, &n1, &p2, &n2, kDsbLockEntireBuffer);
+    for (uint32_t i = 0; i < n1 / 4; i++) {
+        const int16_t v = (int16_t)lrint(3276.8 * sin(2.0 * 3.14159265358979 * 441.0 * i / 22050.0));
+
+        memcpy((uint8_t *)p1 + 4 * i, &v, 2);
+        memcpy((uint8_t *)p1 + 4 * i + 2, &v, 2);
+    }
+    b->vtbl->unlock(b, p1, n1, p2, n2);
+    b->vtbl->setVolume(b, volume);
+    b->vtbl->setPan(b, pan);
+    peaks[0] = peaks[1] = 0;
+    *lead = 0;
+    b->vtbl->play(b, 0, 0, 1);
+    t0 = SDL_GetTicksNS();
+    while (SDL_GetTicksNS() - t0 < 600000000ull) {
+        b->vtbl->getCurrentPosition(b, &p, &w);
+        if (p != lp) {
+            const uint64_t t = SDL_GetTicksNS();
+
+            if (lp != UINT32_MAX && p != 0) {
+                if (first == 0) {
+                    first = t;
+                }
+                last = t;
+                steps++;
+                *lead = (w + 22050 * 4 - p) % (22050 * 4);
+            }
+            lp = p;
+        }
+        if (gMeter != NULL && SDL_GetTicksNS() - t0 > 100000000ull) {
+            float now[2] = {0, 0};
+
+            gMeter->vtbl->channelPeaks(gMeter, 2, now);
+            peaks[0] = now[0] > peaks[0] ? now[0] : peaks[0];
+            peaks[1] = now[1] > peaks[1] ? now[1] : peaks[1];
+        }
+        SDL_Delay(1);
+    }
+    b->vtbl->stop(b);
+    b->vtbl->release(b);
+    *stepMs = steps > 1 ? (double)(last - first) / 1e6 / (steps - 1) : 0;
+    SDL_Delay(100);
+}
+
+static void testSoundRealTime(HWND window)
+{
+    static const int32_t kSettings[][2] = {{0, 0}, {-600, 0}, {-300, 2000}, {-1000, -4000}};
+    BmxDs *real = createReal(), *ours;
+
+    bmxSoundReset();
+    bmxSoundUseOffline(0); /* the SDL audio device, as in the game */
+    ours = createOurs();
+    if (real == NULL || ours == NULL) {
+        CHECK(0, "DirectSoundCreate");
+        return;
+    }
+    real->vtbl->setCooperativeLevel(real, window, 1);
+    ours->vtbl->setCooperativeLevel(ours, window, 1);
+    for (size_t i = 0; i < sizeof kSettings / sizeof kSettings[0]; i++) {
+        float rp[2], op[2];
+        double rs, os;
+        uint32_t rl, ol;
+
+        playTone(real, kSettings[i][0], kSettings[i][1], rp, &rs, &rl);
+        playTone(ours, kSettings[i][0], kSettings[i][1], op, &os, &ol);
+        printf("dsound real time vol %d pan %d: step every %.2f ms, lead %u bytes, peaks %.4f %.4f; ours "
+               "%.2f ms, "
+               "%u bytes, %.4f %.4f\n",
+               (int)kSettings[i][0], (int)kSettings[i][1], rs, (unsigned)rl, (double)rp[0], (double)rp[1], os,
+               (unsigned)ol, (double)op[0], (double)op[1]);
+        CHECK(fabs(rs - 10.0) < 0.5 && fabs(os - 10.0) < 0.5, "10 ms steps: %.2f / %.2f", rs, os);
+        CHECK(rl == ol, "steady lead %u / %u", (unsigned)rl, (unsigned)ol);
+        if (gMeter != NULL && rp[0] > 0) {
+            CHECK(fabs(op[0] / rp[0] - 1) < 0.002 && fabs(op[1] / rp[1] - 1) < 0.002,
+                  "levels within 0.2%%: %.4f %.4f / %.4f %.4f", (double)op[0], (double)op[1], (double)rp[0],
+                  (double)rp[1]);
+        }
+    }
+    ours->vtbl->release(ours);
+    real->vtbl->release(real);
+    bmxSoundReset();
+}
+
+static void testSound(void)
+{
+    const HWND window = CreateWindowExA(0, "STATIC", "bmxplatformtest sound", WS_OVERLAPPEDWINDOW, 0, 0, 64,
+                                        64, NULL, NULL, GetModuleHandleA(NULL), NULL); /* never shown */
+    SDL_AudioSpec spec = {SDL_AUDIO_F32, 2, 48000};
+    int frames = 0;
+
+    if (!muteSession()) {
+        printf("dsound: could not mute this process's audio session; sound tests skipped\n");
+        DestroyWindow(window);
+        return;
+    }
+    SDL_InitSubSystem(SDL_INIT_AUDIO);
+    SDL_GetAudioDeviceFormat(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, &frames);
+    printf("dsound: device rate %d Hz (%d-frame periods), session muted, meter %s\n", spec.freq, frames,
+           gMeter != NULL ? "yes" : "no");
+    {
+        void *module = bmxStandLoadLibraryA("dsound.dll");
+
+        CHECK(module != NULL &&
+                  bmxStandGetProcAddress(module, "DirectSoundCreate") == (void *)bmxStandDirectSoundCreate,
+              "LoadLibraryA / GetProcAddress");
+        CHECK(bmxStandGetProcAddress(module, "DirectSoundEnumerateA") == NULL, "other names");
+        CHECK(bmxStandLoadLibraryA("ddraw.dll") == NULL && bmxStandFreeLibrary(module) == 1,
+              "other DLLs, free");
+    }
+    bmxSoundReset();
+    bmxSoundUseOffline((uint32_t)spec.freq);
+    testSoundApi(window);
+    testSoundCursors(window, (uint32_t)spec.freq);
+    testSoundMix(window, (uint32_t)spec.freq);
+    testSoundRealTime(window);
+    DestroyWindow(window);
+}
+
 int main(void)
 {
     SetEnvironmentVariableA("BMX_FILE_CHECK", "1"); /* every call above is also made through kernel32 */
@@ -1076,6 +1917,7 @@ int main(void)
     testInputCheck();
     testTwoPads();
     testConfig();
+    testSound();
     bmxPlatformShutdown();
     printf("%d checks, %d failures\n", checks, failures);
     return failures != 0;

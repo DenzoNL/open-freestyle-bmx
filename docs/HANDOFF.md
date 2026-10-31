@@ -73,6 +73,14 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   exclusive pad object was refused; DirectInput allows it within a process) and lX / lY one step off (centre 128,
   not 127): both fixed, PLATFORM.md 4b. **Open:** the user's rerun of NATIVE.md test A; unfocused, the game's whole call sequence already matches the real DirectInput (0 HRESULT differences, same
   product name / GUID / type). **Next:** S7 (DirectSound on SDL3 audio), S8 (own AVI / Cinepak).
+- Platform layer S7 done 2026-10-31 (docs/PLATFORM.md 4c, docs/NATIVE.md "DirectSound on SDL3", native only): the game's
+  DirectSound runs on our own mixer in one SDL audio stream (LoadLibraryA / GetProcAddress / FreeLibrary stand-ins hand
+  out our DirectSoundCreate; KERNEL32 has no real slot left). Cursors, lock rules, the volume / pan law (0.1 dB steps,
+  1/65536 truncation) and focus muting were measured on dsound.dll in-process and copied: `bmxplatformtest` shows the
+  API (193 results) and the cursor sequences of 12 kinds of buffer identical to dsound.dll after every mix, and equal
+  real-time steps and levels; `BMX_SOUND_CHECK=1` mirrors the game's calls on the real dsound.dll (two scripted runs:
+  `RESULT clean`, 0 differences in 46000 calls). **Open:** the user's listening test (`native-run\soundtest.ps1`).
+  **Next:** S8 (own AVI / Cinepak), S9 (movie output and waveOut on SDL3).
 - Golden traces: record sessions with `bmxtrace.orig` (docs/TRACING.md) if not done yet.
 
 ## Machine setup

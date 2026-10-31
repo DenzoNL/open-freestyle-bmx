@@ -15,6 +15,7 @@
 
 #include "platform/input.h"
 #include "platform/platform.h"
+#include "platform/sound.h"
 
 enum {
     kDefaultBase = 0x0036ee80, /* one hour of "uptime" */
@@ -164,5 +165,6 @@ void BMX_WINAPI bmxStandDeleteCriticalSection(void *section)
 void bmxPlatformShutdown(void)
 {
     bmxTimerShutdown();
+    bmxSoundShutdown();
     bmxCheckSummary();
 }

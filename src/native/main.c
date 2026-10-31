@@ -115,9 +115,11 @@ static const char *skipProgramName(const char *cl)
 
 /*
  * Dev aid for automated runs (BMX_MUTE=1): mutes this process's audio session on the default output, so the
- * game's waveOut / DirectSound output (movies, menu music) stays silent. COM is left initialised.
+ * game's waveOut / DirectSound output (movies, menu music) stays silent. Windows remembers a session's mute
+ * per executable, so every other run unmutes it again (else one muted run silences all later ones). COM is
+ * left initialised.
  */
-static void muteProcess(void)
+static void muteProcess(BOOL mute)
 {
     IMMDeviceEnumerator *devices = NULL;
     IMMDevice *device = NULL;
@@ -130,10 +132,10 @@ static void muteProcess(void)
         FAILED(IMMDeviceEnumerator_GetDefaultAudioEndpoint(devices, eRender, eConsole, &device)) ||
         FAILED(IMMDevice_Activate(device, &IID_IAudioSessionManager, CLSCTX_ALL, NULL, (void **)&sessions)) ||
         FAILED(IAudioSessionManager_GetSimpleAudioVolume(sessions, NULL, FALSE, &volume)) ||
-        FAILED(ISimpleAudioVolume_SetMute(volume, TRUE, NULL))) {
-        bmxLog("BMX_MUTE: could not mute the audio session\n");
+        FAILED(ISimpleAudioVolume_SetMute(volume, mute, NULL))) {
+        bmxLog("audio session: could not set its mute\n");
     } else {
-        bmxLog("BMX_MUTE: audio session muted\n");
+        bmxLog(mute ? "BMX_MUTE: audio session muted\n" : "audio session: unmuted\n");
     }
     if (volume) {
         ISimpleAudioVolume_Release(volume);
@@ -185,9 +187,7 @@ int main(void)
     if (getenv("BMX_NO_MOVIES")) {
         VAR(0x0067288c, int) = 1;
     }
-    if (getenv("BMX_MUTE")) {
-        muteProcess();
-    }
+    muteProcess(getenv("BMX_MUTE") != NULL);
     /* BMX_KEYS: scripted keyboard (keys.c). Such a run must not take the focus from what the user is doing:
      * the window is shown without activation at the bottom of the z order, and SDL is told not to activate
      * it either. */

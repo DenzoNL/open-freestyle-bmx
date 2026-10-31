@@ -1,7 +1,9 @@
 # Platform layer: Windows APIs -> SDL3 (P4, "Windows first")
 
-Status 2026-10-31: **decided; S1-S6 implemented** (sections 4a, 4b; S5's check with real pads is the user's). The user took the recommendation for every decision
-P1..P19 (A unless said otherwise). Order: S1-S4 (done, S3 reviewed), input + d-pad (S5, S6: done), then the rest.
+Status 2026-10-31: **decided; S1-S7 implemented** (sections 4a, 4b, 4c; S5's check with real pads and S7's listening
+test are the user's). The user took the recommendation for every decision
+P1..P19 (A unless said otherwise). Order: S1-S4 (done, S3 reviewed), input + d-pad (S5, S6: done), DirectSound (S7:
+done), then the rest.
 Goal: `bmxnative.exe` (src/native/) as a clean standalone
 Windows build whose game and engine code reach the OS only through SDL3 and our own code. The fixed 32-bit memory
 layout (image at 0x400000, docs/NATIVE.md) stays; Mac/Linux come after. Vanilla stays vanilla (PLAN.md Decisions):
@@ -519,7 +521,96 @@ process, so P2's hook use is not needed for it).
   assignment for the triggers is not what we assumed); SDL's HIDAPI driver may set the DualSense's light bar / player LED on open (cosmetic,
   DirectInput never did).
 
-S1-S6 are done apart from the user's real-pad check. S7 and S8 are the large ones.
+S1-S6 are done apart from the user's real-pad check.
+
+### 4c. Status of S7 (2026-10-31, native-only, not committed; the listening test is the user's)
+
+Code: `src/platform/dsound.c` (the stand-ins and the mixer), `soundcheck.c` (BMX_SOUND_CHECK), `dsface.h` (IDirectSound /
+IDirectSoundBuffer in full, WAVEFORMATEX, DSBUFFERDESC, DSBCAPS, the HRESULTs, in our own types), `sound.h` (test and
+check hooks). winchan.c / winstrm.c / winload.c are unchanged; **the hook DLL is unchanged** (the dual check runs in the
+native exe against the real dsound.dll in the same process, as S5's did).
+
+What the game calls (inventory from src/bmx/pc/zge/sound and bmxsound.c; nothing else in src/ touches DirectSound):
+KERNEL32 `LoadLibraryA("DSOUND.DLL")`, `GetProcAddress(.., "DirectSoundCreate")`, `FreeLibrary` (winchanInit 0x46d940,
+winchanProbeDevice 0x46f380, winchanShutdown 0x46df20); `DirectSoundCreate(NULL, ..)`; IDirectSound
+SetCooperativeLevel (NORMAL, PRIORITY around the primary SetFormat, NORMAL), CreateSoundBuffer, Release; the primary
+buffer: SetFormat (22050 Hz 16-bit stereo), Play(LOOPING), Stop, Release; secondary buffers (the mixer's 2 x 50 ms ring,
+8816 bytes at 22050 Hz 16-bit stereo; one per stream, 44100 Hz mono 16-bit 256 KB for music, 64 KB by default):
+GetStatus, GetCurrentPosition, Lock, Unlock, Restore, Play(LOOPING), Stop, SetCurrentPosition(0), SetVolume, SetPan,
+Release. No DuplicateSoundBuffer, SetFrequency, GetCaps or QueryInterface; they are implemented anyway (cheap, tested).
+
+- **The cut.** `LoadLibraryA` returns a stand-in module for `DSOUND.DLL` (any other name is refused and logged: the
+  game asks for no other), `GetProcAddress` gives `bmxStandDirectSoundCreate` for it, `FreeLibrary` accepts it. KERNEL32 now
+  has no real slot left: `137 slots filled: 26 stand-ins, 64 dead, 47 real; real DLLs still used: USER32.dll WINMM.dll
+  AVIFIL32.dll MSVFW32.dll`.
+- **Mixer (P9-A, P10-A).** One SDL audio stream (float stereo at the device's own rate, 48000 Hz here; WASAPI) whose
+  get-callback mixes 10 ms quanta (`SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES` = rate / 100, so the callback, and the cursors,
+  step every 10 ms like dsound.dll's mixer). Per quantum and playing buffer: the buffer advances by quantum * frequency /
+  rate frames, the new frames go through the buffer's own SDL_AudioStream (format, channels, SDL's resampler), then
+  volume and pan, sum, clamp to +-1. If the default device cannot be opened, SDL's dummy driver (silent, cursors run).
+- **Cursors** (measured on this machine, Windows 11, a 48 kHz endpoint; deterministic across runs): after k mixes since
+  Play the write cursor is `ceil(k * quantum * frequency / rate)` frames past the start plus the resampler's lookahead
+  (33 frames when the buffer is resampled up, 63 for 96 kHz into 48 kHz, 0 at the device rate); the play cursor is the
+  write cursor minus `floor(30 ms of frames)`, capped at half the buffer, never before the start. Before the first mix
+  both are at the start; a stopped buffer reports its play cursor for both; SetCurrentPosition while playing restarts
+  the count there without the lookahead (the resampler keeps its history); a non-looping buffer stops at the mix that
+  reaches its end, status 0, position 0. The frames up to the write cursor are the ones the mixer has read, so the
+  game's writes between the play and write cursors are not heard, as on Windows. For the game's ring this means steps of
+  880 / 884 bytes every 10 ms and a write lead of 2644 bytes; the first play-cursor move 20-30 ms after Play.
+- **API semantics** measured and copied: Lock (offset at or past the end, 0 bytes or more than the buffer = INVALIDPARAM
+  with the outputs zeroed; ENTIREBUFFER starts at the offset and wraps; FROMWRITECURSOR; unaligned offsets allowed;
+  overlapping locks refused, also between a buffer and its duplicates); Unlock matches the lock by its first pointer only
+  (sizes are not checked; a wrong second pointer fails but releases the lock; without a second pointer the second part
+  stays locked); SetCurrentPosition rounds down to a frame; volume -10000..0, pan +-10000, frequency 100..200000 or 0,
+  CONTROLUNAVAIL without the CTRL flag; Play's reserved / priority / unknown flags = INVALIDPARAM, Play on a playing
+  buffer only changes the looping flag (status 5 -> 1); a failed CreateSoundBuffer leaves `*out` alone; sizes round up to
+  the block; the caps add LOCSOFTWARE. Primary buffer: one object per device, 32768 bytes, caps flags 9, default format
+  22050 Hz 8-bit stereo, SetFormat needs PRIORITY (PRIOLEVELNEEDED otherwise) and checks block align / bytes per second,
+  is stored for GetFormat and otherwise ignored (dsound.dll mixes at the endpoint's format too), Play needs LOOPING,
+  GetCurrentPosition / Lock need WRITEPRIMARY, SetCurrentPosition = INVALIDCALL. Duplicates share data and locks, start
+  stopped at 0 with the original's volume.
+- **Volume and pan law** (measured through the session's peak meter, which reads before the session mute): the
+  attenuation (-volume, plus the pan on the far side) is applied in 0.1 dB steps, `max(1, (a + 5) / 10 - 1)` steps for a
+  in 1/100 dB (1..24 -> 0.1 dB, 25..34 -> 0.2 dB, ..., 995..1004 -> 9.9 dB), the gain is truncated to 1/65536 (so -96 dB
+  and below is silence); mono buffers play at full level on both sides; the sum clips at 1.0. 8-bit is (v - 128) / 128.
+- **Focus** (measured: a buffer without DSBCAPS_GLOBALFOCUS in a process whose window is not in front is silent in
+  dsound.dll, with GLOBALFOCUS it is heard): ours mute such buffers while SDL's keyboard focus is not on the game
+  window; the cursors run on. Scripted (BMX_KEYS) runs are unfocused, hence silent, like the original would be.
+- **BMX_MUTE** keeps the device open and mixes as usual but outputs silence (the cursors and the callback timing stay
+  those of an audible run); main.c's WASAPI session mute stays for the movies' waveOut (S9 / S11). This replaces "don't
+  open the SDL audio device" from P11's note.
+- **`BMX_SOUND_CHECK=1`** (soundcheck.c): the real IDirectSound is created next to ours and every call is repeated on a
+  real object made the same way: HRESULTs and Release counts, caps and format at creation, status, lock regions (offset
+  and both sizes), volume / pan / frequency read back, the primary format, the steady write lead are strict (`DIFFERENCE`
+  lines, `soundcheck: RESULT clean|DIFFERENCES` at exit); how far our play cursor is from the real one and the cursor
+  step sizes between reads are reported per buffer. The real buffers never get the game's bytes (Lock / Unlock are
+  mirrored, the data not copied), so a check run is not heard twice and can stay on during listening.
+- **Tests** (`bmxplatformtest`, against the real dsound.dll in the same process, hidden window, this process's session
+  muted): the API script (193 results: cooperative levels, the primary buffer, invalid descriptions, every Lock / Unlock
+  case above, positions, volume / pan / frequency ranges, Play flags, status, refcounts, QueryInterface, duplicates)
+  identical; the cursor sequences of 12 plays (the game's ring from 0 and 1000, half size, non-looping, 48 kHz, the
+  44.1 kHz streams 8 / 16 bit, a tiny buffer, 11025 / 16000 / 96000 / 8000 Hz) identical after every mix, our offline
+  mixer against dsound.dll in real time; SetCurrentPosition while playing and Stop identical; the mixer offline (16-bit
+  stereo exact, volume / pan gains, -10000 silent, unfocused silent with the cursor running, GLOBALFOCUS heard, 8-bit
+  mono, a 1 kHz sine's RMS through the resampler within 1.5%, the non-looping end); real time through our SDL device:
+  steps every 10.0 ms and the lead 2644 bytes as dsound.dll's, and the peak level of a GLOBALFOCUS tone at four volume /
+  pan settings equal to dsound.dll's (meter, 4 digits).
+- **Game runs** (`native-run2`, `BMX_MUTE=1`, `BMX_KEYS`, `BMX_SOUND_CHECK=1`): ProQuest into Vail Trails and riding (96 s,
+  17950 calls compared), and ProQuest, end run, exit to the main menu, Freeride into a level (156 s, 28012 calls, the
+  music stream destroyed and created again): `RESULT clean`, 0 differences, every steady write lead equal, our play
+  cursor equal to dsound.dll's at almost every read (the stream's: always; the mixer ring's: at most one 10 ms quantum
+  apart, the two mixers wake on the same WASAPI period), identical cursor-step histograms, 0 resampler underruns, the
+  pump at 15.999 ms.
+- Decisions beyond the document: the cursor model and gain law copied from measurements rather than "advance by what
+  the device pulled"; focus muting; BMX_MUTE outputs silence with the device open; the check in-process and silent;
+  LoadLibraryA refuses other DLLs; mixing at the device's rate in 10 ms quanta; 24 / 32-bit buffers refused with
+  BADFORMAT (dsound.dll takes them; the game has none).
+- Not reproduced (unmeasurable or irrelevant here): dsound.dll's resampler (ours is SDL's; the 1 kHz test only checks
+  the level), the absolute output latency after the cursor (ours sends a quantum to SDL when it is mixed), the timing
+  of the first mix after Play within the 10 ms period, the lookahead for other downsampling ratios (assumed
+  `ceil(32 * ratio) - 1`), dsound.dll's behaviour on a 44.1 kHz endpoint (not available here), BUFFERLOST (never).
+- Open: the user's listening test (docs/NATIVE.md "DirectSound on SDL3"), including whether the original also goes
+  silent behind the QUIT message box (ours does: the box takes the focus) and on alt-tab.
 
 ## 5. Windows behaviour that is hard to reproduce
 
@@ -527,8 +618,9 @@ S1-S6 are done apart from the user's real-pad check. S7 and S8 are the large one
   a DualSense as an Xbox 360 pad); the dead zone/saturation rescale is DI's own integer math. P3/P4 approximate it per
   family; only the dual-read (S5) proves it, per pad model.
 - **DirectSound's mixer** (software since Vista): its resampler, volume curve rounding, pan law and play-cursor
-  granularity (about 10 ms steps) are undocumented. The bytes the game writes are bit-exact by construction; the mixed
-  output can only be matched within a tolerance.
+  granularity are undocumented. S7 measured the cursors (exact model), the volume / pan law (0.1 dB steps, 1/65536
+  truncation) and the focus muting in-process (4c); the resampler remains SDL's, so the mixed output matches within a
+  tolerance only. The bytes the game writes are bit-exact by construction.
 - **Timer-thread concurrency**: winchanPump runs on winmm's thread while the game thread changes channels (plain
   flag, no lock, in winchan.c). Races exist in the original too; P11-A keeps the same shape but not the same
   interleavings. Audio is not part of the deterministic simulation, so golden traces are unaffected.
