@@ -74,6 +74,8 @@ void bmxPlatformShutdown(void);
  * by default except the input conveniences dpad_steering and stick_8way (on); unknown keys are logged.
  */
 int bmxConfigInt(const char *key, int fallback);
+/* A text value (paths), NULL when unset or empty. */
+const char *bmxConfigString(const char *key);
 /* Replaces the configuration by the text (tests; `origin` names it in the log). */
 void bmxConfigLoadText(const char *text, const char *origin);
 

@@ -42,6 +42,15 @@ if(BMX_NATIVE32)
   file(GLOB BMX_NATIVE_SOURCES CONFIGURE_DEPENDS src/native/*.c src/platform/*.c)
   # The smooth resampling mixer reads the game's mixer state at its original addresses (like src/driver).
   set_source_files_properties(src/platform/smoothmix.c PROPERTIES COMPILE_DEFINITIONS BMX_HOOK=1)
+  # The music override (docs/MUSIC.md "Override"): musicgame.c reads the game's music stream like smoothmix.c;
+  # the edit list is compiled in from data/music-edits.json; dr_flac (third_party) is built without warnings.
+  set_source_files_properties(src/platform/musicgame.c PROPERTIES COMPILE_DEFINITIONS BMX_HOOK=1)
+  set_source_files_properties(third_party/dr_flac/dr_flac.c PROPERTIES COMPILE_OPTIONS -w)
+  add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/music_edits.c
+    COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tools/gen_music_edits.py
+            ${CMAKE_SOURCE_DIR}/data/music-edits.json ${CMAKE_BINARY_DIR}/music_edits.c
+    DEPENDS ${CMAKE_SOURCE_DIR}/data/music-edits.json ${CMAKE_SOURCE_DIR}/tools/gen_music_edits.py)
+  set(BMX_MUSIC_SOURCES src/platform/music.c third_party/dr_flac/dr_flac.c ${CMAKE_BINARY_DIR}/music_edits.c)
   # range.S must be the first object on the link line: its block has to start the image.
   add_library(bmx_range OBJECT src/native/range.S)
   # The driver would put the C runtime start files (crt2.o, crtbegin.o) before it: pass them ourselves, after.
@@ -72,9 +81,11 @@ if(BMX_NATIVE32)
   target_compile_definitions(bmx_png PRIVATE BMX_HOOK=1)
   target_compile_options(bmx_png PRIVATE ${BMX_WARNINGS} -ffreestanding -fno-builtin -fno-stack-protector)
   add_executable(bmxnative $<TARGET_OBJECTS:bmx_range> ${BMX_CRT_STARTFILES} $<TARGET_OBJECTS:bmx_game>
-    $<TARGET_OBJECTS:bmx_driver> $<TARGET_OBJECTS:bmx_png> ${BMX_NATIVE_SOURCES} src/native/crtasm.S ${CMAKE_BINARY_DIR}/hooks_table.c)
+    $<TARGET_OBJECTS:bmx_driver> $<TARGET_OBJECTS:bmx_png> ${BMX_NATIVE_SOURCES} src/native/crtasm.S ${CMAKE_BINARY_DIR}/hooks_table.c
+    third_party/dr_flac/dr_flac.c ${CMAKE_BINARY_DIR}/music_edits.c)
   target_link_options(bmxnative PRIVATE -nostartfiles)
   target_include_directories(bmxnative PRIVATE src)
+  target_include_directories(bmxnative SYSTEM PRIVATE third_party/dr_flac)
   target_compile_definitions(bmxnative PRIVATE _WIN32_WINNT=0x0A00 BMX_SOURCE_DIR="${CMAKE_SOURCE_DIR}" BMX_WORK_DIR="${BMX_WORK_DIR}")
   target_compile_options(bmxnative PRIVATE ${BMX_WARNINGS})
   # Fixed base, no ASLR. Headers sit at 0x3f0000 and the first section (.orig, src/native/range.c) at
@@ -87,7 +98,15 @@ if(BMX_NATIVE32)
   add_executable(bmxplatformtest $<TARGET_OBJECTS:bmx_range> ${BMX_CRT_STARTFILES} tests/platform/test_platform.c src/platform/kernel.c src/platform/winmm.c
     src/platform/fileio.c src/platform/paths.c src/platform/input.c src/platform/inputcheck.c
     src/platform/config.c src/platform/dsound.c src/platform/soundcheck.c src/platform/smoothmix.c src/platform/waveout.c src/platform/window.c
-    src/bmx/pc/zge/sound/winchan.c)
+    src/bmx/pc/zge/sound/winchan.c tests/platform/test_music.c ${BMX_MUSIC_SOURCES})
+  target_include_directories(bmxplatformtest SYSTEM PRIVATE third_party/dr_flac)
+  # The music override offline: renders the game's tracks from the user's FLACs and compares them with the
+  # game's own (docs/MUSIC.md "Override"; needs the game folder and the FLACs).
+  add_executable(bmxmusictool tests/platform/musictool.c src/platform/paths.c ${BMX_MUSIC_SOURCES})
+  target_include_directories(bmxmusictool PRIVATE src)
+  target_include_directories(bmxmusictool SYSTEM PRIVATE third_party/dr_flac)
+  target_compile_options(bmxmusictool PRIVATE ${BMX_WARNINGS})
+  target_link_libraries(bmxmusictool PRIVATE SDL3::SDL3)
   # The real winchanMix (compared with the smooth mixer) keeps its state at the original addresses: the test
   # owns that range like bmxnative does (range.S first, then the crt start files); the test unprotects it.
   set_source_files_properties(src/bmx/pc/zge/sound/winchan.c PROPERTIES COMPILE_DEFINITIONS BMX_HOOK=1)

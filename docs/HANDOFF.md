@@ -107,6 +107,8 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   the OS key state, Windows-only GetAsyncKeyState probe; the focus test with Enter held at start is the user's). The
   x87 RwMatrixMultiply routine 0x54b038 is ported (`rwMatrixMultiplyX87`, oracle-tested) and out of kTextKeep, which
   keeps only the thunk table, the RpWorldDestroy stub, and the dinput tables under BMX_INPUT_CHECK. **Next:** S12.
+- Widescreen / native resolution / HUD layout: design with open decisions W1-W11 in docs/WIDESCREEN.md (2026-10-31,
+  not implemented; the user picks the options and the default before slice WS1).
 - Golden traces: record sessions with `bmxtrace.orig` (docs/TRACING.md) if not done yet.
 
 ## Machine setup

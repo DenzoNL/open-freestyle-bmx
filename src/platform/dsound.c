@@ -24,6 +24,10 @@
  *
  * BMX_MUTE=1: the mixer outputs silence (everything else unchanged). BMX_SOUND_CHECK=1: every call is
  * repeated on the real dsound.dll and compared (soundcheck.c).
+ *
+ * The override seam (sound.h, the music override): a registered BmxSoundOverride may take over what a buffer
+ * plays from its Play on; the mixer then feeds the override's stereo frames for the same frame range into a
+ * second resampler instead of the ring's. Cursors, status and the game's calls are not affected.
  */
 #include <SDL3/SDL.h>
 #include <math.h>
@@ -82,6 +86,11 @@ typedef struct Buffer {
     uint64_t base, num, mBase, end, fed;
     uint32_t lookahead;
     SDL_AudioStream *resampler;
+    /* The override (sound.h): its token for this play (-1: none), its stereo resampler, and the track
+     * position of frame `base` while playing / of `pos` while stopped. */
+    int ovrToken;
+    SDL_AudioStream *ovrResampler;
+    uint64_t trackBase, trackStop;
     BmxSoundCheckBuffer *check;
     struct Buffer *next;
 } Buffer;
@@ -105,6 +114,8 @@ static uint32_t gRate, gQuantum, gOfflineRate;
 static int gStarted, gMute, gFocusForced = -1;
 static float *gMix, *gTemp;
 static uint64_t gQuanta, gUnderruns, gBufferCount;
+static const BmxSoundOverride *gOverride;
+static int16_t gOvrFrames[2 * 1024];
 
 static uint64_t ceilDiv(uint64_t a, uint64_t b)
 {
@@ -195,11 +206,32 @@ static void stopAt(Buffer *b, uint32_t pos)
     if (b->resampler != NULL) {
         SDL_ClearAudioStream(b->resampler);
     }
+    if (b->ovrResampler != NULL) {
+        SDL_ClearAudioStream(b->ovrResampler);
+    }
+}
+
+/* Puts the override's frames for the buffer's frames up to `target` (unwrapped) into its resampler. */
+static void feedOverride(Buffer *b, uint64_t target)
+{
+    const uint32_t chunk = (uint32_t)(sizeof gOvrFrames / sizeof gOvrFrames[0] / 2);
+
+    while (b->fed < target) {
+        const uint32_t n = target - b->fed < chunk ? (uint32_t)(target - b->fed) : chunk;
+
+        gOverride->read(b->ovrToken, b->trackBase + (b->fed - b->base), n, gOvrFrames);
+        SDL_PutAudioStreamData(b->ovrResampler, gOvrFrames, (int)(n * 4));
+        b->fed += n;
+    }
 }
 
 /* Puts the buffer's frames up to `target` (unwrapped) into its resampler. */
 static void feed(Buffer *b, uint64_t target)
 {
+    if (b->ovrToken >= 0) {
+        feedOverride(b, target);
+        return;
+    }
     while (b->fed < target) {
         const uint32_t at = (uint32_t)(b->fed % b->sizeFrames);
         const uint64_t left = target - b->fed;
@@ -213,7 +245,8 @@ static void feed(Buffer *b, uint64_t target)
 /* One quantum of one playing buffer, added to out (mixer lock held). */
 static void mixBuffer(Buffer *b, float *out, int focus)
 {
-    const int channels = b->format.channels;
+    const int channels = b->ovrToken >= 0 ? 2 : b->format.channels;
+    SDL_AudioStream *const resampler = b->ovrToken >= 0 ? b->ovrResampler : b->resampler;
     const int want = (int)(gQuantum * channels * sizeof(float));
     uint64_t target;
     int ending = 0, got;
@@ -226,9 +259,9 @@ static void mixBuffer(Buffer *b, float *out, int focus)
     }
     feed(b, target);
     if (ending) {
-        SDL_FlushAudioStream(b->resampler);
+        SDL_FlushAudioStream(resampler);
     }
-    got = SDL_GetAudioStreamData(b->resampler, gTemp, want);
+    got = SDL_GetAudioStreamData(resampler, gTemp, want);
     if (got < 0) {
         got = 0;
     }
@@ -246,6 +279,7 @@ static void mixBuffer(Buffer *b, float *out, int focus)
         }
     }
     if (ending) {
+        b->trackStop = 0;
         stopAt(b, 0);
     }
 }
@@ -377,11 +411,25 @@ void bmxSoundForceFocus(int focus)
     gFocusForced = focus;
 }
 
+void bmxSoundSetOverride(const BmxSoundOverride *override)
+{
+    if (gMutex != NULL) {
+        SDL_LockMutex(gMutex);
+    }
+    gOverride = override;
+    if (gMutex != NULL) {
+        SDL_UnlockMutex(gMutex);
+    }
+}
+
 void bmxSoundShutdown(void)
 {
     if (gDevice != NULL) {
         SDL_DestroyAudioStream(gDevice); /* waits for the callback */
         gDevice = NULL;
+    }
+    if (gOverride != NULL && gOverride->shutdown != NULL) {
+        gOverride->shutdown();
     }
     if (gStarted) {
         bmxLog("sound: %llu quanta mixed (%.1f s), %llu buffers created, %llu resampler underruns\n",
@@ -399,6 +447,7 @@ void bmxSoundReset(void)
 
         gBuffers = b->next;
         SDL_DestroyAudioStream(b->resampler);
+        SDL_DestroyAudioStream(b->ovrResampler);
     }
     if (gMutex != NULL) {
         SDL_DestroyMutex(gMutex);
@@ -475,6 +524,7 @@ static uint32_t BMX_WINAPI bufRelease(BmxDsBuffer *self)
     if (refs == 0) {
         bmxSoundCheckRelease(b->check);
         SDL_DestroyAudioStream(b->resampler);
+        SDL_DestroyAudioStream(b->ovrResampler);
         if (b->data != NULL && --b->data->refs == 0) {
             free(b->data->bytes);
             free(b->data);
@@ -695,6 +745,25 @@ static BmxHresult BMX_WINAPI bufLock(BmxDsBuffer *self, uint32_t offset, uint32_
     return hr;
 }
 
+/* Play from stopped: the override's token for this play (mixer lock held). */
+static void attachOverride(Buffer *b)
+{
+    b->trackBase = b->trackStop;
+    b->ovrToken = gOverride != NULL ? gOverride->attach(&b->iface, b->trackBase) : -1;
+    if (b->ovrToken >= 0 && b->ovrResampler == NULL) {
+        const SDL_AudioSpec src = {SDL_AUDIO_S16LE, 2, (int)b->frequency};
+        const SDL_AudioSpec dst = {SDL_AUDIO_F32, 2, (int)gRate};
+
+        b->ovrResampler = SDL_CreateAudioStream(&src, &dst);
+        if (b->ovrResampler == NULL) {
+            b->ovrToken = -1;
+        }
+    }
+    if (b->ovrResampler != NULL) {
+        SDL_ClearAudioStream(b->ovrResampler);
+    }
+}
+
 static BmxHresult BMX_WINAPI bufPlay(BmxDsBuffer *self, uint32_t reserved, uint32_t priority, uint32_t flags)
 {
     Buffer *const b = (Buffer *)self;
@@ -721,6 +790,7 @@ static BmxHresult BMX_WINAPI bufPlay(BmxDsBuffer *self, uint32_t reserved, uint3
         b->lookahead = bmxDsLookahead(b->frequency, gRate);
         b->end = b->looping ? UINT64_MAX : b->sizeFrames;
         SDL_ClearAudioStream(b->resampler);
+        attachOverride(b);
     }
     SDL_UnlockMutex(gMutex);
     bmxSoundCheckSimple(b->check, "Play", flags, hr);
@@ -739,9 +809,11 @@ static BmxHresult BMX_WINAPI bufSetCurrentPosition(BmxDsBuffer *self, uint32_t p
         hr = kDsErrInvalidParam;
     } else if (!b->playing) {
         b->pos = position / b->align;
+        b->trackStop = b->pos;
     } else {
         /* While playing, the resampler keeps what it has (its lookahead is not counted again). */
         b->base = b->fed = position / b->align;
+        b->trackBase = b->base;
         b->mBase = ceilDiv(b->num, gRate);
         b->lookahead = 0;
         if (!b->looping) {
@@ -831,9 +903,14 @@ static BmxHresult BMX_WINAPI bufSetFrequency(BmxDsBuffer *self, uint32_t frequen
                                    b->format.channels,
                                    (int)(frequency != 0 ? frequency : b->format.samplesPerSec)};
 
+        const SDL_AudioSpec stereo = {SDL_AUDIO_S16LE, 2, src.freq};
+
         SDL_LockMutex(gMutex);
         b->frequency = (uint32_t)src.freq;
         SDL_SetAudioStreamFormat(b->resampler, &src, NULL);
+        if (b->ovrResampler != NULL) {
+            SDL_SetAudioStreamFormat(b->ovrResampler, &stereo, NULL);
+        }
         SDL_UnlockMutex(gMutex);
     }
     bmxSoundCheckSimple(b->check, "SetFrequency", frequency, hr);
@@ -848,9 +925,13 @@ static BmxHresult BMX_WINAPI bufStop(BmxDsBuffer *self)
     if (b->primary) {
         b->playing = 0;
     } else if (b->playing) {
-        uint32_t p, w;
+        const uint64_t w = writeAbs(b);
+        const uint64_t lead = bmxDsLead(b->frequency, gRate, b->sizeFrames);
+        uint32_t p, unused;
 
-        cursorFrames(b, &p, &w);
+        /* The track position of the play cursor (cursorFrames, unwrapped). */
+        b->trackStop = b->trackBase + (w - b->base > lead ? w - lead - b->base : 0);
+        cursorFrames(b, &p, &unused);
         stopAt(b, p);
     }
     SDL_UnlockMutex(gMutex);
@@ -938,6 +1019,7 @@ static Buffer *newBuffer(Device *d, uint32_t flags)
     b->refs = 1;
     b->device = d;
     b->flags = flags;
+    b->ovrToken = -1;
     d->holders++;
     return b;
 }

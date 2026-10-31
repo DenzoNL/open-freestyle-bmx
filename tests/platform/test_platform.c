@@ -30,6 +30,8 @@
 
 static int failures, checks;
 
+int testMusic(int *checks); /* test_music.c: the music override */
+
 #define CHECK(cond, ...)                                                                                     \
     do {                                                                                                     \
         checks++;                                                                                            \
@@ -2718,8 +2720,14 @@ static void testWindow(void)
     printf("window: creation, activation, script keys and close as Windows sends them\n");
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
+    /* `bmxplatformtest music`: only the music override's tests (offline, no devices or windows). */
+    if (argc > 1 && strcmp(argv[1], "music") == 0) {
+        failures = testMusic(&checks);
+        printf("%d checks, %d failures\n", checks, failures);
+        return failures != 0;
+    }
     SetEnvironmentVariableA("BMX_FILE_CHECK", "1"); /* every call above is also made through kernel32 */
     /* A pad the user is playing with elsewhere is only read (no HIDAPI driver: it would set the lights). */
     SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI, "0");
@@ -2739,6 +2747,7 @@ int main(void)
     testConfig();
     testSound();
     testSmoothMix();
+    failures += testMusic(&checks); /* test_music.c */
     testWaveOut();
     testMessageBoxes();
     testMessageQueue();

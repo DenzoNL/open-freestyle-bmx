@@ -6,20 +6,22 @@
  *   dpad_steering = 1    -> key "input.dpad_steering" (also stick_8way)
  *   [audio]
  *   smooth_resample = 2  -> key "audio.smooth_resample" (0 original, 1 linear, 2 cubic)
+ *   music_dir = D:\Music -> key "audio.music_dir" (text: the music override's folder, docs/MUSIC.md)
  *   [video]
  *   width = 640          -> the mode when the command line has no -r (also height, depth, fullscreen)
  *   [ui]
  *   confirm_quit = 0     -> 1: the quit prompt as in the original
  *
  * Read once, on the first query. A missing file means every option at its default (vanilla). Values are
- * integers (decimal or 0x hex); unknown keys and bad lines are logged and ignored. Options that would change
+ * integers (decimal or 0x hex), paths are UTF-8 text used as written; unknown keys and bad lines are logged
+ * and ignored. Options that would change
  * the simulation would have to go into replays (PLAN.md); none of the current ones does.
  */
 #include <SDL3/SDL.h>
 
 #include "platform/platform.h"
 
-enum { kMaxEntries = 64, kKeyLen = 64, kValueLen = 128 };
+enum { kMaxEntries = 64, kKeyLen = 64, kValueLen = 512 };
 
 typedef struct Entry {
     char key[kKeyLen];
@@ -34,6 +36,7 @@ static const char *const kKnownKeys[] = {
     "input.dpad_steering",   /* P7: the d-pad also sets the stick axes */
     "input.stick_8way",      /* P7-B: the left stick snaps to 8 directions */
     "audio.smooth_resample", /* P9 note: 0 original mixer, 1 linear, 2 cubic resampling (smoothmix.c) */
+    "audio.music_dir",       /* the music override: a folder with the user's FLACs (docs/MUSIC.md) */
     "video.width", /* P16: the mode without the device dialog (default 640 x 480 x 16 full screen) */
     "video.height",          "video.depth",
     "video.fullscreen", /* 0: a window of width x height (the game renders at that size) */
@@ -77,7 +80,7 @@ void bmxConfigLoadText(const char *text, const char *origin)
         const char *eol = SDL_strchr(p, '\n');
         const char *end = eol != NULL ? eol : p + SDL_strlen(p);
         const char *comment = p;
-        char name[kKeyLen], value[kValueLen];
+        char name[kKeyLen + kValueLen], value[kValueLen]; /* name: the whole line */
 
         lineNo++;
         while (comment < end && *comment != '#' && *comment != ';') {
@@ -144,6 +147,19 @@ static void load(void)
         SDL_free(text);
     }
     SDL_free(own);
+}
+
+const char *bmxConfigString(const char *key)
+{
+    if (!gLoaded) {
+        load();
+    }
+    for (int i = gCount - 1; i >= 0; i--) {
+        if (SDL_strcasecmp(gEntries[i].key, key) == 0) {
+            return gEntries[i].value[0] != 0 ? gEntries[i].value : NULL;
+        }
+    }
+    return NULL;
 }
 
 int bmxConfigInt(const char *key, int fallback)

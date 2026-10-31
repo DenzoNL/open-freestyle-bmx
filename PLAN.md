@@ -139,7 +139,9 @@ round floats (so the hook build uses SSE2, not x87). Rules are in CONTRIBUTING.m
 - (Retro)Achievements, ideally with in-game popups.
 - Content from other Dave Mirra titles (Maximum Remix, Dave Mirra 2): check PC availability and formats.
 - Code differences from Maximum Remix, if a binary with the same engine is available to diff against.
-- Uncompressed / higher-quality audio.
+- Uncompressed / higher-quality audio. Music: done 2026-10-31 as an opt-in override (`[audio] music_dir`): the
+  game's edits rebuilt in stereo from the user's own FLACs, at the DirectSound stand-in (docs/MUSIC.md
+  "Override"). Left: the effects and speech (22 kHz and lower in the game's banks; no better source).
 - Remastered menu graphics.
 - Compatibility (default on, behaviour-neutral): no DX7/DirectShow/CD dependencies (Cinepak decoder,
   SDL audio); saves and settings in the user profile, not the install dir or registry; any resolution,

@@ -36,6 +36,28 @@ uint32_t bmxDsLead(uint32_t frequency, uint32_t rate, uint32_t sizeFrames);
 /* DirectSound's gain for a volume and pan (1/100 dB; DSBVOLUME_MIN is silence): left and right. */
 void bmxDsGains(int32_t volume, int32_t pan, float *left, float *right);
 
+/* ---- the override seam (the music override, music.c / musicgame.c; docs/MUSIC.md "Override") ---- */
+
+/*
+ * Something that plays in place of a buffer's own data, slaved to the buffer: the buffer's cursors, status,
+ * volume, pan and the game's calls stay exactly as without it; only the frames the mixer feeds into the
+ * resampler come from `read` (16-bit stereo at the buffer's frequency) instead of the ring. The track
+ * position counts the buffer's frames from its last SetCurrentPosition (that offset included), across
+ * Stop / Play and the ring's wrap.
+ */
+typedef struct BmxSoundOverride {
+    /* Play from stopped at track position `pos` (the caller's thread, mixer lock held): a token >= 0 to play
+     * `read` for this play, -1 for the buffer's own data. Must not block. */
+    int (*attach)(const BmxDsBuffer *buffer, uint64_t pos);
+    /* The mixer thread (mixer lock held): `frames` frames from track position `pos`. Must not block. */
+    void (*read)(int token, uint64_t pos, uint32_t frames, int16_t *stereo);
+    /* bmxSoundShutdown (may be NULL). */
+    void (*shutdown)(void);
+} BmxSoundOverride;
+
+/* Registers the override (NULL: none). Native exe: bmxMusicInstall; tests. */
+void bmxSoundSetOverride(const BmxSoundOverride *override);
+
 /* ---- BMX_SOUND_CHECK (soundcheck.c): the same calls on the real DirectSound, compared ---- */
 
 typedef struct BmxSoundCheckBuffer BmxSoundCheckBuffer;

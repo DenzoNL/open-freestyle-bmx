@@ -12,6 +12,7 @@
 #include "driver/driver.h"
 #include "hook/hook.h"
 #include "native/native.h"
+#include "platform/music.h"
 #include "platform/platform.h"
 #include "platform/smoothmix.h"
 #include "png/png.h"
@@ -333,6 +334,8 @@ static int loadImage(const uint8_t *file, size_t size)
         }
         bmxLog("smooth: %u jumps\n", (unsigned)smoothCount);
     }
+    /* [audio] music_dir: the music override attaches at the DirectSound stand-in (no jump; musicgame.c). */
+    bmxMusicInstall();
     if (pngCheck) {
         bmxPngCheckArm();
     }
