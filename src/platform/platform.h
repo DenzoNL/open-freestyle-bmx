@@ -43,6 +43,11 @@ void *bmxRealProc(const char *dll, const char *name);
 /* Log to stderr and bmxnative.log (src/native/trap.c). */
 void bmxLog(const char *fmt, ...);
 
+/* BMX_KEYS (src/native/keys.c): 1 when the keyboard is scripted; the script's DIK state at the current shown
+ * frame (state is zeroed by the caller). */
+int bmxKeysScripted(void);
+void bmxKeysFillState(uint8_t *state, uint32_t size);
+
 /* ---- time and misc kernel32 (kernel.c) ---- */
 
 /* Sets the clock origin; idempotent. Call before the game runs. BMX_TIME_BASE overrides the base. */
@@ -57,6 +62,20 @@ void bmxTimeSetBase(uint32_t base);
 
 /* Stops every timer (joins the threads); logs the interval statistics when BMX_TIMER_LOG is set. */
 void bmxTimerShutdown(void);
+
+/* At exit (kernel.c): stops the timers and logs what the dev checks collected (BMX_INPUT_CHECK). */
+void bmxPlatformShutdown(void);
+
+/* ---- the config file (config.c, P19) ---- */
+
+/*
+ * bmxnative.ini next to the exe (BMX_CONFIG=<path> names another), read on first use: `key = value` lines,
+ * `[section]` headers prefix the keys ("input.dpad_steering"), `#` and `;` start comments. Every option is
+ * off by default; unknown keys are logged.
+ */
+int bmxConfigInt(const char *key, int fallback);
+/* Replaces the configuration by the text (tests; `origin` names it in the log). */
+void bmxConfigLoadText(const char *text, const char *origin);
 
 /* ---- paths (paths.c) ---- */
 

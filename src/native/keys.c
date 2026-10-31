@@ -1,11 +1,10 @@
 /*
  * Scripted keyboard (dev aid, BMX_KEYS): the game reads its keyboard through DirectInput only (pcinput.c:
- * GetDeviceState on a c_dfDIKeyboard device, once per poll), so the script replaces DirectInput itself. The
- * import shim for DirectInputCreateEx hands out a stand-in IDirectInput7 that enumerates no joystick and
- * creates only the keyboard, a stand-in device whose state is the script's keys at the current shown frame.
- * Nothing real is read: the run is the same whether the window has the focus or not, and keys the user
- * presses in another program (or a game pad) never reach it. Without BMX_KEYS the shim forwards to the real
- * DirectInputCreateEx. Modal message boxes are answered by a shim as well (messageBoxA below).
+ * GetDeviceState on a c_dfDIKeyboard device, once per poll), and DirectInput is our stand-in
+ * (src/platform/input.c). With BMX_KEYS its keyboard reports the script's keys at the current shown frame
+ * (bmxKeysFillState), it lists no pad and ignores the focus: nothing real is read, the run is the same
+ * whether the window has the focus or not, and keys the user presses in another program (or a game pad) never
+ * reach it. Modal message boxes are answered by a shim as well (messageBoxA below).
  *
  * BMX_KEYS="f300:enter,+100:enter,+20:down*10,f900:left+e" is a comma separated list of events:
  *   f<N>       press at shown frame N (RwRasterShowRaster count, as BMX_SHOT_FRAME / BMX_QUIT_FRAMES)
@@ -176,51 +175,17 @@ int bmxKeysInstall(void)
     return 1;
 }
 
-/* ---- stand-in DirectInput keyboard ---- */
-
-static HRESULT STDMETHODCALLTYPE kbdQueryInterface(IDirectInputDevice7A *self, REFIID riid, void **out)
+int bmxKeysScripted(void)
 {
-    (void)self;
-    (void)riid;
-    *out = NULL;
-    return E_NOINTERFACE;
+    return scripted;
 }
 
-static ULONG STDMETHODCALLTYPE kbdAddRef(IDirectInputDevice7A *self)
-{
-    (void)self;
-    return 1;
-}
-
-static HRESULT STDMETHODCALLTYPE kbdOk(IDirectInputDevice7A *self)
-{
-    (void)self;
-    return DI_OK;
-}
-
-static HRESULT STDMETHODCALLTYPE kbdSetDataFormat(IDirectInputDevice7A *self, LPCDIDATAFORMAT format)
-{
-    (void)self;
-    (void)format;
-    return DI_OK;
-}
-
-static HRESULT STDMETHODCALLTYPE kbdSetCooperativeLevel(IDirectInputDevice7A *self, HWND window, DWORD flags)
-{
-    (void)self;
-    (void)window;
-    (void)flags;
-    return DI_OK;
-}
-
-/* The c_dfDIKeyboard state: 0x80 for each scripted key held at the current shown frame. */
-static HRESULT STDMETHODCALLTYPE kbdGetDeviceState(IDirectInputDevice7A *self, DWORD size, void *data)
+/* The script's keys held at the current shown frame (0x80 each) into the DIK state of the DirectInput
+ * stand-in's keyboard (src/platform/input.c), which zeroed it. */
+void bmxKeysFillState(uint8_t *state, uint32_t size)
 {
     const int frame = drvGpuShownFrames();
-    uint8_t *const state = data;
 
-    (void)self;
-    memset(state, 0, size);
     for (int i = 0; i < eventCount; i++) {
         const KeyEvent *e = &events[i];
 
@@ -237,96 +202,6 @@ static HRESULT STDMETHODCALLTYPE kbdGetDeviceState(IDirectInputDevice7A *self, D
             }
         }
     }
-    return DI_OK;
-}
-
-/* The game calls Release, Acquire, Unacquire, GetDeviceState, SetDataFormat and SetCooperativeLevel on the
- * keyboard (pcinput.c); the other entries stay NULL. */
-static IDirectInputDevice7AVtbl kbdVtbl = {
-    .QueryInterface = kbdQueryInterface,
-    .AddRef = kbdAddRef,
-    .Release = kbdAddRef,
-    .Acquire = kbdOk,
-    .Unacquire = kbdOk,
-    .GetDeviceState = kbdGetDeviceState,
-    .SetDataFormat = kbdSetDataFormat,
-    .SetCooperativeLevel = kbdSetCooperativeLevel,
-};
-
-static IDirectInputDevice7A keyboard = {&kbdVtbl};
-
-/* ---- stand-in IDirectInput7 ---- */
-
-/* GUID_SysKeyboard (the game passes its own copy, 0x54f2f8). */
-static const GUID kSysKeyboard = {
-    0x6f1d2b61, 0xd5a0, 0x11cf, {0xbf, 0xc7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00}};
-
-static HRESULT STDMETHODCALLTYPE diQueryInterface(IDirectInput7A *self, REFIID riid, void **out)
-{
-    (void)self;
-    (void)riid;
-    *out = NULL;
-    return E_NOINTERFACE;
-}
-
-static ULONG STDMETHODCALLTYPE diAddRef(IDirectInput7A *self)
-{
-    (void)self;
-    return 1;
-}
-
-/* No joystick: the game's pad device falls back to the keyboard. */
-static HRESULT STDMETHODCALLTYPE diEnumDevices(IDirectInput7A *self, DWORD type,
-                                               LPDIENUMDEVICESCALLBACKA callback, void *ref, DWORD flags)
-{
-    (void)self;
-    (void)type;
-    (void)callback;
-    (void)ref;
-    (void)flags;
-    return DI_OK;
-}
-
-static HRESULT STDMETHODCALLTYPE diCreateDeviceEx(IDirectInput7A *self, REFGUID guid, REFIID riid, void **out,
-                                                  IUnknown *outer)
-{
-    (void)self;
-    (void)riid;
-    (void)outer;
-    if (IsEqualGUID(guid, &kSysKeyboard)) {
-        *out = &keyboard;
-        return DI_OK;
-    }
-    *out = NULL;
-    return DIERR_DEVICENOTREG;
-}
-
-/* The game calls Release, EnumDevices and CreateDeviceEx (pcinput.c); the other entries stay NULL. */
-static IDirectInput7AVtbl diVtbl = {
-    .QueryInterface = diQueryInterface,
-    .AddRef = diAddRef,
-    .Release = diAddRef,
-    .EnumDevices = diEnumDevices,
-    .CreateDeviceEx = diCreateDeviceEx,
-};
-
-static IDirectInput7A directInput = {&diVtbl};
-
-typedef HRESULT(WINAPI *DirectInputCreateExFn)(HINSTANCE, DWORD, REFIID, void **, IUnknown *);
-
-/* The import table's stand-in for DINPUT.dll!DirectInputCreateEx (src/platform/imports.c). */
-HRESULT WINAPI bmxKeysDirectInputCreateEx(HINSTANCE instance, DWORD version, REFIID iid, void **out,
-                                          IUnknown *outer)
-{
-    DirectInputCreateExFn real;
-
-    if (scripted) {
-        *out = &directInput;
-        return DI_OK;
-    }
-    /* The DINPUT.dll the import fill loaded (the game folder's hook DLL forwards to the system one). */
-    real = (DirectInputCreateExFn)bmxRealProc("DINPUT.dll", "DirectInputCreateEx");
-    return real != NULL ? real(instance, version, iid, out, outer) : DIERR_GENERIC;
 }
 
 /*
@@ -350,7 +225,6 @@ int WINAPI bmxKeysMessageBoxA(HWND owner, const char *text, const char *caption,
 /* The import table entries of this file (src/platform/imports.c looks them up with the stand-ins of its own).
  */
 const BmxStandIn bmxKeysStandIns[] = {
-    {"DINPUT.dll", "DirectInputCreateEx", (void *)bmxKeysDirectInputCreateEx},
     {"USER32.dll", "MessageBoxA", (void *)bmxKeysMessageBoxA},
 };
 const size_t bmxKeysStandInCount = sizeof bmxKeysStandIns / sizeof bmxKeysStandIns[0];

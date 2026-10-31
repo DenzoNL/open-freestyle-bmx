@@ -1,29 +1,36 @@
 /*
- * Renderer models (C:\NgEngine\Zge\Com\ZglRw\zrwModel.c): a model is one or two RenderWare clumps with a
- * set of body parts (frames that follow a skeleton), a material list and a position, scale and rotation
- * given in game coordinates. Everything the model hands to RenderWare goes through the game-to-RenderWare
- * coordinate conversion (scale gZrwScale, y and z mirrored, origin gZrwWorldCenter).
+ * Renderer models (C:\NgEngine\Zge\Com\ZglRw\zrwModel.c): a model is a RenderWare clump (one per level of
+ * detail, the first one is used) with an optional collision clump, a set of body parts (frames that follow
+ * a skeleton), a material list and a position, scale and rotation given in game coordinates. Everything the
+ * model hands to RenderWare goes through the game-to-RenderWare coordinate conversion (scale gZrwScale, y and
+ * z mirrored, origin gZrwWorldCenter).
  */
 #ifndef ZGE_COM_ZGLRW_ZRWMODEL_H
 #define ZGE_COM_ZGLRW_ZRWMODEL_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "compat/orig.h"
 #include "zge/zlist.h"
 #include "zge/zmath.h"
 
-/* Entry of a model's table of 0x14 byte records, found by the key stored at +0x10. */
+struct RpAtomic;
+struct RpClump;
+struct RpGeometry;
+struct RwFrame;
+
+/* Named entry of a model (one per frame of its hierarchy), found by the frame's user data key. 0x14 bytes. */
 typedef struct ZrwModelEntry {
-    uint8_t pad00[0x10];
-    int32_t key;
+    char name[0x10]; /* 0x00 NUL terminated by the loader */
+    int32_t key;     /* 0x10 */
 } ZrwModelEntry;
 
 /* Definition of one body part of the skeleton: where it sits and how it is rotated. 0x44 bytes. */
 typedef struct ZrwPartDef {
     uint8_t pad00[4];
     uint32_t hash;   /* 0x04 name hash */
-    float offset[3]; /* 0x08 */
+    float offset[3]; /* 0x08 game units */
     uint8_t pad14[4];
     ZQuat rotation; /* 0x18 */
     uint8_t pad28[0x1c];
@@ -36,78 +43,133 @@ typedef struct ZrwPartDefTable {
     ZrwPartDef *defs;
 } ZrwPartDefTable;
 
-/* Body part of a model instance. 0x28 bytes. */
+/*
+ * Body part of a model instance: one node of the clump's frame hierarchy, built when the clump is loaded or
+ * cloned. Children are prepended, so `child` is the child added last. 0x28 bytes.
+ */
 typedef struct ZrwModelPart {
-    uint32_t hash; /* 0x00 matches ZrwPartDef.hash */
+    uint32_t hash; /* 0x00 the frame's user data, matches ZrwPartDef.hash */
     uint32_t pad04;
-    ZrwPartDef *def;   /* 0x08 NULL until zrwModelMatchParts found its definition */
-    void *frame;       /* 0x0c RwFrame the part drives */
-    float offset[3];   /* 0x10 */
-    uint32_t userData; /* 0x1c */
-    uint8_t pad20[8];
+    ZrwPartDef *def;              /* 0x08 NULL until zrwModelMatchParts found its definition */
+    struct RwFrame *frame;        /* 0x0c the frame the part drives */
+    float restPos[3];             /* 0x10 the frame's position when the hierarchy was built */
+    struct ZrwModelPart *parent;  /* 0x1c */
+    struct ZrwModelPart *sibling; /* 0x20 */
+    struct ZrwModelPart *child;   /* 0x24 */
 } ZrwModelPart;
 
-/* A set of parts (the model keeps one per pose set). 12 bytes. */
-typedef struct ZrwPartSet {
-    uint32_t count;
-    ZrwModelPart *parts;
-    uint32_t pad08;
-} ZrwPartSet;
+/* A level of detail: the distance it starts at and the parts of its clump's hierarchy. 12 bytes. */
+typedef struct ZrwModelLod {
+    float distance;      /* 0x00 from the MLOD chunk; 0 or NaN take the default (gZrwLodDefaults) */
+    uint32_t partCount;  /* 0x04 */
+    ZrwModelPart *parts; /* 0x08 */
+} ZrwModelLod;
 
-/* Shared description of a model. */
+#define kZrwModelMaxLods 4
+
+/* Options of a model definition (ZrwModelDef.options, the first word of its MDEF chunk). */
+enum {
+    kZrwModelSkinned = 0x02,        /* RpSkin clump: set up at load, updated with the frames */
+    kZrwModelNotInWorld = 0x04,     /* not added to the world at load */
+    kZrwModelUnlit = 0x08,          /* rpGEOMETRYLIGHT is cleared on every level of detail */
+    kZrwModelFollowCamera = 0x10,   /* drawn at the camera's position by a per-frame callback (sky) */
+    kZrwModelNoCollision = 0x40,    /* its atomics never take part in collision tests */
+    kZrwModelCollisionClump = 0x80, /* has an MCOL chunk: a separate clump collides instead of the model */
+};
+
+/* Atomic render callback (RpAtomicRenderCallBack). */
+typedef struct RpAtomic *(BMX_CDECL *ZrwAtomicRenderFn)(struct RpAtomic *atomic);
+
+/* Shared description of a model; the models using it count themselves in refCount. 0xbc bytes. */
 typedef struct ZrwModelDef {
-    uint32_t flags; /* 0x00 bit 0: set by zrwModelSetFlags(.., 1) */
-    uint8_t pad04[4];
-    uint32_t flags2;       /* 0x08 bit 1: parts need the post-update hook (0x504490) */
-    uint16_t partSetCount; /* 0x0c */
+    uint32_t flags;    /* 0x00 bit 0: set by zrwModelSetFlags(.., 1) */
+    uint32_t refCount; /* 0x04 the last model to let go frees the definition */
+    uint32_t options;  /* 0x08 kZrwModel*; bit 0: zrwModelRender supports the model */
+    uint16_t lodCount; /* 0x0c levels of detail loaded so far */
     uint8_t pad0e[2];
     uint32_t defaultKey; /* 0x10 */
-    char name[0x90];     /* 0x14 */
+    char name[0x10];     /* 0x14 */
+    char path[0x80];     /* 0x24 file it was loaded from (zrwModelLoadFromFile) */
     uint16_t entryCount; /* 0xa4 */
     uint8_t padA6[2];
-    ZrwModelEntry *entries; /* 0xa8 */
-    void *atomic;           /* 0xac first atomic of the first clump */
-    void *geometry;         /* 0xb0 its geometry */
-    void *atomicInfo;       /* 0xb4 the pointer at +0x4c of the atomic */
-    float *vertices;        /* 0xb8 locked vertices of the first morph target (zrwModelLockGeometry) */
+    ZrwModelEntry *entries;         /* 0xa8 */
+    struct RpAtomic *atomic;        /* 0xac first atomic of the first clump */
+    struct RpGeometry *geometry;    /* 0xb0 its geometry */
+    ZrwAtomicRenderFn atomicRender; /* 0xb4 its render callback before the model's own replaced it */
+    float *vertices; /* 0xb8 locked vertices of the first morph target (zrwModelLockGeometry) */
 } ZrwModelDef;
 
 typedef struct ZrwModel ZrwModel;
 typedef void(BMX_CDECL *ZrwModelUpdateFn)(ZrwModel *model);
 
+/* A model instance (0x8c byte records from the loader's pool). */
 struct ZrwModel {
-    uint8_t pad00[8];
-    uint32_t flags;     /* 0x08 bit 0: scale differs from 1, bit 1: parts matched */
-    void *clump;        /* 0x0c RpClump (its frame is at +4) */
-    void *clump2;       /* 0x10 optional second clump that is kept in step */
-    uint32_t userValue; /* 0x14 */
-    ZVec3 position;     /* 0x18 */
+    uint32_t pad00; /* 0x00 the loader clears its low byte */
+    uint32_t pad04;
+    uint32_t flags;                 /* 0x08 bit 0: scale differs from 1, bit 1: parts matched */
+    struct RpClump *clump;          /* 0x0c */
+    struct RpClump *collisionClump; /* 0x10 the MCOL clump, NULL when the model collides with its own */
+    uint32_t userValue;             /* 0x14 */
+    ZVec3 position;                 /* 0x18 game coordinates */
     uint32_t pad24;
     ZVec3 scale; /* 0x28 */
     uint32_t pad34;
-    ZQuat rotation;   /* 0x38 */
-    uint16_t partSet; /* 0x48 index of the active part set */
+    ZQuat rotation;     /* 0x38 */
+    uint16_t activeLod; /* 0x48 the level of detail zrwModelUpdate poses (not range checked) */
     uint8_t pad4a[2];
-    ZList *materials; /* 0x4c */
-    uint32_t pad50;
-    ZrwPartSet partSets[3]; /* 0x54 */
-    uint8_t pad78[8];
-    ZrwModelUpdateFn onUpdate; /* 0x80 called at the end of zrwModelUpdate */
-    uint32_t onUpdateArg;      /* 0x84 */
-    ZrwModelDef *def;          /* 0x88 */
+    ZList *materials;                   /* 0x4c */
+    ZrwModelLod lods[kZrwModelMaxLods]; /* 0x50 */
+    ZrwModelUpdateFn onUpdate;          /* 0x80 called at the end of zrwModelUpdate */
+    uint32_t color;                     /* 0x84 RGBA the model's render callback draws it with */
+    ZrwModelDef *def;                   /* 0x88 */
 };
 
 _Static_assert(sizeof(ZrwModelEntry) == 0x14, "zrw entry");
+_Static_assert(offsetof(ZrwPartDef, hash) == 0x04, "zrw part definition");
+_Static_assert(offsetof(ZrwPartDef, offset) == 0x08, "zrw part definition");
+_Static_assert(offsetof(ZrwPartDef, rotation) == 0x18, "zrw part definition");
 _Static_assert(sizeof(ZrwPartDef) == 0x44, "zrw part definition");
+_Static_assert(offsetof(ZrwPartDefTable, defs) == 0x08, "zrw part definition table");
+_Static_assert(offsetof(ZrwModelPart, def) == 0x08, "zrw part");
+_Static_assert(offsetof(ZrwModelPart, frame) == 0x0c, "zrw part");
+_Static_assert(offsetof(ZrwModelPart, restPos) == 0x10, "zrw part");
+_Static_assert(offsetof(ZrwModelPart, parent) == 0x1c, "zrw part");
+_Static_assert(offsetof(ZrwModelPart, child) == 0x24, "zrw part");
 _Static_assert(sizeof(ZrwModelPart) == 0x28, "zrw part");
-_Static_assert(sizeof(ZrwPartSet) == 12, "zrw part set");
+_Static_assert(sizeof(ZrwModelLod) == 12, "zrw level of detail");
+_Static_assert(offsetof(ZrwModelDef, refCount) == 0x04, "zrw model definition");
+_Static_assert(offsetof(ZrwModelDef, options) == 0x08, "zrw model definition");
+_Static_assert(offsetof(ZrwModelDef, lodCount) == 0x0c, "zrw model definition");
+_Static_assert(offsetof(ZrwModelDef, defaultKey) == 0x10, "zrw model definition");
+_Static_assert(offsetof(ZrwModelDef, name) == 0x14, "zrw model definition");
+_Static_assert(offsetof(ZrwModelDef, path) == 0x24, "zrw model definition");
+_Static_assert(offsetof(ZrwModelDef, entryCount) == 0xa4, "zrw model definition");
+_Static_assert(offsetof(ZrwModelDef, entries) == 0xa8, "zrw model definition");
+_Static_assert(offsetof(ZrwModelDef, atomic) == 0xac, "zrw model definition");
+_Static_assert(offsetof(ZrwModelDef, geometry) == 0xb0, "zrw model definition");
+_Static_assert(offsetof(ZrwModelDef, atomicRender) == 0xb4, "zrw model definition");
+_Static_assert(offsetof(ZrwModelDef, vertices) == 0xb8, "zrw model definition");
 _Static_assert(sizeof(ZrwModelDef) == 0xbc, "zrw model definition");
+_Static_assert(offsetof(ZrwModel, flags) == 0x08, "zrw model");
+_Static_assert(offsetof(ZrwModel, clump) == 0x0c, "zrw model");
+_Static_assert(offsetof(ZrwModel, collisionClump) == 0x10, "zrw model");
+_Static_assert(offsetof(ZrwModel, userValue) == 0x14, "zrw model");
+_Static_assert(offsetof(ZrwModel, position) == 0x18, "zrw model");
+_Static_assert(offsetof(ZrwModel, scale) == 0x28, "zrw model");
+_Static_assert(offsetof(ZrwModel, rotation) == 0x38, "zrw model");
+_Static_assert(offsetof(ZrwModel, activeLod) == 0x48, "zrw model");
+_Static_assert(offsetof(ZrwModel, materials) == 0x4c, "zrw model");
+_Static_assert(offsetof(ZrwModel, lods) == 0x50, "zrw model");
+_Static_assert(offsetof(ZrwModel, onUpdate) == 0x80, "zrw model");
+_Static_assert(offsetof(ZrwModel, color) == 0x84, "zrw model");
+_Static_assert(offsetof(ZrwModel, def) == 0x88, "zrw model");
+_Static_assert(sizeof(ZrwModel) == 0x8c, "zrw model");
 
 /* State of the model system (memset at initialisation): the two scratch matrices of zrwModelUpdate. */
 typedef struct ZrwModelState {
     int initialized;
-    ZMatrix *matrix;
-    ZMatrix *scratch;
+    ZMatrix *matrix;  /* the model's rotation and scale */
+    ZMatrix *scratch; /* the product with the root frame's matrix */
 } ZrwModelState;
 
 #define gZrwModelState ORIG_VAR(0x006722e8, ZrwModelState, gZrwModelState)
@@ -148,27 +210,31 @@ typedef int(BMX_CDECL *ZrwTextureHashFn)(void *texture);
 
 /* ---- RenderWare object helpers ---------------------------------------------------------------------- */
 
-/* Entry whose key (+0x10) equals `key` in the model's table, or NULL. */
+/* Entry whose key equals `key` in the model's table, or NULL. */
 ZrwModelEntry *zrwModelFindEntry(const ZrwModel *model, int key);
-/* RpClumpForAllAtomics callback: flags (byte at +2) = (flags & mask[0]) | mask[1]; counts a use at +0x14. */
+/* RpClumpForAllAtomics callback: flags = (flags & mask[0]) | mask[1]; bumps the atomic's stamp. */
 void *zrwAtomicMaskFlags(void *atomic, const uint32_t *mask);
 /* Applies zrwAtomicMaskFlags to every atomic of the clump: flags = (flags & ~clear) | set. */
 void zrwClumpMaskAtomicFlags(void *clump, uint32_t clear, uint32_t set);
-/* Same callback for the flags of the atomic's geometry (the pointer at +0x1c). Returns the atomic. */
+/* Same callback for the flags of the atomic's geometry. Returns the atomic. */
 void *zrwAtomicMaskGeometryFlags(void *atomic, const uint32_t *mask);
 void zrwClumpMaskGeometryFlags(void *clump, uint32_t clear, uint32_t set);
 /* Adds (nonzero) or removes the model's clumps to / from the renderer's world when they are not / are in it.
  */
 void zrwModelSetInWorld(const ZrwModel *model, int add);
-/* Shows or hides the model: world membership of the second clump, or the object flag of the first. */
-void zrwModelSetActive(const ZrwModel *model, int on);
+/*
+ * Turns collision on or off: the collision clump joins or leaves the world, or, without one, the model's
+ * atomics get or lose rpATOMICCOLLISIONTEST.
+ */
+void zrwModelSetCollision(const ZrwModel *model, int on);
 
 /* Plugin slot hooks of the clump (constructor clears the slot; the destructor does nothing). */
 void *zrwMdlConstructor(void *clump);
 void *zrwMdlDestructor(void *clump);
 int zrwMdlSetUserData(void *clump, uint32_t value);
 int zrwMdlRegisterPlugin(void);
-uint32_t zrwMdlGetUserData(const void *object);
+/* The value in the plugin slot of the atomic's clump (the model that owns it). */
+uint32_t zrwMdlGetUserData(const void *atomic);
 
 /* Rotation matrix of a quaternion in RenderWare space (y, z negated); the second variant mirrors x. */
 void zrwQuatToMatrix(const ZQuat *quat, ZMatrix *out);
@@ -179,7 +245,7 @@ int zrwModelSystemShutdown(void);
 
 /* ---- model parts ------------------------------------------------------------------------------------ */
 
-/* Links every part of every set to the definition with the same hash (printing the misses). */
+/* Links every part of every level of detail to the definition with the same hash (printing the misses). */
 void zrwModelMatchParts(ZrwModel *model, const ZrwPartDefTable *table);
 int zrwModelPartCount(const ZrwModel *model);
 void zrwModelGetPartHashes(const ZrwModel *model, uint32_t *out);
@@ -187,10 +253,11 @@ ZrwModelPart *zrwModelFindPart(const ZrwModel *model, uint32_t hash);
 /* World position of a point given in the frame of a part (flags & 1: through the world matrix). */
 void zrwModelPartToWorld(const ZrwModel *model, const ZrwModelPart *part, const ZVec3 *local, ZVec3 *out,
                          uint8_t flags);
-/* Offset of the part in game coordinates. */
+/* Rest position of the part in game coordinates. */
 void zrwModelPartOffset(const ZrwModel *model, const ZrwModelPart *part, ZVec3 *out);
 void zrwModelPartMatrix(const ZrwModel *model, const ZrwModelPart *part, void *out, uint8_t flags);
-uint32_t zrwModelPartUserData(const ZrwModel *model, const ZrwModelPart *part);
+/* The part's parent part (NULL for the root), as a word. */
+uint32_t zrwModelPartParent(const ZrwModel *model, const ZrwModelPart *part);
 uint32_t zrwModelEntryKey(const ZrwModel *model, const uint32_t *key);
 void *zrwModelEntryLookup(const ZrwModel *model, const uint32_t *key);
 
@@ -198,24 +265,28 @@ void *zrwModelEntryLookup(const ZrwModel *model, const uint32_t *key);
 int zrwModelSetPosition(ZrwModel *model, const ZVec3 *position);
 int zrwModelSetRotation(ZrwModel *model, const ZQuat *rotation);
 int zrwModelSetScale(ZrwModel *model, const ZVec3 *scale);
-/* Pushes position, scale, rotation and the parts of the active set to the RenderWare frames. */
+/* Pushes position, scale, rotation and the parts of the active level of detail to the RenderWare frames. */
 int zrwModelUpdate(ZrwModel *model);
-/* `clear` and `set` are masks of the bits 1 (collision), 2 (world membership), 4, 8 (shown). */
+/*
+ * `clear` and `set` are masks of: 1 (the definition flag and atomic flag 0x80), 2 (world membership),
+ * 4 (draw the collision clump), 8 (collision, as zrwModelSetCollision).
+ */
 int zrwModelSetFlags(const ZrwModel *model, uint8_t clear, uint8_t set);
 
 void zrwModelSetUserValue(ZrwModel *model, uint32_t value);
 uint32_t zrwModelGetUserValue(const ZrwModel *model);
-/* The clump to draw: the second one when there is one. */
-void *zrwModelRenderClump(const ZrwModel *model);
+/* The clump collision queries test: the collision clump when there is one. */
+void *zrwModelCollisionClump(const ZrwModel *model);
 /* Material with the given texture name hash, or NULL. */
 void *zrwModelFindMaterial(const ZrwModel *model, int hash);
 int zrwModelMaterialCount(const ZrwModel *model);
 void *zrwModelGetMaterial(const ZrwModel *model, uint32_t index);
-void zrwModelSetUpdateHook(ZrwModel *model, const uint32_t *arg);
+/* Sets the model's colour and installs the render callback that draws with it. */
+void zrwModelSetDrawColor(ZrwModel *model, const uint32_t *color);
 /* Makes the materials of the model take the vertex colours, then sets the colour of each one. */
 void zrwModelSetColor(const ZrwModel *model, const void *color);
 
-/* ---- dispatch wrappers: each passes the model at +0x2c of the object on --------------------------- */
+/* ---- dispatch wrappers: the hooks of a scene object (ZObj) of the model type; each passes ZObj.model on */
 
 int zrwObjDestroy(void *object);
 int zrwObjUpdate(void *object);

@@ -29,10 +29,10 @@ void bmxPngCheckInstall(const uint8_t *code, uint32_t codeStart);
 void bmxPngCheckArm(void);
 
 /*
- * BMX_KEYS (src/native/keys.c): parse the key script; returns 1 when the keyboard is scripted. The import
- * table (src/platform/imports.c) points DirectInputCreateEx (the stand-in DirectInput) and MessageBoxA
- * (answered without a window) at keys.c; both act only in a scripted run and call the real function
- * otherwise.
+ * BMX_KEYS (src/native/keys.c): parse the key script; returns 1 when the keyboard is scripted. The
+ * DirectInput stand-in (src/platform/input.c) then reads its keyboard from the script (bmxKeysFillState); the
+ * import table points MessageBoxA at keys.c (answered without a window in a scripted run, the real one
+ * otherwise).
  */
 int bmxKeysInstall(void);
 

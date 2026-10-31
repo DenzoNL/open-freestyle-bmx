@@ -9,6 +9,7 @@
 #include "rw/rwworld.h"
 #include "zge/com/zglrw/zrwcam.h"
 #include "zge/com/zglrw/zrwmodelcreate.h"
+#include "zge/com/zglrw/zrwshadow.h"
 #include "zge/com/zglrw/zrwtxr.h"
 #include "zge/com/zglrw/zrwworld.h"
 #include "zge/zobj.h"
@@ -781,7 +782,7 @@ static void setup_shadow_start(DtCtx *c)
     s5SetRet(0x4896d0, (uint32_t)(uintptr_t)handle());
     s5SetRet(0x48ba30, (uint32_t)(uintptr_t)handle());
     gZrwShadowActive = dt_u32() % 8 == 0;
-    gZrwShadowHead = dt_u32();
+    gZrwShadowTexture = dt_u32();
     gZrwShadowReady = dt_u32();
 }
 

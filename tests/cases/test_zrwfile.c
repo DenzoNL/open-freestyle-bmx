@@ -330,11 +330,16 @@ static ZrwModel *randomModel(void)
 
     dt_fill(m, sizeof *m);
     dt_fill(d, sizeof *d);
-    for (int i = dt_range(0, 0x8f); i < 0x90; i++) {
-        d->name[i] = 0;
-    }
-    for (int i = 0; i < 0x90 && d->name[i] != 0; i++) {
-        d->name[i] = (char)dt_range('a', 'z');
+    {
+        /* The name may run on into the path (0x90 bytes in all). */
+        char *const text = (char *)d + offsetof(ZrwModelDef, name);
+
+        for (int i = dt_range(0, 0x8f); i < 0x90; i++) {
+            text[i] = 0;
+        }
+        for (int i = 0; i < 0x90 && text[i] != 0; i++) {
+            text[i] = (char)dt_range('a', 'z');
+        }
     }
     stubVertices = dt_alloc(16 * 12);
     d->vertices = (float *)stubVertices;

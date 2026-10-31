@@ -107,3 +107,65 @@ value held in an x87 register behaves exactly like a C `double`. A value the ori
 3. `cmake --build --preset hook` and `tests/oracle/run.sh -k <module>` until everything passes exactly.
 4. `clang-format -i`, then `clang-tidy`, then commit:
    `port(<module>): <n> functions (<addr range>)`.
+
+## Cleanup conventions
+
+Ported code is cleaned up module by module (pilot: `zrwmodel*.c`, 2026-10-31). A cleanup changes how the code
+reads, never what it does: the object code may differ only where the compiler picks other instructions for the
+same memory effects.
+
+**What to change**
+
+- Raw byte offsets (`*(uint16_t *)((uint8_t *)x + 0x0c)`, `((void **)clump)[1]`, `#define fooRefs(x) ...`)
+  become struct fields. Use the existing RenderWare structs (`RpAtomic`, `RpClump`, `RwFrame`, `RpGeometry` in
+  `rw/*.h`) and accessors (`RpClumpGetFrame`, `RpAtomicGetFrame`) before inventing new ones; the scene object is
+  `ZObj` (`zge/zobj.h`). Grep the whole of `src/` and `tests/` for other users of the same offsets first.
+- Every field a struct claims gets a `_Static_assert(offsetof(T, field) == 0x.., ...)` next to the struct, plus
+  `sizeof` when the size is known (pool record sizes, memset/zmemCopy sizes). Then replace size literals with
+  `sizeof` (`zmemCopy(dst, src, sizeof *dst)`), it is the same constant.
+- Two structs at the same address with different names are one struct: merge them (`ZrwPartNode` and
+  `ZrwModelPart`). Arrays hidden behind stride helpers become arrays of a record (`lodOf`/`partSetOf` at
+  +0x50/+0x54, stride 12, were `ZrwModelLod lods[4]`).
+- Name a `padNN` only when the code makes its meaning clear (who writes it, who reads it, what the value is). A
+  field read by one function and written by another with a plain value stays `padNN`. The w slot after a `ZVec3`
+  stays `padNN`.
+- Names follow the code, not the guess the port started with: a field that holds the atomic's original render
+  callback is `atomicRender`, not `atomicInfo`; a clump loaded from the MCOL chunk is `collisionClump`. Rename
+  our own function names when they are wrong (`zrwModelSetActive` toggles collision: `zrwModelSetCollision`);
+  update the `DT_CASES` name string with the symbol. Z-Axis names that leak from asserts stay.
+- Magic numbers become named constants when the name is certain: chunk ids (`kChunkMlod = 0x444f4c4d /* "MLOD" */`),
+  option bits (`kZrwModelSkinned`), RenderWare flags (`rpATOMICCOLLISIONTEST`, `rpGEOMETRYLIGHT`). Add missing RW
+  SDK names to the `rw/*.h` enums rather than defining local ones.
+- Comments say why or what is surprising (original quirks, inlined steps, unchecked indices), not what the next
+  line does. Fix comments that turn out wrong.
+- `TODO(file)`: move a function only when the right home is clear (an assert's file name, shared globals, the
+  callers). Keep its `BMX_ADDR`, change its row in `data/functions.csv` (file column, confidence `manual`), and
+  run `py -I tools/progress.py --check`. Move its prototype and the types it needs to the new module's header.
+
+**What not to touch**
+
+- Hooks, `BMX_ADDR`, `ORIG_VAR`, `ORIG_FN`, `BMX_FNPTR`, and the signatures of `BMX_ADDR` functions (parameter
+  and return types stay, even `void *`; cast to a typed local inside). Renaming parameters is fine.
+- Order and grouping of FP operations, float/double conversions (`(double)` casts, stored vs register values),
+  integer widths and signedness, the order of calls and of stores around calls, and which memory is read and
+  written. Keep duplicate loads the original does (`RpClumpGetFrame(clump)` twice around a call, not cached).
+- Inlined copies of other functions (the root step of a frame callback, a dump routine): don't replace them by a
+  call, the tests stub the callee and would see an extra call. Say in a comment that it is inlined.
+- Unchecked indices that can go out of range in the original (`edge` up to 255): keep the address computation;
+  a small helper with a comment is fine (`colCorner`).
+- Patterns that comments mark as deliberate (negations kept opaque, `bitsToFloat`, `__builtin_fabs` compares).
+- Anything you are not sure is equivalent. Skip it and note it.
+
+**How to verify**
+
+1. Before editing, build the hook preset and save the per-function disassembly of the module's objects:
+   `python3 -I tools/fndis.py work/fn-before src/<path>.c ...` (every file you will touch, including the files
+   functions move to). After the cleanup, rebuild, run it again into `work/fn-after` and
+   `diff -r work/fn-before/fn work/fn-after/fn`. Expect identical code for almost every function; read every
+   difference and make sure it is the same computation (other addressing of the same field, constant stores
+   merged into a wider store, renamed relocations). This catches more than the tests do.
+2. `cmake --build --preset hook`, then the oracle cases of every touched function and of every module whose
+   tests use the changed types (`tests/oracle/run.sh -k zrwModel -k ... -j 4`), with the tests' fixtures updated
+   for renamed fields.
+3. `clang-format -i` and `clang-tidy --quiet -p build/hook` on the touched files; the native32 build when a header
+   it compiles changed; `py -I tools/progress.py --check` when functions moved.

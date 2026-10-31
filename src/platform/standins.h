@@ -37,11 +37,15 @@ int32_t BMX_WINAPI bmxStandReadFile(void *file, void *buffer, uint32_t bytes, ui
 uint32_t BMX_WINAPI bmxStandSetFilePointer(void *file, int32_t distance, int32_t *high, uint32_t method);
 int32_t BMX_WINAPI bmxStandCloseHandle(void *file);
 
+/* input.c: DirectInput on SDL3 (iid and out as in DirectInputCreateEx). */
+int32_t BMX_WINAPI bmxStandDirectInputCreateEx(void *instance, uint32_t version, const void *iid, void **out,
+                                               void *outer);
+
 /* avi.c */
 int32_t BMX_WINAPI bmxStandAVISaveOptionsFree(int count, void **options);
 
-/* The BMX_KEYS stand-ins (src/native/keys.c, with the Windows types): a table of its own, since only the
- * definition knows the stdcall argument sizes that decorate the symbols. */
+/* The BMX_KEYS stand-in for MessageBoxA (src/native/keys.c, with the Windows types): a table of its own,
+ * since only the definition knows the stdcall argument sizes that decorate the symbols. */
 extern const BmxStandIn bmxKeysStandIns[];
 extern const size_t bmxKeysStandInCount;
 

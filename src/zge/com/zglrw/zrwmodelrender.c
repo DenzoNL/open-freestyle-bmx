@@ -37,9 +37,9 @@ typedef void(BMX_CDECL *ZrwDbgSphereFn)(const ZVec3 *center, float radius, const
 #define gZrwDbgLineHook     ORIG_VAR(0x00560064, ZrwDbgLineFn, gZrwDbgLineHook)
 #define gZrwDbgTriangleHook ORIG_VAR(0x00560068, ZrwDbgTriangleFn, gZrwDbgTriangleHook)
 #define gZrwDbgSphereHook   ORIG_VAR(0x0056006c, ZrwDbgSphereFn, gZrwDbgSphereHook)
+/* zrwzgl.h's render state (flags and the current raster); that header clashes with zrwmodel.h. */
 #define gZrwRenderFlags     ORIG_VAR(0x00697778, uint32_t, gZrwRenderFlags)
 #define gZrwRenderExtra     ORIG_VAR(0x0069777c, int, gZrwRenderExtra)
-typedef void(BMX_CDECL *ZrwModelCallFn)(void *object);
 #define gZrwRenderStateHook ORIG_VAR(0x00561490, ZrwRenderStateHookFn, gZrwRenderStateHook)
 #define gZrwBeginHook       ORIG_VAR(0x00561494, ZrwRenderHookFn, gZrwBeginHook)
 #define gZrwEndHook         ORIG_VAR(0x00561498, ZrwRenderHookFn, gZrwEndHook)
@@ -62,7 +62,15 @@ typedef struct ZrwImVertex {
     float v;          /* 0x20 */
 } ZrwImVertex;
 
+_Static_assert(offsetof(ZrwImVertex, color) == 0x18, "immediate vertex");
 _Static_assert(sizeof(ZrwImVertex) == 0x24, "immediate vertex");
+
+/* Corner `index` of a collision triangle (v0, v1 and v2 are 16 bytes apart). The index is not range checked:
+ * callers pass what the original passed. */
+static const ZVec3 *colCorner(const ZrwRenderColTriangle *triangle, uint32_t index)
+{
+    return (const ZVec3 *)((const uint8_t *)&triangle->v0 + index * 0x10);
+}
 
 /* Draws the 12 edges of a node's bounding box. */
 BMX_ADDR(0x0048def0)
@@ -149,9 +157,8 @@ void zrwModelDrawTriangleEdge(const ZrwRenderColTriangle *triangle, uint8_t edge
 {
     const uint32_t first = edge;
     const uint32_t second = (first + 1) % 3;
-    /* The corner index is not range checked. */
-    const ZVec3 *const from = (const ZVec3 *)((const uint8_t *)triangle + first * 0x10);
-    const ZVec3 *const to = (const ZVec3 *)((const uint8_t *)triangle + second * 0x10);
+    const ZVec3 *const from = colCorner(triangle, first);
+    const ZVec3 *const to = colCorner(triangle, second);
     ZVec3 a, b;
 
     a.x = (float)((double)triangle->normal.x + from->x);
@@ -160,7 +167,7 @@ void zrwModelDrawTriangleEdge(const ZrwRenderColTriangle *triangle, uint8_t edge
     b.x = (float)((double)triangle->normal.x + to->x);
     b.y = (float)((double)to->y + triangle->normal.y);
     b.z = (float)((double)to->z + triangle->normal.z);
-    if (color != NULL && *(const uint32_t *)((const uint8_t *)triangle + 0x44 + first * 4) != 0) {
+    if (color != NULL && triangle->drawEdge[first] != 0) {
         gZrwDbgLineHook(&a, &b, color, 2);
     }
 }
@@ -358,7 +365,6 @@ void zrwColSearch(int mode, const ZrwRenderColNode *node, uint16_t *found, const
     }
     for (int i = 0; i < (int)node->triangleCount; i++) {
         const ZrwRenderColTriangle *tri = node->triangles[i];
-        const ZVec3 *corners = &tri->v0;
         ZVec3 d;
 
         if (mode == 1) {
@@ -381,8 +387,8 @@ void zrwColSearch(int mode, const ZrwRenderColNode *node, uint16_t *found, const
             }
         } else if (mode == 2) {
             for (int e = 0; e < 3; e++) {
-                const ZVec3 *from = (const ZVec3 *)((const uint8_t *)corners + 0x10 * e);
-                const ZVec3 *to = (const ZVec3 *)((const uint8_t *)corners + 0x10 * ((e + 1) % 3));
+                const ZVec3 *from = colCorner(tri, (uint32_t)e);
+                const ZVec3 *to = colCorner(tri, (uint32_t)((e + 1) % 3));
                 ZVec3 edge;
                 float along;
 
@@ -407,7 +413,7 @@ void zrwColSearch(int mode, const ZrwRenderColNode *node, uint16_t *found, const
             }
         } else if (mode == 3) {
             for (int k = 0; k < 3; k++) {
-                const ZVec3 *corner = (const ZVec3 *)((const uint8_t *)corners + 0x10 * k);
+                const ZVec3 *corner = colCorner(tri, (uint32_t)k);
 
                 if (tri->drawPoint[k] == 0) {
                     continue;
@@ -431,22 +437,23 @@ ZrwRenderColQuery *zrwModelQuery(const ZVec3 *point, float radius)
 }
 
 /*
- * Draws a model facing the camera: its frame is reset to a rotation about y that undoes the camera's yaw,
- * the model's own draw hook (+0xb4 of its definition) is called, and the model colour is switched around it.
+ * Atomic render callback that draws a model facing the camera: the atomic's world matrix is reset to a
+ * rotation about y that undoes the camera's yaw, the atomic's original render callback draws it, and the
+ * model colour is switched around that.
  */
 BMX_ADDR(0x0048f3e0)
 void *zrwModelRenderBillboard(void *object)
 {
     ZrwModel *const model = (ZrwModel *)(uintptr_t)zrwMdlGetUserData(object);
     const ZMatrix *cameraMatrix = RwFrameGetLTM(RwCameraGetFrame(gZrwCamera));
-    ZMatrix *const frame = RwFrameGetLTM(*(void **)((uint8_t *)object + 4));
+    ZMatrix *const frame = RwFrameGetLTM(RpAtomicGetFrame(object));
     uint32_t renderFlags;
     ZVec3 axis;
     ZVec3 position;
     ZAngle yaw;
     float angle;
 
-    zrwModelSetColor(model, &model->onUpdateArg);
+    zrwModelSetColor(model, &model->color);
     gZrwBeginHook();
     renderFlags = (gZrwRenderFlags & 0xffff22ffu) | 0x2222;
     if (gZrwRenderFlags != renderFlags || gZrwRenderExtra != 0) {
@@ -473,32 +480,33 @@ void *zrwModelRenderBillboard(void *object)
     frame->flags |= 0x20003;
     RwMatrixRotate(frame, &axis, angle, 0);
     frame->pos = position;
-    (*(ZrwModelCallFn *)((uint8_t *)model->def + 0xb4))(object);
+    model->def->atomicRender(object);
     gZrwEndHook();
     zrwModelSetColor(model, &gZrwModelColor1);
     return object;
 }
 
-/* The render callback of a model's atomics: its definition's draw hook between two colour changes. */
+/* The render callback zrwModelSetDrawColor installs: the atomic's original one, drawn in the model colour. */
 BMX_ADDR(0x0048f530)
 void *zrwModelRenderCallback(void *object)
 {
     ZrwModel *const model = (ZrwModel *)(uintptr_t)zrwMdlGetUserData(object);
 
-    zrwModelSetColor(model, &model->onUpdateArg);
-    (*(ZrwModelCallFn *)((uint8_t *)model->def + 0xb4))(object);
+    zrwModelSetColor(model, &model->color);
+    model->def->atomicRender(object);
     zrwModelSetColor(model, &gZrwModelColor2);
     return object;
 }
 
 /* Sends the buffered triangles of one material to the renderer, switching the texture when needed. */
-static void flushTriangles(void *geometry, int material, int count)
+static void flushTriangles(RpGeometry *geometry, int material, int count)
 {
-    void *const materialPtr = RpGeometryGetMaterial(geometry, material);
-    void *raster = RwTextureGetRaster(RpMaterialGetTexture(materialPtr));
+    RpMaterial *const rpMaterial = RpGeometryGetMaterial(geometry, material);
+    void *raster = RwTextureGetRaster(RpMaterialGetTexture(rpMaterial));
 
+    /* the original fetches the raster a second time */
     if ((int)(uintptr_t)raster != gZrwRenderExtra) {
-        raster = RwTextureGetRaster(RpMaterialGetTexture(materialPtr));
+        raster = RwTextureGetRaster(RpMaterialGetTexture(rpMaterial));
         gZrwRenderStateHook(gZrwRenderFlags, raster);
     }
     RwIm3DRenderIndexedPrimitive(3, gZrwModelRender.indices, count * 3);
@@ -513,8 +521,8 @@ BMX_ADDR(0x0048f720)
 void *zrwModelRenderAtomic(void *atomic)
 {
     ZrwImVertex local[0x100];
-    ZMatrix *const frame = RwFrameGetLTM(*(void **)((uint8_t *)atomic + 4));
-    void *const geometry = *(void **)((uint8_t *)atomic + 0x1c);
+    ZMatrix *const frame = RwFrameGetLTM(RpAtomicGetFrame(atomic));
+    RpGeometry *const geometry = ((const RpAtomic *)atomic)->geometry;
     const int vertexCount = RpGeometryGetNumVertices(geometry);
     const float *vertices = (const float *)RpMorphTargetGetVertices(RpGeometryGetMorphTarget(geometry, 0));
     const int16_t *triangle = (const int16_t *)RpGeometryGetTriangles(geometry);
@@ -630,7 +638,7 @@ BMX_ADDR(0x0048fb70)
 void zrwModelDrawFrames(const ZrwModel *model)
 {
     if (model->clump != NULL) {
-        void *const frame = *(void **)((uint8_t *)model->clump + 4);
+        RwFrame *const frame = RpClumpGetFrame(model->clump);
 
         if (frame != NULL) {
             const ZVec3 position = RwFrameGetLTM(frame)->pos;
@@ -641,23 +649,25 @@ void zrwModelDrawFrames(const ZrwModel *model)
     }
 }
 
-/* Per-frame update: puts the clump at the camera's position and draws its atomics. 0 for unsupported models.
+/*
+ * Per-frame callback of kZrwModelFollowCamera models: puts the clump at the camera's position and draws its
+ * atomics. 0 for models without option bit 0.
  */
 BMX_ADDR(0x0048fbc0)
 int zrwModelRender(ZrwModel *model)
 {
-    void *const clump = model->clump;
+    RpClump *const clump = model->clump;
 
-    if ((model->def->flags2 & 1) == 0) {
+    if ((model->def->options & 1) == 0) {
         zdebugFail("Not coded", kZrwModelRenderFile, 0x312, 0);
         return 0;
     }
     {
         const ZMatrix *const camera = RwFrameGetLTM(RwCameraGetFrame(gZrwCamera));
 
-        RwMatrixTranslate(RwFrameGetMatrix(*(void **)((uint8_t *)clump + 4)), &camera->pos, 0);
+        RwMatrixTranslate(RwFrameGetMatrix(RpClumpGetFrame(clump)), &camera->pos, 0);
     }
-    RwFrameUpdateObjects(*(void **)((uint8_t *)clump + 4));
+    RwFrameUpdateObjects(RpClumpGetFrame(clump));
     RpClumpForAllAtomics(model->clump, BMX_FNPTR(RpAtomicCallback, 0x0048f720, zrwModelRenderAtomic), NULL);
     return 1;
 }
@@ -710,35 +720,36 @@ int zrwModelRenderShutdown(void)
     return 1;
 }
 
-/* Draws the model right away (the same positioning as zrwModelRender) with the model's own post-update hook.
- */
+/* Draws the clump right away at the camera's position (as zrwModelRender), updating a skinned model first. */
 BMX_ADDR(0x0048fda0)
 void zrwModelRenderDirect(ZrwModel *model)
 {
-    void *const clump = model->clump;
+    RpClump *const clump = model->clump;
 
-    if ((model->def->flags2 & 1) == 0) {
+    if ((model->def->options & 1) == 0) {
         zdebugFail("Not coded", kZrwModelRenderFile, 900, 0);
         return;
     }
     {
         const ZMatrix *const camera = RwFrameGetLTM(RwCameraGetFrame(gZrwCamera));
 
-        RwMatrixTranslate(RwFrameGetMatrix(*(void **)((uint8_t *)clump + 4)), &camera->pos, 0);
+        RwMatrixTranslate(RwFrameGetMatrix(RpClumpGetFrame(clump)), &camera->pos, 0);
     }
-    RwFrameUpdateObjects(*(void **)((uint8_t *)clump + 4));
-    if ((model->def->flags2 & 2) != 0) {
+    RwFrameUpdateObjects(RpClumpGetFrame(clump));
+    if ((model->def->options & kZrwModelSkinned) != 0) {
         RpSkinClumpUpdate(clump);
     }
     RpClumpRender(clump);
 }
 
-/* Per-atomic callback: stores the render callback and counts the change. */
+/* RpClumpForAllAtomics callback: installs the render callback and bumps the atomic's stamp. */
 BMX_ADDR(0x0048fea0)
 void *zrwAtomicSetRenderCallback(void *atomic, void *callback)
 {
-    *(void **)((uint8_t *)atomic + 0x4c) = callback;
-    (*(uint8_t *)((uint8_t *)atomic + 0x14))++;
+    RpAtomic *const rpAtomic = atomic;
+
+    rpAtomic->renderCallBack = (RpAtomicRenderCallBack)(uintptr_t)callback;
+    rpAtomic->stamp++;
     return atomic;
 }
 

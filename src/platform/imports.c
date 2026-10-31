@@ -34,6 +34,8 @@ const BmxStandIn bmxStandIns[] = {
     STAND("KERNEL32.dll", "ReadFile", bmxStandReadFile),
     STAND("KERNEL32.dll", "SetFilePointer", bmxStandSetFilePointer),
     STAND("KERNEL32.dll", "CloseHandle", bmxStandCloseHandle),
+    /* S5: DirectInput (keyboard and pad on SDL3; BMX_KEYS is a source of its keyboard) */
+    STAND("DINPUT.dll", "DirectInputCreateEx", bmxStandDirectInputCreateEx),
     /* Moved here from the loader */
     STAND("AVIFIL32.dll", "AVISaveOptionsFree", bmxStandAVISaveOptionsFree),
 };
@@ -144,7 +146,9 @@ int bmxImportIsDead(const char *dll, const char *name)
 
 int bmxImportKeepsDll(const char *dll)
 {
-    /* DINPUT.dll: the forwarding DirectInputCreateEx needs it, and the game folder's copy may be the hook
+    /* DINPUT.dll only for BMX_INPUT_CHECK, which calls the real one: the game folder's copy may be the hook
      * DLL, which has to patch the range before our jumps are written (docs/NATIVE.md). */
-    return SDL_strcasecmp(dll, "DINPUT.dll") == 0;
+    const char *check = SDL_getenv("BMX_INPUT_CHECK");
+
+    return SDL_strcasecmp(dll, "DINPUT.dll") == 0 && check != NULL && *check != 0 && *check != '0';
 }

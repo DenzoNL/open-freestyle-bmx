@@ -1975,12 +1975,12 @@ addr,size,file,confidence,name,status
 0049b250,72,zge/ziff.c,assert,FUN_0049b250,ported
 0049b2a0,137,zge/ziff.c,assert,FUN_0049b2a0,ported
 0049b330,160,zge/com/zglrw/zrwshadow.c,assert,FUN_0049b330,ported
-0049b3d0,258,zge/com/zglrw/zrwmodelcreate.c,affinity,FUN_0049b3d0,ported
-0049b4e0,44,zge/com/zglrw/zrwmodelcreate.c,affinity,FUN_0049b4e0,ported
-0049b520,851,zge/com/zglrw/zrwmodelcreate.c,affinity,FUN_0049b520,ported
+0049b3d0,258,zge/com/zglrw/zrwshadow.c,manual,FUN_0049b3d0,ported
+0049b4e0,44,zge/com/zglrw/zrwshadow.c,manual,FUN_0049b4e0,ported
+0049b520,851,zge/com/zglrw/zrwshadow.c,manual,FUN_0049b520,ported
 0049bd10,781,zge/com/zglrw/zrwmodelcreate.c,affinity,FUN_0049bd10,ported
 0049c080,950,zge/com/zglrw/zrwmodelcreate.c,affinity,FUN_0049c080,ported
-0049c570,131,zge/com/zglrw/zrwmodelcreate.c,affinity,FUN_0049c570,ported
+0049c570,131,zge/zobj.c,manual,FUN_0049c570,ported
 0049c6e0,93,zge/com/zglrw/zrwmodelcreate.c,affinity,FUN_0049c6e0,ported
 0049c7a0,82,zge/com/zglrw/zrwmodelcreate.c,affinity,FUN_0049c7a0,ported
 0049c880,237,zge/com/zglrw/zrwmodelcreate.c,affinity,FUN_0049c880,ported

@@ -339,3 +339,28 @@ void zobjDetach(ZObj *object)
         }
     }
 }
+
+/* Each event leaves the queue after its handlers ran. */
+BMX_ADDR(0x0049c570)
+void zobjDispatchEvents(ZObj *object)
+{
+    if (object->events == NULL || object->events->pending == NULL) {
+        return;
+    }
+    ZObjEvent *event = zlistFirst(object->events->pending);
+
+    while (event != NULL) {
+        if (object->events->handlers != NULL) {
+            ZObjHandler *handler = zlistFirst(object->events->handlers);
+
+            while (handler != NULL) {
+                if (handler->eventId == event->id && handler->kind == 1) {
+                    handler->fn(event);
+                }
+                handler = zlistNext(object->events->handlers);
+            }
+        }
+        zlistRemoveCurrent(object->events->pending);
+        event = zlistCurrent(object->events->pending);
+    }
+}

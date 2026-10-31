@@ -8,7 +8,7 @@
 #include "rw/rwplugins.h"
 #include "rw/rwtexture.h"
 #include "rw/rwworld.h"
-#include "zge/com/zglrw/zrwmodelcreate.h"
+#include "zge/com/zglrw/zrwshadow.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zobjcamera.h"
 #include "zge/zmem.h"

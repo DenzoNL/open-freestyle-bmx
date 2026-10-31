@@ -271,7 +271,7 @@ int main(void)
             }
         }
     }
-    bmxTimerShutdown();
+    bmxPlatformShutdown(); /* timers; BMX_INPUT_CHECK summary */
     ExitProcess((UINT)-1); /* the original's _exit(-1) */
     return 0;
 }

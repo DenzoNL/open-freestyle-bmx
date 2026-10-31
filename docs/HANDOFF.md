@@ -63,6 +63,14 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   `BMX_TIMER_LOG=1`, scripted runs without a trap, frames identical to the previous build. Opus review wanted for
   the timer thread's concurrency (PLATFORM.md 5, "Timer-thread concurrency"). **Next:** S5/S6 (SDL input stand-in,
   d-pad), then S7 (DirectSound on SDL3 audio) and S8 (own AVI / Cinepak).
+- Platform layer S5/S6 done 2026-10-31 (docs/PLATFORM.md 4b, docs/NATIVE.md "Input on SDL3", native only): every run
+  reads keyboard and pad through a stand-in DirectInput on SDL3 (DirectInput's button numbering per pad family,
+  its dead zone arithmetic, DIK scan codes, foreground semantics; BMX_KEYS is its scripted keyboard);
+  `BMX_INPUT_CHECK=1` compares every call with the real dinput.dll in the same process; `bmxnative.ini`
+  (`BMX_CONFIG`) with the opt-in `[input] dpad_steering = 1`. The S3 timer review fixed a double join / slot reuse
+  race and the timeKillEvent return codes. **Open:** the user's focused test with the DualSense (NATIVE.md test A /
+  B); unfocused, the game's whole call sequence already matches the real DirectInput (0 HRESULT differences, same
+  product name / GUID / type). **Next:** S7 (DirectSound on SDL3 audio), S8 (own AVI / Cinepak).
 - Golden traces: record sessions with `bmxtrace.orig` (docs/TRACING.md) if not done yet.
 
 ## Machine setup

@@ -23,7 +23,9 @@
 
 #include "platform/standins.h"
 
-enum { kMaxTimers = 8, kTimePeriodic = 1, kTimerrStruct = 129, kMmsyserrInvalParam = 11 };
+/* TIMERR_NOCANDO: what winmm's timeKillEvent returns for an unknown, killed or fired one-shot id (measured).
+ */
+enum { kMaxTimers = 8, kTimePeriodic = 1, kTimerrStruct = 129, kTimerrNoCanDo = 97 };
 
 typedef struct Timer {
     SDL_ThreadID threadId;
@@ -33,7 +35,10 @@ typedef struct Timer {
     BmxTimeProc proc;
     SDL_Thread *thread;
     SDL_AtomicInt stop;
-    int used, finished, detached;
+    /* used: the slot is taken; finished: the thread left its loop; detached: killed from its own callback
+     * (the thread frees the slot); joining: a timeKillEvent is joining it (nobody else may join or free it).
+     * All four change only under gLock. */
+    int used, finished, detached, joining;
     uint32_t id, delay, user, flags;
 } Timer;
 
@@ -99,7 +104,6 @@ static int SDLCALL timerThread(void *arg)
     const uint64_t period = (uint64_t)(t->delay ? t->delay : 1) * 1000000ull;
     uint64_t deadline;
 
-    t->threadId = SDL_GetCurrentThreadID();
     SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_TIME_CRITICAL);
     deadline = SDL_GetTicksNS() + period;
     while (!SDL_GetAtomicInt(&t->stop)) {
@@ -165,7 +169,7 @@ static void reap(void)
     for (int i = 0; i < kMaxTimers; i++) {
         Timer *const t = &gTimers[i];
 
-        if (t->used && t->finished && !t->detached) {
+        if (t->used && t->finished && !t->detached && !t->joining) {
             SDL_WaitThread(t->thread, NULL);
             t->used = 0;
         }
@@ -179,6 +183,7 @@ uint32_t BMX_WINAPI bmxStandTimeSetEvent(uint32_t delay, uint32_t resolution, Bm
     uint32_t id = 0;
 
     (void)resolution;
+    (void)logging(); /* read the environment before any timer thread can */
     lockInit();
     SDL_LockMutex(gLock);
     reap();
@@ -197,6 +202,9 @@ uint32_t BMX_WINAPI bmxStandTimeSetEvent(uint32_t delay, uint32_t resolution, Bm
         if (t->thread == NULL) {
             t->used = 0;
             id = 0;
+        } else {
+            /* Set under the lock, before the callback can run and call timeKillEvent itself. */
+            t->threadId = SDL_GetThreadID(t->thread);
         }
     }
     SDL_UnlockMutex(gLock);
@@ -215,13 +223,20 @@ uint32_t BMX_WINAPI bmxStandTimeKillEvent(uint32_t id)
     lockInit();
     SDL_LockMutex(gLock);
     for (int i = 0; i < kMaxTimers; i++) {
-        if (gTimers[i].used && gTimers[i].id == id && !gTimers[i].detached) {
+        if (gTimers[i].used && gTimers[i].id == id && !gTimers[i].detached && !gTimers[i].joining) {
             t = &gTimers[i];
         }
     }
     if (t == NULL) {
         SDL_UnlockMutex(gLock);
-        return kMmsyserrInvalParam;
+        return kTimerrNoCanDo;
+    }
+    if (t->finished && !(t->flags & kTimePeriodic)) {
+        /* A one-shot event that already fired no longer exists for winmm. */
+        SDL_WaitThread(t->thread, NULL);
+        t->used = 0;
+        SDL_UnlockMutex(gLock);
+        return kTimerrNoCanDo;
     }
     SDL_SetAtomicInt(&t->stop, 1);
     thread = t->thread;
@@ -232,6 +247,9 @@ uint32_t BMX_WINAPI bmxStandTimeKillEvent(uint32_t id)
         SDL_UnlockMutex(gLock);
         return 0;
     }
+    /* Join outside the lock (the thread takes it to finish); `joining` keeps reap() and a second kill of the
+     * same id from joining the thread again or reusing the slot meanwhile. */
+    t->joining = 1;
     SDL_UnlockMutex(gLock);
     SDL_WaitThread(thread, NULL);
     SDL_LockMutex(gLock);
@@ -249,7 +267,7 @@ void bmxTimerShutdown(void)
     lockInit();
     SDL_LockMutex(gLock);
     for (int i = 0; i < kMaxTimers; i++) {
-        if (gTimers[i].used && !gTimers[i].detached) {
+        if (gTimers[i].used && !gTimers[i].detached && !gTimers[i].joining) {
             ids[n++] = gTimers[i].id;
         }
     }

@@ -100,6 +100,23 @@ struct RpClump {
 _Static_assert(offsetof(RpClump, stamp) == 0x12, "RpClump layout");
 _Static_assert(offsetof(RpClump, callback) == 0x1c, "RpClump layout");
 
+/* Atomic flags (RpAtomic.object.object.flags). */
+enum {
+    rpATOMICCOLLISIONTEST = 0x01,
+    rpATOMICRENDER = 0x04,
+};
+
+/* The frame of a clump / an atomic (RenderWare's RpClumpGetFrame / RpAtomicGetFrame macros). */
+static inline RwFrame *RpClumpGetFrame(const RpClump *clump)
+{
+    return clump->object.parent;
+}
+
+static inline RwFrame *RpAtomicGetFrame(const RpAtomic *atomic)
+{
+    return atomic->object.object.parent;
+}
+
 /* A bone as the skin code uses it: the matrix applied to its vertices and a flag word (bit 1: active). */
 typedef struct RpSkinBone {
     RwFrame *frame;   /* 0x00 the bone's frame */

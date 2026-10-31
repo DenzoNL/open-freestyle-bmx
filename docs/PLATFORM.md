@@ -1,7 +1,7 @@
 # Platform layer: Windows APIs -> SDL3 (P4, "Windows first")
 
-Status 2026-10-31: **decided; S1-S4 implemented** (section 4a). The user took the recommendation for every decision
-P1..P19 (A unless said otherwise). Order: S1-S4 (done), then input + d-pad (S5, S6), then the rest.
+Status 2026-10-31: **decided; S1-S6 implemented** (sections 4a, 4b; S5's check with real pads is the user's). The user took the recommendation for every decision
+P1..P19 (A unless said otherwise). Order: S1-S4 (done, S3 reviewed), input + d-pad (S5, S6: done), then the rest.
 Goal: `bmxnative.exe` (src/native/) as a clean standalone
 Windows build whose game and engine code reach the OS only through SDL3 and our own code. The fixed 32-bit memory
 layout (image at 0x400000, docs/NATIVE.md) stays; Mac/Linux come after. Vanilla stays vanilla (PLAN.md Decisions):
@@ -14,7 +14,8 @@ functions (rw/rwd3d.h); this one is at the **exe's import table**.
 
 The original imports 137 functions from 8 DLLs. `fillImports` (src/native/loader.c) fills every slot with the real
 function via `LoadLibraryA`/`GetProcAddress`, except two shims: `AVISaveOptionsFree` (loader.c, heap mismatch) and,
-in a `BMX_KEYS` run, `DirectInputCreateEx` / `MessageBoxA` (src/native/keys.c). The loader also recreates the exe's
+in a `BMX_KEYS` run, `DirectInputCreateEx` / `MessageBoxA` (src/native/keys.c). (Inventory as of before S1;
+the import table is now src/platform/imports.c, section 4a.) The loader also recreates the exe's
 own `jmp [slot]` thunks (e.g. 0x4afc58 DirectInputCreateEx, 0x4af9d0..0x4afa48 AVIFile/DrawDib, 0x47ec3a timeGetTime).
 
 Callers were found by scanning the original's code for `call/jmp/mov [slot]` and mapping each site to
@@ -361,16 +362,17 @@ tidy list like src/native (tidy it with `-p build/native32`). Tests: `tests/plat
 **The hook DLL is unchanged and does not use the stand-ins** (P2-A allows it; nothing in S1-S4 needs it, S5 will).
 
 - **S1 done.** `loader.c fillImports` asks, per slot: `bmxStandInFind(dll, name)` (src/platform/imports.c; entries
-  `{dll, name, fn}`, DLL name case-insensitive; keys.c adds its two through `bmxKeysStandIns` because only its
-  definitions know the stdcall decoration), then `bmxImportIsDead` (the 64 slots of 1b: all of ADVAPI32 and DDRAW,
+  `{dll, name, fn}`, DLL name case-insensitive; keys.c adds its MessageBoxA through `bmxKeysStandIns` because
+  only its definition knows the stdcall decoration), then `bmxImportIsDead` (the 64 slots of 1b: all of ADVAPI32 and DDRAW,
   49 KERNEL32, 9 USER32), else the real function. A dead slot gets a 16-byte stub (`push index; call deadSlot`) in a
   VirtualAlloc'd page: calling it logs `DEAD IMPORT called: KERNEL32.dll!HeapAlloc ..., caller <addr>` and exits
-  with code 3. A DLL is loaded only when a slot needs the real function (or `bmxImportKeepsDll`: DINPUT.dll, whose
-  stand-in forwards and whose copy in the game folder may be the hook DLL, which must patch before our jumps).
+  with code 3. A DLL is loaded only when a slot needs the real function (or `bmxImportKeepsDll`: DINPUT.dll, since S5 only
+  with BMX_INPUT_CHECK, which calls the real one; the game folder's copy may be the hook DLL, which must patch before
+  our jumps).
   The log has one line per DLL and a summary; today: `137 slots filled: 23 stand-ins, 64 dead, 50 real; real DLLs
   still used: KERNEL32.dll USER32.dll WINMM.dll AVIFIL32.dll MSVFW32.dll` (KERNEL32: 3 real = LoadLibraryA /
   GetProcAddress / FreeLibrary; ADVAPI32, DDRAW and DINPUT are no longer loaded for the dead / stand-in slots).
-  The stand-in count 23 = 11 (S2) + 5 (S3) + 4 (S4) + AVISaveOptionsFree + the two BMX_KEYS ones.
+  The stand-in count 23 = 11 (S2) + 5 (S3) + 4 (S4) + AVISaveOptionsFree + DirectInputCreateEx (S5, before: BMX_KEYS's) + MessageBoxA (BMX_KEYS).
 - **S2 done** (`kernel.c`). timeGetTime and GetTickCount share one clock: milliseconds since process start plus a
   fixed base (0x36ee80 = 1 h of "uptime"; `BMX_TIME_BASE=<n>` overrides it, e.g. `0xfffff000` runs the limiter
   through the 32-bit wrap), 32-bit wrapping, never 0 at start. Resolution as Windows: timeGetTime 1 ms; GetTickCount
@@ -399,10 +401,97 @@ tidy list like src/native (tidy it with `-p build/native32`). Tests: `tests/plat
   results, byte counts, bytes and positions**: this replaces "hash of every byte read, native vs hooked" (the hook
   cannot log it) with an exact check against Windows in the same process; a game run (ProQuest into Vail Trails, with
   the music stream read on the timer thread) shows `filecheck ok` for all 8 files.
-- Not done / deliberately left: LoadLibraryA / GetProcAddress / FreeLibrary stay real (S7), all window, input, movie
-  and waveOut slots stay real. A stand-in that "forwards when its option is off" is only BMX_KEYS's.
+- Not done / deliberately left: LoadLibraryA / GetProcAddress / FreeLibrary stay real (S7), all window, movie
+  and waveOut slots stay real (input: S5 below). The only stand-in that calls the real function when its option is
+  off is BMX_KEYS's MessageBoxA.
+- **S3 review (Opus, 2026-10-31)**, section 5 "Timer-thread concurrency" has the item-by-item notes. Fixed in
+  winmm.c: (1) a timeKillEvent joining outside the lock left its slot looking live, so a concurrent timeSetEvent
+  (reaping a fired one-shot) or a second kill of the same id could join the thread a second time and reuse the slot,
+  whose new event the first kill then freed; a `joining` flag under the lock now keeps everyone else off the slot;
+  (2) the thread id was written by the timer thread without the lock and read by other threads' kills: it is now
+  set under the lock in timeSetEvent before the callback can run; (3) return codes measured against winmm: an
+  unknown id, a killed id and a one-shot that already fired all give `TIMERR_NOCANDO` (97), ours gave 11 / 0 (the
+  game ignores the value); (4) BMX_TIMER_LOG's lazy flag is read before any timer thread exists. New tests: two
+  threads killing the same id (20 rounds, exactly one succeeds, nothing joined twice), the three return codes against
+  the real winmm.
 
-S1-S4 are independent and small; S5/S6 answer the playtest note first if wanted. S7 and S8 are the large ones.
+### 4b. Status of S5 and S6 (2026-10-31, native-only, not committed; the real-pad check needs the user)
+
+Code: `src/platform/input.c` (the stand-in DirectInput and the conversions), `inputcheck.c` (BMX_INPUT_CHECK),
+`diface.h` (the DirectInput 7 interfaces in our own types: src/platform still has no windows.h), `input.h`,
+`config.c` (P19). keys.c keeps the BMX_KEYS parser and the MessageBoxA shim; its DirectInput stand-in is gone.
+**The hook DLL is unchanged** (the dual-read runs in the native exe against the real dinput.dll in the same
+process, so P2's hook use is not needed for it).
+
+- **S5 done (code, unit tests, the unfocused half of the check); the focused check with real pads is the user's.**
+  `DINPUT.dll!DirectInputCreateEx` -> `bmxStandDirectInputCreateEx` (all builds, not only BMX_KEYS). At the first
+  call: the config, BMX_KEYS, then `SDL_InitSubSystem(SDL_INIT_GAMEPAD)` and the first joystick SDL lists (P5-A, no
+  hot-plug; an unplugged pad is found again by its SDL GUID, as DirectInput re-acquires it). SDL's joystick and
+  gamepad events are off (nobody pumps SDL's queue, the game's own message loop runs); the pad's `Poll` calls
+  `SDL_UpdateJoysticks`. `SDL_HINT_JOYSTICK_ENHANCED_REPORTS=0` is set first: SDL's default switches a Bluetooth
+  DualSense to its enhanced report, after which DirectInput (other programs, and our own check) sees no input until
+  the pad is switched off. Devices (up to 8 objects): `SetDataFormat` (keeps dwDataSize; DIERR_ACQUIRED while
+  acquired), `SetCooperativeLevel` (validates the flag pairs), `SetProperty` (DIPROP_RANGE / DEADZONE / SATURATION
+  per axis or device-wide, sizes checked: the game's fourth call, DIPROP_RANGE with a DIPROPDWORD, fails with
+  DIERR_INVALIDPARAM as it does in DirectInput), `Acquire` (fails with DIERR_OTHERAPPHASPRIO while the window has no
+  focus, or for a second exclusive object on the pad while the first holds it; S_FALSE when already acquired),
+  `Unacquire`, `Poll` (S_FALSE: HID devices need no polling), `GetDeviceState` (DIERR_NOTACQUIRED / DIERR_INPUTLOST
+  once after the focus or the pad went away, the buffer untouched on failure), `GetDeviceInfo` (SDL's name, the
+  product GUID `PIDVID` / "PIDVID" from VID/PID, type 0x10404 like DirectInput's), Release. Focus = SDL's keyboard
+  focus on the game window (SDL subclasses the HWND it wraps, driver/gpu.c, so it sees WM_ACTIVATE / WM_SETFOCUS).
+  - Keyboard (P6-A): `SDL_GetKeyboardState`, each pressed scancode through a fixed SDL_Scancode -> DIK table (set-1
+    scan code, + 0x80 for E0 keys; ISO `#` shares 0x2b with backslash as on Windows).
+  - Pad (P3-A, P4-A): opened as SDL_Gamepad when SDL knows it. PS4 / PS5 types: DirectInput's HID order Square 0,
+    Cross 1, Circle 2, Triangle 3, L1 4, R1 5, L2 6, R2 7, Create 8, Options 9, L3 10, R3 11, PS 12, touchpad 13,
+    (DualSense) mute 14; L2 / R2 buttons = trigger > 0; axes X / Y left stick, Z / Rz right stick, Rx / Ry triggers.
+    Xbox 360 / One types: A 0, B 1, X 2, Y 3, LB 4, RB 5, Back 6, Start 7, LS 8, RS 9, no guide; X / Y, Rx / Ry
+    sticks, both triggers on Z. Everything else: SDL_Joystick raw buttons, axes in order into X, Y, Z, Rx, Ry, Rz,
+    hat 0. POV 0 from the d-pad (hundredths of a degree, -1 centred), POVs 1-3 -1. Axis values: the raw HID value is
+    recovered from SDL's (`r * 257 - 32768` for the Sony pads' 8-bit sticks under SDL's HIDAPI driver; `v + 32768`
+    for 16-bit pads) and cooked like DirectInput: centre = logical max / 2, dead zone and saturation as fractions of
+    each half (MulDiv-rounded, MulDiv checked bit-exact against kernel32's), the rest scaled linearly onto the half
+    range with MulDiv. With the game's -127..127 and 10% that is: 8-bit stick 0 up to 13 steps from the centre, -1 /
+    +1 from 14; 16-bit 0 up to 3277. This follows Wine's dinput formula; DirectInput's own is not documented, so the
+    check measures the threshold (below).
+  - BMX_KEYS: `bmxKeysScripted()` / `bmxKeysFillState()` (keys.c) are the keyboard; no pad is listed and the focus
+    is ignored, so scripted runs behave exactly as before (ProQuest into Vail Trails: no trap, the frame at 1450 is
+    byte-identical between runs).
+  - **`BMX_INPUT_CHECK=1`** (inputcheck.c; off in a BMX_KEYS run): creates the real IDirectInput7 (the loader then
+    keeps DINPUT.dll loaded, see `bmxImportKeepsDll`), finds its first joystick, and mirrors every call the game
+    makes on a stand-in device on a real device for the same keyboard / joystick: the HRESULT of every call, then
+    per read the DIK state, the 32 buttons, lX / lY. Strict (what pcinput.c reads, and the device block's bits are a
+    function of exactly these): DIK & 0x80, buttons & 0x80, the sign of lX / lY. A difference that persists over two
+    reads in a row is a `MISMATCH` line; a one-read difference is counted as transient (a key reaches SDL through
+    the message queue, DirectInput directly). Informational: the other axes (beyond 1%) and the POVs (logged once
+    each). The live log has every real key / button edge and every lX / lY sign change with our raw HID value, and
+    the summary at exit (`bmxPlatformShutdown`, also at BMX_QUIT_FRAMES) the counts and, per stick direction, the
+    largest distance from the centre DirectInput still reported as 0 and the smallest it reported non-zero, next to
+    ours. Last line: `inputcheck: RESULT clean|MISMATCHES`.
+  - Checked here (unfocused, with the user's DualSense attached): bmxplatformtest runs the game's exact pcinput.c
+    sequence (keyboard and pad: formats, cooperative levels, the four SetProperty calls, GetDeviceInfo, Acquire,
+    Poll, GetDeviceState, Unacquire) on the stand-in with BMX_INPUT_CHECK on and a hidden window: **0 HRESULT
+    differences**; DirectInput's product name ("DualSense Wireless Controller") and product GUID
+    (0ce6054c-0000-0000-0000-504944564944) equal ours; device type equal after the fix to 0x10404. Not checkable
+    without the focus: the states themselves, the stick threshold, the second pad object's exclusive Acquire. That
+    is the user's test (docs/NATIVE.md "Input on SDL3"). Xbox pads: no pad here, the table is from the usual
+    DirectInput order (unverified).
+- **S6 done (code and unit tests).** `bmxnative.ini` (P19, config.c): next to the exe, or `BMX_CONFIG=<path>`;
+  `[section]` + `key = value`, `#` / `;` comments; read once, unknown keys logged; every option off by default.
+  Option `[input] dpad_steering = 1` (P7-A): after the check has compared the vanilla state, a pressed d-pad
+  direction sets lX / lY to the end of the range the game set (-127 / +127), over the stick on that axis; the log
+  shows each d-pad change with the resulting lX / lY. Input-only (the game sees a full stick deflection, the same
+  bits 0x1..0x8), not recorded in replays. Unit tests: left on a centred stick, up + right, no d-pad = no change. The
+  "golden trace with d-pad equals one with the stick" part waits for native replay; with BMX_INPUT_CHECK on, the
+  check still compares the vanilla values (the d-pad never shows as a mismatch).
+- Decisions beyond the document: ENHANCED_REPORTS off (above); the check is in-process against the real dinput.dll,
+  not in the hook build; transient vs persistent differences; Wine's cooking formula as the starting point (to be
+  confirmed by the check); a lost pad is found again by SDL GUID; the d-pad log line; `bmxPlatformShutdown` replaces
+  the two `bmxTimerShutdown` calls (main.c, driver/gpu.c).
+- Open: the user's focused check (keyboard, DualSense buttons and stick threshold, alt-tab, the d-pad option), an
+  Xbox pad if one is at hand; SDL's HIDAPI driver may set the DualSense's light bar / player LED on open (cosmetic,
+  DirectInput never did).
+
+S1-S6 are done apart from the user's real-pad check. S7 and S8 are the large ones.
 
 ## 5. Windows behaviour that is hard to reproduce
 
@@ -415,17 +504,23 @@ S1-S4 are independent and small; S5/S6 answer the playtest note first if wanted.
 - **Timer-thread concurrency**: winchanPump runs on winmm's thread while the game thread changes channels (plain
   flag, no lock, in winchan.c). Races exist in the original too; P11-A keeps the same shape but not the same
   interleavings. Audio is not part of the deterministic simulation, so golden traces are unaffected.
-  **For the Opus review of S3 (src/platform/winmm.c):** (a) timeKillEvent joins the timer thread, so a callback that
-  waits for something the killing thread holds would deadlock (bmxSoundClose holds nothing; winmm's own kill waits for
-  a running callback too, believed but not verified); (b) a timer thread is created per event with its own
-  SDL_Mutex-guarded slot table (8 slots), slot reuse after kill, one-shot reaping, self-kill from the callback
-  (detached thread frees its slot): check the lock order and the `finished` / `detached` handshake; (c) the statistics
-  fields are written by the timer thread and read after the join, no lock; (d) the callback runs game code on a
-  thread SDL created: its x87 control word is Windows' default for a new thread, not the game thread's (matters only
-  if the main thread ever leaves the 53-bit default, SDL3-DRIVER.md open points), and `bmxLog` / the CRT layer's
-  malloc are called from it concurrently with the game thread; (e) TIME_CRITICAL priority plus absolute deadlines
-  with SDL_DelayPrecise (which spins for the last part) costs a little CPU on the timer's core; (f) the game's plain
-  flag gWinchanLock is unchanged (not atomic), as in the original.
+  **Review of S3 (src/platform/winmm.c, Opus, 2026-10-31)**; the four fixes are listed in 4a.
+  (a) timeKillEvent's join cannot deadlock the game: bmxSoundClose kills the timer first and holds no lock or
+  critical section (the game thread takes winstrm's sections only inside winstrm calls), and the callback takes only
+  winstrm's sections and the gWinchanLock flag. Without TIME_KILL_SYNCHRONOUS winmm may still run one callback after
+  timeKillEvent returns; the join rules that out, a subset of the original's interleavings (the pump never touches
+  a closed winchan). (b) The handshake holds: `finished` / `detached` / `joining` / `used` change only under the
+  lock; a detached slot is touched only by its own thread, which frees it under the lock as its last act; reap()
+  joins only finished, non-detached, non-joining one-shots; the double join through a concurrent kill or reap was
+  the real bug (fixed). (c) The statistics are written only by the timer thread and read after SDL_WaitThread
+  (a join orders them) or by the thread itself (self-kill): no race. (d) The FP environment equals the original's:
+  winmm's timer thread is a new Windows thread as well, so both start with Windows' default x87 control word 0x27f
+  (53-bit, exceptions masked) and MXCSR 0x1f80; a D3D7 change of the x87 precision would only affect the thread that
+  created the device. bmxLog is two vfprintf calls on UCRT streams, each locked per stream (lines can interleave
+  between threads, never tear); crt.c's malloc is the UCRT's (thread-safe). (e) Cost: the callback averages 0.015 to
+  0.036 ms; SDL_DelayPrecise sleeps and spins only the last part of each 16 ms: acceptable, a power seam could use
+  SDL_DelayNS later. (f) gWinchanLock stays a plain flag as in the original (aligned 32-bit stores are atomic on
+  x86; the ported code reads it once per pump).
 - **Timer resolution**: timeGetTime has 1 ms resolution only while the multimedia timer holds the system timer at
   1 ms (the game calls timeEndPeriod right after timeSetEvent); GetTickCount steps ~15.6 ms (movie clock). SDL clocks
   are finer: the frame limiter and movie frame choice can differ by a tick. Not part of the simulation (fixed tick).

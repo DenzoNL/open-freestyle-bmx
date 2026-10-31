@@ -379,7 +379,9 @@ script replaces DirectInput itself, at the import: the loader's import shim for 
 falls back to the keyboard, as on a PC without a pad) and creates only the keyboard, whose state is the script's keys
 held at the current shown frame (`drvGpuShownFrames`, the counter of `BMX_SHOT_FRAME` / `BMX_QUIT_FRAMES`). Nothing
 real is read: a scripted run is the same with or without focus, and keys or pad input the user gives another program
-never reach it. Without `BMX_KEYS` the shim forwards to the real DirectInputCreateEx.
+never reach it. Without `BMX_KEYS` the shim forwards to the real DirectInputCreateEx. (Since S5 the stand-in
+DirectInput is src/platform/input.c for every run and the script is its keyboard source: "Input on SDL3"
+below.)
 
 A second shim, for `USER32.dll!MessageBoxA` (the slot 0x6997bc), answers the game's modal boxes in a scripted run:
 without it the main menu's QUIT hung the run in "Do you want to quit the game?" (and its `MB_SETFOREGROUND` would take
@@ -504,6 +506,65 @@ inputs natively once the replay exists; S1-S4 do not touch the simulation (a fix
 are identical to the previous commit's, so the expectation is "unchanged". (2) Pump interval of the hooked game: not
 needed, the test program compares our timer with the real winmm directly (mean 16.0 ms in both). (3) File bytes: not
 needed, `BMX_FILE_CHECK` compares with the real kernel32 in the same process.
+
+### Input on SDL3, the dual-read check and d-pad steering (S5, S6, 2026-10-31)
+
+docs/PLATFORM.md 4b has the design and the status. Since S5 every run gets the stand-in DirectInput
+(src/platform/input.c): keyboard and first pad on SDL3, numbered and scaled as DirectInput reports them, foreground
+semantics (no input while the window has no focus). `BMX_KEYS` is its keyboard source (no pad, focus ignored), so
+the recipes above work unchanged (ProQuest into Vail Trails rechecked: no trap, same frames). The S3 timer review is
+in PLATFORM.md 4a / 5 (four fixes).
+
+Switches: `BMX_INPUT_CHECK=1` repeats every DirectInput call of the game on the real dinput.dll and compares (log
+lines `inputcheck:`; summary at exit, last line `inputcheck: RESULT clean|MISMATCHES`); `BMX_CONFIG=<file>` names
+the config file (default `bmxnative.ini` next to the exe), whose only option so far is `[input] dpad_steering = 1`.
+Both need a focused window, so they are the user's tests (an agent must not take the focus):
+
+**Test A, vanilla input against real DirectInput** (DualSense attached before the start, by USB; Steam closed, its
+Steam Input can re-present the pad). PowerShell, a fresh window:
+
+```powershell
+cd C:\Users\Dennis\Games\dmfbmx\native-run
+copy save\SAVE.DAT save\SAVE.DAT.bak
+$env:BMX_INPUT_CHECK = "1"; $env:BMX_NO_MOVIES = "1"
+& <build>\native32\bmxnative.exe Scene.Txt -r640.480.16
+```
+
+1. The log (`<build>\native32\bmxnative.log`) starts with `input: pad "DualSense Wireless Controller" (VID 054c PID
+   0ce6, ...), buttons numbered as DualSense`, `inputcheck: DirectInput's first joystick: "DualSense Wireless
+   Controller" ...` and `device N info: ... (same); type 0x10404 / 0x10404`.
+2. Main menu, window focused. Keyboard, about half a second per key, never Esc (quits) or Enter, Alt, Win: the
+   arrows, E S F D W R 3 4, Space, then the letter rows Q..P, A..L, Z..M, the digits, Shift, Ctrl, the keypad.
+   Each gives `key DIK 0x.. down (ours: down)` / `up (ours: up)`.
+3. Pad, half a second each: Square, Cross, Circle, Triangle, L1, R1, L2 (slowly half way, then fully), R2, Create,
+   Options, L3, R3, PS, touchpad click, mute. Each gives `pad button k: DirectInput down, ours down` (expected k: 0,
+   1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14). Menus may move; that is fine.
+4. Left stick, slowly (about 3 s each way): centre to full right and back, full left, full up, full down; then a few
+   slow circles. `stick lX: DirectInput 1, ours 1 (our raw HID value 141, centre 127)` lines appear at the edges.
+   Right stick and d-pad once (informational only).
+5. Alt-tab to another window for 3 s with a key held, back again, then press a few keys and buttons.
+6. Quit: arrow down to QUIT, Enter, Yes in the box. Then `copy save\SAVE.DAT.bak save\SAVE.DAT`.
+
+Success: no `MISMATCH` line; `inputcheck: RESULT clean: 0 mismatches, 0 HRESULT differences` (a few HRESULT
+differences right at the alt-tab, i.e. SDL and DirectInput seeing the focus change one poll apart, are to be
+reported, not a failure in themselves); the four `X- / X+ / Y- / Y+ threshold` lines show the same numbers for
+DirectInput and ours, or a difference of one step. Repeat once with the pad on Bluetooth (checks that SDL leaves the
+pad's report mode alone: with the old default, DirectInput would see no input at all).
+
+**Test B, d-pad steering** (same window, then): create `C:\Users\Dennis\Games\dmfbmx\native-run\dpad.ini` with the
+two lines `[input]` and `dpad_steering = 1`, then
+
+```powershell
+$env:BMX_CONFIG = "C:\Users\Dennis\Games\dmfbmx\native-run\dpad.ini"
+copy save\SAVE.DAT save\SAVE.DAT.bak
+& <build>\native32\bmxnative.exe Scene.Txt -r640.480.16
+```
+
+The log has `config: input.dpad_steering = 1` and `input: d-pad steering on`. In the main menu the d-pad moves the
+selection like the stick (in test A it did nothing: vanilla). Freeride (or ProQuest) into a level: d-pad left /
+right steers, up / down act like the stick's up / down, the left stick still works; each d-pad change logs
+`input: d-pad 0x8 -> lX -127, lY 0` (0x1 up, 0x2 right, 0x4 down, 0x8 left). The check still ends `RESULT clean`
+(it compares the values before the d-pad is applied). Quit as above, restore the save, `Remove-Item Env:BMX_CONFIG`.
 
 ### Open points from the CRT layer (2026-10-28)
 

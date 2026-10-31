@@ -6,6 +6,7 @@
 #ifndef ZGE_COM_ZGLRW_ZRWMODELRENDER_H
 #define ZGE_COM_ZGLRW_ZRWMODELRENDER_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "compat/orig.h"
@@ -27,6 +28,12 @@ typedef struct ZrwRenderColTriangle {
     uint32_t drawPoint[3]; /* 0x50 the corners (offset by the normal) are marked in debug */
 } ZrwRenderColTriangle;
 
+_Static_assert(offsetof(ZrwRenderColTriangle, v1) == 0x10, "collision triangle");
+_Static_assert(offsetof(ZrwRenderColTriangle, v2) == 0x20, "collision triangle");
+_Static_assert(offsetof(ZrwRenderColTriangle, normal) == 0x30, "collision triangle");
+_Static_assert(offsetof(ZrwRenderColTriangle, tag) == 0x40, "collision triangle");
+_Static_assert(offsetof(ZrwRenderColTriangle, drawEdge) == 0x44, "collision triangle");
+_Static_assert(offsetof(ZrwRenderColTriangle, drawPoint) == 0x50, "collision triangle");
 _Static_assert(sizeof(ZrwRenderColTriangle) == 0x5c, "collision triangle");
 
 /* A node of the triangle tree (0x3c bytes): split nodes (types 2, 4, 8 split on x, y, z) and leaves (1). */
@@ -45,6 +52,12 @@ typedef struct ZrwRenderColNode {
     uint8_t pad34[8];
 } ZrwRenderColNode;
 
+_Static_assert(offsetof(ZrwRenderColNode, boxMin) == 0x04, "collision node");
+_Static_assert(offsetof(ZrwRenderColNode, boxMax) == 0x14, "collision node");
+_Static_assert(offsetof(ZrwRenderColNode, type) == 0x24, "collision node");
+_Static_assert(offsetof(ZrwRenderColNode, triangleCount) == 0x26, "collision node");
+_Static_assert(offsetof(ZrwRenderColNode, below) == 0x28, "collision node");
+_Static_assert(offsetof(ZrwRenderColNode, triangles) == 0x30, "collision node");
 _Static_assert(sizeof(ZrwRenderColNode) == 0x3c, "collision node");
 
 /* Result of zrwModelFindTriangle (kept in the exe's data): the triangle's corners and tag. */
@@ -60,6 +73,10 @@ typedef struct ZrwRenderColHit {
     uint32_t tag; /* 0x34 */
 } ZrwRenderColHit;
 
+_Static_assert(offsetof(ZrwRenderColHit, v0) == 0x04, "collision hit");
+_Static_assert(offsetof(ZrwRenderColHit, v1) == 0x14, "collision hit");
+_Static_assert(offsetof(ZrwRenderColHit, v2) == 0x24, "collision hit");
+_Static_assert(offsetof(ZrwRenderColHit, tag) == 0x34, "collision hit");
 _Static_assert(sizeof(ZrwRenderColHit) == 0x38, "collision hit");
 
 /* Result of zrwModelQuery (0x6737b0): a flag and a pointer to the hit list (0x672908). */
@@ -68,6 +85,8 @@ typedef struct ZrwRenderColQuery {
     uint8_t pad02[2];
     void *list;
 } ZrwRenderColQuery;
+
+_Static_assert(offsetof(ZrwRenderColQuery, list) == 0x04, "collision query");
 
 /* The tree's root (0x6728c4) and the "draw while searching" flag (0x672900). */
 #define gZrwColRoot  ORIG_VAR(0x006728c4, ZrwRenderColNode, gZrwColRoot)
@@ -114,9 +133,10 @@ void zrwColSearch(int mode, const ZrwRenderColNode *node, uint16_t *found, const
 /* The marked edges near `point` as a fresh query result, or NULL when there are none. */
 ZrwRenderColQuery *zrwModelQuery(const ZVec3 *point, float radius);
 
-/* Callbacks of RenderWare objects (they return the object). */
+/* Atomic render callbacks (they return the atomic); the first two chain to ZrwModelDef.atomicRender. */
 void *zrwModelRenderBillboard(void *object);
 void *zrwModelRenderCallback(void *object);
+/* RpClumpForAllAtomics callback of zrwModelRender: draws the atomic through immediate mode. */
 void *zrwModelRenderAtomic(void *atomic);
 void *zrwFrameDrawLines(void *frame, const ZVec3 *parentPosition);
 void zrwModelDrawFrames(const ZrwModel *model);

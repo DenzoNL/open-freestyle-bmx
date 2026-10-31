@@ -523,11 +523,11 @@ static ZrwModelDef *make_def(int sets)
     ZrwModelEntry *entries;
 
     def->flags = dt_u32();
-    def->flags2 = dt_u32();
-    def->partSetCount = (uint16_t)sets;
+    def->options = dt_u32();
+    def->lodCount = (uint16_t)sets;
     def->defaultKey = dt_u32();
-    for (int i = 0; i < 20; i++) {
-        def->name[i] = (char)dt_range('a', 'z');
+    for (int i = 0; i < 20; i++) { /* runs on into the path: the name need not be terminated */
+        ((char *)def + offsetof(ZrwModelDef, name))[i] = (char)dt_range('a', 'z');
     }
     def->entryCount = (uint16_t)dt_range(0, 6);
     entries = dt_alloc(sizeof *entries * 8);
@@ -548,7 +548,7 @@ static ZrwModelPart *make_parts(int count)
         parts[i].hash = small_hash();
         parts[i].frame = make_frame();
         parts[i].def = NULL;
-        random_vec((ZVec3 *)parts[i].offset);
+        random_vec((ZVec3 *)parts[i].restPos);
     }
     return parts;
 }
@@ -598,30 +598,30 @@ static ZrwModel *make_model(void)
         model->flags = dt_u32();
     }
     model->clump = make_clump();
-    model->clump2 = (dt_u32() % 3 == 0) ? NULL : make_clump();
+    model->collisionClump = (dt_u32() % 3 == 0) ? NULL : make_clump();
     random_vec(&model->position);
     random_vec(&model->scale);
     if (dt_u32() % 3 == 0) {
         model->scale.x = model->scale.y = model->scale.z = 1.0f;
     }
     random_quat(&model->rotation);
-    model->partSet = (uint16_t)(sets > 0 ? dt_range(0, sets - 1) : 0);
+    model->activeLod = (uint16_t)(sets > 0 ? dt_range(0, sets - 1) : 0);
     model->materials = make_materials();
     for (int i = 0; i < 3; i++) {
         const int count = dt_range(0, 4);
 
-        model->partSets[i].count = (uint32_t)count;
-        model->partSets[i].parts = make_parts(count);
-        model->partSets[i].pad08 = dt_u32();
+        model->lods[i].partCount = (uint32_t)count;
+        model->lods[i].parts = make_parts(count);
+        dt_fill(&model->lods[i].distance, sizeof model->lods[i].distance);
     }
     model->onUpdate = (dt_u32() & 1) ? stubOnUpdate : NULL;
     model->def = make_def(sets);
     if (dt_u32() & 1) {
         for (int i = 0; i < 3; i++) {
-            for (uint32_t k = 0; k < model->partSets[i].count; k++) {
+            for (uint32_t k = 0; k < model->lods[i].partCount; k++) {
                 ZrwPartDefTable *t = make_defs();
 
-                model->partSets[i].parts[k].def = &t->defs[dt_range(0, 5)];
+                model->lods[i].parts[k].def = &t->defs[dt_range(0, 5)];
             }
         }
     }
@@ -630,12 +630,12 @@ static ZrwModel *make_model(void)
 
 static ZrwModelPart *pick_part(const ZrwModel *model)
 {
-    const ZrwPartSet *set = &model->partSets[0];
+    const ZrwModelLod *set = &model->lods[0];
 
-    if (set->count == 0 || dt_u32() % 8 == 0) {
+    if (set->partCount == 0 || dt_u32() % 8 == 0) {
         return make_parts(1);
     }
-    return &set->parts[dt_u32() % set->count];
+    return &set->parts[dt_u32() % set->partCount];
 }
 
 static void begin(DtCtx *c, int stubFail)
@@ -983,7 +983,7 @@ DT_CASES(zrwmodel_cases) = {
     {"zrwClumpMaskGeometryFlags", 0x00487bf0, zrwClumpMaskGeometryFlags, 3, DT_RET_VOID, setup_clump_mask,
      300, 0},
     {"zrwModelSetInWorld", 0x00487c20, zrwModelSetInWorld, 2, DT_RET_VOID, setup_model_int, 600, 0},
-    {"zrwModelSetActive", 0x00487cd0, zrwModelSetActive, 2, DT_RET_VOID, setup_model_int, 600, 0},
+    {"zrwModelSetCollision", 0x00487cd0, zrwModelSetCollision, 2, DT_RET_VOID, setup_model_int, 600, 0},
     {"zrwMdlConstructor", 0x00487d90, zrwMdlConstructor, 1, DT_RET_INT, setup_plugin_ctor, 200, 0},
     {"zrwMdlDestructor", 0x00487db0, zrwMdlDestructor, 1, DT_RET_INT, setup_plugin_ctor, 50, 0},
     {"zrwMdlSetUserData", 0x00487dc0, zrwMdlSetUserData, 2, DT_RET_INT, setup_plugin_set, 200, 0},
@@ -998,7 +998,7 @@ DT_CASES(zrwmodel_cases) = {
     {"zrwModelPartToWorld", 0x004883a0, zrwModelPartToWorld, 5, DT_RET_VOID, setup_part_to_world, 2000, 0},
     {"zrwModelPartOffset", 0x00488480, zrwModelPartOffset, 3, DT_RET_VOID, setup_part_offset, 1000, 0},
     {"zrwModelPartMatrix", 0x004884b0, zrwModelPartMatrix, 4, DT_RET_VOID, setup_part_matrix, 300, 0},
-    {"zrwModelPartUserData", 0x004884f0, zrwModelPartUserData, 2, DT_RET_INT, setup_part_user, 100, 0},
+    {"zrwModelPartParent", 0x004884f0, zrwModelPartParent, 2, DT_RET_INT, setup_part_user, 100, 0},
     {"zrwModelEntryKey", 0x00488500, zrwModelEntryKey, 2, DT_RET_INT, setup_key, 200, 0},
     {"zrwModelEntryLookup", 0x00488520, zrwModelEntryLookup, 2, DT_RET_INT, setup_key, 400, 0},
     {"zrwModelSetPosition", 0x00488580, zrwModelSetPosition, 2, DT_RET_INT, setup_set_vec, 100, 0},
@@ -1010,11 +1010,11 @@ DT_CASES(zrwmodel_cases) = {
     {"zrwMdlGetUserData", 0x00488b80, zrwMdlGetUserData, 1, DT_RET_INT, setup_user_data, 200, 0},
     {"zrwModelSetUserValue", 0x00488ba0, zrwModelSetUserValue, 2, DT_RET_VOID, setup_model_value, 100, 0},
     {"zrwModelGetUserValue", 0x00488bb0, zrwModelGetUserValue, 1, DT_RET_INT, setup_model, 100, 0},
-    {"zrwModelRenderClump", 0x00488bc0, zrwModelRenderClump, 1, DT_RET_INT, setup_model, 100, 0},
+    {"zrwModelCollisionClump", 0x00488bc0, zrwModelCollisionClump, 1, DT_RET_INT, setup_model, 100, 0},
     {"zrwModelFindMaterial", 0x00488bd0, zrwModelFindMaterial, 2, DT_RET_INT, setup_find_material, 600, 0},
     {"zrwModelMaterialCount", 0x00488c30, zrwModelMaterialCount, 1, DT_RET_INT, setup_model, 100, 0},
     {"zrwModelGetMaterial", 0x00488c50, zrwModelGetMaterial, 2, DT_RET_INT, setup_get_material, 600, 0},
-    {"zrwModelSetUpdateHook", 0x00488ca0, zrwModelSetUpdateHook, 2, DT_RET_VOID, setup_update_hook, 100, 0},
+    {"zrwModelSetDrawColor", 0x00488ca0, zrwModelSetDrawColor, 2, DT_RET_VOID, setup_update_hook, 100, 0},
     {"zrwModelSetColor", 0x00488cc0, zrwModelSetColor, 2, DT_RET_VOID, setup_color, 400, 0},
     {"zrwObjDestroy", 0x00488d30, zrwObjDestroy, 1, DT_RET_INT, setup_destroy, 200, 0},
     {"zrwObjUpdate", 0x00488d60, zrwObjUpdate, 1, DT_RET_INT, setup_object, 100, 0},

@@ -352,7 +352,7 @@ int drvGpuPresent(struct SDL_GPUTexture *color, int32_t x, int32_t y, int32_t wi
     }
     if (quit != NULL && shownFrames >= SDL_atoi(quit)) {
         bmxLog("driver: BMX_QUIT_FRAMES reached after %d frames\n", shownFrames);
-        bmxTimerShutdown(); /* joins the sound timer thread; logs its statistics with BMX_TIMER_LOG */
+        bmxPlatformShutdown(); /* joins the sound timer thread; logs BMX_TIMER_LOG / BMX_INPUT_CHECK */
         ExitProcess(0);
     }
     return 1;

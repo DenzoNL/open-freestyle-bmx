@@ -800,9 +800,9 @@ static ZrwModel *make_model(void)
     *(uint32_t *)(def + 8) = dt_u32() % 6 == 0 ? 0 : (dt_u32() & 3) | 1;
     *(uint32_t *)(def + 0xb4) = (uint32_t)(uintptr_t)stubDrawHook;
     model->def = (ZrwModelDef *)def;
-    model->clump = clump;
+    model->clump = (void *)clump;
     *(void **)(clump + 4) = make_frame();
-    model->onUpdateArg = dt_u32();
+    model->color = dt_u32();
     gPluginOffset = 0x10;
     *(void **)(clump + 0x40) = plugin;
     *(void **)(plugin + gPluginOffset) = model;
@@ -818,7 +818,7 @@ static void setup_billboard(DtCtx *c)
     begin(c);
     DT_ORIG(0x00480d20, InitTablesFn)();
     model = make_model();
-    object = model->clump;
+    object = (uint8_t *)model->clump;
     gCameraFrame = make_frame();
     gCameraFrame->at.x = dt_float_edgy(-1.0f, 1.0f);
     gCameraFrame->at.z = dt_float_edgy(-1.0f, 1.0f);
@@ -885,7 +885,7 @@ static void setup_draw_frames(DtCtx *c)
         uint8_t *clump = dt_alloc(0x40);
 
         *(void **)(clump + 4) = dt_u32() % 5 == 0 ? NULL : make_frame();
-        model->clump = clump;
+        model->clump = (void *)clump;
     }
     DT_ARG_PTR(c, 0, model);
 }

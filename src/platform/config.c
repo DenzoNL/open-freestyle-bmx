@@ -1,0 +1,155 @@
+/*
+ * The config file (docs/PLATFORM.md P19, S6): bmxnative.ini next to the exe, or the file BMX_CONFIG names.
+ *
+ *   # comment            ; comment
+ *   [input]
+ *   dpad_steering = 1    -> key "input.dpad_steering"
+ *
+ * Read once, on the first query. A missing file means every option at its default (vanilla). Values are
+ * integers (decimal or 0x hex); unknown keys and bad lines are logged and ignored. Options that would change
+ * the simulation would have to go into replays (PLAN.md); none of the current ones does.
+ */
+#include <SDL3/SDL.h>
+
+#include "platform/platform.h"
+
+enum { kMaxEntries = 64, kKeyLen = 64, kValueLen = 128 };
+
+typedef struct Entry {
+    char key[kKeyLen];
+    char value[kValueLen];
+} Entry;
+
+static Entry gEntries[kMaxEntries];
+static int gCount, gLoaded;
+
+/* The keys this build knows (all off by default). */
+static const char *const kKnownKeys[] = {
+    "input.dpad_steering", /* P7: the d-pad also sets the stick axes */
+};
+
+static int known(const char *key)
+{
+    for (size_t i = 0; i < sizeof kKnownKeys / sizeof kKnownKeys[0]; i++) {
+        if (SDL_strcasecmp(kKnownKeys[i], key) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* Copies [begin, end) without surrounding blanks. */
+static void trimCopy(char *out, size_t size, const char *begin, const char *end)
+{
+    size_t n;
+
+    while (begin < end && (*begin == ' ' || *begin == '\t')) {
+        begin++;
+    }
+    while (end > begin && (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '\r')) {
+        end--;
+    }
+    n = (size_t)(end - begin) < size - 1 ? (size_t)(end - begin) : size - 1;
+    SDL_memcpy(out, begin, n);
+    out[n] = 0;
+}
+
+void bmxConfigLoadText(const char *text, const char *origin)
+{
+    char section[kKeyLen] = "";
+    int lineNo = 0;
+
+    gCount = 0;
+    gLoaded = 1;
+    for (const char *p = text; p != NULL && *p != 0;) {
+        const char *eol = SDL_strchr(p, '\n');
+        const char *end = eol != NULL ? eol : p + SDL_strlen(p);
+        const char *comment = p;
+        char name[kKeyLen], value[kValueLen];
+
+        lineNo++;
+        while (comment < end && *comment != '#' && *comment != ';') {
+            comment++;
+        }
+        trimCopy(name, sizeof name, p, comment);
+        if (name[0] == '[') {
+            char *close = SDL_strchr(name, ']');
+
+            if (close == NULL) {
+                bmxLog("config: %s:%d: bad section header\n", origin, lineNo);
+            } else {
+                *close = 0;
+                trimCopy(section, sizeof section, name + 1, close);
+            }
+        } else if (name[0] != 0) {
+            const char *eq = SDL_strchr(name, '=');
+
+            if (eq == NULL) {
+                bmxLog("config: %s:%d: expected key = value\n", origin, lineNo);
+            } else if (gCount == kMaxEntries) {
+                bmxLog("config: %s:%d: too many entries\n", origin, lineNo);
+            } else {
+                Entry *const e = &gEntries[gCount];
+                char key[kKeyLen];
+
+                trimCopy(key, sizeof key, name, eq);
+                trimCopy(value, sizeof value, eq + 1, name + SDL_strlen(name));
+                SDL_snprintf(e->key, sizeof e->key, "%s%s%s", section, section[0] ? "." : "", key);
+                SDL_snprintf(e->value, sizeof e->value, "%s", value);
+                if (!known(e->key)) {
+                    bmxLog("config: %s:%d: unknown key \"%s\" ignored\n", origin, lineNo, e->key);
+                } else {
+                    bmxLog("config: %s = %s\n", e->key, e->value);
+                    gCount++;
+                }
+            }
+        }
+        p = eol != NULL ? eol + 1 : NULL;
+    }
+}
+
+static void load(void)
+{
+    const char *path = SDL_getenv("BMX_CONFIG");
+    char *own = NULL;
+    void *text;
+
+    gLoaded = 1;
+    if (path == NULL || *path == 0) {
+        const char *base = SDL_GetBasePath();
+
+        if (base == NULL || SDL_asprintf(&own, "%sbmxnative.ini", base) < 0) {
+            return;
+        }
+        path = own;
+    }
+    text = SDL_LoadFile(path, NULL);
+    if (text == NULL) {
+        bmxLog("config: no %s, every option off\n", path);
+    } else {
+        bmxLog("config: %s\n", path);
+        bmxConfigLoadText(text, path);
+        SDL_free(text);
+    }
+    SDL_free(own);
+}
+
+int bmxConfigInt(const char *key, int fallback)
+{
+    if (!gLoaded) {
+        load();
+    }
+    for (int i = gCount - 1; i >= 0; i--) {
+        if (SDL_strcasecmp(gEntries[i].key, key) == 0) {
+            char *end;
+            const long v = SDL_strtol(gEntries[i].value, &end, 0);
+
+            if (end == gEntries[i].value || *end != 0) {
+                bmxLog("config: %s = \"%s\" is not a number, using %d\n", key, gEntries[i].value, fallback);
+                return fallback;
+            }
+            return (int)v;
+        }
+    }
+    return fallback;
+}

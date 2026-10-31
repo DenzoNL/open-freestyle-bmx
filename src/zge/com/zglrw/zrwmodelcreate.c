@@ -4,7 +4,6 @@
 #include <stddef.h>
 
 #include "compat/crt.h"
-#include "rw/rwcamera.h"
 #include "rw/rwclump.h"
 #include "rw/rwcore.h"
 #include "rw/rwmath.h"
@@ -12,31 +11,52 @@
 #include "rw/rwstream.h"
 #include "rw/rwtexture.h"
 #include "rw/rwworld.h"
-#include "zge/com/zglrw/zrwcol.h"
 #include "zge/com/zglrw/zrwmat.h"
 #include "zge/com/zglrw/zrwmodelrender.h"
-#include "zge/com/zglrw/zrwprim.h"
 #include "zge/com/zglrw/zrwtxr.h"
 #include "zge/zasset.h"
 #include "zge/zdebug.h"
 #include "zge/zfile.h"
-#include "zge/zgemods/zobjcamera.h"
-#include "zge/zgemods/zobjpemit.h"
 #include "zge/ziff.h"
 #include "zge/zlist.h"
 #include "zge/zmem.h"
-#include "zge/zobj.h"
 #include "zge/zquat.h"
 #include "zge/zstring.h"
 
-/* Declared by zrwzgl.h, which clashes with zrwmodel.h over the names of the scale globals. */
-int zrwGetParameter(int id, void *out, const void *extra);
-int zrwUnregisterUpdateFunction(struct ZrwUpdateNode *node);
-
 static const char kModelCreateFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwModelCreate.c";
 
+/* Chunk ids of a model file (four characters, read as a little endian word). */
+enum {
+    kChunkModl = 0x4c444f4d, /* "MODL" a model */
+    kChunkMdef = 0x4645444d, /* "MDEF" its definition (ZrwMdefHeader and the entries) */
+    kChunkMati = 0x4954414d, /* "MATI" a material */
+    kChunkMlod = 0x444f4c4d, /* "MLOD" a level of detail */
+    kChunkMldf = 0x46444c4d, /* "MLDF" the header of a level of detail (ZrwLodHeader) */
+    kChunkMcol = 0x4c4f434d, /* "MCOL" the collision clump */
+    kChunkMdff = 0x4646444d, /* "MDFF" a RenderWare clump stream */
+};
+
+/* The MDEF chunk's header. */
+typedef struct ZrwMdefHeader {
+    uint32_t options;    /* 0x00 kZrwModel* */
+    char name[0x10];     /* 0x04 */
+    uint32_t defaultKey; /* 0x14 */
+    uint32_t pad18[4];
+    uint32_t entryCount; /* 0x28 followed by that many ZrwModelEntry name / key pairs */
+} ZrwMdefHeader;
+
+/* The MLDF chunk. */
+typedef struct ZrwLodHeader {
+    uint32_t pad00;
+    float distance; /* 0x04 */
+} ZrwLodHeader;
+
+_Static_assert(offsetof(ZrwMdefHeader, defaultKey) == 0x14, "MDEF header");
+_Static_assert(sizeof(ZrwMdefHeader) == 0x2c, "MDEF header");
+_Static_assert(sizeof(ZrwLodHeader) == 8, "MLDF chunk");
+
 /* Default distances of the four levels of detail. */
-typedef float ZrwLodTable[4];
+typedef float ZrwLodTable[kZrwModelMaxLods];
 #define gZrwLodDefaults ORIG_VAR(0x00562cc4, ZrwLodTable, gZrwLodDefaults)
 
 typedef void *(BMX_CDECL *RwFrameCallback)(void *frame, void *data);
@@ -45,168 +65,10 @@ typedef void *(BMX_CDECL *RpAtomicCallback)(void *atomic, void *data);
 /* The same function called with a stray second argument (see zrwAtomicCountGeometry). */
 ORIG_FN(0x004b4720, int, RpGeometryGetNumTrianglesWithArg, (void *geometry, int vertices));
 
-/* The RenderWare memory interface: allocation at +0, free at +4. */
-typedef void *(BMX_CDECL *RwAllocFn)(uint32_t size);
-typedef void(BMX_CDECL *RwFreeFn)(void *block);
-
-/* Reference count of a model definition (+4). */
-#define defRefs(def) (*(uint32_t *)((uint8_t *)(def) + 4))
-
-static inline void *rwFrameOf(const void *clump)
-{
-    return *(void *const *)((const uint8_t *)clump + 4);
-}
-
-static inline ZrwPartSet *partSetOf(ZrwModel *model, uint32_t index)
-{
-    return (ZrwPartSet *)((uint8_t *)model + 0x54 + index * 12);
-}
-
-static inline float *lodOf(ZrwModel *model, uint32_t index)
-{
-    return (float *)((uint8_t *)model + 0x50 + index * 12);
-}
-
-/* ---- shadow sampler ----------------------------------------------------------------------------- */
-
-/* TODO(file): 0x49b3d0-0x49b520 are the roller's shadow (probably ngifzroller.c); the data file puts them
- * here. */
-BMX_ADDR(0x0049b3d0)
-int zrollerShadowDraw(void)
-{
-    if (gZrwShadowReady != 0) {
-        static const int8_t corner[4][2] = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
-        uint32_t count = 0;
-
-        for (uint32_t i = 0; i < kZrwShadowCells; i++) {
-            for (uint32_t j = 0; j < kZrwShadowCells; j++) {
-                ZrwShadowQuad *quad = &gZrwShadowQuads[count];
-                int complete = 1;
-
-                quad->head = gZrwShadowHead;
-                for (int c = 0; c < 4; c++) {
-                    const uint32_t index = (uint32_t)(corner[c][1] + (int)j) +
-                                           (uint32_t)(corner[c][0] + (int)i) * kZrwShadowGrid;
-                    if (gZrwShadowMiss[index] != 0) {
-                        complete = 0;
-                        break;
-                    }
-                    quad->corner[c] = &gZrwShadowVertices[index];
-                }
-                if (complete) {
-                    count++;
-                }
-            }
-        }
-        if (count != 0) {
-            zrwprimDrawQuads(0x4103, (const ZrwPrimQuad *)&gZrwShadowQuads[0], (int)count, 0);
-        }
-        gZrwShadowReady = 0;
-    }
-    return 1;
-}
-
-BMX_ADDR(0x0049b4e0)
-int zrollerShadowStop(void)
-{
-    if (gZrwShadowActive != 0) {
-        if (gZrwShadowNode != NULL) {
-            zrwUnregisterUpdateFunction(gZrwShadowNode);
-        }
-        gZrwShadowActive = 0;
-    }
-    return 1;
-}
-
-/*
- * Original quirk: the vertex position adds the hit point to a vector that is never set (a stack slot
- * right behind the hit record); it is taken as zero here.
- */
-BMX_ADDR(0x0049b520)
-void zrollerUpdateShadow(void *state)
-{
-    ZrwShadow *shadow = state;
-    ZVec3 position;
-    ZVec3 eye;
-    ZVec3 zero;
-    ZVec3 unset = {0.0f, 0.0f, 0.0f};
-    ZMatrix look;
-    ZMatrix frame;
-
-    if (gZrwShadowInit == 0) {
-        float world;
-        zrwGetParameter(1, &world, NULL);
-        const double doubled = (double)world + (double)world;
-        const float a = (float)(doubled * (double)0.5f);
-        const float b = (float)(doubled * (double)0.5f);
-        const float c = (float)(doubled * (double)0.2f);
-        const double step = doubled * (double)0.2f;
-
-        for (uint32_t i = 0; i < kZrwShadowGrid; i++) {
-            for (uint32_t j = 0; j < kZrwShadowGrid; j++) {
-                ZrwShadowPoint *p = &gZrwShadowOffsets[i * kZrwShadowGrid + j];
-                p->pos.x = (float)((double)i * (double)c - (double)a);
-                p->pos.z = 0.0f;
-                p->pos.y = (float)(((double)j * step - (double)b) * (double)-1.0f);
-            }
-        }
-        gZrwShadowScale = (float)((double)world * (double)0.1f);
-        gZrwShadowInit = 1;
-        gZrwShadowDouble = (float)doubled;
-    }
-
-    position = *zobjGetPosition((const void *)(uintptr_t)shadow->model->userValue);
-    zvec3Add(&eye, &position, &shadow->offset);
-    zobjLookAtMatrix(&look, &eye, &position);
-    zmatrixInvertRigid(&look, &look);
-    zero.x = 0.0f;
-    zero.y = 0.0f;
-    zero.z = 0.0f;
-    zmatrixIdentity(&frame);
-    frame.pos = position;
-    zmatrixCopyBasis(&frame, &look);
-    zmatrixTransformVector(&zero, &frame, &zero);
-    zmatrixTranslate(&frame, &frame, &zero);
-
-    for (uint32_t i = 0; i < kZrwShadowGrid; i++) {
-        for (uint32_t j = 0; j < kZrwShadowGrid; j++) {
-            const uint32_t k = i * kZrwShadowGrid + j;
-            ZVec3 probe = eye;
-            ZVec3 end;
-            ZrwColLineHit hit;
-
-            gZrwShadowMiss[k] = 1;
-            zmatrixTransformPoint(&gZrwShadowPoints[k].pos, &frame, &gZrwShadowOffsets[k].pos);
-            zvec3Lerp(&end, &probe, &gZrwShadowPoints[k].pos, 10.0f);
-            if (zrwcolQueryLine(&probe.x, &end.x, 1, NULL, &hit) != 0) {
-                ZrwShadowVertex *vertex = &gZrwShadowVertices[k];
-                double alpha;
-
-                zvec3Scale((ZVec3 *)hit.hit.normal, (ZVec3 *)hit.hit.normal, gZrwShadowScale);
-                zvec3Add(&vertex->pos, &unset, (ZVec3 *)hit.hit.normal);
-                vertex->u = (float)((double)i * (double)0.2f);
-                vertex->v = (float)((double)(5 - j) * (double)0.2f);
-                alpha = (double)probe.y - (double)unset.y;
-                alpha = alpha + (double)1450.0f;
-                alpha = alpha * (double)0.001f;
-                if (!(alpha >= (double)0.0f)) {
-                    alpha = (double)0.0f;
-                }
-                alpha = alpha * (double)128.0f;
-                const uint8_t level = (uint8_t)bmxFtol(alpha);
-                vertex->color[0] = level;
-                vertex->color[1] = level;
-                vertex->color[2] = level;
-                vertex->color[3] = level;
-                gZrwShadowMiss[k] = 0;
-            }
-        }
-    }
-    gZrwShadowReady = 1;
-}
-
 /* ---- decompression ------------------------------------------------------------------------------ */
 
+/* TODO(file): 0x49bd10 and 0x49c080 have no asserts; their "ZCOMPRES:" messages suggest a source file of
+ * their own between zrwShadow.c and zrwModelCreate.c. */
 #ifdef BMX_HOOK
 #define kHashDummy ((const uint8_t *)(uintptr_t)0x00562c04)
 #else
@@ -467,30 +329,10 @@ int zassetDecompress(int kind, const void *packed, uint32_t size, void *dest, ui
 
 /* ---- frames and clumps -------------------------------------------------------------------------- */
 
-BMX_ADDR(0x0049c570)
-void zobjDispatchEvents(ZObj *object)
-{
-    if (object->events == NULL || object->events->pending == NULL) {
-        return;
-    }
-    ZObjEvent *event = zlistFirst(object->events->pending);
-
-    while (event != NULL) {
-        if (object->events->handlers != NULL) {
-            ZObjHandler *handler = zlistFirst(object->events->handlers);
-
-            while (handler != NULL) {
-                if (handler->eventId == event->id && handler->kind == 1) {
-                    handler->fn(event);
-                }
-                handler = zlistNext(object->events->handlers);
-            }
-        }
-        zlistRemoveCurrent(object->events->pending);
-        event = zlistCurrent(object->events->pending);
-    }
-}
-
+/*
+ * RpClumpClone does not copy the frames' user data (the part hashes), so zrwModelCreateInstance parks it in
+ * each frame's matrix (at.x: low half, at.y: high half) for the clone and reads it back afterwards.
+ */
 BMX_ADDR(0x0049c6e0)
 void *zrwFrameUserDataToMatrix(void *frame, void *arg)
 {
@@ -515,16 +357,18 @@ void *zrwFrameMatrixToUserData(void *frame, void *arg)
     return frame;
 }
 
+/* Materials are matched by texture: the loader gave the model's ZrwMaterial and the RpMaterial the same one.
+ */
 BMX_ADDR(0x0049c880)
 void zrwModelSetRwInfo(ZrwModel *model)
 {
-    void *geometry;
+    RpGeometry *geometry;
 
     zrwMdlSetUserData(model->clump, (uint32_t)(uintptr_t)model);
-    if (model->clump2 != NULL) {
-        zrwMdlSetUserData(model->clump2, (uint32_t)(uintptr_t)model);
+    if (model->collisionClump != NULL) {
+        zrwMdlSetUserData(model->collisionClump, (uint32_t)(uintptr_t)model);
     }
-    geometry = *(void **)((uint8_t *)model->def + 0xb0);
+    geometry = model->def->geometry;
     for (void *material = zlistFirst(model->materials); material != NULL;
          material = zlistNext(model->materials)) {
         void *texture = zrwmatGetTexture(material, 0);
@@ -534,7 +378,7 @@ void zrwModelSetRwInfo(ZrwModel *model)
         int matched = 0;
 
         for (; index >= 0; index--) {
-            void *rpMaterial = RpGeometryGetMaterial(geometry, index);
+            RpMaterial *rpMaterial = RpGeometryGetMaterial(geometry, index);
 
             if (RpMaterialGetTexture(rpMaterial) == rwTexture) {
                 zrwmatSetTexture(material, rpMaterial);
@@ -551,7 +395,7 @@ void zrwModelSetRwInfo(ZrwModel *model)
 BMX_ADDR(0x0049c970)
 void *zrwAtomicCountGeometry(void *atomic, int *counts)
 {
-    void *geometry = *(void **)((uint8_t *)atomic + 0x1c);
+    RpGeometry *geometry = ((const RpAtomic *)atomic)->geometry;
 
     counts[0] += RpGeometryGetNumTriangles(geometry);
     counts[1] += RpGeometryGetNumVertices(geometry);
@@ -571,13 +415,13 @@ void *zrwFrameCollectFirst(void *object, void *out)
 BMX_ADDR(0x0049c9c0)
 void zrwClumpDump(void *clump)
 {
-    void *first = NULL;
+    RpAtomic *first = NULL;
     int counts[2];
-    void *geometry;
+    RpGeometry *geometry;
 
     RpClumpForAllAtomics(clump, BMX_FNPTR(RpAtomicCallback, 0x0049cc60, zrwFrameCollectFirst),
                          (void *)&first);
-    geometry = *(void **)((uint8_t *)first + 0x1c);
+    geometry = first->geometry;
     counts[0] = 0;
     counts[1] = 0;
     gZdebugPrint("Num atomics:%d (", RpClumpGetNumAtomics(clump));
@@ -586,19 +430,19 @@ void zrwClumpDump(void *clump)
     gZdebugPrint("Num triangles:%d\n", counts[0]);
     gZdebugPrint("Num vertices :%d\n", counts[1]);
     gZdebugPrint("Flags (Atomic0):");
-    if ((RpGeometryGetFlags(geometry) & 4) != 0) {
+    if ((RpGeometryGetFlags(geometry) & rpGEOMETRYTEXTURED) != 0) {
         gZdebugPrint(" rpGEOMETRYTEXTURED");
     }
-    if ((RpGeometryGetFlags(geometry) & 8) != 0) {
+    if ((RpGeometryGetFlags(geometry) & rpGEOMETRYPRELIT) != 0) {
         gZdebugPrint(" rpGEOMETRYPRELIT");
     }
-    if ((RpGeometryGetFlags(geometry) & 0x10) != 0) {
+    if ((RpGeometryGetFlags(geometry) & rpGEOMETRYNORMALS) != 0) {
         gZdebugPrint(" rpGEOMETRYNORMALS");
     }
-    if ((RpGeometryGetFlags(geometry) & 0x20) != 0) {
+    if ((RpGeometryGetFlags(geometry) & rpGEOMETRYLIGHT) != 0) {
         gZdebugPrint(" rpGEOMETRYLIGHT");
     }
-    if ((RpGeometryGetFlags(geometry) & 1) != 0) {
+    if ((RpGeometryGetFlags(geometry) & rpGEOMETRYTRISTRIP) != 0) {
         gZdebugPrint(" rpGEOMETRYTRISTRIP");
     }
     gZdebugPrint("\n");
@@ -613,7 +457,7 @@ void *zrwFrameDumpHierarchy(void *frame, void *model)
     if (entry == NULL) {
         gZdebugPrint("0x%x\n", key);
     } else {
-        gZdebugPrint("0x%x (%s)\n", key, (const char *)entry);
+        gZdebugPrint("0x%x (%s)\n", key, entry->name);
     }
     gZdebugIndent(1);
     RwFrameForAllChildren(frame, BMX_FNPTR(RwFrameCallback, 0x0049caf0, zrwFrameDumpHierarchy),
@@ -622,10 +466,11 @@ void *zrwFrameDumpHierarchy(void *frame, void *model)
     return frame;
 }
 
+/* The root frame's step of zrwFrameDumpHierarchy is inlined (as in the original). */
 BMX_ADDR(0x0049cb60)
 void zrwModelDumpHierarchy(const ZrwModel *model)
 {
-    void *frame = rwFrameOf(model->clump);
+    RwFrame *frame = RpClumpGetFrame(model->clump);
     uint32_t key;
     const ZrwModelEntry *entry;
 
@@ -636,7 +481,7 @@ void zrwModelDumpHierarchy(const ZrwModel *model)
     if (entry == NULL) {
         gZdebugPrint("0x%x\n", key);
     } else {
-        gZdebugPrint("0x%x (%s)\n", key, (const char *)entry);
+        gZdebugPrint("0x%x (%s)\n", key, entry->name);
     }
     gZdebugIndent(1);
     RwFrameForAllChildren(frame, BMX_FNPTR(RwFrameCallback, 0x0049caf0, zrwFrameDumpHierarchy),
@@ -655,76 +500,79 @@ void *zrwModelCreateFirstAtomic(void *clump)
     return first;
 }
 
+/* Fills a part from its frame; the hierarchy links are left to the caller. */
+static void initPart(ZrwModelPart *part, RwFrame *frame)
+{
+    const ZMatrix *matrix = RwFrameGetMatrix(frame);
+
+    part->hash = RwFrameGetUserData(frame);
+    part->def = NULL;
+    part->frame = frame;
+    part->restPos[0] = matrix->pos.x;
+    part->restPos[1] = matrix->pos.y;
+    part->restPos[2] = matrix->pos.z;
+}
+
 BMX_ADDR(0x0049cce0)
 void *zrwFrameBuildPartNode(void *frame, void *parentNode)
 {
-    ZrwPartNode *node = gZrwModelCreate.cursor;
-    ZrwPartNode *parent = parentNode;
-    ZMatrix *matrix;
+    ZrwModelPart *part = gZrwModelCreate.cursor;
+    ZrwModelPart *parent = parentNode;
 
-    gZrwModelCreate.cursor = node + 1;
-    matrix = RwFrameGetMatrix(frame);
-    node->hash = RwFrameGetUserData(frame);
-    node->def = NULL;
-    node->frame = frame;
-    node->pos[0] = matrix->pos.x;
-    node->pos[1] = matrix->pos.y;
-    node->pos[2] = matrix->pos.z;
-    node->parent = parent;
+    gZrwModelCreate.cursor = part + 1;
+    initPart(part, frame);
+    part->parent = parent;
     if (parent != NULL) {
-        node->sibling = parent->child;
-        parent->child = node;
+        part->sibling = parent->child;
+        parent->child = part;
     }
-    RwFrameForAllChildren(frame, BMX_FNPTR(RwFrameCallback, 0x0049cce0, zrwFrameBuildPartNode), node);
+    RwFrameForAllChildren(frame, BMX_FNPTR(RwFrameCallback, 0x0049cce0, zrwFrameBuildPartNode), part);
     return frame;
 }
 
-/* Allocates the part nodes of a frame hierarchy, fills them and returns the root. */
-static ZrwPartNode *buildPartTree(void *frame, int *count)
+/* Allocates the `count` parts of a frame hierarchy (count = RwFrameCount(frame)), fills them, returns the
+ * root. */
+static ZrwModelPart *newPartTree(RwFrame *frame, int count)
 {
-    ZrwPartNode *root;
-    ZMatrix *matrix;
-    const int n = RwFrameCount(frame);
+    const uint32_t size = (uint32_t)count * (uint32_t)sizeof(ZrwModelPart);
+    ZrwModelPart *root = zmemFill(zmemAlloc(size), 0, size);
 
-    *count = n;
-    root = zmemFill(zmemAlloc((uint32_t)n * 0x28), 0, (uint32_t)n * 0x28);
     gZrwModelCreate.cursor = root + 1;
-    matrix = RwFrameGetMatrix(frame);
-    root->hash = RwFrameGetUserData(frame);
-    root->def = NULL;
-    root->frame = frame;
-    root->pos[0] = matrix->pos.x;
-    root->pos[1] = matrix->pos.y;
-    root->pos[2] = matrix->pos.z;
+    initPart(root, frame);
     root->parent = NULL;
     RwFrameForAllChildren(frame, BMX_FNPTR(RwFrameCallback, 0x0049cce0, zrwFrameBuildPartNode), root);
     return root;
 }
 
+/*
+ * Only the first clump is cloned, and every level of detail of the instance gets the parts of that clone.
+ * The root frame's steps of zrwFrameUserDataToMatrix / zrwFrameMatrixToUserData are inlined (as in the
+ * original); the source model's child frames keep the user data in their matrices.
+ */
 BMX_ADDR(0x0049ce90)
 ZrwModel *zrwModelCreateInstance(const ZrwModel *model)
 {
     ZrwModel *instance;
-    void *frame;
+    RwFrame *frame;
     ZMatrix *matrix;
     uint32_t data;
-    void *cloneFrame;
+    RwFrame *cloneFrame;
 
-    if ((model->def->flags2 & 2) != 0) {
+    if ((model->def->options & kZrwModelSkinned) != 0) {
         gZdebugPrint("zrwModelCreateInstance: Not instancing skinned model - ReLoading\n");
-        return zrwModelLoadFromFile(&model->def->name[0x10]);
+        return zrwModelLoadFromFile(model->def->path);
     }
     instance = zmemFreeListAlloc(gZrwModelCreate.pool);
-    zmemCopy(instance, model, 0x8c);
-    defRefs(instance->def)++;
-    frame = rwFrameOf(model->clump);
+    zmemCopy(instance, model, sizeof *instance);
+    instance->def->refCount++;
+    frame = RpClumpGetFrame(model->clump);
     matrix = RwFrameGetMatrix(frame);
     data = RwFrameGetUserData(frame);
     matrix->at.x = (float)(data & 0xffff);
     matrix->at.y = (float)(data >> 16);
     RwFrameForAllChildren(frame, BMX_FNPTR(RwFrameCallback, 0x0049c6e0, zrwFrameUserDataToMatrix), NULL);
     instance->clump = RpClumpClone(model->clump);
-    cloneFrame = rwFrameOf(instance->clump);
+    cloneFrame = RpClumpGetFrame(instance->clump);
     matrix = RwFrameGetMatrix(cloneFrame);
     {
         const uint16_t high = (uint16_t)bmxFtol((double)matrix->at.y);
@@ -732,18 +580,19 @@ ZrwModel *zrwModelCreateInstance(const ZrwModel *model)
         RwFrameSetUserData(cloneFrame, ((uint32_t)high << 16) | (low & 0xffff));
     }
     RwFrameForAllChildren(cloneFrame, BMX_FNPTR(RwFrameCallback, 0x0049c7a0, zrwFrameMatrixToUserData), NULL);
-    RwFrameSetIdentity(rwFrameOf(instance->clump));
-    RwFrameSetIdentity(rwFrameOf(model->clump));
-    if (model->clump2 != NULL) {
-        instance->clump2 = RpClumpClone(model->clump2);
+    RwFrameSetIdentity(RpClumpGetFrame(instance->clump));
+    RwFrameSetIdentity(RpClumpGetFrame(model->clump));
+    if (model->collisionClump != NULL) {
+        instance->collisionClump = RpClumpClone(model->collisionClump);
     }
     zrwModelSetRwInfo(instance);
-    for (uint32_t i = 0; i < instance->def->partSetCount; i++) {
-        int count;
-        ZrwPartSet *set = partSetOf(instance, i);
+    for (uint32_t level = 0; level < instance->def->lodCount; level++) {
+        ZrwModelLod *lod = &instance->lods[level];
+        RwFrame *const root = RpClumpGetFrame(instance->clump);
+        const int count = RwFrameCount(root);
 
-        set->parts = (ZrwModelPart *)buildPartTree(rwFrameOf(instance->clump), &count);
-        set->count = (uint32_t)count;
+        lod->parts = newPartTree(root, count);
+        lod->partCount = (uint32_t)count;
     }
     instance->materials = zlistCreate(0x10);
     for (void *material = zlistFirst(model->materials); material != NULL;
@@ -752,16 +601,21 @@ ZrwModel *zrwModelCreateInstance(const ZrwModel *model)
         zrwmatRetainMaterial(material);
     }
     zrwModelSetInWorld(instance, 1);
-    if ((instance->def->flags2 & 0x40) == 0) {
-        zrwModelSetActive(instance, 1);
+    if ((instance->def->options & kZrwModelNoCollision) == 0) {
+        zrwModelSetCollision(instance, 1);
     }
     return instance;
 }
 
+/*
+ * The first level of detail's clump becomes the model's clump and its first atomic the definition's; every
+ * level's parts are built from that first clump's hierarchy. The clump memory is freed in any case.
+ */
 BMX_ADDR(0x0049d120)
 int zrwModelAddClump(ZrwModel *model, const uint32_t *memory, const char *imagePath, int collision)
 {
-    void *clump = NULL;
+    const RwMemory *const source = (const RwMemory *)memory;
+    RpClump *clump = NULL;
     void *stream;
 
     if (imagePath != NULL) {
@@ -775,82 +629,68 @@ int zrwModelAddClump(ZrwModel *model, const uint32_t *memory, const char *imageP
         clump = RpClumpStreamRead(stream);
     }
     RwStreamClose(stream, NULL);
-    ((RwFreeFn)(uintptr_t)RwOsGetMemoryInterface()->rwfree)((void *)(uintptr_t)memory[0]);
+    RwOsGetMemoryInterface()->rwfree(source->start);
     if (clump == NULL) {
         return 0;
     }
     if (collision == 1) {
-        model->clump2 = clump;
+        model->collisionClump = clump;
         return 1;
     }
     {
         ZrwModelDef *def = model->def;
-        void *frame;
+        RwFrame *frame;
         int count;
-        ZrwPartSet *set;
         uint32_t level;
 
-        gZrwModelCreate.lodClumps[def->partSetCount] = clump;
-        if (def->partSetCount == 0) {
+        gZrwModelCreate.lodClumps[def->lodCount] = clump;
+        if (def->lodCount == 0) {
             model->clump = clump;
-            RwFrameSetIdentity(rwFrameOf(clump));
+            RwFrameSetIdentity(RpClumpGetFrame(clump));
         }
-        if (model->def->partSetCount == 0) {
-            void *first = NULL;
+        if (model->def->lodCount == 0) {
+            RpAtomic *first = NULL;
 
             RpClumpForAllAtomics(clump, BMX_FNPTR(RpAtomicCallback, 0x0049cc60, zrwFrameCollectFirst),
                                  (void *)&first);
             model->def->atomic = first;
-            model->def->atomicInfo = *(void **)((uint8_t *)model->def->atomic + 0x4c);
-            model->def->geometry = *(void **)((uint8_t *)model->def->atomic + 0x1c);
+            model->def->atomicRender = model->def->atomic->renderCallBack;
+            model->def->geometry = model->def->atomic->geometry;
         }
-        level = model->def->partSetCount;
-        frame = rwFrameOf(model->clump);
+        level = model->def->lodCount;
+        frame = RpClumpGetFrame(model->clump);
         count = RwFrameCount(frame);
-        partSetOf(model, level)->count = (uint32_t)count;
+        model->lods[level].partCount = (uint32_t)count;
         {
-            ZrwPartNode *root;
-            ZMatrix *matrix;
+            ZrwModelPart *const parts = newPartTree(frame, count);
 
-            root = zmemFill(zmemAlloc((uint32_t)count * 0x28), 0, (uint32_t)count * 0x28);
-            gZrwModelCreate.cursor = root + 1;
-            matrix = RwFrameGetMatrix(frame);
-            root->hash = RwFrameGetUserData(frame);
-            root->def = NULL;
-            root->frame = frame;
-            root->pos[0] = matrix->pos.x;
-            root->pos[1] = matrix->pos.y;
-            root->pos[2] = matrix->pos.z;
-            root->parent = NULL;
-            RwFrameForAllChildren(frame, BMX_FNPTR(RwFrameCallback, 0x0049cce0, zrwFrameBuildPartNode), root);
-            set = partSetOf(model, model->def->partSetCount);
-            set->parts = (ZrwModelPart *)root;
+            model->lods[model->def->lodCount].parts = parts;
         }
-        model->def->partSetCount++;
-        if ((model->def->flags2 & 8) != 0) {
-            zrwClumpMaskGeometryFlags(clump, 0x20, 0);
+        model->def->lodCount++;
+        if ((model->def->options & kZrwModelUnlit) != 0) {
+            zrwClumpMaskGeometryFlags(clump, rpGEOMETRYLIGHT, 0);
         }
-        if ((model->def->flags2 & 0xc0) != 0) {
-            zrwClumpMaskAtomicFlags(clump, 1, 0);
+        if ((model->def->options & (kZrwModelNoCollision | kZrwModelCollisionClump)) != 0) {
+            zrwClumpMaskAtomicFlags(clump, rpATOMICCOLLISIONTEST, 0);
         }
-        if ((model->def->flags2 & 0xc0) == 0) {
-            zrwClumpMaskAtomicFlags(clump, 0, 1);
+        if ((model->def->options & (kZrwModelNoCollision | kZrwModelCollisionClump)) == 0) {
+            zrwClumpMaskAtomicFlags(clump, 0, rpATOMICCOLLISIONTEST);
         }
         zrwClumpDump(clump);
     }
     return 1;
 }
 
-/* Reads the MDFF clump chunk the reader is on into memory and loads it into the model. */
+/* Reads the MDFF clump chunk the reader is on into RenderWare memory and loads it into the model. */
 static int loadClumpChunk(void *iff, ZrwModel *model, int collision, int line)
 {
-    uint32_t memory[2];
+    RwMemory memory;
     const uint32_t size = ziffChunkSize(iff);
 
-    memory[0] = (uint32_t)(uintptr_t)((RwAllocFn)(uintptr_t)RwOsGetMemoryInterface()->rwmalloc)(size);
-    memory[1] = size;
-    ziffRead(iff, (void *)(uintptr_t)memory[0], size);
-    if (zrwModelAddClump(model, memory, NULL, collision) == 0) {
+    memory.start = RwOsGetMemoryInterface()->rwmalloc(size);
+    memory.length = size;
+    ziffRead(iff, memory.start, size);
+    if (zrwModelAddClump(model, (const uint32_t *)&memory, NULL, collision) == 0) {
         zdebugFail("Clump failed to load", kModelCreateFile, line, 0);
         gZdebugPrint("Clump failed to load\n");
         return 0;
@@ -861,24 +701,24 @@ static int loadClumpChunk(void *iff, ZrwModel *model, int collision, int line)
 BMX_ADDR(0x0049d350)
 int zrwModelLoadLod(void *iff, ZrwModel *model)
 {
-    if (model->def->partSetCount == 4) {
+    if (model->def->lodCount == kZrwModelMaxLods) {
         gZdebugPrint("Ignoring extra LOD in %s\n", model->def->name);
         return 0;
     }
     if (ziffBeginModel(iff) != 0) {
-        if (ziffFindChunk(iff, 0x46444c4d) != 0) {
-            uint32_t header[2];
+        if (ziffFindChunk(iff, kChunkMldf) != 0) {
+            ZrwLodHeader header;
             uint32_t level;
 
-            ziffRead(iff, header, 8);
-            *lodOf(model, model->def->partSetCount) = *(const float *)&header[1];
-            level = model->def->partSetCount;
+            ziffRead(iff, &header, sizeof header);
+            model->lods[model->def->lodCount].distance = header.distance;
+            level = model->def->lodCount;
             /* Zero or NaN (what the x87 compare against 0 reports as equal). */
-            if (!(*lodOf(model, level) < 0.0f || *lodOf(model, level) > 0.0f)) {
-                *lodOf(model, level) = gZrwLodDefaults[level];
+            if (!(model->lods[level].distance < 0.0f || model->lods[level].distance > 0.0f)) {
+                model->lods[level].distance = gZrwLodDefaults[level];
             }
         }
-        if (ziffFindChunk(iff, 0x4646444d) != 0) {
+        if (ziffFindChunk(iff, kChunkMdff) != 0) {
             loadClumpChunk(iff, model, 0, 0x3fc);
         }
         ziffEndModel(iff);
@@ -886,14 +726,15 @@ int zrwModelLoadLod(void *iff, ZrwModel *model)
     return 1;
 }
 
+/* The collision clump is never drawn but always tested, and it is in the world from the start. */
 BMX_ADDR(0x0049d4d0)
 int zrwModelLoadCollision(void *iff, ZrwModel *model)
 {
     if (ziffBeginModel(iff) != 0) {
-        if (ziffFindChunk(iff, 0x4646444d) != 0) {
+        if (ziffFindChunk(iff, kChunkMdff) != 0) {
             loadClumpChunk(iff, model, 1, 0x441);
-            zrwClumpMaskAtomicFlags(model->clump2, 4, 1);
-            RpWorldAddClump(gZrwWorld, model->clump2);
+            zrwClumpMaskAtomicFlags(model->collisionClump, rpATOMICRENDER, rpATOMICCOLLISIONTEST);
+            RpWorldAddClump(gZrwWorld, model->collisionClump);
         }
         ziffEndModel(iff);
     }
@@ -903,24 +744,24 @@ int zrwModelLoadCollision(void *iff, ZrwModel *model)
 BMX_ADDR(0x0049d5f0)
 int zrwModelReadDef(void *iff, ZrwModel *model)
 {
-    uint32_t block[11];
+    ZrwMdefHeader header;
 
-    if (ziffFindChunk(iff, 0x4645444d) == 0) {
+    if (ziffFindChunk(iff, kChunkMdef) == 0) {
         zdebugFail("Missing model def block", kModelCreateFile, 0x495, 0);
         return 0;
     }
-    ziffRead(iff, block, 0x2c);
-    zstrncpy(model->def->name, (const char *)&block[1], 0x10);
-    model->def->defaultKey = block[5];
-    model->def->flags2 = block[0];
-    model->def->entryCount = (uint16_t)block[10];
-    model->def->entries = zmemAlloc((block[10] & 0xffff) * 0x14);
+    ziffRead(iff, &header, sizeof header);
+    zstrncpy(model->def->name, header.name, sizeof model->def->name);
+    model->def->defaultKey = header.defaultKey;
+    model->def->options = header.options;
+    model->def->entryCount = (uint16_t)header.entryCount;
+    model->def->entries = zmemAlloc((header.entryCount & 0xffff) * (uint32_t)sizeof(ZrwModelEntry));
     for (int i = 0; i < model->def->entryCount; i++) {
-        uint8_t *entry = (uint8_t *)model->def->entries + i * 0x14;
+        ZrwModelEntry *entry = &model->def->entries[i];
 
-        ziffRead(iff, entry, 0x10);
-        ziffReadWordA(iff, entry + 0x10);
-        entry[0xf] = 0;
+        ziffRead(iff, entry->name, sizeof entry->name);
+        ziffReadWordA(iff, &entry->key);
+        entry->name[sizeof entry->name - 1] = 0;
     }
     gZdebugPrint("-------------------------------------------------\n");
     gZdebugPrint("Loading model:%s\n", model->def->name);
@@ -939,14 +780,14 @@ BMX_ADDR(0x0049d770)
 int zrwModelLoadMaterials(void *iff, ZrwModel *model)
 {
     void *previous = zrwmatSetMaterialHook(BMX_FNPTR(void *, 0x0049d750, zrwModelAddMaterial));
-    int found = ziffFindChunk(iff, 0x4954414d);
+    int found = ziffFindChunk(iff, kChunkMati);
 
     while (found != 0) {
         if (ziffDispatchChunk(iff, model) == 0) {
             zrwmatSetMaterialHook(previous);
             return 0;
         }
-        found = ziffNextChunk(iff, 0x4954414d);
+        found = ziffNextChunk(iff, kChunkMati);
     }
     zrwmatSetMaterialHook(previous);
     return 1;
@@ -964,48 +805,49 @@ int zrwModelLoad(void *iff)
 
     gZrwModelCreate.last = NULL;
     model = zmemFreeListAlloc(gZrwModelCreate.pool);
-    memset(model, 0, 0x8c);
-    *(uint32_t *)model &= 0xffffff00u;
-    model->def = zmemAlloc(0xbc);
-    memset(model->def, 0, 0xbc);
-    defRefs(model->def) = 1;
+    memset(model, 0, sizeof *model);
+    model->pad00 &= 0xffffff00u; /* the original clears this byte again after the memset */
+    model->def = zmemAlloc(sizeof *model->def);
+    memset(model->def, 0, sizeof *model->def);
+    model->def->refCount = 1;
     model->materials = zlistCreate(0x10);
     zquatIdentity(&model->rotation);
     model->scale.x = 1.0f;
     model->scale.y = 1.0f;
     model->scale.z = 1.0f;
-    model->onUpdateArg = 0xffffffffu;
+    model->color = 0xffffffffu;
     if (ziffBeginModel(iff) == 0) {
         return 0;
     }
     return zrwModelLoadTail(iff, model);
 }
 
+/* The MLOD and MCOL chunks reach zrwModelLoadLod / zrwModelLoadCollision through ziffDispatchChunk. */
 BMX_ADDR(0x0049d895)
 int zrwModelLoadTail(void *iff, ZrwModel *model)
 {
     zrwModelReadDef(iff, model);
     zrwModelLoadMaterials(iff, model);
     {
-        int found = ziffFindChunk(iff, 0x444f4c4d);
+        int found = ziffFindChunk(iff, kChunkMlod);
 
         while (found != 0 && ziffDispatchChunk(iff, model) != 0) {
-            found = ziffNextChunk(iff, 0x444f4c4d);
+            found = ziffNextChunk(iff, kChunkMlod);
         }
     }
-    if ((model->def->flags2 & 0x80) != 0 && ziffFindChunk(iff, 0x4c4f434d) != 0) {
+    if ((model->def->options & kZrwModelCollisionClump) != 0 && ziffFindChunk(iff, kChunkMcol) != 0) {
         ziffDispatchChunk(iff, model);
     }
     if (ziffEndModel(iff) == 0) {
         return 0;
     }
-    if ((model->def->flags2 & 2) != 0) {
+    if ((model->def->options & kZrwModelSkinned) != 0) {
         RpSkinClumpSetup(model->clump);
     }
     zrwModelSetDefaultRenderCallback(model);
-    if ((model->def->flags2 & 0x10) != 0) {
+    if ((model->def->options & kZrwModelFollowCamera) != 0) {
         zrwModelRenderRegister(model);
-    } else if ((model->def->flags2 & 4) == 0) {
+    } else if ((model->def->options & kZrwModelNotInWorld) == 0) {
         RpWorldAddClump(gZrwWorld, model->clump);
     }
     zrwModelSetRwInfo(model);
@@ -1022,15 +864,15 @@ int zrwModelCreateInitialize(void)
         zdebugFail("Already initialized", kModelCreateFile, 0x52d, 0);
     }
     memset(&gZrwModelCreate, 0, sizeof gZrwModelCreate);
-    gZrwModelCreate.pool =
-        zmemFreeListCreate(0x8c, 0x100, BMX_FNPTR(ZMemDestroyFn, 0x0049dcd0, (ZMemDestroyFn)zrwModelDestroy));
+    gZrwModelCreate.pool = zmemFreeListCreate(
+        sizeof(ZrwModel), 0x100, BMX_FNPTR(ZMemDestroyFn, 0x0049dcd0, (ZMemDestroyFn)zrwModelDestroy));
     gZrwModelCreate.initialized = 1;
-    ziffSetupCallback(0x4c444f4d, BMX_FNPTR(int(BMX_CDECL *)(void *), 0x0049d7e0, zrwModelLoad), 0);
+    ziffSetupCallback(kChunkModl, BMX_FNPTR(int(BMX_CDECL *)(void *), 0x0049d7e0, zrwModelLoad), 0);
     ziffSetupCallback(
-        0x444f4c4d,
+        kChunkMlod,
         BMX_FNPTR(int(BMX_CDECL *)(void *), 0x0049d350, (int(BMX_CDECL *)(void *))zrwModelLoadLod), 0);
     ziffSetupCallback(
-        0x4c4f434d,
+        kChunkMcol,
         BMX_FNPTR(int(BMX_CDECL *)(void *), 0x0049d4d0, (int(BMX_CDECL *)(void *))zrwModelLoadCollision), 0);
     return 1;
 }
@@ -1052,6 +894,7 @@ ZrwModel *zrwModelLoadFromChunk(void *iff)
     return gZrwModelCreate.last;
 }
 
+/* Original quirk: without a MODL chunk inside the block, the buffer itself comes back as the model. */
 BMX_ADDR(0x0049dab0)
 ZrwModel *zrwModelLoadFromBuffer(const uint32_t *buffer)
 {
@@ -1060,7 +903,7 @@ ZrwModel *zrwModelLoadFromBuffer(const uint32_t *buffer)
     void *iff;
     const void *result = buffer;
 
-    if (buffer[0] != 0x4c444f4d) {
+    if (buffer[0] != kChunkModl) {
         zdebugFail("Not a MODL", kModelCreateFile, 0x577, 0);
         return NULL;
     }
@@ -1074,7 +917,7 @@ ZrwModel *zrwModelLoadFromBuffer(const uint32_t *buffer)
         zdebugFail("Couldn't open MODL", kModelCreateFile, 0x57e, 0);
         return NULL;
     }
-    if (ziffFindChunk(iff, 0x4c444f4d) != 0) {
+    if (ziffFindChunk(iff, kChunkModl) != 0) {
         ziffDispatchChunk(iff, NULL);
         result = gZrwModelCreate.last;
     }
@@ -1083,6 +926,10 @@ ZrwModel *zrwModelLoadFromBuffer(const uint32_t *buffer)
     return (ZrwModel *)(uintptr_t)result;
 }
 
+/*
+ * zrwModelLoadFromBuffer on the file's contents, then the path is stored in the definition. Original quirk:
+ * without a MODL chunk inside, the path string comes back as the model (and gets the path written into it).
+ */
 BMX_ADDR(0x0049db90)
 ZrwModel *zrwModelLoadFromFile(const char *path)
 {
@@ -1095,7 +942,7 @@ ZrwModel *zrwModelLoadFromFile(const char *path)
         return NULL;
     }
     length = buffer[1];
-    if (buffer[0] == 0x4c444f4d) {
+    if (buffer[0] == kChunkModl) {
         ZfileHandle *file = zfileOpenRamDisk((uint32_t)(uintptr_t)buffer, length + 8);
 
         if (file == NULL) {
@@ -1108,7 +955,7 @@ ZrwModel *zrwModelLoadFromFile(const char *path)
                 zdebugFail("Couldn't open MODL", kModelCreateFile, 0x57e, 0);
                 result = NULL;
             } else {
-                if (ziffFindChunk(iff, 0x4c444f4d) != 0) {
+                if (ziffFindChunk(iff, kChunkModl) != 0) {
                     ziffDispatchChunk(iff, NULL);
                     result = gZrwModelCreate.last;
                 } else {
@@ -1124,7 +971,9 @@ ZrwModel *zrwModelLoadFromFile(const char *path)
     }
     zfileFreeBuffer(buffer);
     if (result != NULL) {
-        zstrncpy(&((const ZrwModel *)result)->def->name[0x10], path, 0x80);
+        ZrwModelDef *const def = ((const ZrwModel *)result)->def;
+
+        zstrncpy(def->path, path, sizeof def->path);
     }
     return (ZrwModel *)(uintptr_t)result;
 }
@@ -1136,6 +985,7 @@ int zrwModelNotCoded(void)
     return 0;
 }
 
+/* The textures are released only with the last model that uses the definition. */
 BMX_ADDR(0x0049dcd0)
 int zrwModelDestroy(ZrwModel *model)
 {
@@ -1147,16 +997,16 @@ int zrwModelDestroy(ZrwModel *model)
         }
         RpClumpDestroy(model->clump);
     }
-    if (model->clump2 != NULL) {
-        if (RpClumpGetWorld(model->clump2) != NULL) {
-            RpWorldRemoveClump(gZrwWorld, model->clump2);
+    if (model->collisionClump != NULL) {
+        if (RpClumpGetWorld(model->collisionClump) != NULL) {
+            RpWorldRemoveClump(gZrwWorld, model->collisionClump);
         }
-        RpClumpDestroy(model->clump2);
+        RpClumpDestroy(model->collisionClump);
     }
-    if ((model->def->flags2 & 0x10) != 0) {
+    if ((model->def->options & kZrwModelFollowCamera) != 0) {
         zrwModelRenderUnregister();
     }
-    references = defRefs(model->def);
+    references = model->def->refCount;
     for (void *material = zlistFirst(model->materials); material != NULL;
          material = zlistFirst(model->materials)) {
         if (references == 1) {
@@ -1166,11 +1016,11 @@ int zrwModelDestroy(ZrwModel *model)
         zlistRemoveCurrent(model->materials);
     }
     zlistDestroy(model->materials);
-    for (uint32_t i = 0; i < model->def->partSetCount; i++) {
-        zmemFree(partSetOf(model, i)->parts);
+    for (uint32_t level = 0; level < model->def->lodCount; level++) {
+        zmemFree(model->lods[level].parts);
     }
-    defRefs(model->def)--;
-    if (defRefs(model->def) == 0) {
+    model->def->refCount--;
+    if (model->def->refCount == 0) {
         zmemFree(model->def->entries);
         zmemFree(model->def);
     }
@@ -1184,11 +1034,12 @@ void zrwModelPrintUsage(void)
     gZdebugPrint("ZGLMODEL: Objects in use:%d\n", zmemFreeListUsedCount(gZrwModelCreate.pool));
 }
 
+/* zrwModelDumpHierarchy is inlined (as in the original). */
 BMX_ADDR(0x0049de60)
 void zrwModelDumpInfo(const ZrwModel *model)
 {
-    void *clump = model->clump;
-    void *frame;
+    RpClump *clump = model->clump;
+    RwFrame *frame;
     uint32_t key;
     const ZrwModelEntry *entry;
 
@@ -1197,7 +1048,7 @@ void zrwModelDumpInfo(const ZrwModel *model)
     gZdebugPrint("-------------------------------------------------\n");
     gZdebugIndent(1);
     zrwClumpDump(clump);
-    frame = rwFrameOf(model->clump);
+    frame = RpClumpGetFrame(model->clump);
     gZdebugPrint("HIERARCHY:-\n");
     gZdebugIndent(1);
     key = RwFrameGetUserData(frame);
@@ -1205,7 +1056,7 @@ void zrwModelDumpInfo(const ZrwModel *model)
     if (entry == NULL) {
         gZdebugPrint("0x%x\n", key);
     } else {
-        gZdebugPrint("0x%x (%s)\n", key, (const char *)entry);
+        gZdebugPrint("0x%x (%s)\n", key, entry->name);
     }
     gZdebugIndent(1);
     RwFrameForAllChildren(frame, BMX_FNPTR(RwFrameCallback, 0x0049caf0, zrwFrameDumpHierarchy),

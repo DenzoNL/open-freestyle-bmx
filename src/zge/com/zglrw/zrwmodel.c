@@ -14,6 +14,7 @@
 #include "zge/zdebug.h"
 #include "zge/ziff.h"
 #include "zge/zlist.h"
+#include "zge/zobj.h"
 #include "zge/zquat.h"
 
 static const char kZrwModelFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwModel.c";
@@ -26,12 +27,6 @@ int zrwModelCreateInitialize(void);
 int zrwModelCreateShutdown(void);
 void *zrwModelCreateFirstAtomic(void *clump);
 ORIG_FN(0x0048be30, void, zrwMatrixToGame, (void *out, const ZMatrix *matrix));
-
-/* Part sets are 12 bytes apart from +0x54; the index is a 16 bit field of the model, not range checked. */
-static ZrwPartSet *partSet(const ZrwModel *model, uint32_t index)
-{
-    return (ZrwPartSet *)((uint8_t *)model + offsetof(ZrwModel, partSets)) + index;
-}
 
 BMX_ADDR(0x00487ad0)
 ZrwModelEntry *zrwModelFindEntry(const ZrwModel *model, int key)
@@ -49,10 +44,11 @@ ZrwModelEntry *zrwModelFindEntry(const ZrwModel *model, int key)
 BMX_ADDR(0x00487b60)
 void *zrwAtomicMaskFlags(void *atomic, const uint32_t *mask)
 {
-    uint8_t *bytes = atomic;
+    RpAtomic *const rpAtomic = atomic;
 
-    bytes[2] = (uint8_t)(((uint8_t)mask[0] & bytes[2]) | (uint8_t)mask[1]);
-    bytes[0x14]++;
+    rpAtomic->object.object.flags =
+        (uint8_t)(((uint8_t)mask[0] & rpAtomic->object.object.flags) | (uint8_t)mask[1]);
+    rpAtomic->stamp++;
     return atomic;
 }
 
@@ -67,7 +63,7 @@ void zrwClumpMaskAtomicFlags(void *clump, uint32_t clear, uint32_t set)
 BMX_ADDR(0x00487bc0)
 void *zrwAtomicMaskGeometryFlags(void *atomic, const uint32_t *mask)
 {
-    void *geometry = *(void **)((uint8_t *)atomic + 0x1c);
+    RpGeometry *const geometry = ((const RpAtomic *)atomic)->geometry;
     const uint32_t flags = RpGeometryGetFlags(geometry);
 
     RpGeometrySetFlags(geometry, (mask[0] & flags) | mask[1]);
@@ -82,8 +78,8 @@ void zrwClumpMaskGeometryFlags(void *clump, uint32_t clear, uint32_t set)
     RpClumpForAllAtomics(clump, BMX_FNPTR(RpAtomicCallback, 0x00487bc0, zrwAtomicMaskGeometryFlags), mask);
 }
 
-/* Masks the atomic flags of a clump with the given (keep, set) words. */
-static void maskAtomics(void *clump, uint32_t keep, uint32_t set)
+/* zrwClumpMaskAtomicFlags with the mask given as (keep, set), the way the original inlines it. */
+static void maskAtomics(RpClump *clump, uint32_t keep, uint32_t set)
 {
     uint32_t mask[2] = {keep, set};
 
@@ -95,9 +91,9 @@ static void worldRemove(const ZrwModel *model)
     if (RpClumpGetWorld(model->clump) != NULL) {
         RpWorldRemoveClump(gZrwWorld, model->clump);
     }
-    if (model->clump2 != NULL) {
-        if (RpClumpGetWorld(model->clump2) != NULL) {
-            RpWorldRemoveClump(gZrwWorld, model->clump2);
+    if (model->collisionClump != NULL) {
+        if (RpClumpGetWorld(model->collisionClump) != NULL) {
+            RpWorldRemoveClump(gZrwWorld, model->collisionClump);
         }
     }
 }
@@ -107,9 +103,9 @@ static void worldAdd(const ZrwModel *model)
     if (RpClumpGetWorld(model->clump) == NULL) {
         RpWorldAddClump(gZrwWorld, model->clump);
     }
-    if (model->clump2 != NULL) {
-        if (RpClumpGetWorld(model->clump2) == NULL) {
-            RpWorldAddClump(gZrwWorld, model->clump2);
+    if (model->collisionClump != NULL) {
+        if (RpClumpGetWorld(model->collisionClump) == NULL) {
+            RpWorldAddClump(gZrwWorld, model->collisionClump);
         }
     }
 }
@@ -125,28 +121,34 @@ void zrwModelSetInWorld(const ZrwModel *model, int add)
 }
 
 BMX_ADDR(0x00487cd0)
-void zrwModelSetActive(const ZrwModel *model, int on)
+void zrwModelSetCollision(const ZrwModel *model, int on)
 {
     if (on == 0) {
-        if (model->clump2 == NULL) {
-            maskAtomics(model->clump, 0xfffffffe, 0);
-        } else if (RpClumpGetWorld(model->clump2) != NULL) {
-            RpWorldRemoveClump(gZrwWorld, model->clump2);
+        if (model->collisionClump == NULL) {
+            maskAtomics(model->clump, ~(uint32_t)rpATOMICCOLLISIONTEST, 0);
+        } else if (RpClumpGetWorld(model->collisionClump) != NULL) {
+            RpWorldRemoveClump(gZrwWorld, model->collisionClump);
         }
     } else {
-        if (model->clump2 == NULL) {
-            maskAtomics(model->clump, 0xffffffff, 1);
-        } else if (RpClumpGetWorld(model->clump2) == NULL) {
-            RpWorldAddClump(gZrwWorld, model->clump2);
+        if (model->collisionClump == NULL) {
+            maskAtomics(model->clump, 0xffffffff, rpATOMICCOLLISIONTEST);
+        } else if (RpClumpGetWorld(model->collisionClump) == NULL) {
+            RpWorldAddClump(gZrwWorld, model->collisionClump);
         }
     }
+}
+
+/* The model slot the plugin adds to every clump; its offset is only known once the plugin is registered. */
+static uint32_t *mdlSlot(void *clump)
+{
+    return (uint32_t *)((uint8_t *)clump + gZrwMdlPluginOffset);
 }
 
 BMX_ADDR(0x00487d90)
 void *zrwMdlConstructor(void *clump)
 {
     if (gZrwMdlPluginOffset > 0) {
-        *(uint32_t *)((uint8_t *)clump + gZrwMdlPluginOffset) = 0;
+        *mdlSlot(clump) = 0;
     }
     return clump; /* the plugin registry treats NULL as failure */
 }
@@ -163,7 +165,7 @@ int zrwMdlSetUserData(void *clump, uint32_t value)
     if (gZrwMdlPluginOffset < 1) {
         return 0;
     }
-    *(uint32_t *)((uint8_t *)clump + gZrwMdlPluginOffset) = value;
+    *mdlSlot(clump) = value;
     return 1;
 }
 
@@ -200,22 +202,22 @@ static void quatTerms(const ZQuat *quat, QuatTerms *t)
     t->zz = t->zs * t->q.z;
 }
 
+/* Only the 3x3 rotation is written; the position and flags are left to RwMatrixUpdate. */
 BMX_ADDR(0x00487e70)
 void zrwQuatToMatrix(const ZQuat *quat, ZMatrix *out)
 {
     QuatTerms t;
-    float *m = (float *)out;
 
     quatTerms(quat, &t);
-    m[0] = (float)(1.0 - (t.zz + (double)t.yy));
-    m[1] = (float)((double)t.xy + t.zw);
-    m[2] = (float)((double)t.xz - t.yw);
-    m[4] = (float)((double)t.xy - t.zw);
-    m[5] = (float)(1.0 - (t.zz + (double)t.xx));
-    m[6] = (float)((double)t.yz + t.xw);
-    m[8] = (float)((double)t.xz + t.yw);
-    m[9] = (float)((double)t.yz - t.xw);
-    m[10] = (float)(1.0 - ((double)t.yy + (double)t.xx));
+    out->right.x = (float)(1.0 - (t.zz + (double)t.yy));
+    out->right.y = (float)((double)t.xy + t.zw);
+    out->right.z = (float)((double)t.xz - t.yw);
+    out->up.x = (float)((double)t.xy - t.zw);
+    out->up.y = (float)(1.0 - (t.zz + (double)t.xx));
+    out->up.z = (float)((double)t.yz + t.xw);
+    out->at.x = (float)((double)t.xz + t.yw);
+    out->at.y = (float)((double)t.yz - t.xw);
+    out->at.z = (float)(1.0 - ((double)t.yy + (double)t.xx));
     RwMatrixUpdate(out);
 }
 
@@ -223,18 +225,17 @@ BMX_ADDR(0x00487fc0)
 void zrwQuatToMatrixMirrored(const ZQuat *quat, ZMatrix *out)
 {
     QuatTerms t;
-    float *m = (float *)out;
 
     quatTerms(quat, &t);
-    m[0] = (float)(1.0 - (t.zz + (double)t.yy));
-    m[1] = (float)(-((double)t.xy + t.zw));
-    m[2] = (float)(-((double)t.xz - t.yw));
-    m[4] = (float)(-((double)t.xy - t.zw));
-    m[5] = (float)(1.0 - (t.zz + (double)t.xx));
-    m[6] = (float)((double)t.yz + t.xw);
-    m[8] = (float)(-((double)t.xz + t.yw));
-    m[9] = (float)((double)t.yz - t.xw);
-    m[10] = (float)(1.0 - ((double)t.yy + (double)t.xx));
+    out->right.x = (float)(1.0 - (t.zz + (double)t.yy));
+    out->right.y = (float)(-((double)t.xy + t.zw));
+    out->right.z = (float)(-((double)t.xz - t.yw));
+    out->up.x = (float)(-((double)t.xy - t.zw));
+    out->up.y = (float)(1.0 - (t.zz + (double)t.xx));
+    out->up.z = (float)((double)t.yz + t.xw);
+    out->at.x = (float)(-((double)t.xz + t.yw));
+    out->at.y = (float)((double)t.yz - t.xw);
+    out->at.z = (float)(1.0 - ((double)t.yy + (double)t.xx));
     RwMatrixUpdate(out);
 }
 
@@ -277,13 +278,13 @@ int zrwModelSystemShutdown(void)
 BMX_ADDR(0x00488250)
 void zrwModelMatchParts(ZrwModel *model, const ZrwPartDefTable *table)
 {
-    const uint32_t sets = model->def->partSetCount;
+    const uint32_t lodCount = model->def->lodCount;
 
-    for (uint32_t set = 0; set < sets; set++) {
-        const ZrwPartSet *parts = partSet(model, set);
+    for (uint32_t level = 0; level < lodCount; level++) {
+        const ZrwModelLod *lod = &model->lods[level];
 
-        for (uint32_t i = 0; i < parts->count; i++) {
-            ZrwModelPart *part = &parts->parts[i];
+        for (uint32_t i = 0; i < lod->partCount; i++) {
+            ZrwModelPart *part = &lod->parts[i];
             const uint32_t hash = part->hash;
             uint32_t k = 0;
 
@@ -305,27 +306,27 @@ void zrwModelMatchParts(ZrwModel *model, const ZrwPartDefTable *table)
 BMX_ADDR(0x00488310)
 int zrwModelPartCount(const ZrwModel *model)
 {
-    return (int)model->partSets[0].count;
+    return (int)model->lods[0].partCount;
 }
 
 BMX_ADDR(0x00488320)
 void zrwModelGetPartHashes(const ZrwModel *model, uint32_t *out)
 {
-    const ZrwPartSet *set = &model->partSets[0];
+    const ZrwModelLod *lod = &model->lods[0];
 
-    for (uint32_t i = 0; i < set->count; i++) {
-        out[i] = set->parts[i].hash;
+    for (uint32_t i = 0; i < lod->partCount; i++) {
+        out[i] = lod->parts[i].hash;
     }
 }
 
 BMX_ADDR(0x00488350)
 ZrwModelPart *zrwModelFindPart(const ZrwModel *model, uint32_t hash)
 {
-    const ZrwPartSet *set = &model->partSets[0];
+    const ZrwModelLod *lod = &model->lods[0];
 
-    for (uint32_t i = 0; i < set->count; i++) {
-        if (set->parts[i].hash == hash) {
-            return &set->parts[i];
+    for (uint32_t i = 0; i < lod->partCount; i++) {
+        if (lod->parts[i].hash == hash) {
+            return &lod->parts[i];
         }
     }
     gZdebugPrint("Part (0x%x)not found in model:%s\n", hash, model->def->name);
@@ -357,9 +358,9 @@ void zrwModelPartToWorld(const ZrwModel *model, const ZrwModelPart *part, const 
 BMX_ADDR(0x00488480)
 void zrwModelPartOffset(const ZrwModel *model, const ZrwModelPart *part, ZVec3 *out)
 {
-    out->x = (float)((double)part->offset[0] * gZrwInvScale);
-    out->y = (float)-((double)part->offset[1] * gZrwInvScale);
-    out->z = (float)-((double)part->offset[2] * gZrwInvScale);
+    out->x = (float)((double)part->restPos[0] * gZrwInvScale);
+    out->y = (float)-((double)part->restPos[1] * gZrwInvScale);
+    out->z = (float)-((double)part->restPos[2] * gZrwInvScale);
 }
 
 BMX_ADDR(0x004884b0)
@@ -371,9 +372,9 @@ void zrwModelPartMatrix(const ZrwModel *model, const ZrwModelPart *part, void *o
 }
 
 BMX_ADDR(0x004884f0)
-uint32_t zrwModelPartUserData(const ZrwModel *model, const ZrwModelPart *part)
+uint32_t zrwModelPartParent(const ZrwModel *model, const ZrwModelPart *part)
 {
-    return part->userData;
+    return (uint32_t)(uintptr_t)part->parent;
 }
 
 /* Key of an entry: the one given, or the model's default key. */
@@ -386,7 +387,7 @@ uint32_t zrwModelEntryKey(const ZrwModel *model, const uint32_t *key)
     return *key;
 }
 
-/* Entry with the given key; without a key the model's name (at def + 0x14) comes back instead. */
+/* Entry with the given key; without a key the model's name comes back instead. */
 BMX_ADDR(0x00488520)
 void *zrwModelEntryLookup(const ZrwModel *model, const uint32_t *key)
 {
@@ -433,13 +434,18 @@ int zrwModelSetScale(ZrwModel *model, const ZVec3 *scale)
     return 1;
 }
 
+/*
+ * The root frame is reset to the identity, the matched parts of the active level of detail are posed (their
+ * definition's rotation, their rest position plus the definition's offset; the root frame is a part too),
+ * then the root frame gets the model's rotation and scale and the model position is added to its
+ * translation. The collision clump's frame copies the result.
+ */
 BMX_ADDR(0x00488650)
 int zrwModelUpdate(ZrwModel *model)
 {
-    void *clump = model->clump;
-    ZMatrix *matrix;
+    RpClump *const clump = model->clump;
+    ZMatrix *root;
     float x, y, z;
-    uint32_t *m;
 
     if ((gZrwFlags & 2) == 0) {
         zrwQuatToMatrix(&model->rotation, gZrwModelState.matrix);
@@ -454,54 +460,53 @@ int zrwModelUpdate(ZrwModel *model)
 
         RwMatrixScale(gZrwModelState.matrix, &scale, 1);
     }
-    matrix = RwFrameGetMatrix(((void **)clump)[1]);
-    m = (uint32_t *)matrix;
-    m[10] = 0x3f800000;
-    m[5] = 0x3f800000;
-    m[0] = 0x3f800000;
-    m[4] = 0;
-    m[2] = 0;
-    m[1] = 0;
-    m[9] = 0;
-    m[8] = 0;
-    m[6] = 0;
-    m[14] = 0;
-    m[13] = 0;
-    m[12] = 0;
-    m[3] |= 0x20003;
+    root = RwFrameGetMatrix(RpClumpGetFrame(clump));
+    root->at.z = 1.0f;
+    root->up.y = 1.0f;
+    root->right.x = 1.0f;
+    root->up.x = 0;
+    root->right.z = 0;
+    root->right.y = 0;
+    root->at.y = 0;
+    root->at.x = 0;
+    root->up.z = 0;
+    root->pos.z = 0;
+    root->pos.y = 0;
+    root->pos.x = 0;
+    root->flags |= 0x20003;
     if (model->flags & 2) {
-        const ZrwPartSet *set = partSet(model, model->partSet);
-        ZrwModelPart *part = set->parts;
+        const ZrwModelLod *lod = &model->lods[model->activeLod];
+        ZrwModelPart *part = lod->parts;
 
-        for (uint32_t i = set->count; i != 0; i--, part++) {
+        for (uint32_t i = lod->partCount; i != 0; i--, part++) {
             ZrwPartDef *def = part->def;
 
             if (def != NULL) {
                 ZMatrix *partMatrix = RwFrameGetMatrix(part->frame);
 
                 zrwQuatToMatrix(&def->rotation, partMatrix);
-                partMatrix->pos.x = (float)((double)def->offset[0] * gZrwScale + part->offset[0]);
-                partMatrix->pos.y = (float)((double)part->offset[1] - (double)def->offset[1] * gZrwScale);
-                partMatrix->pos.z = (float)((double)part->offset[2] - (double)def->offset[2] * gZrwScale);
+                partMatrix->pos.x = (float)((double)def->offset[0] * gZrwScale + part->restPos[0]);
+                partMatrix->pos.y = (float)((double)part->restPos[1] - (double)def->offset[1] * gZrwScale);
+                partMatrix->pos.z = (float)((double)part->restPos[2] - (double)def->offset[2] * gZrwScale);
             }
         }
     }
-    RwMatrixMultiply(gZrwModelState.scratch, matrix, gZrwModelState.matrix);
-    gZrwModelState.scratch->pos.x = (float)((double)matrix->pos.x + x);
-    gZrwModelState.scratch->pos.y = (float)((double)matrix->pos.y + y);
-    gZrwModelState.scratch->pos.z = (float)((double)matrix->pos.z + z);
-    memcpy(matrix, gZrwModelState.scratch, sizeof *matrix);
-    RwFrameUpdateObjects(((void **)clump)[1]);
-    if (model->def->flags2 & 2) {
+    RwMatrixMultiply(gZrwModelState.scratch, root, gZrwModelState.matrix);
+    gZrwModelState.scratch->pos.x = (float)((double)root->pos.x + x);
+    gZrwModelState.scratch->pos.y = (float)((double)root->pos.y + y);
+    gZrwModelState.scratch->pos.z = (float)((double)root->pos.z + z);
+    memcpy(root, gZrwModelState.scratch, sizeof *root);
+    RwFrameUpdateObjects(RpClumpGetFrame(clump));
+    if (model->def->options & kZrwModelSkinned) {
         RpSkinClumpUpdate(clump);
     }
     if (model->onUpdate != NULL) {
         model->onUpdate(model);
     }
-    if (model->clump2 != NULL) {
-        void *frame = ((void **)model->clump2)[1];
+    if (model->collisionClump != NULL) {
+        RwFrame *frame = RpClumpGetFrame(model->collisionClump);
 
-        memcpy(RwFrameGetMatrix(frame), matrix, sizeof *matrix);
+        memcpy(RwFrameGetMatrix(frame), root, sizeof *root);
         RwFrameUpdateObjects(frame);
     }
     return 1;
@@ -517,27 +522,30 @@ int zrwMdlRegisterPlugin(void)
 }
 
 /*
- * Turns model states off (`clear`) and on (`set`). The bit 4 blocks only touch the second clump; bit 2 puts
- * the clumps in or takes them out of the world; bit 8 shows or hides them; bit 1 marks the definition and all
- * atomics with flag 0x80.
+ * Turns model states off (`clear`) and on (`set`). Bit 4 shows or hides the collision clump (both of its
+ * blocks only touch that clump; the first also keeps it colliding); bit 2 puts the clumps in or takes them
+ * out of the world; bit 8 is zrwModelSetCollision, except that it clears through zrwClumpMaskAtomicFlags;
+ * bit 1 marks the definition and all atomics with flag 0x80.
  */
 BMX_ADDR(0x004888c0)
 int zrwModelSetFlags(const ZrwModel *model, uint8_t clear, uint8_t set)
 {
-    if (model->clump2 != NULL) {
+    const uint32_t keepOthers = ~(uint32_t)(rpATOMICRENDER | rpATOMICCOLLISIONTEST);
+
+    if (model->collisionClump != NULL) {
         if (clear & 4) {
-            maskAtomics(model->clump2, 0xfffffffa, 1);
+            maskAtomics(model->collisionClump, keepOthers, rpATOMICCOLLISIONTEST);
         }
         if (set & 4) {
-            maskAtomics(model->clump2, 0xfffffffa, 5);
+            maskAtomics(model->collisionClump, keepOthers, rpATOMICRENDER | rpATOMICCOLLISIONTEST);
         }
     }
-    if (model->clump2 != NULL) {
+    if (model->collisionClump != NULL) {
         if (clear & 4) {
-            maskAtomics(model->clump2, 0xfffffffb, 0);
+            maskAtomics(model->collisionClump, ~(uint32_t)rpATOMICRENDER, 0);
         }
         if (set & 4) {
-            maskAtomics(model->clump2, 0xffffffff, 4);
+            maskAtomics(model->collisionClump, 0xffffffff, rpATOMICRENDER);
         }
     }
     if (clear & 2) {
@@ -547,44 +555,43 @@ int zrwModelSetFlags(const ZrwModel *model, uint8_t clear, uint8_t set)
         worldAdd(model);
     }
     if (clear & 8) {
-        if (model->clump2 == NULL) {
-            zrwClumpMaskAtomicFlags(model->clump, 1, 0);
-        } else if (RpClumpGetWorld(model->clump2) != NULL) {
-            RpWorldRemoveClump(gZrwWorld, model->clump2);
+        if (model->collisionClump == NULL) {
+            zrwClumpMaskAtomicFlags(model->clump, rpATOMICCOLLISIONTEST, 0);
+        } else if (RpClumpGetWorld(model->collisionClump) != NULL) {
+            RpWorldRemoveClump(gZrwWorld, model->collisionClump);
         }
     }
     if (set & 8) {
-        if (model->clump2 == NULL) {
-            maskAtomics(model->clump, 0xffffffff, 1);
-        } else if (RpClumpGetWorld(model->clump2) == NULL) {
-            RpWorldAddClump(gZrwWorld, model->clump2);
+        if (model->collisionClump == NULL) {
+            maskAtomics(model->clump, 0xffffffff, rpATOMICCOLLISIONTEST);
+        } else if (RpClumpGetWorld(model->collisionClump) == NULL) {
+            RpWorldAddClump(gZrwWorld, model->collisionClump);
         }
     }
     if (clear & 1) {
         model->def->flags &= ~1u;
-        maskAtomics(model->clump, 0xffffff7f, 0);
-        if (model->clump2 != NULL) {
-            maskAtomics(model->clump2, 0xffffff7f, 0);
+        maskAtomics(model->clump, ~0x80u, 0);
+        if (model->collisionClump != NULL) {
+            maskAtomics(model->collisionClump, ~0x80u, 0);
         }
     }
     if (set & 1) {
         model->def->flags |= 1;
         maskAtomics(model->clump, 0xffffffff, 0x80);
-        if (model->clump2 != NULL) {
-            maskAtomics(model->clump2, 0xffffffff, 0x80);
+        if (model->collisionClump != NULL) {
+            maskAtomics(model->collisionClump, 0xffffffff, 0x80);
         }
     }
     return 0;
 }
 
 BMX_ADDR(0x00488b80)
-uint32_t zrwMdlGetUserData(const void *object)
+uint32_t zrwMdlGetUserData(const void *atomic)
 {
     if (gZrwMdlPluginOffset < 1) {
         return 0;
     }
-    return *(const uint32_t *)(*(const uint8_t *const *)((const uint8_t *)object + 0x40) +
-                               gZrwMdlPluginOffset);
+    return *mdlSlot(((const RpAtomic *)atomic)->clump);
 }
 
 BMX_ADDR(0x00488ba0)
@@ -600,9 +607,9 @@ uint32_t zrwModelGetUserValue(const ZrwModel *model)
 }
 
 BMX_ADDR(0x00488bc0)
-void *zrwModelRenderClump(const ZrwModel *model)
+void *zrwModelCollisionClump(const ZrwModel *model)
 {
-    return model->clump2 != NULL ? model->clump2 : model->clump;
+    return model->collisionClump != NULL ? model->collisionClump : model->clump;
 }
 
 BMX_ADDR(0x00488bd0)
@@ -634,17 +641,19 @@ void *zrwModelGetMaterial(const ZrwModel *model, uint32_t index)
 }
 
 BMX_ADDR(0x00488ca0)
-void zrwModelSetUpdateHook(ZrwModel *model, const uint32_t *arg)
+void zrwModelSetDrawColor(ZrwModel *model, const uint32_t *color)
 {
-    model->onUpdateArg = *arg;
+    model->color = *color;
     zrwModelSetRenderCallback(model, BMX_FNPTR(ZrwObjectCallback, 0x0048f530, zrwModelRenderCallback));
 }
 
+/* Every geometry of the clump gets rpGEOMETRYMODULATEMATERIALCOLOR, but only the first atomic's materials
+ * get the colour. */
 BMX_ADDR(0x00488cc0)
 void zrwModelSetColor(const ZrwModel *model, const void *color)
 {
-    void *geometry = *(void **)((uint8_t *)zrwModelCreateFirstAtomic(model->clump) + 0x1c);
-    uint32_t mask[2] = {0xffffffff, 0x40};
+    RpGeometry *const geometry = ((const RpAtomic *)zrwModelCreateFirstAtomic(model->clump))->geometry;
+    uint32_t mask[2] = {0xffffffff, rpGEOMETRYMODULATEMATERIALCOLOR};
     int count;
 
     RpClumpForAllAtomics(model->clump, BMX_FNPTR(RpAtomicCallback, 0x00487bc0, zrwAtomicMaskGeometryFlags),
@@ -662,7 +671,7 @@ int zrwObjDestroy(void *object)
     void *model;
 
     zrwmatFreeSkeleton(object);
-    model = *(void **)((uint8_t *)object + 0x2c);
+    model = ((const ZObj *)object)->model;
     if (model != NULL) {
         gZrwVtDestroy(model);
     }
@@ -672,60 +681,61 @@ int zrwObjDestroy(void *object)
 BMX_ADDR(0x00488d60)
 int zrwObjUpdate(void *object)
 {
-    gZrwVtUpdate(*(void **)((uint8_t *)object + 0x2c));
+    gZrwVtUpdate(((const ZObj *)object)->model);
     return 1;
 }
 
 BMX_ADDR(0x00488d80)
 void zrwObjSetPosition(void *object, const void *position)
 {
-    gZrwVtSetPos(*(void **)((uint8_t *)object + 0x2c), position);
+    gZrwVtSetPos(((const ZObj *)object)->model, position);
 }
 
 BMX_ADDR(0x00488da0)
 void zrwObjSetRotation(void *object, const void *rotation)
 {
-    gZrwVtSetRot(*(void **)((uint8_t *)object + 0x2c), rotation);
+    gZrwVtSetRot(((const ZObj *)object)->model, rotation);
 }
 
 BMX_ADDR(0x00488dc0)
 void zrwObjSetScale(void *object, const void *scale)
 {
-    gZrwVtSetScale(*(void **)((uint8_t *)object + 0x2c), scale);
+    gZrwVtSetScale(((const ZObj *)object)->model, scale);
 }
 
+/* Showing a model object means putting its clumps in the world (zrwModelSetFlags bit 2). */
 BMX_ADDR(0x00488de0)
 int zrwObjSetShown(void *object, int shown)
 {
     if (shown == 0) {
-        gZrwVtSetFlags(*(void **)((uint8_t *)object + 0x2c), 2, 0);
+        gZrwVtSetFlags(((const ZObj *)object)->model, 2, 0);
         return 1;
     }
-    gZrwVtSetFlags(*(void **)((uint8_t *)object + 0x2c), 0, 2);
+    gZrwVtSetFlags(((const ZObj *)object)->model, 0, 2);
     return 1;
 }
 
 BMX_ADDR(0x00488e20)
 uint32_t zrwObjEntryKey(void *object)
 {
-    return (uint32_t)(uintptr_t)gZrwVtKey(*(void **)((uint8_t *)object + 0x2c), NULL);
+    return (uint32_t)(uintptr_t)gZrwVtKey(((const ZObj *)object)->model, NULL);
 }
 
 BMX_ADDR(0x00488e40)
 void *zrwObjClump(void *object)
 {
-    return (void *)(uintptr_t)gZrwVtClump(*(void **)((uint8_t *)object + 0x2c));
+    return (void *)(uintptr_t)gZrwVtClump(((const ZObj *)object)->model);
 }
 
 BMX_ADDR(0x00488e60)
 void *zrwObjEntry(void *object)
 {
-    return gZrwVtEntry(*(void **)((uint8_t *)object + 0x2c), NULL);
+    return gZrwVtEntry(((const ZObj *)object)->model, NULL);
 }
 
 BMX_ADDR(0x00488e80)
 int zrwObjUpdateAgain(void *object)
 {
-    gZrwVtUpdate(*(void **)((uint8_t *)object + 0x2c));
+    gZrwVtUpdate(((const ZObj *)object)->model);
     return 1;
 }

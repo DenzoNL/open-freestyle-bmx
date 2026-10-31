@@ -13,6 +13,7 @@
 #include <SDL3/SDL.h>
 #include <string.h>
 
+#include "platform/input.h"
 #include "platform/platform.h"
 
 enum {
@@ -158,4 +159,10 @@ void BMX_WINAPI bmxStandDeleteCriticalSection(void *section)
 
     s->mutex = NULL;
     SDL_DestroyMutex(m);
+}
+
+void bmxPlatformShutdown(void)
+{
+    bmxTimerShutdown();
+    bmxCheckSummary();
 }

@@ -107,8 +107,8 @@ void zobjSetAngles(void *object, const ZAngle3 *angles);
 /* Detaches an object from its parent, or orphans its children when it has no parent. */
 void zobjDetach(ZObj *object);
 /*
- * Fires the handlers for every pending event of the object and drains the queue.
- * TODO(file): lives in zrwmodelcreate.c by address (0x49c570); it belongs with zobj.
+ * Fires the handlers for every pending event of the object and drains the queue. By address (0x49c570) it
+ * sits just before zrwModelCreate.c, in a source file without asserts; it is kept here with its callers.
  */
 void zobjDispatchEvents(ZObj *object);
 /* Calls fn(child, arg) for every child of the object. Always returns 1. */

@@ -8,6 +8,7 @@
 #include "zge/com/zglrw/zrwcol.h"
 #include "zge/com/zglrw/zrwmodelcreate.h"
 #include "zge/com/zglrw/zrwprim.h"
+#include "zge/com/zglrw/zrwshadow.h"
 #include "zge/zasset.h"
 #include "zge/zlist.h"
 #include "zge/zmem.h"
@@ -77,7 +78,7 @@ static void setup_shadow_draw(DtCtx *c)
     dt_fill(&gZrwShadowQuads, sizeof(ZrwShadowQuadList));
     dt_fill(&gZrwShadowVertices, sizeof(ZrwShadowVertexList));
     gZrwShadowReady = dt_u32() % 6 != 0;
-    gZrwShadowHead = dt_u32();
+    gZrwShadowTexture = dt_u32();
     for (int i = 0; i < 36; i++) {
         gZrwShadowMiss[i] = dt_u32() % 7 == 0;
     }
@@ -479,13 +480,13 @@ static void setup_collect(DtCtx *c)
 /* Part nodes: a cursor into an array that is big enough for a small hierarchy. */
 static void setup_part_node(DtCtx *c)
 {
-    ZrwPartNode *nodes = dt_alloc(sizeof *nodes * 16);
-    ZrwPartNode *parent = dt_alloc(sizeof *parent);
+    ZrwModelPart *nodes = dt_alloc(sizeof *nodes * 16);
+    ZrwModelPart *parent = dt_alloc(sizeof *parent);
 
     beginFrames(c, 2);
     dt_fill(nodes, sizeof *nodes * 16);
     dt_fill(parent, sizeof *parent);
-    parent->child = dt_u32() % 2 ? (ZrwPartNode *)(uintptr_t)dt_u32() : NULL;
+    parent->child = dt_u32() % 2 ? (ZrwModelPart *)(uintptr_t)dt_u32() : NULL;
     gZrwModelCreate.cursor = nodes;
     DT_ARG_PTR(c, 0, gFrames[dt_u32() & 0xf]);
     DT_ARG_PTR(c, 1, dt_u32() % 5 == 0 ? NULL : parent);
@@ -612,15 +613,16 @@ static ZrwModelDef *newDef(int maxSets)
     ZrwModelDef *def = dt_alloc(sizeof *def);
 
     dt_fill(def, sizeof *def);
-    *(uint32_t *)((uint8_t *)def + 4) = (uint32_t)dt_range(1, 2);
-    def->flags2 = dt_u32();
-    def->partSetCount = (uint16_t)dt_range(0, maxSets);
+    def->refCount = (uint32_t)dt_range(1, 2);
+    def->options = dt_u32();
+    def->lodCount = (uint16_t)dt_range(0, maxSets);
     memset(def->name, 0, sizeof def->name);
+    memset(def->path, 0, sizeof def->path);
     for (int i = 0; i < 12; i++) {
         def->name[i] = (char)dt_range('a', 'z');
     }
     for (int i = 0; i < 20; i++) {
-        def->name[0x10 + i] = (char)dt_range('a', 'z');
+        def->path[i] = (char)dt_range('a', 'z');
     }
     def->geometry = (void *)0x39000000u;
     return def;
@@ -632,8 +634,8 @@ static ZrwModel *newModel(int maxSets, int materials)
 
     dt_fill(m, sizeof *m);
     m->def = newDef(maxSets);
-    m->clump = gClumps[dt_u32() % 4];
-    m->clump2 = dt_u32() % 3 == 0 ? NULL : gClumps[dt_u32() % 4];
+    m->clump = (void *)gClumps[dt_u32() % 4];
+    m->collisionClump = dt_u32() % 3 == 0 ? NULL : (void *)gClumps[dt_u32() % 4];
     m->materials = newMaterials(materials);
     s5RandQuat(&m->rotation);
     return m;
@@ -720,7 +722,7 @@ static void setup_set_rw_info(DtCtx *c)
     S5_ON(0x00487dc0, stubMdlUserData);
     model = newModel(2, dt_range(0, 4));
     if (dt_u32() % 3 == 0) {
-        model->clump2 = NULL;
+        model->collisionClump = NULL;
     }
     DT_ARG_PTR(c, 0, model);
 }
@@ -745,7 +747,7 @@ static void setup_instance(DtCtx *c)
     s5SetRet(0x49db90, 0x3a000000u);
     s5SetRet(0x4d2f00, (uint32_t)dt_range(3, 5));
     model = newModel(4, dt_range(0, 4));
-    model->def->flags2 = dt_u32() % 6 == 0 ? (model->def->flags2 | 2u) : (model->def->flags2 & ~2u);
+    model->def->options = dt_u32() % 6 == 0 ? (model->def->options | 2u) : (model->def->options & ~2u);
     DT_ARG_PTR(c, 0, model);
 }
 
@@ -804,7 +806,7 @@ static void setup_add_clump(DtCtx *c)
     memory[0] = (uint32_t)(uintptr_t)gLoadBuffer;
     memory[1] = (uint32_t)dt_range(16, 512);
     model = newModel(3, dt_range(0, 2));
-    model->clump = gClumps[0];
+    model->clump = (void *)gClumps[0];
     DT_ARG_PTR(c, 0, model);
     DT_ARG_PTR(c, 1, memory);
     DT_ARG_PTR(c, 2, dt_u32() % 2 == 0 ? NULL : (void *)"textures\\");
@@ -921,7 +923,7 @@ static int BMX_CDECL stubReadDef(void *iff, ZrwModel *model)
     s5Log(0x49d5f0);
     s5LogPtr(iff);
     s5LogPtr(model);
-    model->def->flags2 = gLoadFlags2;
+    model->def->options = gLoadFlags2;
     return 1;
 }
 
@@ -1060,18 +1062,16 @@ static void setup_destroy(DtCtx *c)
     dt_fill(model, sizeof *model);
     def = dt_zmemalloc(0xbc);
     dt_fill(def, 0xbc);
-    *(uint32_t *)((uint8_t *)def + 4) = (uint32_t)dt_range(1, 2);
-    def->flags2 = dt_u32();
-    def->partSetCount = (uint16_t)dt_range(0, 3);
+    def->refCount = (uint32_t)dt_range(1, 2);
+    def->options = dt_u32();
+    def->lodCount = (uint16_t)dt_range(0, 3);
     def->entries = dt_zmemalloc(0x28);
     model->def = def;
-    model->clump = gClumps[0];
-    model->clump2 = dt_u32() % 2 ? gClumps[1] : NULL;
+    model->clump = (void *)gClumps[0];
+    model->collisionClump = dt_u32() % 2 ? (void *)gClumps[1] : NULL;
     model->materials = newMaterials(dt_range(0, 4));
-    for (uint32_t i = 0; i < def->partSetCount; i++) {
-        ZrwPartSet *set = (ZrwPartSet *)((uint8_t *)model + 0x54 + i * 12);
-
-        set->parts = dt_zmemalloc(0x28);
+    for (uint32_t i = 0; i < def->lodCount; i++) {
+        model->lods[i].parts = dt_zmemalloc(0x28);
     }
     DT_ARG_PTR(c, 0, model);
 }

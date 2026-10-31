@@ -41,6 +41,7 @@ enum {
     rpGEOMETRYPRELIT = 0x08,
     rpGEOMETRYNORMALS = 0x10,
     rpGEOMETRYLIGHT = 0x20,
+    rpGEOMETRYMODULATEMATERIALCOLOR = 0x40,
 };
 
 /* The instance list of triangles of one material in a geometry (a mesh header holds these). */

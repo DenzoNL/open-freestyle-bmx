@@ -1,83 +1,18 @@
 /*
  * Model loading and instancing (C:\NgEngine\Zge\Com\ZglRw\zrwModelCreate.c): reads a MODL chunk (definition,
  * materials, up to four levels of detail and a collision clump) into a ZrwModel, clones models and frees
- * them. By address the file also holds the soft shadow sampler (0x49b3d0-0x49b520, probably a separate
- * source file) and the two decompressors (0x49bd10, 0x49c080) the asset reader uses.
+ * them. By address the file also holds the two decompressors (0x49bd10, 0x49c080) the asset reader uses.
  */
 #ifndef ZGE_COM_ZGLRW_ZRWMODELCREATE_H
 #define ZGE_COM_ZGLRW_ZRWMODELCREATE_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "compat/orig.h"
 #include "zge/com/zglrw/zrwmodel.h"
 #include "zge/zmath.h"
 #include "zge/zmem.h"
-
-/* ---- shadow sampler ----------------------------------------------------------------------------- */
-
-/* The shadow state of the roller (ZrollerShadow in ngifzroller.h): the model whose object casts the shadow
- * and the offset of the ground probes' eye from that object. */
-typedef struct ZrwShadow {
-    uint8_t pad00[8];
-    const ZrwModel *model; /* 0x08 its user value (+0x14) is the scene object whose position is sampled */
-    ZVec3 offset;          /* 0x0c */
-} ZrwShadow;
-
-/* Point of the 6x6 probe grid and the vertex built from its ground hit (0x1c bytes). */
-typedef struct ZrwShadowPoint {
-    ZVec3 pos;
-    uint32_t pad0c;
-} ZrwShadowPoint;
-
-typedef struct ZrwShadowVertex {
-    ZVec3 pos;        /* 0x00 */
-    uint32_t pad0c;   /* 0x0c */
-    float u;          /* 0x10 */
-    float v;          /* 0x14 */
-    uint8_t color[4]; /* 0x18 */
-} ZrwShadowVertex;
-
-/* Quad of the shadow mesh: a header word and its four corner vertices (0x14 bytes). */
-typedef struct ZrwShadowQuad {
-    uint32_t head;
-    ZrwShadowVertex *corner[4];
-} ZrwShadowQuad;
-
-_Static_assert(sizeof(ZrwShadowVertex) == 0x1c, "shadow vertex");
-_Static_assert(sizeof(ZrwShadowQuad) == 0x14, "shadow quad");
-
-#define kZrwShadowGrid  6
-#define kZrwShadowCells 5
-
-/* The probe grid is 6x6 points; the mesh has 5x5 quads. */
-struct ZrwUpdateNode;
-typedef ZrwShadowQuad ZrwShadowQuadList[25];
-typedef ZrwShadowPoint ZrwShadowPointList[36];
-typedef ZrwShadowVertex ZrwShadowVertexList[36];
-typedef uint32_t ZrwShadowMissList[36];
-
-#define gZrwShadowQuads    ORIG_VAR(0x00674930, ZrwShadowQuadList, gZrwShadowQuads)
-#define gZrwShadowPoints   ORIG_VAR(0x006746f0, ZrwShadowPointList, gZrwShadowPoints)
-#define gZrwShadowOffsets  ORIG_VAR(0x00674b34, ZrwShadowPointList, gZrwShadowOffsets)
-#define gZrwShadowVertices ORIG_VAR(0x00674d74, ZrwShadowVertexList, gZrwShadowVertices)
-#define gZrwShadowMiss     ORIG_VAR(0x00675164, ZrwShadowMissList, gZrwShadowMiss)
-#define gZrwShadowHead     ORIG_VAR(0x006751f4, uint32_t, gZrwShadowHead)
-#define gZrwShadowNode     ORIG_VAR(0x006751f8, struct ZrwUpdateNode *, gZrwShadowNode)
-#define gZrwShadowReady    ORIG_VAR(0x006751fc, uint32_t, gZrwShadowReady)
-#define gZrwShadowScale    ORIG_VAR(0x00675200, float, gZrwShadowScale)
-#define gZrwShadowDouble   ORIG_VAR(0x00675204, float, gZrwShadowDouble)
-#define gZrwShadowInit     ORIG_VAR(0x0067520c, uint32_t, gZrwShadowInit)
-#define gZrwShadowActive   ORIG_VAR(0x00674b28, uint32_t, gZrwShadowActive)
-
-/* Draws the quads built by the last zrollerUpdateShadow (once); returns 1. */
-int zrollerShadowDraw(void);
-/* Loads the shadow texture ("assets\shadowMap.Bmp") and registers the draw callback. Returns 1. */
-int zrollerShadowStart(void);
-/* Unregisters the shadow's update callback. Returns 1. */
-int zrollerShadowStop(void);
-/* Update callback of the roller's shadow: probes the ground on a 6x6 grid and builds the quad mesh. */
-void zrollerUpdateShadow(void *state);
 
 /* ---- decompression ------------------------------------------------------------------------------ */
 
@@ -91,30 +26,19 @@ void zassetDecompressHashed(void *work, const uint8_t *src, int srcLength, uint8
 
 /* ---- frames and clumps -------------------------------------------------------------------------- */
 
-/* One node of a part hierarchy (0x28 bytes): the frame's user data hash, the frame and its position. */
-typedef struct ZrwPartNode {
-    uint32_t hash;               /* 0x00 */
-    uint32_t pad04;              /* 0x04 */
-    void *def;                   /* 0x08 */
-    void *frame;                 /* 0x0c */
-    float pos[3];                /* 0x10 */
-    struct ZrwPartNode *parent;  /* 0x1c */
-    struct ZrwPartNode *sibling; /* 0x20 */
-    struct ZrwPartNode *child;   /* 0x24 */
-} ZrwPartNode;
-
-_Static_assert(sizeof(ZrwPartNode) == 0x28, "part node");
-
 /* State of the model loader (0x675218, 0x24 bytes, cleared at initialisation). */
 typedef struct ZrwModelCreateState {
-    int initialized;     /* 0x00 */
-    ZMemFreeList *pool;  /* 0x04 model records (0x8c bytes) */
-    uint32_t pad08;      /* 0x08 */
-    ZrwPartNode *cursor; /* 0x0c next free node while a hierarchy is built */
-    void *lodClumps[4];  /* 0x10 the clump of every level of detail loaded so far */
-    ZrwModel *last;      /* 0x20 the model the last MODL chunk produced */
+    int initialized;                             /* 0x00 */
+    ZMemFreeList *pool;                          /* 0x04 model records (ZrwModel) */
+    uint32_t pad08;                              /* 0x08 */
+    ZrwModelPart *cursor;                        /* 0x0c next free part while a hierarchy is built */
+    struct RpClump *lodClumps[kZrwModelMaxLods]; /* 0x10 the clump of every level of detail loaded so far */
+    ZrwModel *last;                              /* 0x20 the model the last MODL chunk produced */
 } ZrwModelCreateState;
 
+_Static_assert(offsetof(ZrwModelCreateState, cursor) == 0x0c, "model create state");
+_Static_assert(offsetof(ZrwModelCreateState, lodClumps) == 0x10, "model create state");
+_Static_assert(offsetof(ZrwModelCreateState, last) == 0x20, "model create state");
 _Static_assert(sizeof(ZrwModelCreateState) == 0x24, "model create state");
 
 #define gZrwModelCreate ORIG_VAR(0x00675218, ZrwModelCreateState, gZrwModelCreate)
@@ -123,11 +47,12 @@ _Static_assert(sizeof(ZrwModelCreateState) == 0x24, "model create state");
  */
 void *zrwFrameUserDataToMatrix(void *frame, void *arg);
 void *zrwFrameMatrixToUserData(void *frame, void *arg);
-/* RwFrameForAllObjects callback: stores the first object and stops (returns NULL). */
+/* RpClumpForAllAtomics callback: stores the first object and stops (returns NULL). */
 void *zrwFrameCollectFirst(void *object, void *out);
 /* First atomic of a clump (NULL when there is none). */
 void *zrwModelCreateFirstAtomic(void *clump);
-/* Adds a node for the frame under `parent` (NULL for the root) at the cursor, then recurses. */
+/* Adds a part for the frame under `parentNode` (a ZrwModelPart, NULL for the root) at the cursor, then
+ * recurses into the frame's children. */
 void *zrwFrameBuildPartNode(void *frame, void *parentNode);
 
 /* Hands the model to the clumps and links every material to the texture of the clump's matching RpMaterial.
@@ -146,7 +71,7 @@ void zrwModelPrintUsage(void);
 
 /* Clones a model (a shared definition, its clumps cloned); a skinned model is loaded again from its file. */
 ZrwModel *zrwModelCreateInstance(const ZrwModel *model);
-/* Reads a clump from memory (descriptor: data pointer and size, freed afterwards) into the model: the
+/* Reads a clump from memory (an RwMemory: data pointer and size, freed afterwards) into the model: the
  * collision clump when `collision` is 1, else the next level of detail. */
 int zrwModelAddClump(ZrwModel *model, const uint32_t *memory, const char *imagePath, int collision);
 
