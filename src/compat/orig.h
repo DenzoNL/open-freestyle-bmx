@@ -10,12 +10,13 @@
  * Three modes:
  * - BMX_HOOK (hook DLL, oracle test DLL): the original's code and data at their addresses; ORIG_FN and
  *   BMX_FNPTR are those addresses, ORIG_VAR reads the global there.
- * - BMX_IMAGE (bmxnative.exe, docs/NATIVE.md "Relocated data image"): no original code anywhere; the
- *   original's data sections are a copy at an address of the loader's choosing, gBmxImageDelta bytes from
- *   where they were linked. ORIG_VAR and BMX_ORIG add the delta; ORIG_FN calls the function serving that
- *   address (the generated origmap.h, tools/gen_origmap.py); BMX_FNPTR is the function itself. BMX_HOOK stays
- *   defined there too, for what it says about the target (i686 MSVC-style conventions, x87 asm, assembler
- *   names of stdcall functions, the compat/crt.h shims); only the address machinery is BMX_IMAGE's.
+ * - BMX_IMAGE (bmxnative.exe, docs/NATIVE.md "The original's data in the source"): no original code or data
+ *   is loaded; the original's data sections are C objects of ours with the original's layout (src/data, one
+ *   per section). ORIG_VAR and BMX_ORIG give the place of an original address in its block (BMX_DATA_AT,
+ *   src/data/blocks.h); ORIG_FN calls the function serving that address (the generated origmap.h,
+ *   tools/gen_origmap.py); BMX_FNPTR is the function itself. BMX_HOOK stays defined there too, for what it
+ *   says about the target (i686 MSVC-style conventions, x87 asm, assembler names of stdcall functions, the
+ *   compat/crt.h shims); only the address machinery is BMX_IMAGE's.
  * - neither (host builds without the exe): globals and functions by name.
  */
 #ifndef BMX_COMPAT_ORIG_H
@@ -52,13 +53,13 @@
 /*
  * BMX_ORIG(addr): where the original's data at `addr` is now, as a uintptr_t (an original data address
  * written as a number: a table, a string, a global used as an array base). BMX_ORIG_PTR(addr): the same for
- * an address that may be code or data or a value read from the original's tables (RenderWare callbacks):
- * natively a lookup (bmxOrigPtr, src/native/loader.c) that gives the function serving a code address.
+ * an original code address (RenderWare callbacks): natively a lookup (bmxOrigPtr, src/native/loader.c) that
+ * gives the function serving it.
  */
 #if defined(BMX_IMAGE)
-extern uintptr_t gBmxImageDelta;
+#include "data/blocks.h"
 void *bmxOrigPtr(uint32_t addr);
-#define BMX_ORIG(addr)     ((uintptr_t)(addr) + gBmxImageDelta)
+#define BMX_ORIG(addr)     ((uintptr_t)BMX_DATA_AT(addr))
 #define BMX_ORIG_PTR(addr) ((uintptr_t)bmxOrigPtr((uint32_t)(addr)))
 #include "origmap.h"
 #else
@@ -75,7 +76,7 @@ void *bmxOrigPtr(uint32_t addr);
  * name, the C runtime layer, the PNG reader, the driver, a trap or an import thunk stub). */
 #define ORIG_FN(addr, ret, name, params)         ret BMX_CDECL name params __asm__(BMX_ORIGFN_##addr)
 #define ORIG_FN_STDCALL(addr, ret, name, params) ret BMX_STDCALL name params __asm__(BMX_ORIGFN_##addr)
-#define ORIG_VAR(addr, type, name)               (*(type *)BMX_ORIG(addr))
+#define ORIG_VAR(addr, type, name)               (*(type *)BMX_DATA_AT(addr))
 #define ORIG_FN_REGPARM(n, addr, ret, name, params)                                                          \
     __attribute__((regparm(n))) ret name params __asm__(BMX_ORIGFN_##addr)
 #elif defined(BMX_HOOK)

@@ -76,6 +76,14 @@ if(BMX_NATIVE32)
   target_compile_definitions(bmx_game PUBLIC BMX_IMAGE=1)
   target_include_directories(bmx_game PUBLIC ${CMAKE_BINARY_DIR}/gen)
   add_dependencies(bmx_game bmx_origmap)
+  # The original's data as C (src/data, docs/NATIVE.md "The original's data in the source"; made once by
+  # tools/gen_data.py): one object per original data section, compiled like the game objects (its types).
+  file(GLOB BMX_DATA_SOURCES CONFIGURE_DEPENDS src/data/*.c)
+  add_library(bmx_data OBJECT ${BMX_DATA_SOURCES})
+  target_link_libraries(bmx_data PRIVATE bmx_game)
+  target_compile_options(bmx_data PRIVATE ${BMX_WARNINGS} -ffreestanding -fno-builtin -fno-stack-protector
+    -Wno-sign-compare -Wno-cast-function-type-mismatch)
+  add_dependencies(bmx_data bmx_origmap)
   # bmxplatformtest keeps the fixed-address mode for winchan.c (the real mixer against the smooth one): range.S
   # must be the first object on its link line, its block has to start the image.
   add_library(bmx_range OBJECT src/native/range.S)
@@ -110,18 +118,21 @@ if(BMX_NATIVE32)
   target_include_directories(bmx_png PRIVATE ${CMAKE_BINARY_DIR}/gen)
   add_dependencies(bmx_png bmx_origmap)
   target_compile_options(bmx_png PRIVATE ${BMX_WARNINGS} -ffreestanding -fno-builtin -fno-stack-protector)
-  add_executable(bmxnative $<TARGET_OBJECTS:bmx_game> $<TARGET_OBJECTS:bmx_driver> $<TARGET_OBJECTS:bmx_png>
+  add_executable(bmxnative $<TARGET_OBJECTS:bmx_game> $<TARGET_OBJECTS:bmx_data> $<TARGET_OBJECTS:bmx_driver>
+    $<TARGET_OBJECTS:bmx_png>
     ${BMX_NATIVE_SOURCES} src/native/crtasm.S ${CMAKE_BINARY_DIR}/gen/origmap.c
     third_party/dr_flac/dr_flac.c ${CMAKE_BINARY_DIR}/music_edits.c)
   target_include_directories(bmxnative PRIVATE src ${CMAKE_BINARY_DIR}/gen)
   target_include_directories(bmxnative SYSTEM PRIVATE third_party/dr_flac)
   target_compile_definitions(bmxnative PRIVATE _WIN32_WINNT=0x0A00 BMX_IMAGE=1 BMX_SOURCE_DIR="${CMAKE_SOURCE_DIR}" BMX_WORK_DIR="${BMX_WORK_DIR}")
   target_compile_options(bmxnative PRIVATE ${BMX_WARNINGS})
-  # Fixed base, no ASLR (runs stay alike), well away from the original's 0x400000..0x6b3000: nothing of ours may
-  # sit at an original address, where a leftover raw address would silently reach it.
-  target_link_options(bmxnative PRIVATE -Wl,--image-base=0x20000000 -Wl,--disable-dynamicbase
+  # Fixed base, no ASLR (runs stay alike), away from the original's 0x400000..0x6b3000: nothing of ours may sit at an
+  # original address, where a leftover raw address would silently reach it. Below 0x10000000: the original's data
+  # is part of this image since X1b (src/data), and the PSX-style ordering tables (ngifpsx.c, zoverii.c, the
+  # front end) keep pointers to it in 28 bits, the top 4 being the packet's length.
+  target_link_options(bmxnative PRIVATE -Wl,--image-base=0x01000000 -Wl,--disable-dynamicbase
     -Wl,--disable-high-entropy-va)
-  target_link_libraries(bmxnative PRIVATE bcrypt SDL3::SDL3)
+  target_link_libraries(bmxnative PRIVATE SDL3::SDL3)
   # Checks of the platform stand-ins against Windows (tests/platform): hosted, no game image.
   add_executable(bmxplatformtest $<TARGET_OBJECTS:bmx_range> ${BMX_CRT_STARTFILES} tests/platform/test_platform.c src/platform/kernel.c src/platform/winmm.c
     src/platform/fileio.c src/platform/paths.c src/platform/input.c src/platform/inputcheck.c

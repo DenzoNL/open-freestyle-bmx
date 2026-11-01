@@ -128,7 +128,7 @@ int main(int argc, char **argv)
 
     bmxLogOpen();
     bmxPlatformInit();
-    if (bmxLoadImage("NgBMX.exe") != 0) {
+    if (bmxLoaderInit() != 0) {
         return 1;
     }
     bmxTrapInstall();

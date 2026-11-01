@@ -4,7 +4,66 @@ Goal: an exe of our own that runs the ported game code without the original's co
 as the first step of the platform flip. 64-bit cleanliness (Mac, Android, Linux x64) comes after, as a
 separate step.
 
-## Relocated data image (since X1a, 2026-11-01)
+## The original's data in the source (since X1b, 2026-11-01)
+
+bmxnative.exe reads nothing from NgBMX.exe: it needs only the game's data folders (docs/PORTING.md X1b, decision
+X2-A). The original's initialised data (the globals' values, tables, strings, the pointers between them and into
+the code) is C source in `src/data`, made once from the exe by `tools/gen_data.py` and maintained like the code.
+
+- **One object per original data section** (a "block"), whose struct keeps the original's exact layout:
+  `bmxRdata` (.rdata, const), `bmxData` (.data's initialised part, 0x551000..0x56a000), `bmxBss` (.data's zero tail,
+  no initialiser, no bytes in the exe file), `bmxImports` (the import slots of .idata), `bmxData1` (.data1),
+  `bmxRwBss` (_rwdseg) and `bmxInputTables` (dinput.lib's object tables of c_dfDIJoystick / c_dfDIKeyboard, which
+  the linker put into the original's .text). Why not one symbol per global: the code relies on globals being next
+  to each other: SAVE.DAT is one memcpy over a range of globals (gComdataRecords, a 90 KB view), 61 declarations
+  span several globals (byte-array views such as gActionMapTable, rider and trick tables), several tables are
+  declared smaller than they are (gFxHandlerTable is a uint8_t at the start of a table of three function pointers),
+  main.c's initGlobals clears 0x697780..+0x34 in one memset. Exact layout keeps all of that working by construction;
+  splitting the blocks into separate symbols is X2's work, global by global, with xcheck.
+- **`src/data/layout.h`**: the blocks' structs. Members are the `ORIG_VAR` globals, typed as the source declares them
+  (1449 of 1665 declarations have a type the data files see; the others, types local to a .c file, get a
+  same-layout mirror of standard types, marked in the comment), with every other name for the same address in the
+  comment. Bytes nothing names are members too, split where the original's code or a pointer refers to an address:
+  `p_<addr>` pointers, `s<Text>` strings (named from their text), `d_<addr>` floats / words / bytes, `pad_<addr>`
+  zeros; a filler where a declaration starts that cannot be a member (a view, or a uint8_t declared over a table of
+  pointers) takes that declaration's name. Each global's offset is asserted (`AT(gAction, 0x0056b3e0)`), and so is
+  each block's end, which moves if the compiler pads anywhere. The headers' `ORIG_VAR` macros are `#undef`'d there:
+  in the data files the names are the members.
+- **`src/data/<block>.c`**: the values, as designated initialisers: integers, floats with the shortest digits that
+  give the same bits, strings as literals, pointers as `&bmxData.member.field` or, into the code, the name of the
+  function serving that address (tools/gen_origmap.py's map, incremental-link thunks followed; casts where the
+  field's type differs). The 237 code addresses that nothing serves (switch tables inside unported CRT and D3D7
+  driver code, the D3D7 driver's own entry points; X1a gave them run-time trap stubs) get a stub each that reports
+  the address if ever called (`BMX_DATA_UNSERVED`).
+- **`src/data/imports.c`**: the 137 import slots, the table the loader fills them from (`bmxImportSlots`: DLL and
+  name per slot) and the 21 stubs for the original's `jmp [slot]` thunks that ported code calls by address (AVIFile,
+  DrawDib, DirectInputCreateEx), each the same jump through our slot (`BMX_IMPORT_THUNK`; the slot was checked
+  against the exe's thunk at generation).
+- **`ORIG_VAR(addr)` and `BMX_ORIG(addr)`** (src/compat/orig.h, `BMX_IMAGE` mode) are `BMX_DATA_AT(addr)`
+  (src/data/blocks.h): the block holding the address plus the address's offset in it. For a constant address the
+  compiler folds it to `&block + offset` (also in static initialisers); computed addresses
+  (`BMX_ORIG(0x0055d8c8 + index * 4)`) compare the ranges at run time. An address in no block calls
+  `bmxDataBadAddress`, which reports and stops; tools/gen_data.py checked that every `ORIG_VAR` and `BMX_ORIG`
+  address in the source is in a block. `RW_CB` / `bmxOrigPtr` give a function for a code address and
+  `BMX_DATA_AT` for a data address (RenderWare's plugin tables at 0x69b520 / 0x69bee0).
+- **The loader** (src/native/loader.c, `bmxLoaderInit`) fills the import slots (stand-in, dead-slot stub or the real
+  function, as before) and writes the opt-in jumps over our own functions (smooth mixer, wide HUD, draw distance).
+  Gone with X1b: reading NgBMX.exe and its sha256 check (bcrypt.dll is no longer imported), the data copy, the
+  relocation pass, the incremental-link thunk table, the copy of the input tables, the scan for the exe's import
+  thunks and `BMX_RELOC_LOG`.
+- **The check** (`tools/gen_data.py --check`, in tools/check.sh when build/native32 and the exe are there): every
+  byte of the compiled blocks equals the exe's (132830 bytes), every pointer points where the exe's did (813 data
+  pointers: same original address; 739 code pointers: the function serving the exe's target). The hook build is
+  untouched (its code is identical before and after).
+- **Placement**: each block starts on a page like its section did (pointers into it keep the original's low 12
+  bits, as in X1a's image), and the exe is linked at 0x01000000, below 0x10000000: the PSX-style ordering tables
+  (ngifpsx.c, zoverii.c, the front end) keep pointers to the data in 28 bits (the top 4 are the packet's length).
+- **Regenerating** (`tools/gen_data.py`, needs the exe, a configured build/native32 and clang-format 21) overwrites
+  src/data: only for a fresh start, not after hand edits.
+
+## Relocated data image (X1a, 2026-11-01, until X1b)
+
+History: the step between the fixed-address layout and the data in the source.
 
 The layout described under "Idea" below (the original's image rebuilt at 0x400000, its code range full of jumps)
 was the native exe's until docs/PORTING.md slice X1a. Since then nothing of the original is mapped at its
@@ -54,12 +113,12 @@ addresses and none of its code is loaded:
   for 237 addresses), 25388 in the code (ignored)`.
 - **No code range**: no int3 fill, no hook / driver / PNG / CRT jumps at original addresses, no `.orig` section
   (range.S is now only linked into bmxplatformtest, whose winchan.c keeps the fixed-address mode). The exe is
-  linked at 0x20000000, away from the original's range. The jumps over our own functions' entries (smooth mixer,
+  linked at 0x20000000 (0x01000000 since X1b), away from the original's range. The jumps over our own functions' entries (smooth mixer,
   wide HUD, draw distance) stay. The trap handler reports faults; an address in 0x400000..0x6b3000 there is an
   original one that was not converted.
 - **Retired**: `BMX_PNG_CHECK` (src/native/pngcheck.c ran the original libpng from the code range; its result, 112
   files identical, stands; tools/png_cases.py still makes the synthetic set) and `BMX_TRAP_SKIP` (no int3 traps).
-- **Still read from NgBMX.exe**: the data itself (X1b moves it into the source, docs/PORTING.md).
+- **Still read from NgBMX.exe** then: the data itself (X1b moved it into the source, above).
 
 Verification (X1a): the user's recording (5594 ticks, DualSense, several levels) and the scripted ride (1014
 ticks) replayed with tools/xcheck.py give per-tick simulation hashes identical to the fixed-address build; the hook
@@ -111,15 +170,11 @@ declarations of functions that are ported under another name, and WinMain. The C
 to equivalents in our C library, checked against MSVC6 behaviour where it differs (strcmp returns
 -1/0/1; printf formatting of floats).
 
-## Later: drop the dependency on the user's NgBMX.exe
+## Dropping the dependency on the user's NgBMX.exe (done: X1b)
 
-Step 1 copies the original's initialised data (515 globals: tables, strings, settings) from the user's
-own NgBMX.exe at startup, so bmxnative.exe must sit next to the original and cannot replace it yet.
-Before a release, every ORIG_VAR with initial data gets a native definition (generated from the
-original's formula where possible, else read from the game's asset files) and the remaining ORIG_FN
-targets are ours. Then the exe needs only the user's asset files and can be dropped into the game
-folder as NgBMX.exe (save files stay compatible: same formats). Other platforms have no exe to
-replace: they point at a copy of the game's assets folder.
+Done in X1b (above): the data is in the source, every ORIG_FN target is ours, and the exe needs only the user's
+asset files; it can sit in the game folder next to NgBMX.exe or replace it (save files stay compatible: same
+formats). Other platforms have no exe to replace: they point at a copy of the game's assets folder.
 
 ## Done for step 1
 
@@ -132,7 +187,7 @@ trap; the trap report names the function. A short list of the first traps goes i
 export PATH="$HOME/tools/llvm-mingw-20261020-ucrt-x86_64/bin:$PATH"   # i686-w64-mingw32-clang
 cmake --preset native32 -DBMX_WORK_DIR=<repo>/work                    # work/ = labels.raw, for names in reports
 cmake --build build/native32 -j 2
-cd <game folder> && <repo>/build/native32/bmxnative.exe Scene.Txt -r640.480.16   # needs NgBMX.exe in the working dir
+cd <game folder> && <repo>/build/native32/bmxnative.exe Scene.Txt -r640.480.16   # the game folder's data, no NgBMX.exe
 ```
 
 SDL3 (the mingw devel package's `i686-w64-mingw32` folder) is found by the `native32` configure under
@@ -164,7 +219,6 @@ Environment (dev aids):
 
 | Variable | Effect |
 |---|---|
-| `BMX_RELOC_LOG=1` | list the relocated pointers in the original's data that point at code nothing serves (they get trap stubs that report the address if called) |
 | `BMX_NO_MOVIES=1` | sets the original's own movie skip switch (0x67288c, which the game never sets): no ACCLAIM/ZAXIS/INTRO.AVI |
 | `BMX_MUTE=1` | the DirectSound and waveOut (movies) stand-ins output silence (they still consume their data at the normal pace, so cursors and MM_WOM_DONE run as in an audible run); since S11 there is no WASAPI session mute (a machine whose last run was an old BMX_MUTE=1 run may need bmxnative.exe unmuted once in the Windows volume mixer) |
 | `BMX_SOUND_CHECK=1` | repeat every DirectSound call of the game on the real dsound.dll and compare (log lines `soundcheck:`, last line `soundcheck: RESULT clean\|DIFFERENCES`); the real buffers get no data, so nothing is heard twice |
@@ -269,7 +323,7 @@ functions that need equivalents in our C library, like the other `skip` rows of 
 ## C runtime layer (src/native/crt.c, crtasm.S)
 
 The original links MSVC6's CRT statically, so its code is int3 here. After the hook jumps, `bmxCrtInstall` (called
-at the end of `bmxLoadImage`) writes a `jmp` from each CRT entry the game or RenderWare can reach to an
+at the end of `bmxLoadImage`, now `bmxLoaderInit`) writes a `jmp` from each CRT entry the game or RenderWare can reach to an
 implementation; the table in `crt.c` has the original address, replacement and name (54 entries). The set comes from
 the CRT functions that ported code calls (callers in `work/bundles*`), the `ORIG_FN`/`RW_CB` addresses in `src`, and
 the stdio/string tables `_rwFSOpen`/`_rwStringOpen` fill. `data/functions-rw.csv` is incomplete here (it lacks

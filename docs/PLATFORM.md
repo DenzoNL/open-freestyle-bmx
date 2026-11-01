@@ -888,7 +888,8 @@ The import table of `bmxnative.exe` is now SDL3.dll, bcrypt.dll, KERNEL32.dll an
 - **Kept Win32 (on purpose):** window.c's real SetWindowPos for BMX_KEYS runs (dev aid, loaded at run time through
   bmxRealProc, no import); the dev checks BMX_INPUT_CHECK / BMX_SOUND_CHECK / BMX_FILE_CHECK and bmxplatformtest,
   which load real DLLs; loader.c / trap.c / range.S / crt.c (VirtualProtect, the vectored handler, LoadLibrary /
-  GetProcAddress, the .orig section: KERNEL32) and bcrypt for the SHA-256 of NgBMX.exe. USER32.dll is in the process
+  GetProcAddress, the .orig section: KERNEL32); bcrypt for the SHA-256 of NgBMX.exe until X1b (docs/PORTING.md), which
+  stopped reading the exe. USER32.dll is in the process
   because SDL3.dll imports it.
 - **Import check (tools/check.sh).** After the build, when `build/native32/bmxnative.exe` exists (CI without
   native32 skips it), `llvm-objdump -p` lists the imported DLLs (`OBJDUMP` overrides the tool) and any outside this
@@ -898,7 +899,6 @@ The import table of `bmxnative.exe` is now SDL3.dll, bcrypt.dll, KERNEL32.dll an
   |---|---|
   | `SDL3.dll` | window, input, audio, GPU: the platform layer |
   | `KERNEL32.dll` | the loader / trap / range machinery and the CRT layer (VirtualProtect, the vectored exception handler, LoadLibrary / GetProcAddress for the dev checks and bmxRealProc, threads, files) |
-  | `bcrypt.dll` | BCryptHash for the SHA-256 check of NgBMX.exe, until an own SHA-256 |
   | `api-ms-win-crt-*.dll` | the UCRT's forwarder sets that the mingw-w64 CRT imports (stdio, heap, string, ...) |
 
   Tested: the real exe passes; a fake extra `USER32.dll` in the listing fails; an empty listing fails.

@@ -11,9 +11,9 @@ echo "== build (hook preset) (${SECONDS} s)"
 cmake --preset hook >/dev/null
 cmake --build --preset hook
 echo "== clang-tidy (${SECONDS} s)"
-# src/native, src/platform, src/driver and src/png are only built by the native32 preset (hosted mingw, SDL3), not in build/hook's
-# compile database; tidy them with -p build/native32 (docs/NATIVE.md).
-mapfile -t units < <(git ls-files -co --exclude-standard 'src/*.c' 'tests/cases/*.c' ':!src/native/*' ':!src/platform/*' ':!src/driver/*' ':!src/png/*')
+# src/native, src/platform, src/driver, src/png and src/data are only built by the native32 preset (hosted mingw, SDL3), not in
+# build/hook's compile database; tidy them with -p build/native32 (docs/NATIVE.md).
+mapfile -t units < <(git ls-files -co --exclude-standard 'src/*.c' 'tests/cases/*.c' ':!src/native/*' ':!src/platform/*' ':!src/driver/*' ':!src/png/*' ':!src/data/*')
 # nixpkgs' clang-tidy wrapper puts the host libc on CPATH, which breaks the freestanding i686-windows
 # units on Linux (gnu/stubs-32.h). Use the unwrapped clang-tidy next to the flake's cross clang.
 tidy=(clang-tidy)
@@ -30,10 +30,10 @@ echo "== native32 imports (${SECONDS} s)"
 # The native exe's import table must stay free of the Windows DLLs the platform layer replaced (docs/PLATFORM.md
 # 4f). Only when build/native32 exists (CI without it is unaffected); needs llvm-objdump (llvm-mingw has it).
 if [[ -e build/native32/bmxnative.exe ]]; then
-    # sdl3: window, input, audio, GPU. kernel32: the loader / trap / range machinery and the thin CRT layer
-    # (VirtualProtect, AddVectoredExceptionHandler, LoadLibrary for the dev checks, ...). bcrypt: SHA-256 of
-    # NgBMX.exe until an own one. api-ms-win-crt-*: the UCRT's forwarders, which the mingw CRT imports.
-    allowed='^(sdl3\.dll|kernel32\.dll|bcrypt\.dll|api-ms-win-crt-[a-z0-9-]+\.dll)$'
+    # sdl3: window, input, audio, GPU. kernel32: the loader / trap machinery and the thin CRT layer
+    # (VirtualProtect, AddVectoredExceptionHandler, LoadLibrary for the dev checks, ...). api-ms-win-crt-*: the
+    # UCRT's forwarders, which the mingw CRT imports.
+    allowed='^(sdl3\.dll|kernel32\.dll|api-ms-win-crt-[a-z0-9-]+\.dll)$'
     mapfile -t imported < <("${OBJDUMP:-llvm-objdump}" -p build/native32/bmxnative.exe | sed -n 's/^[[:space:]]*DLL Name: //p' | tr -d '\r')
     if [[ ${#imported[@]} -eq 0 ]]; then
         echo "import check: no DLL names found in build/native32/bmxnative.exe (llvm-objdump missing?)" >&2
@@ -50,6 +50,14 @@ if [[ -e build/native32/bmxnative.exe ]]; then
     echo "ok: ${#imported[@]} imported DLLs, all allowed"
 else
     echo "skipped: build/native32 not available"
+fi
+echo "== native32 data (${SECONDS} s)"
+# The original's data in the source (src/data, docs/NATIVE.md): every byte and pointer of the compiled blocks
+# against NgBMX.exe's. Needs build/native32's objects and the exe.
+if [[ -d build/native32/CMakeFiles/bmx_data.dir && -e ${BMX_EXE:-work/NgBMX.exe} ]]; then
+    "${PYTHON:-python3}" -I tools/gen_data.py --check
+else
+    echo "skipped: build/native32 or NgBMX.exe not available"
 fi
 echo "== differential tests (${SECONDS} s)"
 if [[ -e ${BMX_EXE:-work/NgBMX.exe} ]]; then
