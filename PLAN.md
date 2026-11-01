@@ -182,6 +182,18 @@ round floats (so the hook build uses SSE2, not x87). Rules are in CONTRIBUTING.m
 - DLSS / FSR upscaling: needs depth + motion vectors (also needed for render interpolation). SDL3 GPU
   may not expose enough for the vendor SDKs; decide in P4 whether a D3D12/Vulkan backend is needed.
 - Modding: asset override folder (menus, riders, bikes), custom music, later a Blender level exporter.
+- **Long-term direction (2026-11-01, the user's wish; not now): an "Oblivion Remastered" style remaster with Unreal
+  Engine 5 as the renderer.** The C game stays the simulation (physics bit-exact on the original collision, tricks,
+  scoring, judges, camera, replays, menus' logic) and runs as a library at its 29.4 Hz tick; each tick it hands UE a
+  render snapshot (camera, rider / bike bone transforms, props, particles, the HUD draw list, sound events) and UE
+  renders with Lumen / Nanite, interpolating between ticks (the HIGHFPS capture is the starting point). The current
+  renderer stays as "classic mode". Android may be dropped for it (UE's mobile renderer has no Lumen). Wanted: the
+  Unreal Editor for editing existing and building new levels, which needs a level compiler from UE back to the
+  game's formats (RW world geometry for collision, the tag tables: grind edges, lips, spawns, goals). Engines
+  compared (docs/notes/raytracing.md, chat 2026-11-01): Godot 4 is the most portable (baked GI, Android), Bevy too
+  young for RT, an own Vulkan RT backend (Q2RTX style) has no editor. Prerequisites are the current steps: the game
+  as a clean 64-bit library (docs/PORTING.md). First experiment when it starts: export one level to glTF and light
+  it in UE.
 - Level remaster (render-only replacement pack, opt-in):
   - **Rule:** collision always stays on the original triangles. Grinds, lips and landings depend on
     the exact faces and edges, and the physics is bit-exact against them. Render meshes stay within
