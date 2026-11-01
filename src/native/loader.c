@@ -279,7 +279,7 @@ static int fillImports(const IMAGE_NT_HEADERS32 *nt, uint32_t *iatLo, uint32_t *
         int dllStandIns = 0, dllDead = 0, dllReal = 0;
         const uint32_t *names =
             imagePtr(kBmxImageBase + (imp->OriginalFirstThunk ? imp->OriginalFirstThunk : imp->FirstThunk));
-        FARPROC *slots = imagePtr(kBmxImageBase + imp->FirstThunk);
+        FARPROC *slots = (FARPROC *)imagePtr(kBmxImageBase + imp->FirstThunk);
 
         if (bmxImportKeepsDll(dllName)) {
             dll = LoadLibraryA(dllName);
@@ -373,7 +373,7 @@ static int findImportThunks(const uint8_t *file, const IMAGE_SECTION_HEADER *sec
                    bmxOrigImports[k].name);
             return -1;
         }
-        *bmxOrigImports[k].slotRef = imagePtr(gImportThunks[found].slot);
+        *bmxOrigImports[k].slotRef = (void **)imagePtr(gImportThunks[found].slot);
     }
     bmxLog("import thunks: %d in the exe, %u called by ported code\n", gImportThunkCount,
            (unsigned)bmxOrigImportCount);
@@ -438,7 +438,7 @@ static int relocate(const uint8_t *file, const IMAGE_NT_HEADERS32 *nt, const IMA
                 bmxLog("relocation: pointer at %08x to %08x %s: nothing serves it (trap stub)\n",
                        (unsigned)at, (unsigned)value, name);
             }
-            memcpy(imagePtr(at), &now, 4);
+            memcpy(imagePtr(at), (const void *)&now, 4);
             counts[how]++;
             total++;
         }
