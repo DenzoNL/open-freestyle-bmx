@@ -38,12 +38,12 @@ typedef struct ZbspLevelFace {
     PhysFace *face;                /* cached by zbspFindTaggedFaces */
 } ZbspLevelFace;
 
-_Static_assert(sizeof(ZbspLevelFace) == 0x6c, "ZbspLevelFace size");
+BMX_LAYOUT32_ASSERT(sizeof(ZbspLevelFace) == 0x6c, "ZbspLevelFace size");
 _Static_assert(offsetof(ZbspLevelFace, v1) == 0x10, "ZbspLevelFace.v1");
 _Static_assert(offsetof(ZbspLevelFace, tag) == 0x40, "ZbspLevelFace.tag");
-_Static_assert(offsetof(ZbspLevelFace, edgeTag) == 0x44, "ZbspLevelFace.edgeTag");
-_Static_assert(offsetof(ZbspLevelFace, edge) == 0x5c, "ZbspLevelFace.edge");
-_Static_assert(offsetof(ZbspLevelFace, face) == 0x68, "ZbspLevelFace.face");
+BMX_LAYOUT32_ASSERT(offsetof(ZbspLevelFace, edgeTag) == 0x44, "ZbspLevelFace.edgeTag");
+BMX_LAYOUT32_ASSERT(offsetof(ZbspLevelFace, edge) == 0x5c, "ZbspLevelFace.edge");
+BMX_LAYOUT32_ASSERT(offsetof(ZbspLevelFace, face) == 0x68, "ZbspLevelFace.face");
 
 /* Source definition of a tree object; `kind` 1..4 maps to the shape kind (see zbspBuildShape). */
 typedef struct ZbspObjectDef {
@@ -91,10 +91,10 @@ typedef struct ZbspTreeNode {
 } ZbspTreeNode;
 
 _Static_assert(offsetof(ZbspTreeObject, def) == 0x20, "ZbspTreeObject.def");
-_Static_assert(offsetof(ZbspTreeObject, shape) == 0x28, "ZbspTreeObject.shape");
-_Static_assert(offsetof(ZbspTreeObject, size) == 0x30, "ZbspTreeObject.size");
-_Static_assert(offsetof(ZbspTreeObject, lift) == 0x40, "ZbspTreeObject.lift");
-_Static_assert(offsetof(ZbspTreeObject, base) == 0x48, "ZbspTreeObject.base");
+BMX_LAYOUT32_ASSERT(offsetof(ZbspTreeObject, shape) == 0x28, "ZbspTreeObject.shape");
+BMX_LAYOUT32_ASSERT(offsetof(ZbspTreeObject, size) == 0x30, "ZbspTreeObject.size");
+BMX_LAYOUT32_ASSERT(offsetof(ZbspTreeObject, lift) == 0x40, "ZbspTreeObject.lift");
+BMX_LAYOUT32_ASSERT(offsetof(ZbspTreeObject, base) == 0x48, "ZbspTreeObject.base");
 
 /* Flags of a prop collision object (PhysPropObject.flags), set by zbspObjectSignal. */
 enum {
@@ -194,8 +194,8 @@ typedef struct ZbspFaceQuery {
     ZbspFaceHit *hits;
 } ZbspFaceQuery;
 
-_Static_assert(sizeof(ZbspFaceHit) == 0x1c, "ZbspFaceHit size");
-_Static_assert(sizeof(ZbspFaceQuery) == 0x40, "ZbspFaceQuery size");
+BMX_LAYOUT32_ASSERT(sizeof(ZbspFaceHit) == 0x1c, "ZbspFaceHit size");
+BMX_LAYOUT32_ASSERT(sizeof(ZbspFaceQuery) == 0x40, "ZbspFaceQuery size");
 
 /* zbspFindFaceNear's buffers: the renderer's sphere test result, face records and their int16 corners. */
 typedef struct ZbspSphereResult {

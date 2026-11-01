@@ -31,11 +31,11 @@ typedef struct ZassetLibrary {
     uint32_t cachedSize;     /* 0x124 */
 } ZassetLibrary;
 
-_Static_assert(__builtin_offsetof(ZassetLibrary, cursor) == 0xc, "zasset layout");
-_Static_assert(__builtin_offsetof(ZassetLibrary, entryBytes) == 0x18, "zasset layout");
-_Static_assert(__builtin_offsetof(ZassetLibrary, linkName) == 0x1f, "zasset layout");
-_Static_assert(__builtin_offsetof(ZassetLibrary, cachedEntry) == 0x120, "zasset layout");
-_Static_assert(sizeof(ZassetLibrary) == 0x128, "zasset size");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZassetLibrary, cursor) == 0xc, "zasset layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZassetLibrary, entryBytes) == 0x18, "zasset layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZassetLibrary, linkName) == 0x1f, "zasset layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZassetLibrary, cachedEntry) == 0x120, "zasset layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZassetLibrary) == 0x128, "zasset size");
 
 /* Free list of open libraries (0x65e2b0), created with the first library and destroyed with the last. */
 #define gZassetLibraries ORIG_VAR(0x0065e2b0, ZMemFreeList *, gZassetLibraries)

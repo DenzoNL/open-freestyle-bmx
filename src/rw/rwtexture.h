@@ -59,9 +59,9 @@ typedef struct RwRaster {
     uint8_t stamp;           /* 0x24 incremented when the raster changes */
 } RwRaster;
 
-_Static_assert(offsetof(RwRaster, originX) == 0x1c, "RwRaster layout");
-_Static_assert(offsetof(RwRaster, type) == 0x20, "RwRaster layout");
-_Static_assert(offsetof(RwRaster, stamp) == 0x24, "RwRaster layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwRaster, originX) == 0x1c, "RwRaster layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwRaster, type) == 0x20, "RwRaster layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwRaster, stamp) == 0x24, "RwRaster layout");
 
 /* The raster module's data in the engine instance: the context stack and the raster free list. */
 typedef struct RwRasterGlobals {
@@ -71,7 +71,7 @@ typedef struct RwRasterGlobals {
     RwFreeList *freeList; /* 0x64 */
 } RwRasterGlobals;
 
-_Static_assert(offsetof(RwRasterGlobals, freeList) == 0x64, "RwRasterGlobals layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwRasterGlobals, freeList) == 0x64, "RwRasterGlobals layout");
 
 typedef struct RwTexDictionary RwTexDictionary;
 typedef struct RwTexture RwTexture;
@@ -90,9 +90,9 @@ struct RwTexture {
     int32_t addressing;     /* 0x24 */
 };
 
-_Static_assert(sizeof(RwTexture) == 0x28, "RwTexture layout");
-_Static_assert(offsetof(RwTexture, lInDictionary) == 0xc, "RwTexture layout");
-_Static_assert(offsetof(RwTexture, refCount) == 0x1c, "RwTexture layout");
+BMX_LAYOUT32_ASSERT(sizeof(RwTexture) == 0x28, "RwTexture layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwTexture, lInDictionary) == 0xc, "RwTexture layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwTexture, refCount) == 0x1c, "RwTexture layout");
 
 /* A texture dictionary: its textures (texturesInDict) and its place in the list of all dictionaries. */
 struct RwTexDictionary {
@@ -103,8 +103,8 @@ struct RwTexDictionary {
     RwLLLink lInInstance;    /* 0x14 */
 };
 
-_Static_assert(sizeof(RwTexDictionary) == 0x1c, "RwTexDictionary layout");
-_Static_assert(offsetof(RwTexDictionary, texturesInDict) == 0xc, "RwTexDictionary layout");
+BMX_LAYOUT32_ASSERT(sizeof(RwTexDictionary) == 0x1c, "RwTexDictionary layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwTexDictionary, texturesInDict) == 0xc, "RwTexDictionary layout");
 
 typedef void *(BMX_CDECL *RwTextureCallBackRead)(const char *name, const char *maskName);
 typedef void *(BMX_CDECL *RwTextureCallBackFind)(const char *name);
@@ -124,7 +124,7 @@ typedef struct RwTextureGlobals {
     void *defaultFind; /* 0x28 the mipmap generator (0x4e1140), called by the mipmapped reader */
 } RwTextureGlobals;
 
-_Static_assert(sizeof(RwTextureGlobals) == 0x2c, "RwTextureGlobals layout");
+BMX_LAYOUT32_ASSERT(sizeof(RwTextureGlobals) == 0x2c, "RwTextureGlobals layout");
 
 enum { rwIMAGEOWNSPIXELS = 1, rwIMAGEGAMMACORRECTED = 2 };
 
@@ -140,8 +140,8 @@ typedef struct RwImage {
     uint8_t stamp;    /* 0x1c */
 } RwImage;
 
-_Static_assert(offsetof(RwImage, pixels) == 0x14, "RwImage layout");
-_Static_assert(offsetof(RwImage, stamp) == 0x1c, "RwImage layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwImage, pixels) == 0x14, "RwImage layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwImage, stamp) == 0x1c, "RwImage layout");
 
 typedef RwImage *(BMX_CDECL *RwImageCallBackRead)(const char *name);
 typedef RwImage *(BMX_CDECL *RwImageCallBackWrite)(RwImage *image, const char *name);
@@ -155,7 +155,7 @@ typedef struct RwImageFormat {
     struct RwImageFormat *next; /* 0x30 */
 } RwImageFormat;
 
-_Static_assert(sizeof(RwImageFormat) == 0x34, "RwImageFormat layout");
+BMX_LAYOUT32_ASSERT(sizeof(RwImageFormat) == 0x34, "RwImageFormat layout");
 
 /* The image module's data in the engine instance. */
 typedef struct RwImageGlobals {
@@ -176,8 +176,8 @@ typedef struct RwImageGlobals {
     RwImageFormat *formats;     /* 0x21c newest first */
 } RwImageGlobals;
 
-_Static_assert(offsetof(RwImageGlobals, gamma) == 0x20c, "RwImageGlobals layout");
-_Static_assert(offsetof(RwImageGlobals, formats) == 0x21c, "RwImageGlobals layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwImageGlobals, gamma) == 0x20c, "RwImageGlobals layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwImageGlobals, formats) == 0x21c, "RwImageGlobals layout");
 
 /* Offsets of the module data inside the engine instance. */
 #define rwTextureOffset ORIG_VAR(0x00676d40, int32_t, rwTextureOffset)

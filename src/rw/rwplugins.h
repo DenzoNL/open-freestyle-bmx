@@ -30,8 +30,8 @@ typedef struct RpMorphTarget {
     ZVec3 *normals;          /* 0x18 */
 } RpMorphTarget;
 
-_Static_assert(offsetof(RpMorphTarget, boundingSphere) == 4, "RpMorphTarget layout");
-_Static_assert(offsetof(RpMorphTarget, normals) == 0x18, "RpMorphTarget layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpMorphTarget, boundingSphere) == 4, "RpMorphTarget layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpMorphTarget, normals) == 0x18, "RpMorphTarget layout");
 
 /* RpGeometry and RpTriangle are in rw/rwclump.h. */
 typedef struct RpGeometry RpGeometry;
@@ -73,17 +73,17 @@ struct RpAtomic {
     RwLLLink llWorldSectorsInAtomic;       /* 0x68 RpTie links of the sectors it touches */
 };
 
-_Static_assert(offsetof(RpAtomic, stamp) == 0x14, "RpAtomic layout");
-_Static_assert(offsetof(RpAtomic, repEntry) == 0x18, "RpAtomic layout");
-_Static_assert(offsetof(RpAtomic, geometry) == 0x1c, "RpAtomic layout");
-_Static_assert(offsetof(RpAtomic, boundingSphere) == 0x20, "RpAtomic layout");
-_Static_assert(offsetof(RpAtomic, worldBoundingSphere) == 0x30, "RpAtomic layout");
-_Static_assert(offsetof(RpAtomic, clump) == 0x40, "RpAtomic layout");
-_Static_assert(offsetof(RpAtomic, inClumpLink) == 0x44, "RpAtomic layout");
-_Static_assert(offsetof(RpAtomic, renderCallBack) == 0x4c, "RpAtomic layout");
-_Static_assert(offsetof(RpAtomic, interpolator) == 0x50, "RpAtomic layout");
-_Static_assert(offsetof(RpAtomic, collisionTag) == 0x66, "RpAtomic layout");
-_Static_assert(offsetof(RpAtomic, llWorldSectorsInAtomic) == 0x68, "RpAtomic layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpAtomic, stamp) == 0x14, "RpAtomic layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpAtomic, repEntry) == 0x18, "RpAtomic layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpAtomic, geometry) == 0x1c, "RpAtomic layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpAtomic, boundingSphere) == 0x20, "RpAtomic layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpAtomic, worldBoundingSphere) == 0x30, "RpAtomic layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpAtomic, clump) == 0x40, "RpAtomic layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpAtomic, inClumpLink) == 0x44, "RpAtomic layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpAtomic, renderCallBack) == 0x4c, "RpAtomic layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpAtomic, interpolator) == 0x50, "RpAtomic layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpAtomic, collisionTag) == 0x66, "RpAtomic layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpAtomic, llWorldSectorsInAtomic) == 0x68, "RpAtomic layout");
 _Static_assert(sizeof(RpInterpolator) == 0x14, "RpInterpolator layout");
 
 /* An RpClump: atomics on a frame hierarchy (parent is the root frame). */
@@ -97,8 +97,8 @@ struct RpClump {
     void *callback;       /* 0x1c */
 };
 
-_Static_assert(offsetof(RpClump, stamp) == 0x12, "RpClump layout");
-_Static_assert(offsetof(RpClump, callback) == 0x1c, "RpClump layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpClump, stamp) == 0x12, "RpClump layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpClump, callback) == 0x1c, "RpClump layout");
 
 /* Atomic flags (RpAtomic.object.object.flags). */
 enum {
@@ -149,9 +149,9 @@ typedef struct RpSkinGeometry {
     ZVec3 *origNormals;
 } RpSkinGeometry;
 
-_Static_assert(sizeof(RpSkinBoneBlock) == 0x10, "RpSkinBoneBlock layout");
-_Static_assert(sizeof(RpSkinBone) == 0x88, "RpSkinBone layout");
-_Static_assert(sizeof(RpSkinGeometry) == 0xc, "RpSkinGeometry layout");
+BMX_LAYOUT32_ASSERT(sizeof(RpSkinBoneBlock) == 0x10, "RpSkinBoneBlock layout");
+BMX_LAYOUT32_ASSERT(sizeof(RpSkinBone) == 0x88, "RpSkinBone layout");
+BMX_LAYOUT32_ASSERT(sizeof(RpSkinGeometry) == 0xc, "RpSkinGeometry layout");
 
 /* The registries of the object types, in .data. */
 #define rpClumpRegistry       ORIG_VAR(0x005667b0, RwPluginRegistry, rpClumpRegistry)
@@ -339,7 +339,7 @@ typedef struct RpLodAtomicData {
     RpGeometry *levels[10];             /* 0x18 */
 } RpLodAtomicData;
 
-_Static_assert(sizeof(RpLodAtomicData) == 0x40, "RpLodAtomicData layout");
+BMX_LAYOUT32_ASSERT(sizeof(RpLodAtomicData) == 0x40, "RpLodAtomicData layout");
 
 int32_t rpLodAtomicSelectLevel(RpAtomic *atomic);
 __attribute__((regparm(2))) RpAtomic *rpLodAtomicApply(RpAtomic *atomic, RpLodAtomicData *lod);

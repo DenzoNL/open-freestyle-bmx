@@ -104,17 +104,17 @@ typedef struct OvlProfile {
     char name[0x45];
 } OvlProfile;
 
-_Static_assert(sizeof(OvlElement) == 0x18, "OvlElement size");
-_Static_assert(sizeof(OvlScreen) == 0x10, "OvlScreen size");
+BMX_LAYOUT32_ASSERT(sizeof(OvlElement) == 0x18, "OvlElement size");
+BMX_LAYOUT32_ASSERT(sizeof(OvlScreen) == 0x10, "OvlScreen size");
 _Static_assert(sizeof(OvlProfile) == 0x4c, "OvlProfile size");
 _Static_assert(sizeof(OvlFade) == 0x20, "OvlFade size");
 _Static_assert(sizeof(OvlTimedMsg) == 4, "OvlTimedMsg size");
 _Static_assert(sizeof(OvlStatusMsg) == 8, "OvlStatusMsg size");
 _Static_assert(sizeof(OvlPageDef) == 4, "OvlPageDef size");
-_Static_assert(offsetof(OvlScreen, itemCount) == 0xc && offsetof(OvlScreen, selected) == 0xd,
-               "OvlScreen fields");
-_Static_assert(offsetof(OvlElement, setB) == 0x14, "OvlElement fields");
-_Static_assert(offsetof(OvlFont, glyphs) == 8 && offsetof(OvlFont, height) == 5, "OvlFont fields");
+BMX_LAYOUT32_ASSERT(offsetof(OvlScreen, itemCount) == 0xc && offsetof(OvlScreen, selected) == 0xd,
+                    "OvlScreen fields");
+BMX_LAYOUT32_ASSERT(offsetof(OvlElement, setB) == 0x14, "OvlElement fields");
+BMX_LAYOUT32_ASSERT(offsetof(OvlFont, glyphs) == 8 && offsetof(OvlFont, height) == 5, "OvlFont fields");
 _Static_assert(offsetof(OvlFade, ticks) == 4 && offsetof(OvlFade, db) == 0x1c, "OvlFade fields");
 _Static_assert(offsetof(OvlProfile, name) == 7 && offsetof(OvlProfile, option) == 6, "OvlProfile fields");
 

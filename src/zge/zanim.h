@@ -38,7 +38,7 @@ typedef struct ZanimRecord {
     ZanimChannel *channels10;
 } ZanimRecord;
 
-_Static_assert(sizeof(ZanimRecord) == 0x14, "animation record layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZanimRecord) == 0x14, "animation record layout");
 
 /* Chunk handler of the animation container (ANIM): nothing to read. */
 int zanimReadAnim(void *iff);

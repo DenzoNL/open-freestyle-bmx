@@ -1132,8 +1132,8 @@ uint32_t rpAnimSequenceType(const uint32_t *sequence)
 BMX_ADDR(0x004fd710)
 __attribute__((regparm(1))) int32_t rpAnimSequenceSize(const uint32_t *sequence)
 {
-    _Static_assert(offsetof(RwGlobals, stringFuncs) + offsetof(RwStringFunctions, rwstrlen) == 0x114,
-                   "rwstrlen offset");
+    BMX_LAYOUT32_ASSERT(offsetof(RwGlobals, stringFuncs) + offsetof(RwStringFunctions, rwstrlen) == 0x114,
+                        "rwstrlen offset");
     const int32_t length = ((int32_t(BMX_CDECL *)(const char *))RwEngineInstance->stringFuncs.rwstrlen)(
         (const char *)(uintptr_t)sequence[1]);
     const int32_t type = (int32_t)sequence[2];

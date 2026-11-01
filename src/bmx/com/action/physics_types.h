@@ -14,10 +14,10 @@ typedef struct PhysContactSnap {
     uint8_t data[500];
 } PhysContactSnap;
 
-_Static_assert(sizeof(PhysContactSnap) == 0x1fc, "PhysContactSnap size");
+BMX_LAYOUT32_ASSERT(sizeof(PhysContactSnap) == 0x1fc, "PhysContactSnap size");
 _Static_assert(offsetof(PhysContactSnap, surface) == 0x0, "PhysContactSnap.surface");
-_Static_assert(offsetof(PhysContactSnap, contact) == 0x4, "PhysContactSnap.contact");
-_Static_assert(offsetof(PhysContactSnap, data) == 0x8, "PhysContactSnap.data");
+BMX_LAYOUT32_ASSERT(offsetof(PhysContactSnap, contact) == 0x4, "PhysContactSnap.contact");
+BMX_LAYOUT32_ASSERT(offsetof(PhysContactSnap, data) == 0x8, "PhysContactSnap.data");
 
 typedef struct PhysWheel {
     ZVec3 anchor; /* attachment point in bike space */
@@ -262,7 +262,7 @@ typedef struct PhysRider {
     uint8_t ik[0x1d8]; /* IK limb targets of the rider actor (0x457790 fills, 0x456120 applies) */
 } PhysRider;
 
-_Static_assert(sizeof(PhysRider) == 0xf70, "PhysRider size");
+BMX_LAYOUT32_ASSERT(sizeof(PhysRider) == 0xf70, "PhysRider size");
 /* No pointer before `contact`: the overlay reads the record by byte offset (kOvlPlayer*, overlay.h). */
 _Static_assert(offsetof(PhysRider, contact) == 0x488, "PhysRider.contact");
 _Static_assert(offsetof(PhysRider, look) == 0x0, "PhysRider.look");
@@ -313,51 +313,51 @@ _Static_assert(offsetof(PhysRider, rot) == 0x478, "PhysRider.rot");
 _Static_assert(offsetof(PhysRider, yawTrim) == 0x480, "PhysRider.yawTrim");
 _Static_assert(offsetof(PhysRider, speed) == 0x484, "PhysRider.speed");
 _Static_assert(offsetof(PhysRider, contact) == 0x488, "PhysRider.contact");
-_Static_assert(offsetof(PhysRider, contactData) == 0x48c, "PhysRider.contactData");
-_Static_assert(offsetof(PhysRider, contactPos) == 0x680, "PhysRider.contactPos");
-_Static_assert(offsetof(PhysRider, contactAxis0) == 0x690, "PhysRider.contactAxis0");
-_Static_assert(offsetof(PhysRider, contactAxis1) == 0x6a0, "PhysRider.contactAxis1");
-_Static_assert(offsetof(PhysRider, contactAxis2) == 0x6b0, "PhysRider.contactAxis2");
-_Static_assert(offsetof(PhysRider, stat) == 0x6d0, "PhysRider.stat");
-_Static_assert(offsetof(PhysRider, orientA) == 0x6ec, "PhysRider.orientA");
-_Static_assert(offsetof(PhysRider, orientARot) == 0x72c, "PhysRider.orientARot");
-_Static_assert(offsetof(PhysRider, orientB) == 0x734, "PhysRider.orientB");
-_Static_assert(offsetof(PhysRider, orientBRot) == 0x774, "PhysRider.orientBRot");
-_Static_assert(offsetof(PhysRider, snapA) == 0x77c, "PhysRider.snapA");
-_Static_assert(offsetof(PhysRider, snapAPos) == 0x978, "PhysRider.snapAPos");
-_Static_assert(offsetof(PhysRider, snapB) == 0x988, "PhysRider.snapB");
-_Static_assert(offsetof(PhysRider, snapBPos) == 0xb84, "PhysRider.snapBPos");
-_Static_assert(offsetof(PhysRider, actor) == 0xb94, "PhysRider.actor");
-_Static_assert(offsetof(PhysRider, actor2) == 0xb98, "PhysRider.actor2");
-_Static_assert(offsetof(PhysRider, fieldB9C) == 0xb9c, "PhysRider.fieldB9C");
-_Static_assert(offsetof(PhysRider, fieldBA0) == 0xba0, "PhysRider.fieldBA0");
-_Static_assert(offsetof(PhysRider, fieldBA4) == 0xba4, "PhysRider.fieldBA4");
-_Static_assert(offsetof(PhysRider, animSpeed) == 0xba8, "PhysRider.animSpeed");
-_Static_assert(offsetof(PhysRider, motionIndex) == 0xbac, "PhysRider.motionIndex");
-_Static_assert(offsetof(PhysRider, motionSample) == 0xbb0, "PhysRider.motionSample");
-_Static_assert(offsetof(PhysRider, motionFlags) == 0xbb4, "PhysRider.motionFlags");
-_Static_assert(offsetof(PhysRider, motionFlagsHi) == 0xbb6, "PhysRider.motionFlagsHi");
-_Static_assert(offsetof(PhysRider, motionWeight) == 0xbb8, "PhysRider.motionWeight");
-_Static_assert(offsetof(PhysRider, ikBlend) == 0xbbc, "PhysRider.ikBlend");
-_Static_assert(offsetof(PhysRider, motionScale) == 0xbc0, "PhysRider.motionScale");
-_Static_assert(offsetof(PhysRider, fieldBFC) == 0xbfc, "PhysRider.fieldBFC");
-_Static_assert(offsetof(PhysRider, bikeLookId) == 0xc0c, "PhysRider.bikeLookId");
-_Static_assert(offsetof(PhysRider, center) == 0xc10, "PhysRider.center");
-_Static_assert(offsetof(PhysRider, basis) == 0xc20, "PhysRider.basis");
-_Static_assert(offsetof(PhysRider, fieldC60) == 0xc60, "PhysRider.fieldC60");
-_Static_assert(offsetof(PhysRider, fieldC64) == 0xc64, "PhysRider.fieldC64");
-_Static_assert(offsetof(PhysRider, fieldC68) == 0xc68, "PhysRider.fieldC68");
-_Static_assert(offsetof(PhysRider, fieldC6C) == 0xc6c, "PhysRider.fieldC6C");
-_Static_assert(offsetof(PhysRider, fieldC70) == 0xc70, "PhysRider.fieldC70");
-_Static_assert(offsetof(PhysRider, travelMin) == 0xc74, "PhysRider.travelMin");
-_Static_assert(offsetof(PhysRider, travelMax) == 0xc78, "PhysRider.travelMax");
-_Static_assert(offsetof(PhysRider, fieldC7C) == 0xc7c, "PhysRider.fieldC7C");
-_Static_assert(offsetof(PhysRider, fieldC80) == 0xc80, "PhysRider.fieldC80");
-_Static_assert(offsetof(PhysRider, fieldC84) == 0xc84, "PhysRider.fieldC84");
-_Static_assert(offsetof(PhysRider, wheel) == 0xc88, "PhysRider.wheel");
-_Static_assert(offsetof(PhysRider, bikeObj) == 0xd90, "PhysRider.bikeObj");
-_Static_assert(offsetof(PhysRider, bikeObj2) == 0xd94, "PhysRider.bikeObj2");
-_Static_assert(offsetof(PhysRider, ik) == 0xd98, "PhysRider.ik");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, contactData) == 0x48c, "PhysRider.contactData");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, contactPos) == 0x680, "PhysRider.contactPos");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, contactAxis0) == 0x690, "PhysRider.contactAxis0");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, contactAxis1) == 0x6a0, "PhysRider.contactAxis1");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, contactAxis2) == 0x6b0, "PhysRider.contactAxis2");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, stat) == 0x6d0, "PhysRider.stat");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, orientA) == 0x6ec, "PhysRider.orientA");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, orientARot) == 0x72c, "PhysRider.orientARot");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, orientB) == 0x734, "PhysRider.orientB");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, orientBRot) == 0x774, "PhysRider.orientBRot");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, snapA) == 0x77c, "PhysRider.snapA");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, snapAPos) == 0x978, "PhysRider.snapAPos");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, snapB) == 0x988, "PhysRider.snapB");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, snapBPos) == 0xb84, "PhysRider.snapBPos");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, actor) == 0xb94, "PhysRider.actor");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, actor2) == 0xb98, "PhysRider.actor2");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, fieldB9C) == 0xb9c, "PhysRider.fieldB9C");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, fieldBA0) == 0xba0, "PhysRider.fieldBA0");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, fieldBA4) == 0xba4, "PhysRider.fieldBA4");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, animSpeed) == 0xba8, "PhysRider.animSpeed");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, motionIndex) == 0xbac, "PhysRider.motionIndex");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, motionSample) == 0xbb0, "PhysRider.motionSample");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, motionFlags) == 0xbb4, "PhysRider.motionFlags");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, motionFlagsHi) == 0xbb6, "PhysRider.motionFlagsHi");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, motionWeight) == 0xbb8, "PhysRider.motionWeight");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, ikBlend) == 0xbbc, "PhysRider.ikBlend");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, motionScale) == 0xbc0, "PhysRider.motionScale");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, fieldBFC) == 0xbfc, "PhysRider.fieldBFC");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, bikeLookId) == 0xc0c, "PhysRider.bikeLookId");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, center) == 0xc10, "PhysRider.center");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, basis) == 0xc20, "PhysRider.basis");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, fieldC60) == 0xc60, "PhysRider.fieldC60");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, fieldC64) == 0xc64, "PhysRider.fieldC64");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, fieldC68) == 0xc68, "PhysRider.fieldC68");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, fieldC6C) == 0xc6c, "PhysRider.fieldC6C");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, fieldC70) == 0xc70, "PhysRider.fieldC70");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, travelMin) == 0xc74, "PhysRider.travelMin");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, travelMax) == 0xc78, "PhysRider.travelMax");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, fieldC7C) == 0xc7c, "PhysRider.fieldC7C");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, fieldC80) == 0xc80, "PhysRider.fieldC80");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, fieldC84) == 0xc84, "PhysRider.fieldC84");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, wheel) == 0xc88, "PhysRider.wheel");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, bikeObj) == 0xd90, "PhysRider.bikeObj");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, bikeObj2) == 0xd94, "PhysRider.bikeObj2");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRider, ik) == 0xd98, "PhysRider.ik");
 
 typedef struct PhysEdge {
     uint8_t side; /* bit 0 / bit 1: the solid side of the edge (see zbspEdgeSide) */
@@ -374,7 +374,7 @@ typedef struct PhysEdge {
     void *prop;
 } PhysEdge;
 
-_Static_assert(sizeof(PhysEdge) == 0x38, "PhysEdge size");
+BMX_LAYOUT32_ASSERT(sizeof(PhysEdge) == 0x38, "PhysEdge size");
 _Static_assert(offsetof(PhysEdge, side) == 0x0, "PhysEdge.side");
 _Static_assert(offsetof(PhysEdge, kind) == 0x4, "PhysEdge.kind");
 _Static_assert(offsetof(PhysEdge, a) == 0x8, "PhysEdge.a");
@@ -384,7 +384,7 @@ _Static_assert(offsetof(PhysEdge, tag) == 0x16, "PhysEdge.tag");
 _Static_assert(offsetof(PhysEdge, dir) == 0x18, "PhysEdge.dir");
 _Static_assert(offsetof(PhysEdge, normal) == 0x24, "PhysEdge.normal");
 _Static_assert(offsetof(PhysEdge, d) == 0x30, "PhysEdge.d");
-_Static_assert(offsetof(PhysEdge, prop) == 0x34, "PhysEdge.prop");
+BMX_LAYOUT32_ASSERT(offsetof(PhysEdge, prop) == 0x34, "PhysEdge.prop");
 
 typedef struct PhysFace {
     ZVec3 normal;
@@ -412,21 +412,21 @@ typedef struct PhysFace {
     void *owner; /* geometry the face belongs to: a point of the plane at +0x10, the material at +0x48 */
 } PhysFace;
 
-_Static_assert(sizeof(PhysFace) == 0x88, "PhysFace size");
+BMX_LAYOUT32_ASSERT(sizeof(PhysFace) == 0x88, "PhysFace size");
 _Static_assert(offsetof(PhysFace, normal) == 0x0, "PhysFace.normal");
 _Static_assert(offsetof(PhysFace, d) == 0xc, "PhysFace.d");
 _Static_assert(offsetof(PhysFace, kind) == 0x14, "PhysFace.kind");
 _Static_assert(offsetof(PhysFace, flags) == 0x15, "PhysFace.flags");
 _Static_assert(offsetof(PhysFace, tag) == 0x16, "PhysFace.tag");
-_Static_assert(offsetof(PhysFace, vert) == 0x1c, "PhysFace.vert");
-_Static_assert(offsetof(PhysFace, object) == 0x2c, "PhysFace.object");
-_Static_assert(offsetof(PhysFace, p0) == 0x30, "PhysFace.p0");
-_Static_assert(offsetof(PhysFace, p1) == 0x40, "PhysFace.p1");
-_Static_assert(offsetof(PhysFace, p2) == 0x50, "PhysFace.p2");
-_Static_assert(offsetof(PhysFace, q0) == 0x60, "PhysFace.q0");
-_Static_assert(offsetof(PhysFace, q1) == 0x6c, "PhysFace.q1");
-_Static_assert(offsetof(PhysFace, q2) == 0x78, "PhysFace.q2");
-_Static_assert(offsetof(PhysFace, owner) == 0x84, "PhysFace.owner");
+BMX_LAYOUT32_ASSERT(offsetof(PhysFace, vert) == 0x1c, "PhysFace.vert");
+BMX_LAYOUT32_ASSERT(offsetof(PhysFace, object) == 0x2c, "PhysFace.object");
+BMX_LAYOUT32_ASSERT(offsetof(PhysFace, p0) == 0x30, "PhysFace.p0");
+BMX_LAYOUT32_ASSERT(offsetof(PhysFace, p1) == 0x40, "PhysFace.p1");
+BMX_LAYOUT32_ASSERT(offsetof(PhysFace, p2) == 0x50, "PhysFace.p2");
+BMX_LAYOUT32_ASSERT(offsetof(PhysFace, q0) == 0x60, "PhysFace.q0");
+BMX_LAYOUT32_ASSERT(offsetof(PhysFace, q1) == 0x6c, "PhysFace.q1");
+BMX_LAYOUT32_ASSERT(offsetof(PhysFace, q2) == 0x78, "PhysFace.q2");
+BMX_LAYOUT32_ASSERT(offsetof(PhysFace, owner) == 0x84, "PhysFace.owner");
 
 typedef struct PhysGroundHit {
     uint32_t flags;
@@ -439,13 +439,13 @@ typedef struct PhysGroundHit {
     void *edge;
 } PhysGroundHit;
 
-_Static_assert(sizeof(PhysGroundHit) == 0x30, "PhysGroundHit size");
+BMX_LAYOUT32_ASSERT(sizeof(PhysGroundHit) == 0x30, "PhysGroundHit size");
 _Static_assert(offsetof(PhysGroundHit, flags) == 0x0, "PhysGroundHit.flags");
 _Static_assert(offsetof(PhysGroundHit, pos) == 0x4, "PhysGroundHit.pos");
 _Static_assert(offsetof(PhysGroundHit, normal) == 0x14, "PhysGroundHit.normal");
 _Static_assert(offsetof(PhysGroundHit, d) == 0x20, "PhysGroundHit.d");
-_Static_assert(offsetof(PhysGroundHit, face) == 0x24, "PhysGroundHit.face");
-_Static_assert(offsetof(PhysGroundHit, material) == 0x28, "PhysGroundHit.material");
-_Static_assert(offsetof(PhysGroundHit, edge) == 0x2c, "PhysGroundHit.edge");
+BMX_LAYOUT32_ASSERT(offsetof(PhysGroundHit, face) == 0x24, "PhysGroundHit.face");
+BMX_LAYOUT32_ASSERT(offsetof(PhysGroundHit, material) == 0x28, "PhysGroundHit.material");
+BMX_LAYOUT32_ASSERT(offsetof(PhysGroundHit, edge) == 0x2c, "PhysGroundHit.edge");
 
 #endif

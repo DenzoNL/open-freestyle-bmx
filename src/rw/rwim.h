@@ -27,7 +27,7 @@ typedef struct RwIm3DPipeline {
     void(BMX_CDECL *stage6)(void *work);                    /* 0x18 */
 } RwIm3DPipeline;
 
-_Static_assert(sizeof(RwIm3DPipeline) == 0x1c, "RwIm3DPipeline layout");
+BMX_LAYOUT32_ASSERT(sizeof(RwIm3DPipeline) == 0x1c, "RwIm3DPipeline layout");
 
 /* The Im3D plugin's data in the engine instance: the device's begin/end entries and the pipeline stack. */
 typedef int(BMX_CDECL *RwIm3DBeginFunc)(RwIm3DPipeline *pipeline);
@@ -44,7 +44,7 @@ typedef struct RwIm3DGlobals {
     RwIm3DPipeline *stack[10];    /* 0x10 the pipelines on the stack */
 } RwIm3DGlobals;
 
-_Static_assert(offsetof(RwIm3DGlobals, stack) == 0x10, "RwIm3DGlobals layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwIm3DGlobals, stack) == 0x10, "RwIm3DGlobals layout");
 BMX_LAYOUT32_ASSERT(sizeof(RwIm3DGlobals) == 0x38, "RwIm3DGlobals size");
 
 /* Offsets of plugin data inside the engine instance. */

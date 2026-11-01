@@ -17,7 +17,7 @@ typedef struct ZrwMarker {
     struct ZrwMarker *next; /* 0x4c */
 } ZrwMarker;
 
-_Static_assert(__builtin_offsetof(ZrwMarker, next) == 0x4c, "marker layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZrwMarker, next) == 0x4c, "marker layout");
 
 #define gZrwMarkers ORIG_VAR(0x00674014, ZrwMarker *, gZrwMarkers)
 
@@ -70,17 +70,17 @@ typedef struct ZrwCamera {
 } ZrwCamera;
 
 _Static_assert(offsetof(ZrwCamera, state) == 0x08, "camera layout");
-_Static_assert(offsetof(ZrwCamera, rwCamera) == 0x0c, "camera layout");
-_Static_assert(offsetof(ZrwCamera, world) == 0x14, "camera layout");
-_Static_assert(offsetof(ZrwCamera, view) == 0x54, "camera layout");
-_Static_assert(offsetof(ZrwCamera, viewport) == 0x94, "camera layout");
-_Static_assert(offsetof(ZrwCamera, width) == 0xa4, "camera layout");
-_Static_assert(offsetof(ZrwCamera, nearClip) == 0xac, "camera layout");
-_Static_assert(offsetof(ZrwCamera, offsetX) == 0xb4, "camera layout");
-_Static_assert(offsetof(ZrwCamera, fov) == 0xbc, "camera layout");
-_Static_assert(offsetof(ZrwCamera, clearColor) == 0xc0, "camera layout");
-_Static_assert(offsetof(ZrwCamera, clipOffset) == 0xc4, "camera layout");
-_Static_assert(sizeof(ZrwCamera) == 0xc8, "camera layout");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwCamera, rwCamera) == 0x0c, "camera layout");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwCamera, world) == 0x14, "camera layout");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwCamera, view) == 0x54, "camera layout");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwCamera, viewport) == 0x94, "camera layout");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwCamera, width) == 0xa4, "camera layout");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwCamera, nearClip) == 0xac, "camera layout");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwCamera, offsetX) == 0xb4, "camera layout");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwCamera, fov) == 0xbc, "camera layout");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwCamera, clearColor) == 0xc0, "camera layout");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwCamera, clipOffset) == 0xc4, "camera layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZrwCamera) == 0xc8, "camera layout");
 
 /* Creates a camera (flags bit 0: parallel projection, bit 1: no rasters); NULL on failure. */
 ZrwCamera *zrwCameraCreate(uint32_t flags, void *owner);

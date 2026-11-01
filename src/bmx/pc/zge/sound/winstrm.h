@@ -111,9 +111,9 @@ typedef struct WinstrmStream {
     uint32_t drain; /* 0x40 bytes left until the end of the data reaches the play cursor */
 } WinstrmStream;
 
-_Static_assert(sizeof(WinstrmSource) == 0x24, "source layout");
-_Static_assert(sizeof(WinstrmNode) == 0xc, "node layout");
-_Static_assert(sizeof(WinstrmStream) == 0x44, "stream layout");
+BMX_LAYOUT32_ASSERT(sizeof(WinstrmSource) == 0x24, "source layout");
+BMX_LAYOUT32_ASSERT(sizeof(WinstrmNode) == 0xc, "node layout");
+BMX_LAYOUT32_ASSERT(sizeof(WinstrmStream) == 0x44, "stream layout");
 
 typedef WinstrmStream WinstrmStreamTable[kWinstrmMaxStreams];
 typedef WinstrmSource WinstrmSourceTable[kWinstrmMaxSources];

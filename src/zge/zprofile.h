@@ -51,7 +51,7 @@ typedef struct ZProfileState {
     uint32_t unitsPerSecond;    /* 0x64 0x3c: the budgets are in 1/60 s */
 } ZProfileState;
 
-_Static_assert(sizeof(ZProfileState) == 0x68, "profile state");
+BMX_LAYOUT32_ASSERT(sizeof(ZProfileState) == 0x68, "profile state");
 
 #define gZProfile ORIG_VAR(0x00676438, ZProfileState, gZProfile)
 
@@ -67,7 +67,7 @@ typedef struct ZProfileEntry {
     int32_t start[2]; /* 0x1c counter when the section was started */
 } ZProfileEntry;
 
-_Static_assert(sizeof(ZProfileEntry) == 0x24, "profile entry");
+BMX_LAYOUT32_ASSERT(sizeof(ZProfileEntry) == 0x24, "profile entry");
 
 /* Callbacks of the file interface; `file` is the slot RenderWare keeps the handle in. */
 int zrwfclose(ZfileHandle **file);

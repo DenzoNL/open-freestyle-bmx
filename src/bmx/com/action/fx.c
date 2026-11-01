@@ -40,7 +40,7 @@ typedef struct FxBlock {
     uint8_t pad1c[4];
 } FxBlock;
 
-_Static_assert(sizeof(FxBlock) == 0x20, "FxBlock size");
+BMX_LAYOUT32_ASSERT(sizeof(FxBlock) == 0x20, "FxBlock size");
 typedef const void *FxPresets[6];
 #define gFxPresets     ORIG_VAR(0x00554a9c, FxPresets, gFxPresets)
 #define gFxEmitBlock   ORIG_VAR(0x00554ab8, FxBlock, gFxEmitBlock)

@@ -15,7 +15,7 @@ typedef struct RwMatrixGlobals {
     uint32_t pad0c;                /* 0x0c */
 } RwMatrixGlobals;
 
-_Static_assert(sizeof(RwMatrixGlobals) == 0x10, "RwMatrixGlobals layout");
+BMX_LAYOUT32_ASSERT(sizeof(RwMatrixGlobals) == 0x10, "RwMatrixGlobals layout");
 
 static RwMatrixGlobals *rwMatrixGlobals(void)
 {

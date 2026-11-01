@@ -32,7 +32,7 @@ typedef struct GuiPad {
     uint32_t prevAxis[2];
 } GuiPad;
 
-_Static_assert(sizeof(GuiPad) == 0x28, "GuiPad layout");
+BMX_LAYOUT32_ASSERT(sizeof(GuiPad) == 0x28, "GuiPad layout");
 
 #define gGuiPad ORIG_VAR(0x0056d298, GuiPad, gGuiPad)
 /* Last button state and repeat count for the auto-repeating d-pad tests. */

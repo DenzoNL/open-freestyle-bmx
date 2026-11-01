@@ -25,6 +25,8 @@
 
 #include <stdint.h>
 
+#include "compat/layout.h"
+
 /*
  * In the hook build a ported function must stay a real call: test stubs and in-game hooks patch its
  * entry, which an inlined copy would bypass (clang 23 inlined gameBigGameFunction into gameStartMode).

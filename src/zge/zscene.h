@@ -30,7 +30,7 @@ typedef struct ZsceneNode {
     struct ZsceneNode *child;   /* 0x74 */
 } ZsceneNode;
 
-_Static_assert(sizeof(ZsceneNode) == 0x78, "scene node layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZsceneNode) == 0x78, "scene node layout");
 
 /* ZsceneEntry.flags: byte 0 is the object type, byte 1 a sub kind. */
 enum {
@@ -50,7 +50,7 @@ typedef struct ZsceneEntry {
     void *object;     /* 0x0c */
 } ZsceneEntry;
 
-_Static_assert(sizeof(ZsceneEntry) == 0x10, "scene entry layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZsceneEntry) == 0x10, "scene entry layout");
 
 /* An animation of an animation library (ZsceneEntry.object of a kZsceneEntryAnimLib entry), newest first. */
 typedef struct ZsceneAnim {
@@ -59,7 +59,7 @@ typedef struct ZsceneAnim {
     struct ZsceneAnim *next; /* 0x08 */
 } ZsceneAnim;
 
-_Static_assert(sizeof(ZsceneAnim) == 0xc, "scene animation layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZsceneAnim) == 0xc, "scene animation layout");
 
 /* The globals from 0x673f70 on (cleared as one block by zsceneInitialize). */
 typedef struct ZsceneState {
@@ -71,7 +71,7 @@ typedef struct ZsceneState {
     ZsceneNode common;     /* 0x673f84 SCENE_COMMON */
 } ZsceneState;
 
-_Static_assert(sizeof(ZsceneState) == 0x8c, "scene state layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZsceneState) == 0x8c, "scene state layout");
 
 #define gScene ORIG_VAR(0x00673f70, ZsceneState, gScene)
 

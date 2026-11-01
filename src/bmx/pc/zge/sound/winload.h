@@ -205,7 +205,7 @@ typedef struct WinloadCounts {
     int32_t keymaps;
 } WinloadCounts;
 
-_Static_assert(sizeof(WinloadFile) == 0x48, "file slot layout");
+BMX_LAYOUT32_ASSERT(sizeof(WinloadFile) == 0x48, "file slot layout");
 
 typedef WinloadFile WinloadFileTable[kWinloadMaxFiles];
 

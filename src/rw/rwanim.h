@@ -34,7 +34,7 @@ typedef struct RpAnimKey {
     float duration; /* 0x08 */
 } RpAnimKey;
 
-_Static_assert(sizeof(RpAnimFrameSequence) == 0x1c, "RpAnimFrameSequence layout");
+BMX_LAYOUT32_ASSERT(sizeof(RpAnimFrameSequence) == 0x1c, "RpAnimFrameSequence layout");
 _Static_assert(sizeof(RpAnimKey) == 0xc, "RpAnimKey layout");
 
 typedef struct RpAnimFrameLink {
@@ -100,8 +100,8 @@ typedef struct RpAnimClumpData {
     RpAnimClumpSequence *others;    /* 0x10 */
 } RpAnimClumpData;
 
-_Static_assert(sizeof(RpAnimNode) == 0x3c, "RpAnimNode layout");
-_Static_assert(sizeof(RpAnimClumpSequence) == 0x24, "RpAnimClumpSequence layout");
+BMX_LAYOUT32_ASSERT(sizeof(RpAnimNode) == 0x3c, "RpAnimNode layout");
+BMX_LAYOUT32_ASSERT(sizeof(RpAnimClumpSequence) == 0x24, "RpAnimClumpSequence layout");
 
 /* The walk's data for the children of the clump's frame (0x4fc540 appends their nodes). */
 typedef struct RpAnimNodeSearch {

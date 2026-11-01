@@ -25,7 +25,7 @@ typedef struct ZtimerHeap {
     ZtimerHeapEntry *entries; /* 0x0c */
 } ZtimerHeap;
 
-_Static_assert(sizeof(ZtimerHeap) == 0x10, "timer heap");
+BMX_LAYOUT32_ASSERT(sizeof(ZtimerHeap) == 0x10, "timer heap");
 
 enum { kZtimerScript = 3, kZtimerEvent = 2, kZtimerCallback = 1 };
 
@@ -44,7 +44,7 @@ typedef struct ZtimerNode {
     } u;                                                                       /* 0x1c */
 } ZtimerNode;
 
-_Static_assert(sizeof(ZtimerNode) == 0x20, "timer node");
+BMX_LAYOUT32_ASSERT(sizeof(ZtimerNode) == 0x20, "timer node");
 
 /* State of the profile clock (0x6764d0, cleared at initialisation). */
 typedef struct PcProfileClock {

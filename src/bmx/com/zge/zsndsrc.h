@@ -48,7 +48,7 @@ typedef struct ZsndSource {
     uint8_t pad27;
 } ZsndSource;
 
-_Static_assert(sizeof(ZsndSource) == 0x28, "source layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZsndSource) == 0x28, "source layout");
 
 typedef ZsndSource ZsndSourceTable[kZsndSrcMax];
 

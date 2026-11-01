@@ -79,7 +79,7 @@ typedef struct WinchanHandle {
     uint8_t channelNum; /* 0x01 mixer channel index, 0xff none */
 } WinchanHandle;
 
-_Static_assert(sizeof(WinchanChannel) == 0x48, "channel layout");
+BMX_LAYOUT32_ASSERT(sizeof(WinchanChannel) == 0x48, "channel layout");
 
 /* Parameters for winchanSetEffect. */
 typedef struct WinchanEffect {
@@ -238,7 +238,7 @@ typedef struct WinchanInitDesc {
     float echoSeconds;    /* 0x10 length of the echo buffer */
 } WinchanInitDesc;
 
-_Static_assert(sizeof(WinchanInitDesc) == 0x14, "init descriptor");
+BMX_LAYOUT32_ASSERT(sizeof(WinchanInitDesc) == 0x14, "init descriptor");
 
 /*
  * Resets the channel tables, allocates the ring and echo buffers, builds the LFO table and creates the

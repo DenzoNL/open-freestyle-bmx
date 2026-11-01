@@ -61,8 +61,8 @@ typedef struct ZMathTables {
 } ZMathTables;
 
 _Static_assert(__builtin_offsetof(ZMathTables, cos) == 0xa000, "table layout");
-_Static_assert(__builtin_offsetof(ZMathTables, asin) == 0xe008, "table layout");
-_Static_assert(__builtin_offsetof(ZMathTables, randomSeed) == 0x12014, "table layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZMathTables, asin) == 0xe008, "table layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZMathTables, randomSeed) == 0x12014, "table layout");
 
 #define gZmathTables ORIG_VAR(0x0065e2bc, ZMathTables, gZmathTables)
 

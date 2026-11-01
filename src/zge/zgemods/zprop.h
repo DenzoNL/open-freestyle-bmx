@@ -35,17 +35,17 @@ typedef struct ZPropInst {
     uint32_t pad28[3];  /* 0x28 */
 } ZPropInst;
 
-_Static_assert(sizeof(ZPropDef) == 0x54, "prop definition");
-_Static_assert(sizeof(ZPropInst) == 0x34, "prop instance");
-_Static_assert(__builtin_offsetof(ZPropDef, id) == 0x08, "prop definition");
-_Static_assert(__builtin_offsetof(ZPropDef, name) == 0x0c, "prop definition");
-_Static_assert(__builtin_offsetof(ZPropDef, model) == 0x20, "prop definition");
-_Static_assert(__builtin_offsetof(ZPropDef, extra) == 0x28, "prop definition");
-_Static_assert(__builtin_offsetof(ZPropDef, params) == 0x38, "prop definition");
-_Static_assert(__builtin_offsetof(ZPropInst, tag) == 0x0c, "prop instance");
-_Static_assert(__builtin_offsetof(ZPropInst, object) == 0x1c, "prop instance");
-_Static_assert(__builtin_offsetof(ZPropInst, source) == 0x20, "prop instance");
-_Static_assert(__builtin_offsetof(ZPropInst, extra) == 0x24, "prop instance");
+BMX_LAYOUT32_ASSERT(sizeof(ZPropDef) == 0x54, "prop definition");
+BMX_LAYOUT32_ASSERT(sizeof(ZPropInst) == 0x34, "prop instance");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZPropDef, id) == 0x08, "prop definition");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZPropDef, name) == 0x0c, "prop definition");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZPropDef, model) == 0x20, "prop definition");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZPropDef, extra) == 0x28, "prop definition");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZPropDef, params) == 0x38, "prop definition");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZPropInst, tag) == 0x0c, "prop instance");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZPropInst, object) == 0x1c, "prop instance");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZPropInst, source) == 0x20, "prop instance");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZPropInst, extra) == 0x24, "prop instance");
 
 /* Chunk handlers for PDIN / MODL (a definition) and PRBL (a placed prop). Each returns 0 on a malformed
  * chunk. */

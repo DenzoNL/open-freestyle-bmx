@@ -93,8 +93,8 @@ typedef struct ZsndSeqTrack {
     uint8_t pad46[2];
 } ZsndSeqTrack;
 
-_Static_assert(sizeof(ZsndNote) == 0x14, "note layout");
-_Static_assert(sizeof(ZsndSeqTrack) == 0x48, "track layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZsndNote) == 0x14, "note layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZsndSeqTrack) == 0x48, "track layout");
 
 struct ZsndSeqEvent;
 typedef int(BMX_CDECL *ZsndSeqHandler)(struct ZsndSeqEvent *event);
@@ -112,7 +112,7 @@ typedef struct ZsndSeqEvent {
     ZsndSeqHandler handler; /* 0x0c */
 } ZsndSeqEvent;
 
-_Static_assert(sizeof(ZsndSeqEvent) == 0x10, "event layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZsndSeqEvent) == 0x10, "event layout");
 
 typedef ZsndNote ZsndNotePool[kzsndSeqMaxNotes];
 typedef ZsndSeqTrack ZsndTrackPool[kzsndSeqMaxTracks];

@@ -150,9 +150,9 @@ typedef struct ZRigHit {
     uint8_t pad44[0xd8 - 0x44];
 } ZRigHit;
 
-_Static_assert(sizeof(ZRigHit) == 0xd8, "rig hit size");
+BMX_LAYOUT32_ASSERT(sizeof(ZRigHit) == 0xd8, "rig hit size");
 _Static_assert(__builtin_offsetof(ZRigHit, normal) == 0x1c, "rig hit layout");
-_Static_assert(__builtin_offsetof(ZRigHit, object) == 0x40, "rig hit layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZRigHit, object) == 0x40, "rig hit layout");
 
 struct ZRig;
 /* Called when a point hits level geometry during zoverRigRelax, with the impact speed along the normal. */
@@ -172,9 +172,9 @@ typedef struct ZRig {
 } ZRig;
 
 _Static_assert(sizeof(ZRigPoint) == 0xb4, "rig point size");
-_Static_assert(sizeof(ZRigConstraint) == 0x20, "rig constraint size");
-_Static_assert(sizeof(ZRigHinge) == 0x28, "rig hinge size");
-_Static_assert(sizeof(ZRigHingeDef) == 0x24, "rig hinge definition size");
+BMX_LAYOUT32_ASSERT(sizeof(ZRigConstraint) == 0x20, "rig constraint size");
+BMX_LAYOUT32_ASSERT(sizeof(ZRigHinge) == 0x28, "rig hinge size");
+BMX_LAYOUT32_ASSERT(sizeof(ZRigHingeDef) == 0x24, "rig hinge definition size");
 _Static_assert(__builtin_offsetof(ZRigPoint, mass) == 0x44, "rig point layout");
 _Static_assert(__builtin_offsetof(ZRigPoint, pos) == 0x54, "rig point layout");
 _Static_assert(__builtin_offsetof(ZRigPoint, prev) == 0x64, "rig point layout");
@@ -182,10 +182,10 @@ _Static_assert(__builtin_offsetof(ZRigPoint, accum) == 0x74, "rig point layout")
 _Static_assert(__builtin_offsetof(ZRigPoint, vel) == 0x84, "rig point layout");
 _Static_assert(__builtin_offsetof(ZRig, points) == 4, "rig layout");
 _Static_assert(__builtin_offsetof(ZRig, constraintCount) == 0xa90, "rig layout");
-_Static_assert(__builtin_offsetof(ZRig, hingeCount) == 0xd54, "rig layout");
-_Static_assert(__builtin_offsetof(ZRig, center) == 0xe70, "rig layout");
-_Static_assert(__builtin_offsetof(ZRig, onHit) == 0xe80, "rig layout");
-_Static_assert(sizeof(ZRig) == 0xe88, "rig size");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZRig, hingeCount) == 0xd54, "rig layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZRig, center) == 0xe70, "rig layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZRig, onHit) == 0xe80, "rig layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZRig) == 0xe88, "rig size");
 
 /* The rider rig and the bike rig; the zoverRig* state functions work on the one selected by zoverRigSelect.
  */

@@ -57,8 +57,8 @@ _Static_assert(offsetof(ZrwRenderColNode, boxMax) == 0x14, "collision node");
 _Static_assert(offsetof(ZrwRenderColNode, type) == 0x24, "collision node");
 _Static_assert(offsetof(ZrwRenderColNode, triangleCount) == 0x26, "collision node");
 _Static_assert(offsetof(ZrwRenderColNode, below) == 0x28, "collision node");
-_Static_assert(offsetof(ZrwRenderColNode, triangles) == 0x30, "collision node");
-_Static_assert(sizeof(ZrwRenderColNode) == 0x3c, "collision node");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwRenderColNode, triangles) == 0x30, "collision node");
+BMX_LAYOUT32_ASSERT(sizeof(ZrwRenderColNode) == 0x3c, "collision node");
 
 /* Result of zrwModelFindTriangle (kept in the exe's data): the triangle's corners and tag. */
 typedef struct ZrwRenderColHit {
@@ -86,7 +86,7 @@ typedef struct ZrwRenderColQuery {
     void *list;
 } ZrwRenderColQuery;
 
-_Static_assert(offsetof(ZrwRenderColQuery, list) == 0x04, "collision query");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwRenderColQuery, list) == 0x04, "collision query");
 
 /* The tree's root (0x6728c4) and the "draw while searching" flag (0x672900). */
 #define gZrwColRoot  ORIG_VAR(0x006728c4, ZrwRenderColNode, gZrwColRoot)
@@ -108,7 +108,7 @@ typedef struct ZrwModelRenderState {
     int indexCapacity;    /* 0x673ea4 */
 } ZrwModelRenderState;
 
-_Static_assert(sizeof(ZrwModelRenderState) == 0x28, "model render state");
+BMX_LAYOUT32_ASSERT(sizeof(ZrwModelRenderState) == 0x28, "model render state");
 
 #define gZrwModelRender ORIG_VAR(0x00673e80, ZrwModelRenderState, gZrwModelRender)
 

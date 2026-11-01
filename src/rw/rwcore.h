@@ -109,7 +109,7 @@ typedef struct RwDevice {
     RwIm3DRenderIndexedPrimitiveFunc fpIm3DRenderIndexedPrimitive; /* 0x34 */
 } RwDevice;
 
-_Static_assert(sizeof(RwDevice) == 0x38, "RwDevice layout");
+BMX_LAYOUT32_ASSERT(sizeof(RwDevice) == 0x38, "RwDevice layout");
 
 typedef void *(BMX_CDECL *RwMemMallocFunc)(size_t size);
 typedef void(BMX_CDECL *RwMemFreeFunc)(void *block);
@@ -165,7 +165,7 @@ typedef struct RwFileFunctions {
     int(BMX_CDECL *rwfflush)(void *file);                                                /* 0x24 */
 } RwFileFunctions;
 
-_Static_assert(sizeof(RwFileFunctions) == 0x28, "RwFileFunctions layout");
+BMX_LAYOUT32_ASSERT(sizeof(RwFileFunctions) == 0x28, "RwFileFunctions layout");
 
 /*
  * The engine instance. RwEngineInstance points at it; RwDefaultGlobals is the static one used until
@@ -191,14 +191,14 @@ typedef struct RwGlobals {
     int32_t engineStatus;                      /* 0x144 */
 } RwGlobals;
 
-_Static_assert(sizeof(RwGlobals) == 0x148, "RwGlobals layout");
-_Static_assert(offsetof(RwGlobals, dOpenDevice) == 0x10, "RwGlobals layout");
-_Static_assert(offsetof(RwGlobals, stdFunc) == 0x48, "RwGlobals layout");
-_Static_assert(offsetof(RwGlobals, fileFuncs) == 0xc0, "RwGlobals layout");
-_Static_assert(offsetof(RwGlobals, stringFuncs) == 0xe8, "RwGlobals layout");
-_Static_assert(offsetof(RwGlobals, memoryFuncs) == 0x128, "RwGlobals layout");
-_Static_assert(offsetof(RwGlobals, freeListAlloc) == 0x138, "RwGlobals layout");
-_Static_assert(offsetof(RwGlobals, engineStatus) == 0x144, "RwGlobals layout");
+BMX_LAYOUT32_ASSERT(sizeof(RwGlobals) == 0x148, "RwGlobals layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwGlobals, dOpenDevice) == 0x10, "RwGlobals layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwGlobals, stdFunc) == 0x48, "RwGlobals layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwGlobals, fileFuncs) == 0xc0, "RwGlobals layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwGlobals, stringFuncs) == 0xe8, "RwGlobals layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwGlobals, memoryFuncs) == 0x128, "RwGlobals layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwGlobals, freeListAlloc) == 0x138, "RwGlobals layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwGlobals, engineStatus) == 0x144, "RwGlobals layout");
 
 #define RwEngineInstance      ORIG_VAR(0x0067696c, RwGlobals *, RwEngineInstance)
 #define RwDefaultGlobals      ORIG_VAR(0x00676820, RwGlobals, RwDefaultGlobals)
@@ -230,7 +230,7 @@ struct RwFreeList {
     RwLLLink link;           /* 0x20 in the list of all free lists */
 };
 
-_Static_assert(sizeof(RwFreeList) == 0x28, "RwFreeList layout");
+BMX_LAYOUT32_ASSERT(sizeof(RwFreeList) == 0x28, "RwFreeList layout");
 
 #define rwFreeListHead ORIG_VAR(0x00676ce0, RwLLLink, rwFreeListHead)
 
@@ -284,12 +284,12 @@ typedef struct RwObjectHasFrame {
     void *sync;
 } RwObjectHasFrame;
 
-_Static_assert(offsetof(RwFrame, objectList) == 0x14, "RwFrame layout");
-_Static_assert(offsetof(RwFrame, ltm) == 0x5c, "RwFrame layout");
-_Static_assert(offsetof(RwFrame, root) == 0xa4, "RwFrame layout");
-_Static_assert(sizeof(RwFrame) == 0xa8, "RwFrame layout");
-_Static_assert(offsetof(RwGlobals, dirtyFrameList) == 0xb8, "RwGlobals layout");
-_Static_assert(sizeof(RwObjectHasFrame) == 0x14, "RwObjectHasFrame layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwFrame, objectList) == 0x14, "RwFrame layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwFrame, ltm) == 0x5c, "RwFrame layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwFrame, root) == 0xa4, "RwFrame layout");
+BMX_LAYOUT32_ASSERT(sizeof(RwFrame) == 0xa8, "RwFrame layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwGlobals, dirtyFrameList) == 0xb8, "RwGlobals layout");
+BMX_LAYOUT32_ASSERT(sizeof(RwObjectHasFrame) == 0x14, "RwObjectHasFrame layout");
 
 /* Callback of the for-all helpers: gets the object and the caller's data, returns NULL to stop. */
 typedef void *(BMX_CDECL *RwObjectCallBack)(void *object, void *data);
@@ -345,8 +345,8 @@ typedef struct RwPluginRegistry {
     RwPluginRegEntry *lastRegEntry;  /* 0x10 */
 } RwPluginRegistry;
 
-_Static_assert(sizeof(RwPluginRegEntry) == 0x34, "RwPluginRegEntry layout");
-_Static_assert(sizeof(RwPluginRegistry) == 0x14, "RwPluginRegistry layout");
+BMX_LAYOUT32_ASSERT(sizeof(RwPluginRegEntry) == 0x34, "RwPluginRegEntry layout");
+BMX_LAYOUT32_ASSERT(sizeof(RwPluginRegistry) == 0x14, "RwPluginRegistry layout");
 
 #define rwPluginRegEntryFreeList ORIG_VAR(0x00676d80, RwFreeList *, rwPluginRegEntryFreeList)
 #define rwEngineRegistry         ORIG_VAR(0x00566dc0, RwPluginRegistry, rwEngineRegistry)
@@ -440,8 +440,8 @@ typedef struct RwResourcesGlobals {
     RwLLLink *freeEntries; /* 0x20 */
 } RwResourcesGlobals;
 
-_Static_assert(sizeof(RwResEntry) == 0x18, "RwResEntry layout");
-_Static_assert(sizeof(RwResourcesGlobals) == 0x24, "RwResourcesGlobals layout");
+BMX_LAYOUT32_ASSERT(sizeof(RwResEntry) == 0x18, "RwResEntry layout");
+BMX_LAYOUT32_ASSERT(sizeof(RwResourcesGlobals) == 0x24, "RwResourcesGlobals layout");
 
 int RwResourcesFreeResEntry(RwResEntry *entry);
 typedef void(BMX_CDECL *RwResEntryDestroyNotify)(RwResEntry *entry);

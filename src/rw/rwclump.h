@@ -59,7 +59,7 @@ typedef struct RpMeshHeader {
     uint32_t firstMeshOffset; /* 0x0c */
 } RpMeshHeader;
 
-_Static_assert(sizeof(RpMesh) == 0xc, "RpMesh layout");
+BMX_LAYOUT32_ASSERT(sizeof(RpMesh) == 0xc, "RpMesh layout");
 _Static_assert(sizeof(RpMeshHeader) == 0x10, "RpMeshHeader layout");
 
 /* A geometry: counts, triangles, per vertex data and its morph targets (each with its own vertices). */
@@ -87,10 +87,10 @@ struct RpGeometry {
 
 _Static_assert(offsetof(RpGeometry, refCount) == 0x0e, "RpGeometry layout");
 _Static_assert(offsetof(RpGeometry, matList) == 0x10, "RpGeometry layout");
-_Static_assert(offsetof(RpGeometry, numTriangles) == 0x1c, "RpGeometry layout");
-_Static_assert(offsetof(RpGeometry, triangles) == 0x28, "RpGeometry layout");
-_Static_assert(offsetof(RpGeometry, surfaceProps) == 0x34, "RpGeometry layout");
-_Static_assert(offsetof(RpGeometry, morphTarget) == 0x44, "RpGeometry layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpGeometry, numTriangles) == 0x1c, "RpGeometry layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpGeometry, triangles) == 0x28, "RpGeometry layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpGeometry, surfaceProps) == 0x34, "RpGeometry layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpGeometry, morphTarget) == 0x44, "RpGeometry layout");
 
 /* ---- clumps and atomics ----------------------------------------------------------------------------- */
 
@@ -213,7 +213,7 @@ typedef struct RpBuildMesh {
     RpBuildMeshTriangle *triangles; /* 0x08 */
 } RpBuildMesh;
 
-_Static_assert(sizeof(RpBuildMeshTriangle) == 0xc, "RpBuildMeshTriangle layout");
+BMX_LAYOUT32_ASSERT(sizeof(RpBuildMeshTriangle) == 0xc, "RpBuildMeshTriangle layout");
 
 typedef int(BMX_CDECL *RpMeshCallBack)(RpMesh *mesh, RpMeshHeader *header, void *data);
 

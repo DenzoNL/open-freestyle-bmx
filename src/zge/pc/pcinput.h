@@ -42,29 +42,29 @@ typedef struct ZpadDevice {
     struct ZpadDiRecord *record; /* 0x70 */
 } ZpadDevice;
 
-_Static_assert(sizeof(ZpadDevice) == kZpadDeviceBytes, "pad device");
+BMX_LAYOUT32_ASSERT(sizeof(ZpadDevice) == kZpadDeviceBytes, "pad device");
 
 /* The part of IDirectInputDevice the code uses (stdcall methods). */
 typedef struct ZpadDiDevice ZpadDiDevice;
 typedef struct ZpadDiVtbl {
-    uint32_t pad00[2];
+    void *pad00[2];
     uint32_t(BMX_STDCALL *release)(ZpadDiDevice *self);                                            /* 0x08 */
-    uint32_t pad0c[3];                                                                             /* 0x0c */
+    void *pad0c[3];                                                                                /* 0x0c */
     int32_t(BMX_STDCALL *setProperty)(ZpadDiDevice *self, uintptr_t property, const void *header); /* 0x18 */
     int32_t(BMX_STDCALL *acquire)(ZpadDiDevice *self);                                             /* 0x1c */
     int32_t(BMX_STDCALL *unacquire)(ZpadDiDevice *self);                                           /* 0x20 */
     int32_t(BMX_STDCALL *getDeviceState)(ZpadDiDevice *self, uint32_t size, void *state);          /* 0x24 */
-    uint32_t pad28;                                                                                /* 0x28 */
+    void *pad28;                                                                                   /* 0x28 */
     int32_t(BMX_STDCALL *setDataFormat)(ZpadDiDevice *self, const void *format);                   /* 0x2c */
-    uint32_t pad30;                                                                                /* 0x30 */
+    void *pad30;                                                                                   /* 0x30 */
     int32_t(BMX_STDCALL *setCooperativeLevel)(ZpadDiDevice *self, void *window, uint32_t flags);   /* 0x34 */
-    uint32_t pad38;                                                                                /* 0x38 */
+    void *pad38;                                                                                   /* 0x38 */
     int32_t(BMX_STDCALL *getDeviceInfo)(ZpadDiDevice *self, void *info);                           /* 0x3c */
-    uint32_t pad40[9];                                                                             /* 0x40 */
+    void *pad40[9];                                                                                /* 0x40 */
     int32_t(BMX_STDCALL *poll)(ZpadDiDevice *self);                                                /* 0x64 */
 } ZpadDiVtbl;
 
-_Static_assert(__builtin_offsetof(ZpadDiVtbl, poll) == 0x64, "DirectInput vtable");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZpadDiVtbl, poll) == 0x64, "DirectInput vtable");
 
 struct ZpadDiDevice {
     const ZpadDiVtbl *vtbl;
@@ -128,16 +128,16 @@ ZpadDiRecord *zpadSetupDirectInput(int kind, ZpadDevice *device);
 /* The part of IDirectInput the code uses. */
 typedef struct ZpadDirectInput ZpadDirectInput;
 typedef struct ZpadDirectInputVtbl {
-    uint32_t pad00[4];
+    void *pad00[4];
     int32_t(BMX_STDCALL *enumDevices)(ZpadDirectInput *self, uint32_t type,
                                       uint32_t(BMX_STDCALL *callback)(const void *instance, void *ref),
                                       void *ref, uint32_t flags); /* 0x10 */
-    uint32_t pad14[4];                                            /* 0x14 */
+    void *pad14[4];                                               /* 0x14 */
     int32_t(BMX_STDCALL *createDeviceEx)(ZpadDirectInput *self, const ZpadGuid *guid, const ZpadGuid *iid,
                                          ZpadDiDevice **out, void *outer); /* 0x24 */
 } ZpadDirectInputVtbl;
 
-_Static_assert(__builtin_offsetof(ZpadDirectInputVtbl, createDeviceEx) == 0x24, "IDirectInput vtable");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZpadDirectInputVtbl, createDeviceEx) == 0x24, "IDirectInput vtable");
 
 struct ZpadDirectInput {
     const ZpadDirectInputVtbl *vtbl;

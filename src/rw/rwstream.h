@@ -57,9 +57,9 @@ typedef struct RwStream {
     } u;
 } RwStream;
 
-_Static_assert(sizeof(RwStream) == 0x20, "RwStream layout");
-_Static_assert(offsetof(RwStream, u.memory.block) == 0x14, "RwStream layout");
-_Static_assert(offsetof(RwStream, u.custom.data) == 0x1c, "RwStream layout");
+BMX_LAYOUT32_ASSERT(sizeof(RwStream) == 0x20, "RwStream layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwStream, u.memory.block) == 0x14, "RwStream layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwStream, u.custom.data) == 0x1c, "RwStream layout");
 
 RwStream *RwStreamOpen(int32_t type, int32_t access, const void *data);
 int RwStreamClose(RwStream *stream, void *data);

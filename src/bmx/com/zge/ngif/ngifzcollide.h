@@ -63,9 +63,9 @@ typedef struct ZcollideProbe {
     uint16_t word56;
 } ZcollideProbe;
 
-_Static_assert(sizeof(ZcollideProbe) == 0x58, "ZcollideProbe size");
-_Static_assert(offsetof(ZcollideProbe, point) == 0x30, "ZcollideProbe.point");
-_Static_assert(offsetof(ZcollideProbe, point2) == 0x40, "ZcollideProbe.point2");
+BMX_LAYOUT32_ASSERT(sizeof(ZcollideProbe) == 0x58, "ZcollideProbe size");
+BMX_LAYOUT32_ASSERT(offsetof(ZcollideProbe, point) == 0x30, "ZcollideProbe.point");
+BMX_LAYOUT32_ASSERT(offsetof(ZcollideProbe, point2) == 0x40, "ZcollideProbe.point2");
 
 /* Casts a vertical line through p onto the terrain; returns the hit height or 10000 on a miss. */
 double zcollideProbeHeight(const ZVec3 *p, ZcollideProbe *out);

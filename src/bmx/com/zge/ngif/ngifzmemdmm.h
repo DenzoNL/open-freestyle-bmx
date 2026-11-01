@@ -30,7 +30,7 @@ typedef struct ZmemdmmHandle {
     uint8_t pad0c[4];
 } ZmemdmmHandle;
 
-_Static_assert(sizeof(ZmemdmmHandle) == 0x10, "DMM handle record");
+BMX_LAYOUT32_ASSERT(sizeof(ZmemdmmHandle) == 0x10, "DMM handle record");
 
 typedef struct ZmemdmmState {
     uint8_t *tableLow;      /* 0x5f8f30 lowest handle record (the data area ends below it) */

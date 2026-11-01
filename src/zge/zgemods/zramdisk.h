@@ -34,7 +34,7 @@ typedef struct ZramdiskFile {
     uint8_t *data;
 } ZramdiskFile;
 
-_Static_assert(sizeof(ZramdiskFile) == 0x10, "RAM disk file");
+BMX_LAYOUT32_ASSERT(sizeof(ZramdiskFile) == 0x10, "RAM disk file");
 
 enum { kZramdiskOpenRead = 1, kZramdiskOpenWrite = 2 };
 

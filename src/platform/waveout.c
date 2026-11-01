@@ -16,6 +16,7 @@
 #include <SDL3/SDL.h>
 #include <string.h>
 
+#include "compat/layout.h"
 #include "platform/standins.h"
 
 enum {
@@ -39,7 +40,7 @@ enum {
     kMmWomClose = 0x3bc,
     kMmWomDone = 0x3bd,
     kMaxQueue = 64,
-    kHeaderSize = 0x20,
+
 };
 
 /* WAVEHDR */
@@ -54,7 +55,7 @@ typedef struct WaveHeader {
     uint32_t reserved;
 } WaveHeader;
 
-_Static_assert(sizeof(WaveHeader) == kHeaderSize, "WAVEHDR");
+BMX_LAYOUT32_ASSERT(sizeof(WaveHeader) == 0x20, "WAVEHDR");
 
 /* WAVEFORMATEX up to cbSize */
 typedef struct WaveFormat {
@@ -238,7 +239,7 @@ uint32_t BMX_WINAPI bmxStandWaveOutPrepareHeader(uint32_t handle, void *header, 
     if (asWave(handle) == NULL) {
         return kMmsyserrInvalHandle;
     }
-    if (h == NULL || size < kHeaderSize) {
+    if (h == NULL || size < sizeof(WaveHeader)) {
         return kMmsyserrInvalParam;
     }
     h->flags |= kWhdrPrepared;
@@ -252,7 +253,7 @@ uint32_t BMX_WINAPI bmxStandWaveOutUnprepareHeader(uint32_t handle, void *header
     if (asWave(handle) == NULL) {
         return kMmsyserrInvalHandle;
     }
-    if (h == NULL || size < kHeaderSize) {
+    if (h == NULL || size < sizeof(WaveHeader)) {
         return kMmsyserrInvalParam;
     }
     if ((h->flags & kWhdrInQueue) != 0) {
@@ -271,7 +272,7 @@ uint32_t BMX_WINAPI bmxStandWaveOutWrite(uint32_t handle, void *header, uint32_t
     if (w == NULL) {
         return kMmsyserrInvalHandle;
     }
-    if (h == NULL || size < kHeaderSize) {
+    if (h == NULL || size < sizeof(WaveHeader)) {
         return kMmsyserrInvalParam;
     }
     if ((h->flags & kWhdrPrepared) == 0) {

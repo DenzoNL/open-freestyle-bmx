@@ -22,7 +22,7 @@ typedef struct RpCollisionTriangle {
     RwV3d *vertices[3]; /* 0x1c */
 } RpCollisionTriangle;
 
-_Static_assert(sizeof(RpCollisionTriangle) == 0x28, "RpCollisionTriangle layout");
+BMX_LAYOUT32_ASSERT(sizeof(RpCollisionTriangle) == 0x28, "RpCollisionTriangle layout");
 
 /* Callbacks: they return their object to go on, NULL to stop the query. */
 typedef RpCollisionTriangle *(BMX_CDECL *RpIntersectionCallBackWorldTriangle)(RpIntersection *intersection,
@@ -50,7 +50,7 @@ typedef struct RpCollisionQuery {
     RpAtomic *exclude; /* 0x20 */
 } RpCollisionQuery;
 
-_Static_assert(sizeof(RpCollisionQuery) == 0x24, "RpCollisionQuery layout");
+BMX_LAYOUT32_ASSERT(sizeof(RpCollisionQuery) == 0x24, "RpCollisionQuery layout");
 
 /* Per world sector callback of the line walker (original code: the line tests against triangles / atomics).
  */
