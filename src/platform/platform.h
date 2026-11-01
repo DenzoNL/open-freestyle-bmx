@@ -48,6 +48,23 @@ void bmxLog(const char *fmt, ...);
 int bmxKeysScripted(void);
 void bmxKeysFillState(uint8_t *state, uint32_t size);
 
+/*
+ * BMX_RECORD / BMX_REPLAY (src/native/replay.c, docs/PORTING.md X0): the game's input as the DirectInput
+ * stand-in hands it over, per shown frame and call, so a session can be replayed on another build and the
+ * BMX_SIM_HASH files compared. bmxReplayMode: 0 off, 1 recording, 2 replaying. bmxReplayStart (at
+ * DirectInputCreateEx): recording stores *pad (the pad the game will see); replaying fills *pad from the
+ * recording (no real pad is opened). bmxReplayDeviceState (at the end of GetDeviceState): recording stores
+ * the result and state; replaying replaces them with the recorded ones.
+ */
+typedef struct BmxReplayPad {
+    int present, family;
+    uint16_t vendor, product;
+    char name[128];
+} BmxReplayPad;
+int bmxReplayMode(void);
+void bmxReplayStart(BmxReplayPad *pad);
+void bmxReplayDeviceState(int keyboard, int32_t *result, void *data, uint32_t size);
+
 /* ---- time and misc kernel32 (kernel.c) ---- */
 
 /* Sets the clock origin; idempotent. Call before the game runs. BMX_TIME_BASE overrides the base. */

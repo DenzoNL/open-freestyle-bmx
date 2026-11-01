@@ -141,9 +141,10 @@ int main(int argc, char **argv)
     if (getenv("BMX_NO_MOVIES")) {
         VAR(0x0067288c, int) = 1;
     }
-    /* BMX_KEYS: scripted keyboard (keys.c). Such a run must not take the focus from what the user is doing:
-     * its window is never focused or activated (window.c). */
+    /* BMX_KEYS: scripted keyboard (keys.c); BMX_REPLAY: a recorded session (replay.c). Such a run must not
+     * take the focus from what the user is doing: its window is never focused or activated (window.c). */
     background = bmxKeysInstall();
+    background = background || bmxReplayMode() == 2;
     commandLineText(cmd, sizeof cmd, argc, argv);
     parseResolution(cmd);
     /* Without -r the mode comes from the config (P16, the device dialog's stand-in in src/driver/device.c);
@@ -219,6 +220,7 @@ int main(int argc, char **argv)
             }
         }
     }
+    bmxReplayClose();      /* BMX_RECORD: the last records */
     bmxPlatformShutdown(); /* timers; BMX_INPUT_CHECK summary */
     _exit(-1);             /* the original's own _exit(-1) */
     return 0;

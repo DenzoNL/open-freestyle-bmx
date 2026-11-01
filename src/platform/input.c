@@ -485,10 +485,13 @@ static struct {
 } gPad;
 
 static int gScripted, gDpadSteering, gStick8Way, gStarted;
+/* BMX_REPLAY (src/native/replay.c): the recorded pad stands in, no real one is opened, the focus is ignored.
+ */
+static int gReplaying;
 
 static int focused(void)
 {
-    return gScripted || (SDL_WasInit(SDL_INIT_VIDEO) && SDL_GetKeyboardFocus() != NULL);
+    return gScripted || gReplaying || (SDL_WasInit(SDL_INIT_VIDEO) && SDL_GetKeyboardFocus() != NULL);
 }
 
 static void padClose(void)
@@ -536,6 +539,9 @@ static int padConnected(void)
     int count = 0;
     SDL_JoystickID *ids;
 
+    if (gReplaying) {
+        return gPad.present;
+    }
     if (gPad.joystick != NULL && SDL_JoystickConnected(gPad.joystick)) {
         return 1;
     }
@@ -861,6 +867,9 @@ static BmxHresult BMX_WINAPI devGetDeviceState(BmxDiDevice *self, uint32_t size,
 
         r = keyboardState(d, size, state);
         bmxCheckKeyboardState(d->check, r, r == kDiOk ? state : NULL);
+        if (size == sizeof state) {
+            bmxReplayDeviceState(1, &r, state, size); /* BMX_RECORD stores it, BMX_REPLAY replaces it */
+        }
         if (r == kDiOk) {
             memcpy(data, state, size);
         }
@@ -889,6 +898,11 @@ static BmxHresult BMX_WINAPI devGetDeviceState(BmxDiDevice *self, uint32_t size,
                 }
                 lastDpad = dpad;
             }
+        }
+        if (size == sizeof state) {
+            bmxReplayDeviceState(0, &r, &state, size);
+        }
+        if (r == kDiOk) {
             memcpy(data, &state, size);
         }
     }
@@ -1088,10 +1102,31 @@ int32_t BMX_WINAPI bmxStandDirectInputCreateEx(void *instance, uint32_t version,
         /* On by default (the user's call, PLAN.md Decisions): input conveniences; 0 gives vanilla. */
         gDpadSteering = bmxConfigOption("input.dpad_steering", 1, 0);
         gStick8Way = bmxConfigOption("input.stick_8way", 1, 0);
-        if (gScripted) {
+        gReplaying = bmxReplayMode() == 2;
+        if (gReplaying) {
+            BmxReplayPad pad;
+
+            bmxReplayStart(&pad);
+            gPad.present = pad.present;
+            gPad.family = (BmxPadFamily)pad.family;
+            gPad.vendor = pad.vendor;
+            gPad.product = pad.product;
+            SDL_snprintf(gPad.name, sizeof gPad.name, "%s", pad.name);
+            bmxLog("input: replaying a recording (BMX_REPLAY), focus ignored\n");
+        } else if (gScripted) {
             bmxLog("input: scripted keyboard (BMX_KEYS), no pad, focus ignored\n");
         } else {
             padStart();
+        }
+        if (bmxReplayMode() == 1) {
+            BmxReplayPad pad;
+
+            pad.present = gPad.present;
+            pad.family = (int)gPad.family;
+            pad.vendor = gPad.vendor;
+            pad.product = gPad.product;
+            SDL_snprintf(pad.name, sizeof pad.name, "%s", gPad.name);
+            bmxReplayStart(&pad);
         }
         if (gDpadSteering) {
             bmxLog("input: d-pad steering on (the d-pad also sets lX / lY)\n");

@@ -74,6 +74,25 @@ void bmxKeysFillState(uint8_t *state, uint32_t size)
     }
 }
 
+/* Provided by replay.c in the exe: off in the tests. */
+int bmxReplayMode(void)
+{
+    return 0;
+}
+
+void bmxReplayStart(BmxReplayPad *pad)
+{
+    (void)pad;
+}
+
+void bmxReplayDeviceState(int keyboard, int32_t *result, void *data, uint32_t size)
+{
+    (void)keyboard;
+    (void)result;
+    (void)data;
+    (void)size;
+}
+
 /* ---- time ---- */
 
 static void testTime(void)

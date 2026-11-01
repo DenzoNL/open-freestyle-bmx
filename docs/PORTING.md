@@ -101,6 +101,26 @@ the same per-tick BMX_SIM_HASH.
 | X5 | Portable x87 maths (X4-A, exhaustive tests); MSL shaders (X5-A); macOS arm64 app bundle | sim hash equal on arm64 |
 | X6 | Android arm64: SDL3 Android project, game files chosen through the system file picker, controller (the Thor's built-in pad), 1920x1080 widescreen | plays on the Thor |
 
+### X0 (done 2026-11-01)
+
+- **Recording** (`BMX_RECORD=<file>`, src/native/replay.c): the input as the game receives it from the DirectInput
+  stand-in, changes only, keyed by shown frame and call index within the frame, plus the pad the game saw and the
+  starting SAVE.DAT. Some loops poll thousands of times per frame (as often as the clock lets them), so only
+  changes are stored: a scripted minute is 15-18 KB (the first, every-call version was 1.6 GB). A frame mark about
+  once a second keeps the replay as long as the session.
+- **Replay** (`BMX_REPLAY=<file>`): the recorded pad stands in (no real one is opened), the focus is ignored, the
+  window stays in the background; each call gets the latest recorded state at or before its (frame, index). The
+  run ends 60 frames after the last record.
+- **Check** (`tools/xcheck.py --game-dir <dir> --recording <file> <exe> [<exe>...]`): puts the recording's
+  SAVE.DAT in place (and back), replays on each exe and compares the BMX_SIM_HASH files; names the first tick that
+  differs.
+- **Verified:** a scripted ride (pedal, steer, jumps; 973 ticks) recorded and replayed: identical to the recorded
+  run on every tick, also with `[general] vanilla = 1` on the replay (no widescreen, no interpolation). A build with
+  one gravity term scaled by 1.0001 in the rolling physics is caught (differs from tick 280); a copy of the same
+  exe is identical.
+- **For the user:** `native-run\record.ps1` plays with the personal ini and saves `recordings\rec-<time>.bmxr`.
+  Sessions with the DualSense, several levels, tricks, grinds and bails give X1-X3 their reference.
+
 X1 and X2 are the bulk of the work (thousands of lines touched, mechanical but wide). X3 and X4 should be small
 once X2 is done. X5 and X6 are moderate. The order puts the user's own desktop (X3) first.
 

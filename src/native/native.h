@@ -42,6 +42,9 @@ void bmxPngCheckArm(void);
  */
 int bmxKeysInstall(void);
 
+/* BMX_RECORD / BMX_REPLAY (replay.c; the API is in platform/platform.h): closes the recording at exit. */
+void bmxReplayClose(void);
+
 /* BMX_SIM_HASH=<file> (src/native/simhash.c): a per-tick hash of the simulation state, one line per
  * controller poll (docs/WIDESCREEN.md W10.5). */
 void bmxSimHashInstall(void);
