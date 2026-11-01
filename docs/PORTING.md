@@ -9,17 +9,18 @@ Android arm64 (an AYN Thor, 1920x1080; its Snapdragon has no 32-bit mode, so 32-
 
 - **All code is ported.** 808 of 811 functions, 100% of the bytes (`tools/progress.py`). bmxnative.exe runs
   none of the original's code.
-- **It still borrows the original's address space** (docs/NATIVE.md). The loader maps the user's NgBMX.exe at
-  0x400000 and copies its data sections there; the ported code reads its globals at those addresses. The code range
-  holds jumps to our functions, so function pointers stored in the data land in our code.
+- **It no longer needs NgBMX.exe** (since X1b, below; docs/NATIVE.md "The original's data in the source"). The
+  original's data is C source (src/data), one object per original data section with the original's layout; the
+  ported code still names its globals by original address (`ORIG_VAR`), which is now that address's place in its
+  block. Nothing is mapped at the original's addresses.
 - **Platform layer done for Windows** (docs/PLATFORM.md): SDL3 window, input, audio, GPU (DXIL and SPIR-V shaders),
-  own AVI/Cinepak, file shims. The import table is SDL3, KERNEL32, bcrypt and the UCRT.
+  own AVI/Cinepak, file shims. The import table is SDL3, KERNEL32 and the UCRT.
 
 What ties the game to 32-bit x86 at fixed addresses, measured in `src/`:
 
 | Hazard | Count | Why it matters |
 |---|---|---|
-| `ORIG_VAR(0x...)` globals | 1603 uses | read at the original's addresses; their initial values come from the exe's data |
+| `ORIG_VAR(0x...)` globals | 1603 uses | named by original address (since X1b an offset into a block of src/data with the original's layout) |
 | Function pointers in the data, `BMX_FNPTR` | 333 | 32-bit code addresses in tables (RW plugins, zobj ops, effect types...) |
 | `ORIG_FN` calls by address | 186 | calls through the original's addresses (now jumps) |
 | `_Static_assert(offsetof / sizeof)` | 416 / 247 | layouts pinned to 4-byte pointers |
@@ -181,6 +182,73 @@ What X1b needs: the data copy is now one block addressed through `BMX_ORIG` / `O
 is known from the relocations, so a generator can carve it into named C definitions (pointers as `&symbol` or the
 serving function from bmxOrigMap) and drop NgBMX.exe; `RW_CB`'s run-time lookup then becomes compile-time where
 the tables of original addresses (rw/plugins.c attach routines) turn into tables of functions.
+
+### X1b (done 2026-11-01): the data into the source
+
+bmxnative.exe reads nothing from NgBMX.exe any more; details in docs/NATIVE.md "The original's data in the source".
+
+- **Shape: one C object per original data section, with the original's exact layout** (`bmxRdata`, `bmxData`,
+  `bmxBss`, `bmxImports`, `bmxData1`, `bmxRwBss`, `bmxInputTables`), not one symbol per global. The plan was
+  separate symbols with the adjacency cases grouped; the survey showed the declarations are not object extents:
+  - 61 declarations span several globals without containing them (views): byte-array tables over rider and trick
+    data (gActionMapTable, gRiderStickDir, gRiderTrickFlags...), gComdataRecords (a 90 KB view from 0x551fd8 that
+    covers 476 other declarations: SAVE.DAT is one memcpy over that range), gPhysRiders and gPlayerRecs over the
+    same range with different element sizes, gGameRecords over the game-state globals after it;
+  - declarations smaller than the object: gFxHandlerTable is a uint8_t at the start of a table of three function
+    pointers (`zfxRegisterFuncTable(&gFxHandlerTable, 3)`), likewise gFxGravity, gFxFloorColl, gZglFileDeviceRw /
+    Ram, gButtonGlyphs, gScoreSpinMul (7 such, the generator's log);
+  - ranges: main.c's initGlobals clears 0x697780..+0x34 in one memset.
+
+  So a carve into symbols sized by the declarations would have broken code silently in many places at once, and
+  only game runs (which were not possible while the user played) could find them. Exact layout is correct by
+  construction (asserted at compile time, checked byte for byte against the exe); the blocks are still named,
+  typed C: their members are the globals, typed as declared, with initialisers and real pointers. Splitting a
+  global out of its block into its own symbol is X2's work, one at a time, with xcheck (below).
+- **What the blocks hold** (src/data/layout.h, src/data/<block>.c, 1 MB of source, most of it the layout header's
+  member list and the 1373 `#undef`s of the headers' macros): 1347 globals as members (1665 declarations at 1462
+  addresses; the others are aliases, named in the member's comment), 118 of them through a same-layout mirror
+  because their type is local to a .c file (later: move those types into headers); 2051 strings named from their
+  text (`sErrorParsingFontIcons`); 924 pointers, 1600 float / word / byte runs and 1600 padding runs nothing names
+  (`p_` / `d_` / `pad_<address>`, split wherever the original's code or a pointer refers to an address: the readable
+  names are later tidy-up); the 137 import slots; the dinput.lib object tables. The 1.2 MB zero tail is `bmxBss`: no
+  initialiser, no bytes in the exe file.
+- **Pointers** (the exe's 1284 relocations in the data, plus 268 in the input tables): 813 to data as
+  `&block.member.field` expressions, 739 to code as the function's name (incremental-link thunks followed; 237
+  addresses nothing serves get a reporting stub each). Casts only where the field's type differs from the
+  function's (decided by compiling and reading the compiler's complaints).
+- **Imports**: the slots are block members; `bmxImportSlots` (src/data/imports.c) names each slot's DLL and function
+  for the loader. The 21 original `jmp [slot]` thunks that ported code calls are now stubs in imports.c through the
+  same slot (made from the exe's bytes once), not run-time-patched stubs in origmap.c.
+- **Removed from the loader**: reading NgBMX.exe, its sha256 check (and with it bcrypt.dll), the data copy and
+  `gBmxImageDelta`, the relocation pass and `BMX_RELOC_LOG`, the thunk table and input-table copies, the scan for the
+  exe's import thunks. `bmxLoadImage` is `bmxLoaderInit`: fill the import slots, write the opt-in jumps.
+- **`ORIG_VAR(addr)` / `BMX_ORIG(addr)`** = `BMX_DATA_AT(addr)`: the block holding the address plus the offset
+  (folded at compile time for constant addresses). The hook build and the oracle are unchanged: bmxtest.dll's and
+  dinput.dll's code is identical before and after (only the PE time stamps differ).
+- **Blocks start on a page**, like their sections (`.idata`'s block from the section start, the data / zero-tail
+  split on the page after the last initialised byte, 0x56a000), so pointers into them keep the original's low 12
+  bits, as they did in X1a's image.
+- **The exe is now linked at 0x01000000** (was 0x20000000): the data is part of the image now, and the PSX-style
+  ordering tables (ngifpsx.c, zoverii.c, the front end) store pointers to it in 28 bits, the top 4 bits being the
+  packet's length. Linked at 0x20000000 the first replay crashed in the HUD's draw list (`*entry & 0x0fffffff`).
+  The same 28-bit pointers are an X3 (64-bit) hazard: those tables need their own packet type there.
+- **Verified**: `tools/gen_data.py --check` (in the gate): all 132830 bytes of the compiled blocks equal the
+  exe's, every pointer points where the exe's did; the gate; bmxwidetest and bmxhftest. tools/xcheck.py: the
+  user's recording (rec-20261101-140610, 5594 ticks) replayed in native-run3 **with NgBMX.exe renamed away**:
+  identical to the native32-84da8fd hash file on every tick; the scripted ride (1014 ticks) identical to X1a's
+  build; a run with the movies (ACCLAIM, ZAXIS, INTRO) and the ride, 900 frames, no fault.
+- **Found on the way**: zrwmodel.h and zrwzgl.h name 0x697720 / 0x697724 the other way round (gZrwScale and
+  gZrwInvScale) and declare gZrwFlags as uint8_t / uint32_t; each module's code is right for its own names, but one
+  pair is misnamed (later tidy-up).
+
+What X2 gets from this, and what is left of X1 for it:
+- Every global has a typed definition with its initial value and real pointers; to move one out of its block
+  (needed for 64-bit, where the layouts change size): check its uses for adjacency (the views listed in the
+  generator's log, ranges, `&g + n`), make it a separate definition in its module, replace its member by padding,
+  point `ORIG_VAR` uses at the name; xcheck after each batch.
+- `ORIG_VAR` still names by original address; X2 replaces it by the names (the members' names are the code's).
+- `RW_CB` is still a run-time lookup (bmxOrigPtr); the plugin attach tables could become tables of functions.
+- The 118 mirrored types and the synthesized names (`d_` / `p_` / `pad_`, the strings) want tidying by hand.
 
 X1 and X2 are the bulk of the work (thousands of lines touched, mechanical but wide). X3 and X4 should be small
 once X2 is done. X5 and X6 are moderate. The order puts the user's own desktop (X3) first.

@@ -4,9 +4,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* The original's link base and image size. Nothing of the original is loaded there any more: the loader
- * copies its data elsewhere (gBmxImageDelta) and the exe sits at 0x20000000, so an address in this range in a
- * report is an original one that was not converted. */
+/* The original's link base and image size. Nothing of the original is loaded there: its data is in the source
+ * (src/data) and the exe sits at 0x01000000, so an address in this range in a report is an original one that
+ * was not converted. */
 enum { kBmxImageBase = 0x400000, kBmxOrigRangeSize = 0x2b3000 };
 
 /*
@@ -31,15 +31,15 @@ typedef struct BmxOrigEntry {
 extern const BmxOrigEntry bmxOrigMap[];
 extern const uint32_t bmxOrigMapCount;
 
-/* The exe's `jmp [import slot]` thunks that ported code calls (ORIG_FN_STDCALL): each generated stub jumps
- * through **slotRef; the loader points *slotRef at the thunk's import slot in the image. */
-typedef struct BmxOrigImport {
-    uint32_t orig;
-    void ***slotRef;
+/* The original's import slots (src/data/imports.c): the loader fills each with a stand-in, a dead-slot stub
+ * or the real Windows function. */
+typedef struct BmxImportSlot {
+    const char *dll;
     const char *name;
-} BmxOrigImport;
-extern const BmxOrigImport bmxOrigImports[];
-extern const uint32_t bmxOrigImportCount;
+    void **slot;
+} BmxImportSlot;
+extern const BmxImportSlot bmxImportSlots[];
+extern const uint32_t bmxImportSlotCount;
 
 /* The function serving an original code address, NULL when none does (bmxOrigMap only, no thunks). */
 const void *bmxOrigFind(uint32_t orig);
@@ -59,12 +59,11 @@ void bmxLog(const char *fmt, ...);
 void bmxLogOpen(void);
 
 /*
- * Verify the user's NgBMX.exe, copy its data sections into an allocation of ours (gBmxImageDelta), fill the
- * import table there and apply the exe's relocations to the pointers in the data (data pointers move with the
- * copy, code pointers become the functions serving them). Returns 0 on success; on failure the reason has
- * been logged. docs/NATIVE.md "Relocated data image".
+ * Fill the import slots of the original's data (stand-ins, dead-slot stubs, real Windows functions) and write
+ * the opt-in jumps over our own functions (smooth mixer, wide HUD, draw distance). Returns 0 on success; on
+ * failure the reason has been logged. docs/NATIVE.md "The original's data in the source".
  */
-int bmxLoadImage(const char *exePath);
+int bmxLoaderInit(void);
 
 struct BmxHook;
 /*
