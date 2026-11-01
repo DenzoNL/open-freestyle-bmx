@@ -142,6 +142,12 @@ round floats (so the hook build uses SSE2, not x87). Rules are in CONTRIBUTING.m
   `stick_8way`, `confirm_quit = 0`). One switch, `[general] vanilla = 1`, gives the original game for every option
   the ini does not set (bmxConfigOption, config.c). All of them are visual or input conveniences; none changes the
   simulation (BMX_SIM_HASH checked for each).
+- **64-bit and other platforms (2026-11-01, the user's call; docs/PORTING.md):** one 64-bit codebase for Windows x64,
+  Linux x64, macOS arm64 and Android arm64, with the 32-bit builds as the bit-exact reference. The original's
+  initialised data (~70 KB of tables and strings) moves into the source as named C initialisers, like the code;
+  builds then need only the game's data folders, not NgBMX.exe, and can be released. The game's files (levels,
+  models, textures, sounds, movies, music) and NgBMX.exe are never in the repo or a release. arm64 gets bit-exact
+  portable versions of the x87 operations, so the simulation is identical on every platform.
 
 ## Enhancement backlog (P6+, unordered)
 
