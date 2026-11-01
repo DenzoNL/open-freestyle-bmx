@@ -1,14 +1,12 @@
 /*
- * The original's .idata up to the end of its import slots, 0x00699000..0x0069987c, as one object with the
- * original's layout (src/data/layout.h, docs/PORTING.md X1b): code relies on globals being next to each other
- * (the save data copied as one range, tables used past their declared ends), so the members keep their
- * original offsets; ORIG_VAR(addr) reaches into it (src/compat/orig.h).
+ * The original's globals of the import slots, with their initial values (docs/PORTING.md
+ * X2a; types and declarations in src/data/globals.h).
  *
  * Generated once by tools/gen_data.py from NgBMX.exe; from here on it is source like the code.
  */
 #include "data/data.h"
 
-struct BmxImports bmxImports __attribute__((aligned(4096)));
+struct BmxGroup_bmxImports bmxImports __attribute__((aligned(16)));
 
 /* What the loader fills each slot with (src/native/loader.c). */
 const BmxImportSlot bmxImportSlots[] = {
@@ -153,53 +151,60 @@ const BmxImportSlot bmxImportSlots[] = {
 const uint32_t bmxImportSlotCount = 137;
 
 /* The original's `jmp [import slot]` thunks that ported code calls by address (ORIG_FN_STDCALL). */
-BMX_IMPORT_THUNK(004af9d0, 0x510); /* AVIFIL32!AVIFileInit */
-_Static_assert(offsetof(struct BmxImports, AVIFIL32_AVIFileInit) == 0x510, "AVIFIL32_AVIFileInit");
-BMX_IMPORT_THUNK(004af9d6, 0x4dc); /* AVIFIL32!AVIFileExit */
-_Static_assert(offsetof(struct BmxImports, AVIFIL32_AVIFileExit) == 0x4dc, "AVIFIL32_AVIFileExit");
-BMX_IMPORT_THUNK(004af9dc, 0x4d8); /* AVIFIL32!AVIStreamReadFormat */
-_Static_assert(offsetof(struct BmxImports, AVIFIL32_AVIStreamReadFormat) == 0x4d8,
+BMX_IMPORT_THUNK(004af9d0, 0x78); /* AVIFIL32!AVIFileInit */
+_Static_assert(offsetof(struct BmxGroup_bmxImports, AVIFIL32_AVIFileInit) == 0x78, "AVIFIL32_AVIFileInit");
+BMX_IMPORT_THUNK(004af9d6, 0x44); /* AVIFIL32!AVIFileExit */
+_Static_assert(offsetof(struct BmxGroup_bmxImports, AVIFIL32_AVIFileExit) == 0x44, "AVIFIL32_AVIFileExit");
+BMX_IMPORT_THUNK(004af9dc, 0x40); /* AVIFIL32!AVIStreamReadFormat */
+_Static_assert(offsetof(struct BmxGroup_bmxImports, AVIFIL32_AVIStreamReadFormat) == 0x40,
                "AVIFIL32_AVIStreamReadFormat");
-BMX_IMPORT_THUNK(004af9e2, 0x508); /* AVIFIL32!AVIStreamInfoA */
-_Static_assert(offsetof(struct BmxImports, AVIFIL32_AVIStreamInfoA) == 0x508, "AVIFIL32_AVIStreamInfoA");
-BMX_IMPORT_THUNK(004af9e8, 0x50c); /* AVIFIL32!AVIStreamRead */
-_Static_assert(offsetof(struct BmxImports, AVIFIL32_AVIStreamRead) == 0x50c, "AVIFIL32_AVIStreamRead");
-BMX_IMPORT_THUNK(004af9ee, 0x4f8); /* AVIFIL32!AVIStreamStart */
-_Static_assert(offsetof(struct BmxImports, AVIFIL32_AVIStreamStart) == 0x4f8, "AVIFIL32_AVIStreamStart");
-BMX_IMPORT_THUNK(004af9f4, 0x4f4); /* AVIFIL32!AVIStreamLength */
-_Static_assert(offsetof(struct BmxImports, AVIFIL32_AVIStreamLength) == 0x4f4, "AVIFIL32_AVIStreamLength");
-BMX_IMPORT_THUNK(004af9fa, 0x4f0); /* AVIFIL32!AVIStreamTimeToSample */
-_Static_assert(offsetof(struct BmxImports, AVIFIL32_AVIStreamTimeToSample) == 0x4f0,
+BMX_IMPORT_THUNK(004af9e2, 0x70); /* AVIFIL32!AVIStreamInfoA */
+_Static_assert(offsetof(struct BmxGroup_bmxImports, AVIFIL32_AVIStreamInfoA) == 0x70,
+               "AVIFIL32_AVIStreamInfoA");
+BMX_IMPORT_THUNK(004af9e8, 0x74); /* AVIFIL32!AVIStreamRead */
+_Static_assert(offsetof(struct BmxGroup_bmxImports, AVIFIL32_AVIStreamRead) == 0x74,
+               "AVIFIL32_AVIStreamRead");
+BMX_IMPORT_THUNK(004af9ee, 0x60); /* AVIFIL32!AVIStreamStart */
+_Static_assert(offsetof(struct BmxGroup_bmxImports, AVIFIL32_AVIStreamStart) == 0x60,
+               "AVIFIL32_AVIStreamStart");
+BMX_IMPORT_THUNK(004af9f4, 0x5c); /* AVIFIL32!AVIStreamLength */
+_Static_assert(offsetof(struct BmxGroup_bmxImports, AVIFIL32_AVIStreamLength) == 0x5c,
+               "AVIFIL32_AVIStreamLength");
+BMX_IMPORT_THUNK(004af9fa, 0x58); /* AVIFIL32!AVIStreamTimeToSample */
+_Static_assert(offsetof(struct BmxGroup_bmxImports, AVIFIL32_AVIStreamTimeToSample) == 0x58,
                "AVIFIL32_AVIStreamTimeToSample");
-BMX_IMPORT_THUNK(004afa00, 0x724); /* MSVFW32!DrawDibOpen */
-_Static_assert(offsetof(struct BmxImports, MSVFW32_DrawDibOpen) == 0x724, "MSVFW32_DrawDibOpen");
-BMX_IMPORT_THUNK(004afa06, 0x504); /* AVIFIL32!AVIStreamGetFrameOpen */
-_Static_assert(offsetof(struct BmxImports, AVIFIL32_AVIStreamGetFrameOpen) == 0x504,
+BMX_IMPORT_THUNK(004afa00, 0x28c); /* MSVFW32!DrawDibOpen */
+_Static_assert(offsetof(struct BmxGroup_bmxImports, MSVFW32_DrawDibOpen) == 0x28c, "MSVFW32_DrawDibOpen");
+BMX_IMPORT_THUNK(004afa06, 0x6c); /* AVIFIL32!AVIStreamGetFrameOpen */
+_Static_assert(offsetof(struct BmxGroup_bmxImports, AVIFIL32_AVIStreamGetFrameOpen) == 0x6c,
                "AVIFIL32_AVIStreamGetFrameOpen");
-BMX_IMPORT_THUNK(004afa0c, 0x500); /* AVIFIL32!AVIStreamSampleToTime */
-_Static_assert(offsetof(struct BmxImports, AVIFIL32_AVIStreamSampleToTime) == 0x500,
+BMX_IMPORT_THUNK(004afa0c, 0x68); /* AVIFIL32!AVIStreamSampleToTime */
+_Static_assert(offsetof(struct BmxGroup_bmxImports, AVIFIL32_AVIStreamSampleToTime) == 0x68,
                "AVIFIL32_AVIStreamSampleToTime");
-BMX_IMPORT_THUNK(004afa12, 0x4fc); /* AVIFIL32!AVIFileRelease */
-_Static_assert(offsetof(struct BmxImports, AVIFIL32_AVIFileRelease) == 0x4fc, "AVIFIL32_AVIFileRelease");
-BMX_IMPORT_THUNK(004afa18, 0x518); /* AVIFIL32!AVIFileGetStream */
-_Static_assert(offsetof(struct BmxImports, AVIFIL32_AVIFileGetStream) == 0x518, "AVIFIL32_AVIFileGetStream");
-BMX_IMPORT_THUNK(004afa24, 0x4ec); /* AVIFIL32!AVIFileOpenA */
-_Static_assert(offsetof(struct BmxImports, AVIFIL32_AVIFileOpenA) == 0x4ec, "AVIFIL32_AVIFileOpenA");
-BMX_IMPORT_THUNK(004afa2a, 0x4e8); /* AVIFIL32!AVIStreamRelease */
-_Static_assert(offsetof(struct BmxImports, AVIFIL32_AVIStreamRelease) == 0x4e8, "AVIFIL32_AVIStreamRelease");
-BMX_IMPORT_THUNK(004afa30, 0x4e4); /* AVIFIL32!AVISaveOptionsFree */
-_Static_assert(offsetof(struct BmxImports, AVIFIL32_AVISaveOptionsFree) == 0x4e4,
+BMX_IMPORT_THUNK(004afa12, 0x64); /* AVIFIL32!AVIFileRelease */
+_Static_assert(offsetof(struct BmxGroup_bmxImports, AVIFIL32_AVIFileRelease) == 0x64,
+               "AVIFIL32_AVIFileRelease");
+BMX_IMPORT_THUNK(004afa18, 0x80); /* AVIFIL32!AVIFileGetStream */
+_Static_assert(offsetof(struct BmxGroup_bmxImports, AVIFIL32_AVIFileGetStream) == 0x80,
+               "AVIFIL32_AVIFileGetStream");
+BMX_IMPORT_THUNK(004afa24, 0x54); /* AVIFIL32!AVIFileOpenA */
+_Static_assert(offsetof(struct BmxGroup_bmxImports, AVIFIL32_AVIFileOpenA) == 0x54, "AVIFIL32_AVIFileOpenA");
+BMX_IMPORT_THUNK(004afa2a, 0x50); /* AVIFIL32!AVIStreamRelease */
+_Static_assert(offsetof(struct BmxGroup_bmxImports, AVIFIL32_AVIStreamRelease) == 0x50,
+               "AVIFIL32_AVIStreamRelease");
+BMX_IMPORT_THUNK(004afa30, 0x4c); /* AVIFIL32!AVISaveOptionsFree */
+_Static_assert(offsetof(struct BmxGroup_bmxImports, AVIFIL32_AVISaveOptionsFree) == 0x4c,
                "AVIFIL32_AVISaveOptionsFree");
-BMX_IMPORT_THUNK(004afa36, 0x728); /* MSVFW32!DrawDibClose */
-_Static_assert(offsetof(struct BmxImports, MSVFW32_DrawDibClose) == 0x728, "MSVFW32_DrawDibClose");
-BMX_IMPORT_THUNK(004afa3c, 0x4e0); /* AVIFIL32!AVIStreamGetFrameClose */
-_Static_assert(offsetof(struct BmxImports, AVIFIL32_AVIStreamGetFrameClose) == 0x4e0,
+BMX_IMPORT_THUNK(004afa36, 0x290); /* MSVFW32!DrawDibClose */
+_Static_assert(offsetof(struct BmxGroup_bmxImports, MSVFW32_DrawDibClose) == 0x290, "MSVFW32_DrawDibClose");
+BMX_IMPORT_THUNK(004afa3c, 0x48); /* AVIFIL32!AVIStreamGetFrameClose */
+_Static_assert(offsetof(struct BmxGroup_bmxImports, AVIFIL32_AVIStreamGetFrameClose) == 0x48,
                "AVIFIL32_AVIStreamGetFrameClose");
-BMX_IMPORT_THUNK(004afa42, 0x720); /* MSVFW32!DrawDibDraw */
-_Static_assert(offsetof(struct BmxImports, MSVFW32_DrawDibDraw) == 0x720, "MSVFW32_DrawDibDraw");
-BMX_IMPORT_THUNK(004afa48, 0x4d4); /* AVIFIL32!AVIStreamGetFrame */
-_Static_assert(offsetof(struct BmxImports, AVIFIL32_AVIStreamGetFrame) == 0x4d4,
+BMX_IMPORT_THUNK(004afa42, 0x288); /* MSVFW32!DrawDibDraw */
+_Static_assert(offsetof(struct BmxGroup_bmxImports, MSVFW32_DrawDibDraw) == 0x288, "MSVFW32_DrawDibDraw");
+BMX_IMPORT_THUNK(004afa48, 0x3c); /* AVIFIL32!AVIStreamGetFrame */
+_Static_assert(offsetof(struct BmxGroup_bmxImports, AVIFIL32_AVIStreamGetFrame) == 0x3c,
                "AVIFIL32_AVIStreamGetFrame");
-BMX_IMPORT_THUNK(004afc58, 0x588); /* DINPUT!DirectInputCreateEx */
-_Static_assert(offsetof(struct BmxImports, DINPUT_DirectInputCreateEx) == 0x588,
+BMX_IMPORT_THUNK(004afc58, 0xf0); /* DINPUT!DirectInputCreateEx */
+_Static_assert(offsetof(struct BmxGroup_bmxImports, DINPUT_DirectInputCreateEx) == 0xf0,
                "DINPUT_DirectInputCreateEx");

@@ -2120,7 +2120,9 @@ double rwMatrixDeterminant(const RwMatrix *matrix)
     return (i + g) + k;
 }
 
-#define rwMatrixNormalErrorLimit(n) ORIG_VAR(0x0069b8b4 + 4 * (n), float, rwMatrixNormalLimit##n)
+typedef float RwMatrixNormalLimits[3];
+#define rwMatrixNormalErrorLimits   ORIG_VAR(0x0069b8b4, RwMatrixNormalLimits, rwMatrixNormalErrorLimits)
+#define rwMatrixNormalErrorLimit(n) (rwMatrixNormalErrorLimits[n])
 
 /* How far the squared lengths of the three axes are from 1: sum of squared deviations. */
 BMX_ADDR(0x004d2190)

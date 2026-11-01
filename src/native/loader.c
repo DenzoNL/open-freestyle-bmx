@@ -10,7 +10,6 @@
 
 #include <windows.h>
 
-#include "data/blocks.h"
 #include "driver/wide.h"
 #include "hook/hook.h"
 #include "native/native.h"
@@ -153,15 +152,29 @@ void *bmxOrigPtr(uint32_t addr)
         return NULL;
     }
     if (addr >= kOrigCodeEnd) {
-        return BMX_DATA_AT(addr); /* a table or string in the original's data (RenderWare's plugin tables) */
+        return bmxDataFind(addr); /* a table or string in the original's data (RenderWare's plugin tables) */
     }
     fn = bmxOrigFind(addr);
     return fn != NULL ? (void *)(uintptr_t)fn : trapStub(addr);
 }
 
-char *bmxDataBadAddress(uint32_t addr)
+void *bmxDataFind(uint32_t addr)
 {
-    bmxLog("original data address %08x is in none of the data blocks (src/data/blocks.h)\n", (unsigned)addr);
+    uint32_t lo = 0, hi = bmxDataUnitCount;
+
+    while (lo < hi) {
+        const uint32_t mid = (lo + hi) / 2;
+
+        if (addr < bmxDataUnits[mid].lo) {
+            hi = mid;
+        } else if (addr >= bmxDataUnits[mid].hi) {
+            lo = mid + 1;
+        } else {
+            return (char *)(uintptr_t)bmxDataUnits[mid].at + (addr - bmxDataUnits[mid].lo);
+        }
+    }
+    bmxLog("original data address %08x is in none of the definitions of src/data (dropped padding?)\n",
+           (unsigned)addr);
     ExitProcess(3);
 }
 

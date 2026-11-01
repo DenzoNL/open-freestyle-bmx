@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The original's data as C source (docs/PORTING.md X1b, docs/NATIVE.md "The original's data in the source").
+"""The original's data as C source (docs/PORTING.md X1b / X2a, docs/NATIVE.md "The original's data in the source").
 
 Usage:
   tools/gen_data.py [--build build/native32] [--exe work/NgBMX.exe]   generate src/data from the exe (once)
@@ -7,30 +7,33 @@ Usage:
 
 The native exe needs NgBMX.exe's initial data: the globals' values, the tables, the strings, the pointers between
 them and into the code. This tool turned it into C once; the result is committed (src/data) and maintained like the
-code, and the build does not need the exe. Re-running it overwrites src/data.
+code, and the build does not need the exe. Re-running it overwrites src/data (needs a configured build/native32).
 
-How:
-- Every original data section becomes one C object (a "block": .rdata, .data's initialised part and its zero tail,
-  the import slots, .data1, _rwdseg, and the dinput.lib tables the linker put into .text) whose struct keeps the
-  original's exact layout. The code relies on globals being next to each other (SAVE.DAT copies one range of
-  them, byte-array views span many globals, tables are declared smaller than they are), so the blocks are not cut
-  into separate symbols; ORIG_VAR(addr) is the address's place in its block (src/data/blocks.h).
-- The members are the ORIG_VAR globals of the source, typed as the source declares them (the type's layout from the
-  compiler: each declaring file is compiled with a probe that declares a pointer to the type; the debug metadata of
-  the LLVM IR gives every field's offset and type). Of overlapping declarations the outermost one that contains the
-  others as its fields wins; one that spans several others without containing them (a view) stays an alias. A
-  declaration the data files cannot see (a type local to a .c file) gets a same-layout mirror of standard types.
-- The bytes between the globals become members too, split where the original's code or a pointer refers to an
-  address: pointers (p_<addr>), strings (s<Text>), plausible floats, other words or bytes (d_<addr>), zeros
-  (pad_<addr>).
+How (X2a):
+- Every original global becomes its own definition (a "unit"): typed as the source declares it (ORIG_VAR's type; the
+  layout from the compiler: each declaring file is compiled with a probe that declares a pointer to the type, and
+  the debug metadata of the LLVM IR gives every field's offset and type). Declarations inside another one (its
+  fields) are aliases of it. A type the data files cannot see (local to a .c file) gets a same-layout copy.
+- Globals the code uses as one piece stay together as a group (a struct whose members keep their original offsets,
+  asserted): declarations that span several others without containing them (views), the ranges in RANGES (copied
+  or cleared at once), a global and the bytes after it that nothing refers to (a table declared shorter than it
+  is reads on into them). EXTENTS bounds views whose declared type is bigger than what the code uses. A group
+  starts as if at the 16-byte boundary below it (a `lead_` member), so its members keep their alignment.
+- Bytes no declaration names but the original's code or a pointer refers to are units too: strings (s<Text>),
+  pointers (p_<addr>), plausible floats, other words or bytes (d_<addr>). Fewer than 16 zero bytes nothing refers
+  to are padding and dropped.
 - Initialisers come from the exe's bytes: integers, floats with the shortest digits that give the same bits,
-  strings as literals, pointers (from the exe's relocations) as &block.member.field expressions or, into the code,
-  as the name of the function serving that address (tools/gen_origmap.py's map; incremental-link thunks followed;
+  strings as literals, pointers (from the exe's relocations) as &global.field expressions or, into the code, as the
+  name of the function serving that address (tools/gen_origmap.py's map; incremental-link thunks followed;
   addresses nothing serves get a stub that reports them).
+- Output: src/data/<module>.c (the definitions, by the module that declares them), globals.h (their types and
+  declarations), addrs.h (ORIG_VAR's address -> definition + offset, included by src/compat/orig.h), units.c (every
+  definition's original range: bmxDataFind and --check).
 - The result is compiled with -fsyntax-only, and the compiler's complaints are fed back: casts where a pointer's type
   differs, declarations for functions no header declares, a declaration that does not sit at its offset becomes an
   alias. clang-format formats the files.
-- --check compares the compiled objects with the exe: every byte, and every pointer's target (gate: tools/check.sh).
+- --check compares the compiled objects with the exe (each definition in its own section, -fdata-sections): every
+  byte, and every pointer's target (gate: tools/check.sh).
 """
 import concurrent.futures
 import json
@@ -50,8 +53,9 @@ SRC = ROOT / "src"
 # ---- ORIG_VAR sites ------------------------------------------------------------------------------------------
 
 class Site:
-    def __init__(self, path, addr, type_text, name, line):
+    def __init__(self, path, addr, type_text, name, line, spelled=None):
         self.path, self.addr, self.type_text, self.name, self.line = path, addr, type_text, name, line
+        self.spelled = spelled or f"{addr:#010x}"
         self.type = None  # the probed type (Type)
 
     def __repr__(self):
@@ -63,26 +67,24 @@ def scan_sites():
     sites, odd = [], []
     for path in sorted(list(SRC.rglob("*.c")) + list(SRC.rglob("*.h"))):
         rel = path.relative_to(SRC).as_posix()
-        if rel.startswith("hook/") or rel == "compat/orig.h":
+        if rel.startswith(("hook/", "data/")) or rel == "compat/orig.h":
             continue
         text = path.read_text()
         for m in re.finditer(r"\bORIG_VAR\(", text):
             args = macro_args(text, m.end() - 1)
             line = text.count("\n", 0, m.start()) + 1
+            if args is not None and args[0] == "addr" and rel == "rw/d3dpipe.c":
+                continue
             if args is None or len(args) != 3 or not re.fullmatch(r"0x[0-9a-fA-F]+", args[0]):
                 odd.append((rel, line, args))
                 continue
-            sites.append(Site(rel, int(args[0], 16), " ".join(args[1].split()), args[2], line))
-        # The two macros that wrap ORIG_VAR with a computed address: their uses name the addresses.
+            sites.append(Site(rel, int(args[0], 16), " ".join(args[1].split()), args[2], line, args[0]))
+        # d3dpipe.c's K(addr) wraps ORIG_VAR: its uses name the addresses.
         if rel == "rw/d3dpipe.c":
             for m in re.finditer(r"\bK\((0x[0-9a-fA-F]+)\)", text):
                 line = text.count("\n", 0, m.start()) + 1
-                sites.append(Site(rel, int(m.group(1), 16), "const float", f"rwD3DK{m.group(1)}", line))
-        if rel == "rw/clump.c":
-            for m in re.finditer(r"\brwMatrixNormalErrorLimit\((\d)\)", text):
-                line = text.count("\n", 0, m.start()) + 1
-                n = int(m.group(1))
-                sites.append(Site(rel, 0x0069B8B4 + 4 * n, "float", f"rwMatrixNormalLimit{n}", line))
+                sites.append(Site(rel, int(m.group(1), 16), "const float", f"rwD3DK{m.group(1)}", line,
+                                  m.group(1)))
     return sites, odd
 
 
@@ -246,7 +248,7 @@ def probe_command(cmd, probe_c, out_ll):
         if a in ("-Werror", "-g") or a.startswith("-O"):
             continue
         keep.append(a)
-    return keep + ["-O0", "-gdwarf-4", "-w", "-S", "-emit-llvm", "-o", str(out_ll), str(probe_c)]
+    return keep + ["-DBMX_DATA_PROBE", "-O0", "-gdwarf-4", "-w", "-S", "-emit-llvm", "-o", str(out_ll), str(probe_c)]
 
 
 def probe(sites, build, work):
@@ -384,7 +386,11 @@ class Exe:
 class Block:
     def __init__(self, name, lo, hi, kind, file, what, const=False):
         self.name, self.lo, self.hi, self.kind, self.file, self.what, self.const = name, lo, hi, kind, file, what, const
-        self.tag = "Bmx" + name[3:]  # bmxData -> struct BmxData
+        self.tag = "Bmx" + name[3:] if name else None  # bmxData -> struct BmxData
+        self.rng, self.label, self.group, self.module = None, None, False, None
+        # A group starts as if at the 16-byte boundary below its first address (`lead` bytes of nothing first), so
+        # its members keep their original alignment.
+        self.base, self.lead = lo, 0
         self.members = []
 
     def __contains__(self, a):
@@ -395,6 +401,46 @@ class Block:
 # object tables the linker put into .text (data that the input formats in .rdata point at).
 THUNKS = (0x00401005, 0x00402617)
 INPUT_TABLES = (0x004AFC60, 0x004B0F20)
+
+
+# The extent the code really uses where a declaration's type is bigger (X2a): such a declaration is a view.
+EXTENTS = {
+    ("gComdataRecords", 0x00551FD8): 0x1680,  # 0x1200 records declared, SAVE.DAT's kSaveBytesRecords used
+    ("gPhysRiders", 0x00691F40): 2 * 0xF70,  # 4 riders declared, 2 used (one per player; gPlayerRecs: 2 * 0xf70)
+    ("gActionMapTable", 0x00551FB8): 12,  # 256 bytes declared, unused; the table is gGameLevelInfoIndex's 12
+}
+
+# Ranges the code treats as one piece (one memcpy or memset over several globals): their globals become one
+# group, in their original order and at their original offsets.
+RANGES = [
+    (0x00551FD8, 0x1680, "bmxSaveRecords", "SAVE.DAT's records: memcard.c copies them as one range"),
+    (0x006952A0, 0x98, "bmxSaveProfiles", "SAVE.DAT's profiles: memcard.c copies them as one range"),
+    (0x006955E0, 0xC3C, "bmxSaveOptions", "SAVE.DAT's options and riders: memcard.c copies them as one range"),
+    (0x00697780, 0x34, "bmxWinMainGlobals", "WinMain's globals: main.c's initGlobals clears them in one memset"),
+    (0x006741E0, 0xAC, "bmxZrwWorldState", "the world's state: zrwworld.c clears it in one memset from gZrwWorldReady"),
+]
+
+MODULE_TEXT = {
+    "action": "the game (src/bmx/com/action)", "menu": "the front end (src/bmx/com/menu)",
+    "bmxzge": "the game's engine layer (src/bmx/com/zge)", "pc": "the PC layer (src/bmx/pc)",
+    "zge": "the engine (src/zge)", "zglrw": "the engine's RenderWare layer (src/zge/com/zglrw)",
+    "rw": "RenderWare (src/rw)", "native": "the native exe's own code (src/native, src/platform, src/driver)",
+    "misc": "no module (data before the first global)", "imports": "the import slots",
+    "inputtables": "dinput.lib's object tables",
+}
+
+
+def module_of(path):
+    """The data file (src/data/<module>.c) of a global declared in `path`."""
+    parts = path.split("/")
+    if parts[0] == "bmx":
+        return {"action": "action", "menu": "menu", "zge": "bmxzge"}.get(parts[2], "pc") if parts[1] == "com" \
+            else "pc"
+    if parts[0] == "zge":
+        return "zglrw" if "zglrw" in parts else "zge"
+    if parts[0] == "rw":
+        return "rw"
+    return "native"
 
 
 def make_blocks(exe, split):
@@ -666,6 +712,11 @@ class Emitter:
             return None
         if e.kind == "base" and es == 1 and e.enc in ("char", "uchar") and is_text(raw) and not relocs:
             return ("s", c_string(raw[:raw.index(b"\0")]))
+        if e.kind == "base" and e.enc == "char" and not relocs and \
+                all(b == 0 or 0x20 <= b < 0x7F or b in (9, 10, 13) for b in raw):
+            # Strings one after the other (the ones after the first named by nothing): one literal.
+            last = max(i for i, b in enumerate(raw) if b)
+            return ("s", c_string(raw[:last + 1]).replace("\\x00", "\\0"))
         if e.kind == "base" and es == 1 and not relocs:
             # Bytes: one list, positional up to the last non-zero one.
             last = max(i for i, b in enumerate(raw) if b)
@@ -824,6 +875,17 @@ def raw_addresses():
     return out
 
 
+def raw_spellings():
+    """{address as written: address} of BMX_ORIG(0x...) in the code."""
+    out = {}
+    for path in list(SRC.rglob("*.c")) + list(SRC.rglob("*.h")):
+        if path.relative_to(SRC).as_posix().startswith(("hook/", "compat/orig.h", "data/")):
+            continue
+        for m in re.finditer(r"\bBMX_ORIG\(\s*(0x[0-9a-fA-F]+)\s*\)", path.read_text()):
+            out[m.group(1)] = int(m.group(1), 16)
+    return out
+
+
 def string_name(raw, taken):
     """A readable member name from a string's text: sNgBmxExe, sVailTrails; None when the text has no word."""
     words = re.findall(r"[A-Za-z0-9]+", raw.decode("latin-1"))
@@ -902,7 +964,7 @@ class Gen:
     def site_ok(self, s, block):
         """Can the site be a member: aligned at its offset, every pointer in its bytes on a pointer-sized
         scalar."""
-        if (s.addr - block.lo) % align_of(s.type):
+        if (s.addr - block.base) % align_of(s.type):
             return f"misaligned for its type (alignment {align_of(s.type)})"
         if block.kind == "init":
             for r in self.relocs_in(s.addr, s.addr + s.type.size):
@@ -919,13 +981,14 @@ class Gen:
     def plan_block(self, block):
         bsites = [s for s in self.sites if s.addr in block]
         for s in bsites:
-            if s.addr + s.type.size > block.hi:
-                sys.exit(f"{s}: runs past the end of {block.name} ({block.hi:#x})")
+            if s.addr + s.type.size > block.hi and (s.name, s.addr) not in EXTENTS:
+                sys.exit(f"{s}: runs past the end of {block.name or hex(block.lo)} ({block.hi:#x})")
+        views = [s for s in bsites if s.addr + s.type.size > block.hi]
+        bsites = [s for s in bsites if s not in views]
         if block.kind == "imports":
             # .idata from its start, so the slots keep their offsets in the page; only the slots are used.
-            members = [Member(block.lo, block.iat - block.lo, f"pad_{block.lo:08x}", array_of("uchar", 1,
-                                                                                         block.iat - block.lo), "zero")]
-            for a in range(block.iat, block.hi, 4):
+            members = []
+            for a in range(block.lo, block.hi, 4):
                 dll, name = self.exe.imports.get(a, (None, None))
                 mname = f"{dll.rsplit('.', 1)[0].upper()}_{name}" if dll else f"end_{a:08x}"
                 members.append(Member(a, 4, mname, Type("pointer", 4, target=None), "slot"))
@@ -966,9 +1029,9 @@ class Gen:
                     break
         for m in fill:
             if m.kind == "data":
-                m.type = self.guess_floats(m)
+                m.type = self.guess_floats(m, block)
         block.members = sorted(members + fill, key=lambda m: m.addr)
-        for s in bsites:
+        for s in bsites + views:
             m = self.member_at(block, s.addr)
             if m.site is not s:
                 m.aliases.append(s)
@@ -988,7 +1051,7 @@ class Gen:
             referenced = x in self.targets or x in self.raw
             if x in ptrs:
                 ptr = Type("pointer", 4, target=None)
-                if (x - block.lo) % 4:
+                if (x - block.base) % 4:
                     # A pointer off its natural alignment (in a packed table): a packed one-member struct.
                     ptr = Type("struct", 4, "BmxUnalignedPtr", members=[("p", 0, ptr, None, None)])
                 out.append(Member(x, 4, f"p_{x:08x}", ptr, "ptr"))
@@ -1008,7 +1071,7 @@ class Gen:
         def flush(upto):
             if data_from < upto:
                 n = upto - data_from
-                if data_from % 4 == 0 and n % 4 == 0:
+                if (data_from - block.base) % 4 == 0 and n % 4 == 0:
                     t = array_of("uint", 4, n // 4)
                 else:
                     t = array_of("uchar", 1, n)
@@ -1041,7 +1104,7 @@ class Gen:
                 m.kind, m.name, m.type = "zero", f"pad_{m.addr:08x}", array_of("uchar", 1, m.size)
         return out
 
-    def guess_floats(self, m):
+    def guess_floats(self, m, block):
         """A type for bytes nothing names: floats or doubles when every value reads as a plausible one (constants
         and tuning tables), a scalar for a single word, else the words or bytes as they are."""
         import struct
@@ -1052,13 +1115,13 @@ class Gen:
             mant = re.sub(r"e.*$", "", text.rstrip("f")).replace("-", "").replace(".", "").lstrip("0")
             return len(mant) <= digits
 
-        if m.size % 8 == 0 and m.addr % 8 == 0 and m.size >= 8:
+        if m.size % 8 == 0 and (m.addr - block.base) % 8 == 0 and m.size >= 8:
             vals = [raw[i:i + 8] for i in range(0, m.size, 8)]
             if all(not any(v) or 0x3E0 <= (int.from_bytes(v, "little") >> 52) & 0x7FF <= 0x420 and
                    plausible(float_literal(v, 8), 10) for v in vals) and any(any(v) for v in vals):
                 elem = Type("base", 8, "double", enc="float")
                 return elem if len(vals) == 1 else Type("array", m.size, elem=elem, count=len(vals))
-        if m.size % 4 == 0 and m.addr % 4 == 0:
+        if m.size % 4 == 0 and (m.addr - block.base) % 4 == 0:
             vals = [raw[i:i + 4] for i in range(0, m.size, 4)]
             if all(not any(v) or 0x60 <= (int.from_bytes(v, "little") >> 23) & 0xFF <= 0xA0 and
                    plausible(float_literal(v, 4), 7) for v in vals) and any(any(v) for v in vals):
@@ -1068,20 +1131,166 @@ class Gen:
                 return Type("base", 4, "uint32_t", enc="uint")
         return m.type
 
+    # -- units: one definition each ---------------------------------------------------------------------------------
+
+    def plan_units(self, block):
+        """Cuts a section block into units, each one definition: a global (with the declarations inside it as its
+        fields), a group of globals the code treats as one piece (a view over several of them, a range copied or
+        cleared at once: a struct whose members keep their original offsets), or bytes something points at.
+        Bytes nothing refers to stay with the unit before them (an array declared shorter than it is reads on into
+        them), except padding: fewer than 16 zero bytes."""
+        if block.kind == "imports" or block.name == "bmxInputTables":
+            block.group = True
+            block.label = block.what
+            return [block]
+        lo_b, hi_b = block.lo, block.hi
+        exe = self.exe
+        iv = [(s.addr, s.addr + EXTENTS.get((s.name, s.addr), s.type.size), None) for s in self.sites
+              if s.addr in block]
+        iv += [(lo, lo + n, (lo, lo + n, name, why)) for lo, n, name, why in RANGES if lo in block]
+        iv.sort(key=lambda x: (x[0], -x[1]))
+        comps = []
+        for lo, hi, rng in iv:
+            if comps and lo < comps[-1][1]:
+                comps[-1][1] = max(comps[-1][1], hi)
+                comps[-1][2] = comps[-1][2] or rng
+            else:
+                comps.append([lo, hi, rng])
+        for c in comps:
+            if c[1] > hi_b:
+                sys.exit(f"{c[0]:#x}..{c[1]:#x} runs past the end of {block.name}")
+        comp_at = {c[0]: c for c in comps}
+        inside = self.bisect
+
+        def in_comp(a):
+            i = inside.bisect_right([c[0] for c in comps], a) - 1
+            return i >= 0 and comps[i][0] < a < comps[i][1]
+
+        refs = {a for a in self.targets | self.raw if lo_b <= a < hi_b and not in_comp(a)}
+        starts = sorted(set(comp_at) | refs)
+
+        def blank(lo, hi):
+            return (block.kind == "zero" or not any(exe.read(lo, hi - lo))) and not self.relocs_in(lo - 3, hi)
+
+        spans = []
+        if starts and lo_b < starts[0] and not blank(lo_b, starts[0]):
+            spans.append((lo_b, starts[0], None))  # unreferenced data at the section's start
+        for i, s in enumerate(starts):
+            nxt = starts[i + 1] if i + 1 < len(starts) else hi_b
+            c = comp_at.get(s)
+            end = c[1] if c else nxt
+            if end < nxt and not (blank(end, nxt) and nxt - end < 16):
+                end = nxt
+            spans.append((s, end, c[2] if c else None))
+        units = []
+        for lo, hi, rng in spans:
+            u = Block(None, lo, hi, block.kind, None, block.what, const=block.const)
+            u.rng = rng[2:] if rng and rng[0] == lo and rng[1] <= hi else None
+            if rng and not u.rng:
+                self.log.append(f"{rng[2]} ({rng[3]}) is inside a larger group at {lo:#x}..{hi:#x}")
+            u.base = lo & ~0xF
+            units.append(u)
+        return units
+
+    def finish_unit(self, u, taken):
+        """After plan_block: a unit of one member is that global; else a group struct. Names it (unique among all
+        units: they are the program's symbols)."""
+        # Bytes no declaration names and without pointers: one string (with the strings after it that nothing
+        # names) or one array, not a struct of pieces.
+        if (u.kind == "init" and len(u.members) > 1 and not any(m.kind == "site" or m.aliases for m in u.members)
+                and not self.relocs_in(u.lo - 3, u.hi)):
+            first = u.members[0]
+            raw = self.exe.read(u.lo, u.hi - u.lo)
+            if first.kind == "str":
+                m = Member(u.lo, u.hi - u.lo, first.name, array_of("char", 1, u.hi - u.lo), "str")
+            else:
+                m = Member(u.lo, u.hi - u.lo, first.name, array_of("uchar", 1, u.hi - u.lo), "data")
+                if not any(raw):
+                    m.kind = "zero"
+                elif len(raw) % 4 == 0:
+                    m.type = self.guess_floats(Member(u.lo, len(raw), "", array_of("uint", 4, len(raw) // 4),
+                                                      "data"), u)
+                    if m.type.kind == "array" and m.type.elem.size == 1 or m.type.kind == "base" and m.type.size == 1:
+                        m.type = array_of("uint", 4, len(raw) // 4)
+                    if m.type.kind == "array" and m.type.strip().elem.enc == "uint" and len(raw) == 4:
+                        m.type = Type("base", 4, "uint32_t", enc="uint")
+            u.members = [m]
+        # Neighbouring pointers nothing points into become one array (tables of functions).
+        merged = []
+        for m in u.members:
+            prev = merged[-1] if merged else None
+            if (m.kind == "ptr" and m.type.kind == "pointer" and prev is not None and prev.kind in ("ptr", "ptrs")
+                    and prev.type.strip().kind in ("pointer", "array") and prev.end == m.addr
+                    and getattr(prev.type.strip(), "elem", prev.type).strip().kind == "pointer"
+                    and m.addr not in self.targets and m.addr not in self.raw and not m.aliases):
+                n = prev.size // 4 + 1
+                prev.type = Type("array", 4 * n, elem=Type("pointer", 4, target=None), count=n)
+                prev.size, prev.kind = 4 * n, "ptrs"
+                continue
+            merged.append(m)
+        u.members = merged
+        u.group = not (len(u.members) == 1 and u.members[0].addr == u.lo and u.members[0].size == u.hi - u.lo)
+        u.lead = u.lo - u.base if u.group else 0
+        if u.rng:
+            name, u.label = u.rng
+        elif u.group:
+            first = next((m for m in u.members if m.kind == "site"), u.members[0])
+            name = first.name + "Group"
+            u.label = "globals the code uses as one piece (a view over them, or a table declared shorter)"
+        else:
+            name = u.members[0].name
+            u.label = None
+        if name in taken:
+            name = f"{name}_{u.lo:08x}"
+        if name in self.renames:
+            name = self.renames[name]
+        taken.add(name)
+        u.name = name
+        if not u.group:
+            u.members[0].name = name
+
+    def plan_all(self, blocks):
+        units, taken = [], set()
+        module = "misc"
+        for b in blocks:
+            for u in self.plan_units(b):
+                if u is b:
+                    self.plan_block(b)
+                    u.module = "imports" if b.kind == "imports" else "inputtables"
+                    taken.add(b.name)
+                    units.append(u)
+                    continue
+                self.plan_block(u)
+                self.finish_unit(u, taken)
+                ss = sorted((s for m in u.members for s in ([m.site] if m.site else []) + m.aliases),
+                            key=lambda s: s.addr)
+                if ss:
+                    module = module_of(ss[0].path)
+                u.module = module
+                units.append(u)
+        units.sort(key=lambda u: u.lo)
+        self.blocks = units
+        self.unit_los = [u.lo for u in units]
+
+    def ref(self, u, m):
+        """The C expression of member m of unit u."""
+        return f"{u.name}.{m.name}" if u.group else u.name
+
     def member_at(self, block, a):
         ms = block.members
         i = self.bisect.bisect_right([m.addr for m in ms], a) - 1
         return ms[i] if i >= 0 and ms[i].addr <= a < ms[i].end else None
 
     def locate(self, a):
-        """(block, member, offset) of a data address; one past a member's end counts as that member's."""
-        for b in self.blocks:
-            if b.lo <= a <= b.hi:
-                m = self.member_at(b, a) if a < b.hi else None
-                if m is None and a > b.lo:
-                    m = self.member_at(b, a - 1)
+        """(unit, member, offset) of a data address; one past a member's end counts as that member's."""
+        i = self.bisect.bisect_right(self.unit_los, a) - 1
+        for u in self.blocks[max(i - 1, 0):i + 1][::-1]:
+            if u.lo <= a <= u.hi:
+                m = self.member_at(u, a) if a < u.hi else None
+                if m is None and a > u.lo:
+                    m = self.member_at(u, a - 1)
                 if m is not None:
-                    return b, m, a - m.addr
+                    return u, m, a - m.addr
         return None, None, None
 
     # -- pointers -------------------------------------------------------------------------------------------------
@@ -1100,10 +1309,15 @@ class Gen:
     def pointer_expr(self, v, want):
         if self.exe.is_code(v) and not INPUT_TABLES[0] <= v < INPUT_TABLES[1]:
             return self.code_name(v, self.current_file)
-        b, m, off = self.locate(v)
-        if b is None:
-            raise SystemExit(f"pointer to {v:#x}: not in any data block")
-        base = f"{b.name}.{m.name}"
+        u, m, off = self.locate(v)
+        if u is None:
+            if self.dropped(v):
+                # Into padding that was dropped (a pointer one past an array's end lands there).
+                u, m, off = self.locate(v - 1)
+                off += 1
+            else:
+                raise SystemExit(f"pointer to {v:#x}: not in any unit")
+        base = self.ref(u, m)
         want = want.strip() if want is not None else None
         if want is not None and want.kind == "function":
             want = None
@@ -1117,121 +1331,196 @@ class Gen:
             return expr
         return f"(void *)((char *)&{base} + {off})"
 
+    def dropped(self, v):
+        return self.locate(v - 1)[0] is not None
+
     # -- output ---------------------------------------------------------------------------------------------------
 
-    def declare(self, m, block):
+    def declare(self, m, unit, name=None):
+        """The declaration of member m (its name, or `name`), without the semicolon."""
+        name = name or m.name
         if m.type.kind == "struct" and m.type.name == "BmxUnalignedPtr":
-            return f"BmxUnalignedPtr {m.name};"
+            return f"BmxUnalignedPtr {name}"
         if m.kind != "site":
-            return spell(m.type, m.name) + ";"
+            return spell(m.type, name)
         s = m.site
         if id(s) not in self.visible:
-            return spell(s.type, m.name) + ";  /* the type is local to " + s.path + " */"
+            if not unit.group:
+                return f"BmxType_{name} {name}"
+            return spell(s.type, name)
         text = s.type_text
-        if s.type.kind == "const" and not block.const and text.startswith("const "):
+        if s.type.kind == "const" and text.startswith("const "):
             text = text[6:]
         if re.fullmatch(r"[\w\s]+\**", text):
-            return f"{text} {m.name};"
-        return f"__typeof__({text}) {m.name};"
+            return f"{text} {name}"
+        return f"__typeof__({text}) {name}"
+
+    def mirrored(self, u):
+        m = u.members[0]
+        return not u.group and m.kind == "site" and id(m.site) not in self.visible
 
     def build_inits(self):
         em = Emitter(self)
         bad = []
-        for b in self.blocks:
-            if b.kind != "init":
+        for u in self.blocks:
+            if u.kind != "init":
                 continue
-            self.current_file = b.file
-            for m in b.members:
+            self.current_file = u.module + ".c"
+            for m in u.members:
                 try:
-                    m.init = em.value(m.type, m.addr, (b.name, m.name))
+                    m.init = em.value(m.type, m.addr, (u.lo, m.name))
                 except Unrepresentable as e:
                     if m.kind != "site":
                         raise
                     bad.append((m.site, str(e)))
         return bad
 
+    def comment(self, u, m):
+        aliases = sorted({s.name for s in m.aliases if s.name != m.name})
+        return f"{m.addr:#010x}" + (", also " + ", ".join(aliases) if aliases else "")
+
     def write(self):
-        files = {"layout.h": (self.layout_text(), {})}
-        for b in self.blocks:
-            files[b.file] = self.block_text(b)
+        files = {"globals.h": (self.globals_text(), {})}
+        for module in sorted({u.module for u in self.blocks}):
+            files[module + ".c"] = self.module_text(module)
+        files["addrs.h"] = (self.addrs_text(), {})
+        files["units.c"] = (self.units_text(), {})
         return files
 
-    def layout_text(self):
-        """src/data/layout.h: every block's members (names, types, original addresses) and their offsets."""
-        L = ["/*", " * The layout of the original's data blocks (docs/PORTING.md X1b): one struct per block, its members the",
-             " * globals at their original offsets (asserted below), the bytes nothing names as d_/p_/pad_<address>",
-             " * and strings as s<Text>. The values are in the block's file (src/data/<block>.c).",
+    def globals_text(self):
+        """src/data/globals.h: the types and declarations of every definition in src/data."""
+        L = ["/*", " * The original's globals as C definitions (docs/PORTING.md X2a): their declarations, the types of the",
+             " * groups (globals the code uses as one piece: a struct whose members keep their original offsets, asserted",
+             " * below) and of the globals whose own type is local to a .c file (a same-layout copy). Included by the",
+             " * data files only (src/data/data.h); the game's code reaches the globals through ORIG_VAR (data/addrs.h).",
              " *",
              " * Generated once by tools/gen_data.py from NgBMX.exe; from here on it is source like the code.",
              " */",
-             "#ifndef BMX_DATA_LAYOUT_H", "#define BMX_DATA_LAYOUT_H", ""]
-        names = sorted({m.name for b in self.blocks for m in b.members} & self.site_names)
-        L.append("/* The headers' ORIG_VAR macros of these names: here they are the members. */")
+             "#ifndef BMX_DATA_GLOBALS_H", "#define BMX_DATA_GLOBALS_H", ""]
+        names = sorted(({u.name for u in self.blocks} | {m.name for u in self.blocks for m in u.members})
+                       & self.site_names)
+        L.append("/* The headers' ORIG_VAR macros of these names: here the names are the definitions. */")
         L += [f"#undef {n}" for n in names]
-        for b in self.blocks:
-            L += ["", f"/* {b.what[0].upper() + b.what[1:]}, {b.lo:#010x}..{b.hi:#010x}. */", f"struct {b.tag} {{"]
-            for m in b.members:
-                decl = self.declare(m, b)
-                aliases = sorted({s.name for s in m.aliases if s.name != m.name})
-                comment = f"{m.addr:#010x}" + (", also " + ", ".join(aliases) if aliases else "")
-                if "/*" in decl:
-                    decl = decl.replace("/* ", f"/* {comment}; ")
-                else:
-                    decl += f" /* {comment} */"
-                L.append("    " + decl)
-            L += ["};", ""]
-            # The members' sizes add up to the block's: padding the compiler inserted anywhere would move the end.
-            # The globals' own offsets are asserted too, as the record of where each one is.
-            sited = [m for m in b.members if m.kind == "site"]
-            if sited:
-                L.append(f"#define AT(member, addr) _Static_assert(offsetof(struct {b.tag}, member) == (addr) - "
-                         f"{b.lo:#010x}, #member)")
-                L += [f"AT({m.name}, {m.addr:#010x});" for m in sited]
-                L.append("#undef AT")
-            last = b.members[-1].name
-            L.append(f"_Static_assert(offsetof(struct {b.tag}, {last}) + sizeof(((struct {b.tag} *)0)->{last}) == "
-                     f"{b.hi - b.lo:#x}, \"{b.name}\");")
+        for u in self.blocks:
+            qual = "const " if u.const else ""
+            if not u.group:
+                m = u.members[0]
+                if self.mirrored(u):
+                    L.append("")
+                    L.append(f"/* The type is local to {m.site.path}. */")
+                    L.append(f"typedef {spell(m.site.type, 'BmxType_' + u.name)};")
+                continue
+            L += ["", f"/* {u.label[0].upper() + u.label[1:]}, {u.lo:#010x}..{u.hi:#010x}. */",
+                  f"struct BmxGroup_{u.name} {{"]
+            if u.lead:
+                L.append(f"    uint8_t lead_[{u.lead}]; /* nothing: the members' offsets keep their original alignment */")
+            for m in u.members:
+                decl = self.declare(m, u) + ";"
+                note = f" /* {self.comment(u, m)}" + (f"; the type is local to {m.site.path}" if m.kind == "site" and
+                                                      id(m.site) not in self.visible else "") + " */"
+                L.append("    " + decl + note)
+            L.append("};")
+            L.append(f"#define AT(member, addr) _Static_assert(offsetof(struct BmxGroup_{u.name}, member) == (addr) - "
+                     f"{u.base:#010x}, #member)")
+            L += [f"AT({m.name}, {m.addr:#010x});" for m in u.members]
+            L.append("#undef AT")
+            last = u.members[-1].name
+            L.append(f"_Static_assert(offsetof(struct BmxGroup_{u.name}, {last}) + "
+                     f"sizeof(((struct BmxGroup_{u.name} *)0)->{last}) == {u.hi - u.base:#x}, \"{u.name}\");")
+        L += ["", "/* Every definition, by original address. */"]
+        for u in self.blocks:
+            qual = "const " if u.const else ""
+            if u.group:
+                L.append(f"extern {qual}struct BmxGroup_{u.name} {u.name}; /* {u.lo:#010x} */")
+            else:
+                L.append(f"extern {qual}{self.declare(u.members[0], u, u.name)}; /* {self.comment(u, u.members[0])} */")
         L += ["", "#endif"]
         return L
 
-    def block_text(self, b):
-        L = ["/*", f" * {b.what[0].upper() + b.what[1:]}, {b.lo:#010x}..{b.hi:#010x}, as one object with the original's",
-             " * layout (src/data/layout.h, docs/PORTING.md X1b): code relies on globals being next to each other (the",
-             " * save data copied as one range, tables used past their declared ends), so the members keep their",
-             " * original offsets; ORIG_VAR(addr) reaches into it (src/compat/orig.h).",
+    def module_text(self, module):
+        units = [u for u in self.blocks if u.module == module]
+        file = module + ".c"
+        L = ["/*", f" * The original's globals of {MODULE_TEXT.get(module, module)}, with their initial values (docs/PORTING.md",
+             " * X2a; types and declarations in src/data/globals.h).",
              " *",
              " * Generated once by tools/gen_data.py from NgBMX.exe; from here on it is source like the code.",
              " */",
              '#include "data/data.h"', ""]
-        decls = sorted(self.declared.get(b.file, ()))
+        decls = sorted(self.declared.get(file, ()))
         if decls:
             L.append("/* Functions the data points at that no header declares (assembler name = C name). */")
             L += [f'void {n}(void) __asm__("_{n}");' for n in decls]
             L.append("")
-        unserved = sorted(self.unserved.get(b.file, ()))
+        unserved = sorted(self.unserved.get(file, ()))
         if unserved:
             L.append("/* Code nothing serves (unported, unreachable): calling one reports the address and stops. */")
             L += [f"BMX_DATA_UNSERVED({a:08x})" for a in unserved]
             L.append("")
         ptr_lines = {}
-        qual = "const " if b.const else ""
-        if b.kind != "init":
-            L.append(f"{qual}struct {b.tag} {b.name} __attribute__((aligned({b.align})));")
-        else:
-            L.append(f"{qual}struct {b.tag} {b.name} __attribute__((aligned({b.align}))) = {{")
-            for m in b.members:
-                if m.init is None:
-                    continue
-                lines, pl = render(m.init, self.fixes)
-                lines[0] = f"    .{m.name} = " + lines[0]
-                lines[-1] += ","
+        for u in units:
+            qual = "const " if u.const else ""
+            head = f"{qual}struct BmxGroup_{u.name} {u.name} __attribute__((aligned(16)))" if u.group else \
+                f"{qual}{self.declare(u.members[0], u, u.name)}"
+            if not u.group:
+                L.append(f"/* {self.comment(u, u.members[0])} */")
+            inits = [m for m in u.members if m.init is not None] if u.kind == "init" else []
+            if not inits:
+                L.append(head + ";")
+            elif not u.group:
+                lines, pl = render(u.members[0].init, self.fixes, indent="")
+                lines[0] = f"{head} = " + lines[0]
+                lines[-1] += ";"
                 for k, key in pl.items():
                     ptr_lines[len(L) + k] = key
                 L += lines
-            L.append("};")
-        if b.kind == "imports":
-            L += self.import_table(b)
+            else:
+                L.append(f"{head} = {{")
+                for m in inits:
+                    lines, pl = render(m.init, self.fixes)
+                    lines[0] = f"    .{m.name} = " + lines[0]
+                    lines[-1] += ","
+                    for k, key in pl.items():
+                        ptr_lines[len(L) + k] = key
+                    L += lines
+                L.append("};")
+            if u.kind == "imports":
+                L += self.import_table(u)
+            L.append("")
         return L, ptr_lines
+
+    def addrs_text(self):
+        """src/data/addrs.h: each original data address the code names -> the definition at it (ORIG_VAR)."""
+        L = ["/*", " * Where each original data address that the code names (ORIG_VAR, BMX_ORIG) is now: the definition at it",
+             " * in src/data, plus the offset in it (docs/PORTING.md X2a). The definitions are declared here with an opaque",
+             " * type (ORIG_VAR gives the type at the use); src/data/globals.h has their real types.",
+             " *",
+             " * Generated by tools/gen_data.py.", " */",
+             "#ifndef BMX_DATA_ADDRS_H", "#define BMX_DATA_ADDRS_H", ""]
+        wanted = self.spellings
+        macros, used = [], []
+        for sp in sorted(wanted, key=lambda s: (wanted[s], s)):
+            a = wanted[sp]
+            u, m, off = self.locate(a)
+            if u is None:
+                sys.exit(f"{sp}: named in the code, in no unit")
+            if u not in used:
+                used.append(u)
+            off = a - u.lo + u.lead
+            macros.append(f"#define BMX_DATA_{sp} ((char *)&bmxAt_{u.name}" + (f" + {off:#x})" if off else ")"))
+        for u in used:
+            L.append(f'extern struct BmxDataOpaque bmxAt_{u.name} __asm__("_{u.name}");')
+        L += [""] + macros + ["", "#endif", ""]
+        return L
+
+    def units_text(self):
+        L = ["/*", " * Every definition of src/data with the original address range it holds, sorted (bmxDataFind,",
+             " * src/native/loader.c: original addresses computed at run time, RenderWare's tables; tools/gen_data.py",
+             " * --check). Generated by tools/gen_data.py.", " */",
+             '#include "data/data.h"', "", "const BmxDataUnit bmxDataUnits[] = {"]
+        L += [f"    {{{u.lo:#010x}, {u.hi:#010x}, (const void *)&{u.name}}}," if not u.lead else
+              f"    {{{u.lo:#010x}, {u.hi:#010x}, (const char *)&{u.name} + {u.lead}}}," for u in self.blocks]
+        L += ["};", f"const uint32_t bmxDataUnitCount = {len(self.blocks)};", ""]
+        return L
 
     def import_table(self, b):
         L = ["", "/* What the loader fills each slot with (src/native/loader.c). */",
@@ -1250,14 +1539,15 @@ class Gen:
             if code[:2] != b"\xff\x25":
                 sys.exit(f"{a:#x} ({what}) is not a jmp [slot] in the exe")
             slot = int.from_bytes(code[2:], "little")
-            if slot not in b:
+            if not b.lo <= slot < b.hi:
                 sys.exit(f"{a:#x} ({what}): slot {slot:#x} is not in the import slots")
             dll, name = self.exe.imports[slot]
             if f"{dll.rsplit('.', 1)[0].upper()}!{name}" != what:
                 sys.exit(f"{a:#x}: jumps through {dll}!{name}, IMPORT_THUNKS says {what}")
             m = self.member_at(b, slot)
             L.append(f"BMX_IMPORT_THUNK({a:08x}, {slot - b.lo:#x}); /* {what} */")
-            L.append(f"_Static_assert(offsetof(struct {b.tag}, {m.name}) == {slot - b.lo:#x}, \"{m.name}\");")
+            L.append(f"_Static_assert(offsetof(struct BmxGroup_bmxImports, {m.name}) == {slot - b.lo:#x}, "
+                     f"\"{m.name}\");")
         return L
 
 
@@ -1350,7 +1640,7 @@ def check_visible(sites, build, work):
         probe_c.write_text(text)
         ll = work / "visible.ll"
         r = run_quiet(base[:1] + [a for a in base[1:] if a not in ("-Werror", "-g") and not a.startswith("-O")] +
-                      ["-O0", "-gdwarf-4", "-w", "-S", "-emit-llvm", "-o", str(ll), str(probe_c)])
+                      ["-DBMX_DATA_PROBE", "-O0", "-gdwarf-4", "-w", "-S", "-emit-llvm", "-o", str(ll), str(probe_c)])
         bad = {int(m.group(1)) - first for m in re.finditer(r"visible\.c:(\d+):\d+: error", r.stderr)}
         if r.returncode == 0:
             break
@@ -1425,111 +1715,10 @@ def read_coff(path):
     return secs, syms
 
 
-def check(exe, build, gen_blocks):
-    """Every byte of every block equals the exe's, and every pointer points where the exe's did: data pointers to
-    the same original address, code pointers at the function serving the exe's target."""
-    from gen_origmap import build_map
-
-    owners = {a: n for a, (n, _) in build_map(SRC).items()}
-    objdir = build / "CMakeFiles" / "bmx_data.dir" / "src" / "data"
-    blocks = {b.name: b for b in gen_blocks}
-    errors, counts = [], {"bytes": 0, "data pointers": 0, "code pointers": 0}
-
-    def expect_code(v):
-        if v in owners:
-            return owners[v]
-        if THUNKS[0] <= v < THUNKS[1] and exe.read(v, 1)[0] == 0xE9:
-            dest = (v + 5 + int.from_bytes(exe.read(v + 1, 4), "little", signed=True)) & 0xFFFFFFFF
-            return owners.get(dest, f"unserved_{dest:08x}")
-        return f"unserved_{v:08x}"
-
-    for b in gen_blocks:
-        if b.kind != "init":
-            continue
-        secs, syms = read_coff(objdir / (b.file + ".obj"))
-        sym = next((s for s in syms.values() if s[0] == "_" + b.name), None)
-        if sym is None:
-            errors.append(f"{b.file}: no symbol {b.name}")
-            continue
-        name, value, secno, _ = sym
-        sname, raw, rels = secs[secno - 1]
-        ours = raw[value:value + b.hi - b.lo]
-        theirs = exe.read(b.lo, b.hi - b.lo)
-        relmap = {}
-        for va, si, typ in rels:
-            if value <= va < value + b.hi - b.lo:
-                if typ != 6:  # IMAGE_REL_I386_DIR32
-                    errors.append(f"{b.file}: relocation type {typ} at {va - value:#x}")
-                relmap[va - value] = syms[si]
-        for off in range(0, b.hi - b.lo):
-            a = b.lo + off
-            if any(a - k in exe.relocs for k in range(1, 4)):
-                continue
-            if a in exe.relocs:
-                if off not in relmap:
-                    errors.append(f"{a:#x}: the exe has a pointer here, {b.file} has none")
-                    continue
-                target = exe.relocs[a]
-                sname2, svalue, ssec, scls = relmap[off]
-                addend = int.from_bytes(ours[off:off + 4], "little")
-                if exe.is_code(target) and not INPUT_TABLES[0] <= target < INPUT_TABLES[1]:
-                    want = expect_code(target)
-                    got = sname2[1:] if sname2.startswith("_") else sname2
-                    if scls == 3 and ssec > 0 and svalue == 0 and sname2.startswith("."):  # section symbol
-                        got = next((s[0][1:] if s[0].startswith("_") else s[0]
-                                    for s in syms.values() if s[2] == ssec and s[1] == addend and s[3] in (2, 3)
-                                    and not s[0].startswith(".")), sname2)
-                        addend = 0
-                    if got != want or addend != 0:
-                        errors.append(f"{a:#x}: code pointer to {got}+{addend}, the exe's is {target:#x} ({want})")
-                    counts["code pointers"] += 1
-                else:
-                    if sname2.startswith(".") and scls == 3:  # section symbol of this object
-                        cand = [s for s in syms.values() if s[2] == ssec and s[0].startswith("_bmx")
-                                and s[1] <= addend]
-                        sym2 = max(cand, key=lambda s: s[1])
-                        sname2, addend = sym2[0], addend - sym2[1]
-                    tb = blocks.get(sname2[1:])
-                    got = tb.lo + addend if tb else None
-                    if got != target:
-                        errors.append(f"{a:#x}: data pointer to {sname2}+{addend:#x}, the exe's is {target:#x}")
-                    counts["data pointers"] += 1
-                continue
-            if off in relmap:
-                errors.append(f"{a:#x}: {b.file} has a pointer here, the exe has none")
-                continue
-            if ours[off] != theirs[off]:
-                errors.append(f"{a:#x}: byte {ours[off]:#04x}, the exe's is {theirs[off]:#04x}")
-            counts["bytes"] += 1
-    return errors, counts
-
-
-# ---- main -------------------------------------------------------------------------------------------------------
-
-def blocks_header(blocks):
-    """src/data/blocks.h: the blocks' ranges and the address -> place macro of src/compat/orig.h."""
-    L = ["/*", " * The original's data blocks (src/data/<block>.c) and where an original data address is in them: each block",
-         " * keeps the original's layout, so the address's offset in its block is its offset in the object.",
-         " * Generated by tools/gen_data.py.", " */",
-         "#ifndef BMX_DATA_BLOCKS_H", "#define BMX_DATA_BLOCKS_H", "", "#include <stdint.h>", ""]
-    for b in blocks:
-        L.append(f"extern {'const ' if b.const else ''}struct {b.tag} {b.name}; /* {b.what} */")
-    L += ["", "/* Never reached for a data address the code names (tools/gen_data.py checks them all). */",
-          "char *bmxDataBadAddress(uint32_t addr);", "",
-          "/* The block holding original data address addr, as a char pointer. */",
-          "#define BMX_DATA_AT(addr) \\"]
-    for i, b in enumerate(blocks):
-        lead = "    (" if i == 0 else "     : "
-        L.append(f"{lead}(uint32_t)(addr) - {b.lo:#010x}u < {b.hi - b.lo:#x}u ? (char *)&{b.name} + ((uint32_t)(addr) - "
-                 f"{b.lo:#010x}u) \\")
-    L += ["     : bmxDataBadAddress((uint32_t)(addr)))", "", "#endif", ""]
-    return "\n".join(L)
-
-
 def data_h(headers):
-    L = ["/*", " * Included by the data files (src/data/<block>.c): the game's headers, for the globals' types, the blocks'",
-         " * layout and the helpers of the generated definitions (docs/PORTING.md X1b). Generated once by",
-         " * tools/gen_data.py.", " */",
+    L = ["/*", " * Included by the data files (src/data/<module>.c): the game's headers, for the globals' types, the",
+         " * declarations of the definitions and the helpers of the generated code (docs/PORTING.md X2a). Generated once",
+         " * by tools/gen_data.py.", " */",
          "#ifndef BMX_DATA_DATA_H", "#define BMX_DATA_DATA_H", "", "#include <stddef.h>", "#include <stdint.h>", "",
          "/* zrwmodel.h and zrwzgl.h name 0x697720 / 0x697724 the other way round (gZrwScale, gZrwInvScale), and",
          " * gZrwFlags with different types: each module's own pair is right for its code, both are seen here. */",
@@ -1547,7 +1736,7 @@ def data_h(headers):
           "/* An original `jmp [import slot]` thunk that ported code calls by address: the same jump, through our slot. */",
           "#define BMX_IMPORT_THUNK(addr, offset) \\",
           '    __asm__(".globl _bmxImportThunk_" #addr "\\n_bmxImportThunk_" #addr ":\\n\\tjmp *_bmxImports+" #offset "\\n")',
-          "", '#include "data/blocks.h"', '#include "data/layout.h"', "", "#endif", ""]
+          "", '#include "data/globals.h"', "", "#endif", ""]
     return "\n".join(L)
 
 
@@ -1556,40 +1745,46 @@ def generate(build, exe_path):
     out.mkdir(exist_ok=True)
     work = build / "gendata"
     sites, odd = scan_sites()
+    if odd:
+        sys.exit("ORIG_VAR with a computed address (write the base address, index the result): " +
+                 ", ".join(f"{p}:{l}" for p, l, _ in odd))
     probe(sites, build, work)
     exe = Exe(exe_path)
     data_sec = next(s for s in exe.sections if s[0] == ".data")
-    raw = data_sec[4]
-    last = max(i for i, b in enumerate(raw) if b) + data_sec[1]
-    last = max([last] + [r + 4 for r in exe.relocs if data_sec[1] <= r < data_sec[2]])
-    split = (last + 1 + 0xFFF) & ~0xFFF  # on a page (make_blocks)
-    while any(s.addr < split < s.addr + s.type.size for s in sites):
-        split += 0x1000
-    blocks = make_blocks(exe, split)
-    (out / "blocks.h").write_text(blocks_header(blocks))
+    blocks = make_blocks(exe, data_sec[2])
+    blocks = [b for b in blocks if b.name != "bmxBss"]
+    for b in blocks:
+        if b.kind == "imports":
+            b.lo = b.base = b.iat  # the slots only
     (out / "data.h").write_text(data_h(data_headers()))
-    (out / "layout.h").write_text("/* (being generated) */\n")
+    (out / "globals.h").write_text("/* (being generated) */\n")
     visible = check_visible(sites, build, work)
     for s in sites:
         if not any(s.addr in b for b in blocks):
             sys.exit(f"{s}: not in any data block")
-    for a in raw_addresses():
+    spellings = {s.spelled: s.addr for s in sites}
+    spellings.update(raw_spellings())
+    for sp, a in spellings.items():
         if not any(a in b for b in blocks):
-            sys.exit(f"BMX_ORIG({a:#010x}): not in any data block")
+            sys.exit(f"{sp}: not in any data block")
     gen = Gen(exe, sites, visible)
     gen.log = []
     gen.site_names = {s.name for s in sites}
-    while True:
-        for b in blocks:
-            gen.plan_block(b)
-        gen.blocks = blocks
-        bad = gen.build_inits()
-        if not bad:
-            break
-        for s, why in bad:
-            gen.log.append(f"{s}: not a member, {why}")
-            gen.demoted.add((s.addr, s.name))
-    for rounds in range(8):
+    gen.spellings = spellings
+    gen.renames = {}
+
+    def plan():
+        while True:
+            gen.plan_all(blocks)
+            bad = gen.build_inits()
+            if not bad:
+                return
+            for s, why in bad:
+                gen.log.append(f"{s}: not a member, {why}")
+                gen.demoted.add((s.addr, s.name))
+
+    plan()
+    for rounds in range(10):
         files = gen.write()
         for name, (lines, _) in files.items():
             (out / name).write_text("\n".join(lines) + "\n")
@@ -1622,10 +1817,19 @@ def generate(build, exe_path):
                     gen.fixes[ptr_lines[line - 1]] = "void *"
                     progress = True
                     continue
+                # A name a header already uses for something else (a function, a type): the definition gets the
+                # original address as a suffix.
+                m = re.search(r"(?:redefinition of|conflicting types for|redefinition of '\w+' as different kind of "
+                              r"symbol) '?(\w+)'?", msg)
+                if m and name == "globals.h" and any(u.name == m.group(1) for u in gen.blocks):
+                    u = next(u for u in gen.blocks if u.name == m.group(1))
+                    gen.renames[u.name] = f"{u.name}_{u.lo:08x}"
+                    replan = True
+                    continue
                 m = re.search(r"static assertion failed due to requirement .*: (\w+)$|static assertion failed: (\w+)$", msg)
                 if m:
                     mname = m.group(1) or m.group(2)
-                    hit = [mm for b in blocks for mm in b.members if mm.name == mname and mm.site is not None]
+                    hit = [mm for b in gen.blocks for mm in b.members if mm.name == mname and mm.site is not None]
                     for mm in hit:
                         gen.demoted.add((mm.site.addr, mm.site.name))
                         gen.log.append(f"{mm.site}: not a member, its offset differs (alignment)")
@@ -1636,47 +1840,142 @@ def generate(build, exe_path):
         if unknown:
             sys.exit("\n".join(unknown[:40]))
         if replan:
-            while True:
-                for b in blocks:
-                    gen.plan_block(b)
-                bad = gen.build_inits()
-                if not bad:
-                    break
-                for s, why in bad:
-                    gen.demoted.add((s.addr, s.name))
+            plan()
             continue
         if not progress:
             break
     else:
         sys.exit("the data files still do not compile")
+    for stale in out.iterdir():
+        if stale.name not in files and stale.name != "data.h":
+            stale.unlink()
     # The project's formatting (the gate checks it); clang-format 21 like tools/check.sh.
     r = run_quiet([os.environ.get("CLANG_FORMAT", "clang-format"), "-i"] +
-                  [str(out / n) for n in sorted(files) + ["blocks.h", "data.h"]])
+                  [str(out / n) for n in sorted(files) + ["data.h"]])
     if r.returncode != 0:
         sys.exit(f"clang-format: {r.stderr[-2000:]}")
-    stats(blocks, gen, sites, visible)
+    stats(gen, sites, visible)
     log = work / "gen_data.log"
     log.write_text("\n".join(gen.log) + "\n")
     print(f"log: {log}")
 
 
-def stats(blocks, gen, sites, visible):
-    views = []
-    for b in blocks:
-        for m in b.members:
-            for s in m.aliases:
-                if s.addr + s.type.size > m.end:
-                    views.append(s)
+def stats(gen, sites, visible):
+    units = gen.blocks
+    groups = [u for u in units if u.group]
+    kinds = {}
+    for u in units:
+        if not u.group:
+            k = u.members[0].kind
+            kinds[k] = kinds.get(k, 0) + 1
     gen.log.append("")
-    gen.log.append(f"{len(views)} views: sites that span more than one member (code relying on adjacency)")
-    for s in sorted(views, key=lambda s: s.addr):
-        gen.log.append(f"  {s} ({s.type.size} bytes)")
-    for b in blocks:
-        kinds = {}
-        for m in b.members:
-            kinds[m.kind] = kinds.get(m.kind, 0) + 1
-        print(f"{b.name:15} {b.lo:#010x}..{b.hi:#010x} {len(b.members):5} members {kinds}")
+    gen.log.append(f"{len(groups)} groups (globals the code uses as one piece):")
+    for u in groups:
+        names = [m.name for m in u.members if m.kind == "site"]
+        gen.log.append(f"  {u.name} {u.lo:#010x}..{u.hi:#010x} ({u.hi - u.lo} bytes, {len(u.members)} members: "
+                       f"{' '.join(names[:10])}{' ...' if len(names) > 10 else ''})")
+    tails = [(u, u.members[-1]) for u in units if u.group and u.members[0].kind == "site" and len(u.members) == 2
+             and u.members[1].kind in ("zero", "data")]
+    gen.log.append(f"{len(tails)} of them a global and the unreferenced bytes after it")
+    print(f"{len(units)} definitions: {len(units) - len(groups)} single ({kinds}), {len(groups)} groups")
     print(f"{len(sites)} sites, {len(visible)} with a type the data files see; {len(gen.demoted)} demoted")
+    print("modules:", ", ".join(f"{m} {sum(1 for u in units if u.module == m)}"
+                                for m in sorted({u.module for u in units})))
+
+
+# ---- the check: the compiled data against the exe --------------------------------------------------------------
+
+def check(exe, build):
+    """Every definition's bytes equal the exe's at its original address, and every pointer in it points where the
+    exe's did: data pointers to the same original address, code pointers at the function serving the exe's
+    target."""
+    from gen_origmap import build_map
+
+    owners = {a: n for a, (n, _) in build_map(SRC).items()}
+    table = (SRC / "data" / "units.c").read_text()
+    units, leads = {}, {}
+    for m in re.finditer(r"\{(0x[0-9a-f]+), (0x[0-9a-f]+), \(const (?:void|char) \*\)&(\w+)(?: \+ (\d+))?\}", table):
+        units[m.group(3)] = (int(m.group(1), 16), int(m.group(2), 16))
+        leads[m.group(3)] = int(m.group(4) or 0)
+    if not units:
+        return ["src/data/units.c: no units"], {}
+    objdir = build / "CMakeFiles" / "bmx_data.dir" / "src" / "data"
+    errors, counts = [], {"definitions": 0, "bytes": 0, "data pointers": 0, "code pointers": 0}
+
+    def expect_code(v):
+        if v in owners:
+            return owners[v]
+        if THUNKS[0] <= v < THUNKS[1] and exe.read(v, 1)[0] == 0xE9:
+            dest = (v + 5 + int.from_bytes(exe.read(v + 1, 4), "little", signed=True)) & 0xFFFFFFFF
+            return owners.get(dest, f"unserved_{dest:08x}")
+        return f"unserved_{v:08x}"
+
+    found = set()
+    for obj in sorted(objdir.glob("*.c.obj")):
+        secs, syms = read_coff(obj)
+        for name, value, secno, cls in syms.values():
+            uname = name[1:] if name.startswith("_") else name
+            if uname not in units or secno <= 0 or cls != 2:
+                continue
+            lo, hi = units[uname]
+            if uname == "bmxImports":
+                found.add(uname)
+                continue
+            sname, raw, rels = secs[secno - 1]
+            if sname.startswith(".bss") or not raw:
+                ours = bytes(hi - lo)
+            else:
+                ours = raw[value + leads[uname]:value + leads[uname] + hi - lo]
+            if len(ours) != hi - lo:
+                errors.append(f"{uname}: {len(ours)} bytes in {obj.name}, the original has {hi - lo}")
+                continue
+            found.add(uname)
+            counts["definitions"] += 1
+            theirs = exe.read(lo, hi - lo)
+            relmap = {}
+            start = value + leads[uname]
+            for va, si, typ in rels:
+                if start <= va < start + hi - lo:
+                    if typ != 6:  # IMAGE_REL_I386_DIR32
+                        errors.append(f"{uname}: relocation type {typ} at {va - start:#x}")
+                    relmap[va - start] = syms[si]
+            for off in range(hi - lo):
+                a = lo + off
+                if any(a - k in exe.relocs for k in range(1, 4)):
+                    continue
+                if a in exe.relocs:
+                    if off not in relmap:
+                        errors.append(f"{a:#x} ({uname}): the exe has a pointer here, ours has none")
+                        continue
+                    target = exe.relocs[a]
+                    tname, tvalue, tsec, tcls = relmap[off]
+                    addend = int.from_bytes(ours[off:off + 4], "little")
+                    if tname.startswith(".") and tcls == 3:  # a section symbol: the static function in it
+                        tname = next((s[0] for s in syms.values() if s[2] == tsec and not s[0].startswith(".")
+                                      and s[1] == addend), tname)
+                        addend = 0
+                    got = tname[1:] if tname.startswith("_") else tname
+                    if exe.is_code(target) and not INPUT_TABLES[0] <= target < INPUT_TABLES[1]:
+                        want = expect_code(target)
+                        if got != want or addend != 0:
+                            errors.append(f"{a:#x} ({uname}): code pointer to {got}+{addend}, the exe's is "
+                                          f"{target:#x} ({want})")
+                        counts["code pointers"] += 1
+                    else:
+                        if got not in units or units[got][0] + addend - leads[got] != target:
+                            errors.append(f"{a:#x} ({uname}): data pointer to {got}+{addend:#x}, the exe's is "
+                                          f"{target:#x}")
+                        counts["data pointers"] += 1
+                    continue
+                if off in relmap:
+                    errors.append(f"{a:#x} ({uname}): ours has a pointer here, the exe has none")
+                    continue
+                if ours[off] != theirs[off]:
+                    errors.append(f"{a:#x} ({uname}): byte {ours[off]:#04x}, the exe's is {theirs[off]:#04x}")
+                counts["bytes"] += 1
+    for uname in sorted(set(units) - found):
+        errors.append(f"{uname}: not found in the objects of {objdir}")
+    return errors, counts
 
 
 def main():
@@ -1689,22 +1988,11 @@ def main():
     args = ap.parse_args()
     build = Path(args.build)
     if args.check:
-        exe = Exe(args.exe)
-        # The blocks as src/data/blocks.h has them (BMX_DATA_AT's ranges).
-        text = (SRC / "data" / "blocks.h").read_text()
-        protos = {b.name: b for b in make_blocks(exe, 0)}
-        blocks = []
-        for m in re.finditer(r"\(uint32_t\)\(addr\) - (0x[0-9a-f]+)u < (0x[0-9a-f]+)u\s+\? \(char \*\)&(\w+)", text):
-            b = protos[m.group(3)]
-            b.lo, b.hi = int(m.group(1), 16), int(m.group(1), 16) + int(m.group(2), 16)
-            blocks.append(b)
-        if len(blocks) != len(protos):
-            sys.exit(f"src/data/blocks.h: found {len(blocks)} of the {len(protos)} blocks")
-        errors, counts = check(exe, build, blocks)
+        errors, counts = check(Exe(args.exe), build)
         for e in errors[:50]:
             print(e)
         print(f"{len(errors)} differences; checked {counts}")
-        sys.exit(1 if errors or not counts["bytes"] else 0)
+        sys.exit(1 if errors or not counts.get("bytes") else 0)
     generate(build, args.exe)
 
 

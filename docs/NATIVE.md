@@ -4,62 +4,62 @@ Goal: an exe of our own that runs the ported game code without the original's co
 as the first step of the platform flip. 64-bit cleanliness (Mac, Android, Linux x64) comes after, as a
 separate step.
 
-## The original's data in the source (since X1b, 2026-11-01)
+## The original's data in the source (since X1b; one definition per global since X2a, 2026-11-01)
 
 bmxnative.exe reads nothing from NgBMX.exe: it needs only the game's data folders (docs/PORTING.md X1b, decision
 X2-A). The original's initialised data (the globals' values, tables, strings, the pointers between them and into
 the code) is C source in `src/data`, made once from the exe by `tools/gen_data.py` and maintained like the code.
 
-- **One object per original data section** (a "block"), whose struct keeps the original's exact layout:
-  `bmxRdata` (.rdata, const), `bmxData` (.data's initialised part, 0x551000..0x56a000), `bmxBss` (.data's zero tail,
-  no initialiser, no bytes in the exe file), `bmxImports` (the import slots of .idata), `bmxData1` (.data1),
-  `bmxRwBss` (_rwdseg) and `bmxInputTables` (dinput.lib's object tables of c_dfDIJoystick / c_dfDIKeyboard, which
-  the linker put into the original's .text). Why not one symbol per global: the code relies on globals being next
-  to each other: SAVE.DAT is one memcpy over a range of globals (gComdataRecords, a 90 KB view), 61 declarations
-  span several globals (byte-array views such as gActionMapTable, rider and trick tables), several tables are
-  declared smaller than they are (gFxHandlerTable is a uint8_t at the start of a table of three function pointers),
-  main.c's initGlobals clears 0x697780..+0x34 in one memset. Exact layout keeps all of that working by construction;
-  splitting the blocks into separate symbols is X2's work, global by global, with xcheck.
-- **`src/data/layout.h`**: the blocks' structs. Members are the `ORIG_VAR` globals, typed as the source declares them
-  (1449 of 1665 declarations have a type the data files see; the others, types local to a .c file, get a
-  same-layout mirror of standard types, marked in the comment), with every other name for the same address in the
-  comment. Bytes nothing names are members too, split where the original's code or a pointer refers to an address:
-  `p_<addr>` pointers, `s<Text>` strings (named from their text), `d_<addr>` floats / words / bytes, `pad_<addr>`
-  zeros; a filler where a declaration starts that cannot be a member (a view, or a uint8_t declared over a table of
-  pointers) takes that declaration's name. Each global's offset is asserted (`AT(gAction, 0x0056b3e0)`), and so is
-  each block's end, which moves if the compiler pads anywhere. The headers' `ORIG_VAR` macros are `#undef`'d there:
-  in the data files the names are the members.
-- **`src/data/<block>.c`**: the values, as designated initialisers: integers, floats with the shortest digits that
-  give the same bits, strings as literals, pointers as `&bmxData.member.field` or, into the code, the name of the
-  function serving that address (tools/gen_origmap.py's map, incremental-link thunks followed; casts where the
+- **One definition per global** (X2a): 4232 definitions, each its own symbol with its own initialiser, in
+  `src/data/<module>.c` by the module that declares the global (action, menu, bmxzge, pc, zge, zglrw, rw, native;
+  imports and inputtables). Typed as the source declares it (`ORIG_VAR`'s type; 1446 of 1663 declarations have a type
+  the data files see, the others, types local to a .c file, get a same-layout copy `BmxType_<name>`). Declarations
+  inside another one (its fields, other names for it) are aliases, listed in its comment.
+- **Groups** (233): globals the code uses as one piece stay one struct whose members keep their original offsets
+  (asserted): the views (declarations that span several globals without containing them: byte-array tables over
+  rider and trick data, overlay tables, gGameRecords over the game state...), the ranges copied or cleared at once
+  (SAVE.DAT's three ranges: `bmxSaveRecords` 0x551fd8+0x1680, `bmxSaveProfiles` 0x6952a0+0x98 (with the unreferenced bytes after it),
+  `bmxSaveOptions` 0x6955e0+0xc3c; `bmxWinMainGlobals` cleared by initGlobals; `bmxZrwWorldState` cleared from
+  gZrwWorldReady, 0xac bytes), and a global with the bytes after it that nothing refers to (115: a table declared
+  shorter than it is reads on into them; gNgifPrimBuffer's buffer, gFxHandlerTable's three pointers). `EXTENTS` in
+  the generator bounds views whose declared type is bigger than what the code uses (gComdataRecords: 0x1200 records
+  declared, SAVE.DAT's 0x1680 bytes used; gPhysRiders: 4 riders declared, 2 used; gActionMapTable: 256 bytes
+  declared, unused, gGameLevelInfoIndex's 12 at the same address). A group is laid out as if it
+  started at the 16-byte boundary below its first address (a `lead_` member of nothing), so its members keep their
+  original alignment.
+- **Gap data**: bytes no declaration names but the original's code or a pointer refers to are definitions too:
+  strings (`s<Text>`, named from their text), pointers and pointer tables (`p_<addr>`), plausible floats, words or
+  bytes (`d_<addr>`). Fewer than 16 zero bytes that nothing refers to are padding and dropped (7439 bytes).
+- **`src/data/globals.h`**: the groups' structs, the copied types and an `extern` for every definition (the data
+  files only; the headers' `ORIG_VAR` macros of these names are `#undef`'d there).
+- **`ORIG_VAR(addr)` / `BMX_ORIG(addr)`** (src/compat/orig.h, `BMX_IMAGE` mode) are `BMX_DATA_<addr>` from
+  `src/data/addrs.h`: the definition at that address, plus the offset in it (declared there with an opaque type and
+  its assembler name; ORIG_VAR gives the type). The address must be written as a number in the code, and every one
+  the code names has a macro (1480). Addresses computed at run time and RenderWare's table pointers (`bmxOrigPtr`)
+  go through `bmxDataFind` (src/native/loader.c) over `bmxDataUnits` (src/data/units.c: every definition's original
+  range), which reports and stops for an address in no definition.
+- **Pointers in the data** are `&global.field` (or `&group.member.field`) expressions or, into the code, the name of
+  the function serving that address (tools/gen_origmap.py's map, incremental-link thunks followed; casts where the
   field's type differs). The 237 code addresses that nothing serves (switch tables inside unported CRT and D3D7
-  driver code, the D3D7 driver's own entry points; X1a gave them run-time trap stubs) get a stub each that reports
-  the address if ever called (`BMX_DATA_UNSERVED`).
-- **`src/data/imports.c`**: the 137 import slots, the table the loader fills them from (`bmxImportSlots`: DLL and
-  name per slot) and the 21 stubs for the original's `jmp [slot]` thunks that ported code calls by address (AVIFile,
-  DrawDib, DirectInputCreateEx), each the same jump through our slot (`BMX_IMPORT_THUNK`; the slot was checked
-  against the exe's thunk at generation).
-- **`ORIG_VAR(addr)` and `BMX_ORIG(addr)`** (src/compat/orig.h, `BMX_IMAGE` mode) are `BMX_DATA_AT(addr)`
-  (src/data/blocks.h): the block holding the address plus the address's offset in it. For a constant address the
-  compiler folds it to `&block + offset` (also in static initialisers); computed addresses
-  (`BMX_ORIG(0x0055d8c8 + index * 4)`) compare the ranges at run time. An address in no block calls
-  `bmxDataBadAddress`, which reports and stops; tools/gen_data.py checked that every `ORIG_VAR` and `BMX_ORIG`
-  address in the source is in a block. `RW_CB` / `bmxOrigPtr` give a function for a code address and
-  `BMX_DATA_AT` for a data address (RenderWare's plugin tables at 0x69b520 / 0x69bee0).
-- **The loader** (src/native/loader.c, `bmxLoaderInit`) fills the import slots (stand-in, dead-slot stub or the real
-  function, as before) and writes the opt-in jumps over our own functions (smooth mixer, wide HUD, draw distance).
-  Gone with X1b: reading NgBMX.exe and its sha256 check (bcrypt.dll is no longer imported), the data copy, the
-  relocation pass, the incremental-link thunk table, the copy of the input tables, the scan for the exe's import
-  thunks and `BMX_RELOC_LOG`.
-- **The check** (`tools/gen_data.py --check`, in tools/check.sh when build/native32 and the exe are there): every
-  byte of the compiled blocks equals the exe's (132830 bytes), every pointer points where the exe's did (813 data
-  pointers: same original address; 739 code pointers: the function serving the exe's target). The hook build is
-  untouched (its code is identical before and after).
-- **Placement**: each block starts on a page like its section did (pointers into it keep the original's low 12
-  bits, as in X1a's image), and the exe is linked at 0x01000000, below 0x10000000: the PSX-style ordering tables
-  (ngifpsx.c, zoverii.c, the front end) keep pointers to the data in 28 bits (the top 4 are the packet's length).
+  driver code, the D3D7 driver's own entry points) get a stub each that reports the address if ever called
+  (`BMX_DATA_UNSERVED`).
+- **`src/data/imports.c`**: the 137 import slots (`bmxImports`), the table the loader fills them from
+  (`bmxImportSlots`) and the 21 stubs for the original's `jmp [slot]` thunks that ported code calls by address
+  (`BMX_IMPORT_THUNK`).
+- **The loader** (src/native/loader.c, `bmxLoaderInit`) fills the import slots and writes the opt-in jumps over our
+  own functions (smooth mixer, wide HUD, draw distance). Since X1b nothing is read from NgBMX.exe.
+- **The check** (`tools/gen_data.py --check`, in tools/check.sh when build/native32 and the exe are there): the data
+  files are compiled with `-fdata-sections`, so each definition is its own section; every definition's bytes equal
+  the exe's at its original address (1372840 bytes, zero ones included), every pointer points where the exe's did
+  (813 data pointers: the same original address; 739 code pointers: the function serving the exe's target).
+- **Placement**: the definitions are wherever the linker puts them. The exe is linked at 0x01000000, below
+  0x10000000: the PSX-style ordering tables (ngifpsx.c, zoverii.c, the front end) keep pointers to the data in 28
+  bits (the top 4 are the packet's length).
 - **Regenerating** (`tools/gen_data.py`, needs the exe, a configured build/native32 and clang-format 21) overwrites
   src/data: only for a fresh start, not after hand edits.
+
+X1b's form (one object per original data section with the original's exact layout, src/data/layout.h) was the
+step before: correct by construction, with the adjacency questions left for X2a.
 
 ## Relocated data image (X1a, 2026-11-01, until X1b)
 

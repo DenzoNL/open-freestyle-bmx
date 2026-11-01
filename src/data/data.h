@@ -1,7 +1,7 @@
 /*
- * Included by the data files (src/data/<block>.c): the game's headers, for the globals' types, the blocks'
- * layout and the helpers of the generated definitions (docs/PORTING.md X1b). Generated once by
- * tools/gen_data.py.
+ * Included by the data files (src/data/<module>.c): the game's headers, for the globals' types, the
+ * declarations of the definitions and the helpers of the generated code (docs/PORTING.md X2a). Generated once
+ * by tools/gen_data.py.
  */
 #ifndef BMX_DATA_DATA_H
 #define BMX_DATA_DATA_H
@@ -139,7 +139,6 @@ typedef struct __attribute__((packed)) BmxUnalignedPtr {
 #define BMX_IMPORT_THUNK(addr, offset)                                                                       \
     __asm__(".globl _bmxImportThunk_" #addr "\n_bmxImportThunk_" #addr ":\n\tjmp *_bmxImports+" #offset "\n")
 
-#include "data/blocks.h"
-#include "data/layout.h"
+#include "data/globals.h"
 
 #endif

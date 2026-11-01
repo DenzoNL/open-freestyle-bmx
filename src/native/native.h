@@ -41,6 +41,18 @@ typedef struct BmxImportSlot {
 extern const BmxImportSlot bmxImportSlots[];
 extern const uint32_t bmxImportSlotCount;
 
+/* Every definition of src/data with the original address range it holds, sorted (src/data/units.c). */
+typedef struct BmxDataUnit {
+    uint32_t lo, hi;
+    const void *at;
+} BmxDataUnit;
+extern const BmxDataUnit bmxDataUnits[];
+extern const uint32_t bmxDataUnitCount;
+
+/* Where original data address addr is now (for addresses computed at run time); reports and stops for an
+ * address in no definition. */
+void *bmxDataFind(uint32_t addr);
+
 /* The function serving an original code address, NULL when none does (bmxOrigMap only, no thunks). */
 const void *bmxOrigFind(uint32_t orig);
 

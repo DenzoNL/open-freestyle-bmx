@@ -81,8 +81,9 @@ if(BMX_NATIVE32)
   file(GLOB BMX_DATA_SOURCES CONFIGURE_DEPENDS src/data/*.c)
   add_library(bmx_data OBJECT ${BMX_DATA_SOURCES})
   target_link_libraries(bmx_data PRIVATE bmx_game)
+  # One section per definition: tools/gen_data.py --check reads each definition's bytes from its section.
   target_compile_options(bmx_data PRIVATE ${BMX_WARNINGS} -ffreestanding -fno-builtin -fno-stack-protector
-    -Wno-sign-compare -Wno-cast-function-type-mismatch)
+    -Wno-sign-compare -Wno-cast-function-type-mismatch -fdata-sections -ffunction-sections)
   add_dependencies(bmx_data bmx_origmap)
   # bmxplatformtest keeps the fixed-address mode for winchan.c (the real mixer against the smooth one): range.S
   # must be the first object on its link line, its block has to start the image.

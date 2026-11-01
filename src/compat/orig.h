@@ -11,12 +11,13 @@
  * - BMX_HOOK (hook DLL, oracle test DLL): the original's code and data at their addresses; ORIG_FN and
  *   BMX_FNPTR are those addresses, ORIG_VAR reads the global there.
  * - BMX_IMAGE (bmxnative.exe, docs/NATIVE.md "The original's data in the source"): no original code or data
- *   is loaded; the original's data sections are C objects of ours with the original's layout (src/data, one
- *   per section). ORIG_VAR and BMX_ORIG give the place of an original address in its block (BMX_DATA_AT,
- *   src/data/blocks.h); ORIG_FN calls the function serving that address (the generated origmap.h,
- *   tools/gen_origmap.py); BMX_FNPTR is the function itself. BMX_HOOK stays defined there too, for what it
- *   says about the target (i686 MSVC-style conventions, x87 asm, assembler names of stdcall functions, the
- *   compat/crt.h shims); only the address machinery is BMX_IMAGE's.
+ *   is loaded; the original's globals are C definitions of ours (src/data). ORIG_VAR and BMX_ORIG name the
+ *   definition at that address (BMX_DATA_<addr>, src/data/addrs.h, plus the offset in it); ORIG_FN calls the
+ *   function serving that address (the generated origmap.h, tools/gen_origmap.py); BMX_FNPTR is the function
+ *   itself. BMX_HOOK stays defined there too, for what it says about the target (i686 MSVC-style
+ *   conventions, x87 asm, assembler names of stdcall functions, the compat/crt.h shims); only the address
+ *   machinery is BMX_IMAGE's. (BMX_DATA_PROBE: tools/gen_data.py's type probes, which compile the code before
+ *   src/data exists.)
  * - neither (host builds without the exe): globals and functions by name.
  */
 #ifndef BMX_COMPAT_ORIG_H
@@ -57,8 +58,14 @@
  * gives the function serving it.
  */
 #if defined(BMX_IMAGE)
-#include "data/blocks.h"
 void *bmxOrigPtr(uint32_t addr);
+#if defined(BMX_DATA_PROBE)
+#define BMX_DATA_AT(addr) ((char *)(uintptr_t)(addr))
+#else
+#include "data/addrs.h"
+/* The address must be written as a number (the macro's name is made from it), as in the code. */
+#define BMX_DATA_AT(addr) BMX_DATA_##addr
+#endif
 #define BMX_ORIG(addr)     ((uintptr_t)BMX_DATA_AT(addr))
 #define BMX_ORIG_PTR(addr) ((uintptr_t)bmxOrigPtr((uint32_t)(addr)))
 #include "origmap.h"
