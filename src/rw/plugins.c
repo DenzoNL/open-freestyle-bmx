@@ -906,7 +906,8 @@ void *rpBoneUpdateMatrices(void *frame, void *data)
 BMX_ADDR(0x00505670)
 void *rpBoneGeometryRead(void *stream, int32_t length, void *geometry)
 {
-    const int32_t size = length / 3 * 4;
+    /* Every three words of the chunk become a block (16 bytes in the original: length / 3 * 4). */
+    const int32_t size = length / 3 * (int32_t)(sizeof(RpSkinBoneBlock) / sizeof(int32_t));
     RpSkinBoneBlock *blocks = RwEngineInstance->memoryFuncs.rwmalloc((size_t)size);
     if (blocks == NULL) {
         RwError error;
@@ -916,10 +917,15 @@ void *rpBoneGeometryRead(void *stream, int32_t length, void *geometry)
         return NULL;
     }
     RpSkinBoneBlock *block = blocks;
-    for (int32_t read = 0; read < length; read += 12, block++) {
-        if (RwStreamReadInt32(stream, block, 12) == NULL) {
+    for (int32_t read = 0; read < length; read += (int32_t)sizeof(RpSkinBoneBlockFile), block++) {
+        RpSkinBoneBlockFile in;
+
+        if (RwStreamReadInt32(stream, &in, sizeof in) == NULL) {
             return NULL;
         }
+        block->firstVertex = in.firstVertex;
+        block->numVertices = in.numVertices;
+        block->key = in.key;
         block->bone = NULL;
     }
     RpSkinGeometry *skin = RwEngineInstance->memoryFuncs.rwmalloc(sizeof *skin);
@@ -2552,7 +2558,7 @@ __attribute__((regparm(2))) RpAtomic *rpLodAtomicApply(RpAtomic *atomic, RpLodAt
         } else if (level >= 10) {
             level = 9;
         }
-        RpGeometry *geometry = *(RpGeometry **)((uint8_t *)lod + 0x18 + 4 * level);
+        RpGeometry *geometry = lod->levels[level];
         if (geometry != atomic->geometry) {
             RpAtomicSetGeometry(atomic, geometry, 0);
         }
@@ -2753,8 +2759,25 @@ void *LODAtomicCallBackReadChunk(RwStream *stream, int32_t length, void *atomic,
     }
     result = stream;
     RpLodAtomicData *lod = rpLodAtomicDataCreate();
+    /* The chunk is read over the block, as the original did, then spread into its fields (the same bytes
+     * where pointers are 32 bits wide). The callbacks are replaced below. */
     RwStreamRead(stream, lod, chunkLength);
-    RwMemNative32(lod, 0x40);
+    RwMemNative32(lod, sizeof(RpLodAtomicFile));
+    {
+        RpLodAtomicFile file;
+
+        memcpy(&file, lod, sizeof file);
+        lod->hooked = file.hooked;
+        lod->savedRender = (RpAtomicRenderCallBack)(uintptr_t)file.savedRender;
+        lod->select = (RpLodSelectCallBack)(uintptr_t)file.select;
+        lod->range = file.range;
+        lod->scale = file.scale;
+        lod->current = file.current;
+        for (int32_t i = 0; i < 10; i++) {
+            /* Only tested for NULL: the geometry read below replaces it. */
+            lod->levels[i] = (RpGeometry *)(uintptr_t)file.levels[i];
+        }
+    }
     for (int32_t i = 0; i < 10; i++) {
         if (lod->levels[i] != NULL && i != lod->current) {
             if (RwStreamFindChunk(stream, 0xf, NULL, &version) != 0) {
@@ -2774,13 +2797,20 @@ void *LODAtomicCallBackReadChunk(RwStream *stream, int32_t length, void *atomic,
     if (lod->current >= 0) {
         RpGeometry *own = ((RpAtomic *)atomic)->geometry;
         RpGeometryAddRef(own);
-        *(RpGeometry **)((uint8_t *)lod + 0x18 + 4 * lod->current) = own;
+        lod->levels[lod->current] = own;
     }
     lod->select = RW_CB(RpLodSelectCallBack, 0x00505b30);
     lod->hooked = 0;
     rpLodAtomicHook(atomic, lod);
     *lodSlot(atomic, offset) = lod;
     return result;
+}
+
+/* A pointer as the chunk stores it: the original's 32-bit value; with 64-bit pointers only whether it is set
+ * (readers test it for NULL). */
+static uint32_t filePointer(const void *p)
+{
+    return BMX_LAYOUT32 ? (uint32_t)(uintptr_t)p : (uint32_t)(p != NULL);
 }
 
 BMX_ADDR(0x00506030)
@@ -2794,10 +2824,20 @@ void *LODAtomicCallBackWriteChunk(RwStream *stream, int32_t length, const void *
         return stream;
     }
     _rwStreamWriteVersionedChunkHeader(stream, 1, 0x40, 0x303);
-    uint32_t copy[16];
-    memcpy(copy, lod, sizeof copy);
-    RwMemLittleEndian32(copy, 0x40);
-    RwStreamWrite(stream, lod, 0x40);
+    RpLodAtomicFile copy;
+    copy.hooked = lod->hooked;
+    copy.savedRender = filePointer((const void *)(uintptr_t)lod->savedRender);
+    copy.select = filePointer((const void *)(uintptr_t)lod->select);
+    copy.range = lod->range;
+    copy.scale = lod->scale;
+    copy.current = lod->current;
+    for (int32_t i = 0; i < 10; i++) {
+        copy.levels[i] = filePointer(lod->levels[i]);
+    }
+    RwMemLittleEndian32(&copy, sizeof copy);
+    /* The original writes the block itself, not the swapped copy (the same bytes on x86); where the block is
+     * not the file's layout (64-bit pointers) the copy goes out. */
+    RwStreamWrite(stream, BMX_LAYOUT32 ? (const void *)lod : (const void *)&copy, sizeof copy);
     for (int32_t i = 0; i < 10; i++) {
         if (lod->levels[i] != NULL && i != lod->current) {
             RpGeometryStreamWrite(lod->levels[i], stream);

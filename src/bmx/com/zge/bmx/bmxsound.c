@@ -351,8 +351,7 @@ static void levelSoundsLoad(uint32_t level, uint32_t rider, int gun)
         zsndSrcSetVolume(gBmxRiderLoopB[i], gBmxSfxVolume);
     }
     for (i = 0; i < winloadGetTrackDefCount(gBmxLevelSfxFile); i++) {
-        const uint8_t track =
-            zsndSeqCreate((const ZsndSeqHeader *)winloadGetTrackDef(gBmxLevelSfxFile, i), 0);
+        const uint8_t track = zsndSeqCreate(winloadGetTrackDef(gBmxLevelSfxFile, i), 0);
 
         gBmxAmbientTracks[i] = track;
         zsndSeqSetVolume(track, ambientVolume(i), 0);

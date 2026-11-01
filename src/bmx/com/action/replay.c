@@ -52,10 +52,19 @@ void replayDestroyAll(void)
     }
 }
 
+/*
+ * Where the stored offset `offset` (headerSize, a part) of a recorder points: the offsets count from where
+ * the original's header started, kReplayFileOrigin bytes before padIndex (replay.h).
+ */
+static uint8_t *replayAt(const Replay *r, uint32_t offset)
+{
+    return (uint8_t *)&r->padIndex - kReplayFileOrigin + offset;
+}
+
 /* Address of the last byte a record (3 bytes) can still start at: the end of the frame buffer minus 3. */
 static uintptr_t bufferLimit(const Replay *r)
 {
-    return (uintptr_t)r + r->headerSize + r->size - 3;
+    return (uintptr_t)replayAt(r, r->headerSize) + r->size - 3;
 }
 
 /* A recorder that ran out of buffer reports it and stops (mode 0). */
@@ -196,7 +205,9 @@ uint8_t replayCreate(const ReplayParams *params)
                 total += kReplayPartC;
             }
             size = params->size == 0 ? kReplayDefaultSize : ((uint32_t)params->size + 3) & 0xfffffffc;
-            r = zmemStaticAlloc((uint32_t)total + size);
+            /* The header before padIndex may be longer than the original's (64-bit pointers). */
+            r = zmemStaticAlloc((uint32_t)(offsetof(Replay, padIndex) - kReplayFileOrigin) + (uint32_t)total +
+                                size);
             if (r != NULL) {
                 uint32_t at;
 
@@ -221,14 +232,14 @@ uint8_t replayCreate(const ReplayParams *params)
                     r->partB = at;
                     r->partBEnd = at + 0xb40;
                     at += 0x1680;
-                    zmemCopy((uint8_t *)r + r->partB, &gReplayTable, 0xb40);
+                    zmemCopy(replayAt(r, r->partB), &gReplayTable, 0xb40);
                 }
                 if ((params->flags & 4) == 0) {
                     r->partC = at;
                     at += 0x27;
                     r->partCEnd = at;
                     if (gameGetMode() == 0 && gameGetSubMode() == 0 && gCurrentLevel < 6) {
-                        zmemCopy((uint8_t *)r + r->partC, comdataGetGoalInfo(r->rider, gCurrentLevel), 0x27);
+                        zmemCopy(replayAt(r, r->partC), comdataGetGoalInfo(r->rider, gCurrentLevel), 0x27);
                     }
                 }
                 gReplays[handle] = r;
@@ -345,25 +356,25 @@ uint8_t replaySetMode(uint32_t handle, uint32_t mode)
         }
     } else if ((old == 2 || old == 4) && mode <= 1) {
         if ((rp->flags & 1) == 0) {
-            snapshotRestore(r, (uint8_t *)rp + rp->partAEnd, 0);
+            snapshotRestore(r, replayAt(rp, rp->partAEnd), 0);
         }
         if ((rp->flags & 2) == 0) {
-            propLoadState((uint8_t *)rp + rp->partBEnd);
+            propLoadState(replayAt(rp, rp->partBEnd));
         }
         if (keepsGoalInfo(rp)) {
-            zmemCopy(comdataGetGoalInfo(rp->rider, gCurrentLevel), (uint8_t *)rp + rp->partCEnd, 0x27);
+            zmemCopy(comdataGetGoalInfo(rp->rider, gCurrentLevel), replayAt(rp, rp->partCEnd), 0x27);
         }
     }
     if (mode == 1) {
         rp->padIndex = r->padIndex;
         if ((rp->flags & 2) == 0) {
-            zmemCopy((uint8_t *)rp + rp->partB, &gPropState, 0xb40);
+            zmemCopy(replayAt(rp, rp->partB), &gPropState, 0xb40);
         }
         if (keepsGoalInfo(rp)) {
-            zmemCopy((uint8_t *)rp + rp->partC, comdataGetGoalInfo(rp->rider, gCurrentLevel), 0x27);
+            zmemCopy(replayAt(rp, rp->partC), comdataGetGoalInfo(rp->rider, gCurrentLevel), 0x27);
         }
         if ((rp->flags & 1) == 0) {
-            snapshotSave((uint8_t *)rp + rp->partA, r, pad);
+            snapshotSave(replayAt(rp, rp->partA), r, pad);
             rp->buttons = pad->state.buttons;
         } else {
             rp->buttons = 0;
@@ -371,7 +382,7 @@ uint8_t replaySetMode(uint32_t handle, uint32_t mode)
         rp->sticks[0] = 0;
         rp->sticks[1] = 0;
         rp->field08 = 0;
-        rp->cursor = (uint8_t *)rp + rp->headerSize;
+        rp->cursor = replayAt(rp, rp->headerSize);
         rp->field10 = 0;
         rp->counter = 0;
     } else if (mode == 2) {
@@ -383,23 +394,23 @@ uint8_t replaySetMode(uint32_t handle, uint32_t mode)
         r->padIndex = (uint8_t)rp->padIndex;
         if (rp->state <= 1) {
             if ((rp->flags & 2) == 0) {
-                zmemCopy((uint8_t *)rp + rp->partBEnd, &gPropState, 0xb40);
+                zmemCopy(replayAt(rp, rp->partBEnd), &gPropState, 0xb40);
             }
             if (keepsGoalInfo(rp)) {
-                zmemCopy((uint8_t *)rp + rp->partCEnd, comdataGetGoalInfo(rp->rider, gCurrentLevel), 0x27);
+                zmemCopy(replayAt(rp, rp->partCEnd), comdataGetGoalInfo(rp->rider, gCurrentLevel), 0x27);
             }
         }
         if ((rp->flags & 2) == 0) {
-            propLoadState((uint8_t *)rp + rp->partB);
+            propLoadState(replayAt(rp, rp->partB));
         }
         if (keepsGoalInfo(rp)) {
-            zmemCopy(comdataGetGoalInfo(rp->rider, gCurrentLevel), (uint8_t *)rp + rp->partC, 0x27);
+            zmemCopy(comdataGetGoalInfo(rp->rider, gCurrentLevel), replayAt(rp, rp->partC), 0x27);
         }
         if ((rp->flags & 1) == 0) {
-            const uint8_t *const start = (const uint8_t *)rp + rp->partA;
+            const uint8_t *const start = replayAt(rp, rp->partA);
 
             if (rp->state <= 1) {
-                snapshotSave((uint8_t *)rp + rp->partAEnd, r, pad);
+                snapshotSave(replayAt(rp, rp->partAEnd), r, pad);
             }
             snapshotRestore(r, start, 1);
             rp->buttons = *(const uint32_t *)(start + kSnapButtons);
@@ -410,7 +421,7 @@ uint8_t replaySetMode(uint32_t handle, uint32_t mode)
         rp->sticks[0] = 0;
         rp->sticks[1] = 0;
         rp->field08 = 0;
-        rp->cursor = (uint8_t *)rp + rp->headerSize;
+        rp->cursor = replayAt(rp, rp->headerSize);
         rp->state = (uint8_t)mode;
         rp->counter = *rp->cursor & 0x1f;
         return (uint8_t)mode;
@@ -444,14 +455,15 @@ uint32_t replayGetField08(uint32_t handle)
     return replayLookup(handle, 0x26f, 0x271)->field08;
 }
 
-/* Start and size of the serialisable part of a recorder (everything from offset 0xc). */
+/* Start and size of the serialisable part of a recorder: the ReplayFileHeader (from padIndex on), the frames,
+ * the parts. */
 BMX_ADDR(0x00430d70)
 void replayGetBuffer(uint32_t source, uint8_t **data, int *size)
 {
     const Replay *const r = replayLookup(source, 0x282, 0x284);
 
     *data = (uint8_t *)&r->padIndex;
-    *size = (int)r->size + 0x34;
+    *size = (int)(r->size + sizeof(ReplayFileHeader));
     if ((r->flags & 1) == 0) {
         *size += 0x5bd0;
     }

@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 
+#include "compat/layout.h"
 #include "compat/orig.h"
 
 enum {
@@ -44,8 +45,58 @@ typedef struct ZsdVoice {
 } ZsdVoice;
 
 /*
+ * The .zsd file as stored (docs/PORTING.md X2c): the header's tables, the phrase and key map tables and the
+ * track definitions' event streams are offsets from the file start. These types are the file's layout on
+ * every build; the loader resolves the offsets into the in-memory types below.
+ */
+typedef struct ZsdFileHeader {
+    char magic[4];        /* 0x00 "ZSND" */
+    char platform[4];     /* 0x04 "WIN " */
+    uint32_t fileBytes;   /* 0x08 size of the whole file */
+    uint32_t tableBytes;  /* 0x0c bytes to read when the sample data is streamed (everything but samples) */
+    uint32_t voiceCount;  /* 0x10 */
+    uint32_t voices;      /* 0x14 ZsdVoice[voiceCount] */
+    uint32_t sampleCount; /* 0x18 */
+    uint32_t samples;     /* 0x1c ZsdFileSample[sampleCount] */
+    uint32_t sampleFileCount; /* 0x20 */
+    uint32_t sampleFiles;     /* 0x24 ZsdSampleFileEntry[sampleFileCount] */
+    uint32_t phraseCount;     /* 0x28 */
+    uint32_t phrases;         /* 0x2c uint32_t[phraseCount], offsets of ZsdPhrase records */
+    uint32_t trackDefCount;   /* 0x30 */
+    uint32_t trackDefs;       /* 0x34 ZsdFileTrackDef[trackDefCount] */
+    uint8_t pad38[8];
+    uint32_t keymapCount; /* 0x40 */
+    uint32_t keymaps;     /* 0x44 uint32_t[keymapCount], offsets of ZsdKeymap records */
+} ZsdFileHeader;
+
+typedef struct ZsdFileSample {
+    uint16_t sampleFile; /* 0x00 */
+    uint16_t format;     /* 0x02 */
+    uint32_t rate;       /* 0x04 */
+    uint32_t data;       /* 0x08 the loader's slot (ZsdSample.data) */
+    int32_t loopStart;   /* 0x0c */
+    uint8_t pad10[6];
+    uint16_t file; /* 0x16 */
+} ZsdFileSample;
+
+typedef struct ZsdFileTrackDef {
+    uint8_t volume; /* 0x00 */
+    uint8_t pan;    /* 0x01 */
+    uint8_t voice;  /* 0x02 */
+    uint8_t keymap; /* 0x03 */
+    uint8_t pad04[4];
+    uint32_t data; /* 0x08 offset of the event stream */
+    uint8_t pad0c[2];
+    uint16_t bank; /* 0x0e */
+} ZsdFileTrackDef;
+
+_Static_assert(sizeof(ZsdFileHeader) == 0x48, "file header layout");
+_Static_assert(sizeof(ZsdFileSample) == 0x18, "file sample layout");
+_Static_assert(sizeof(ZsdFileTrackDef) == 0x10, "file track definition layout");
+
+/*
  * Sample description. The sample file number selects an entry of the sample file table; for resident files
- * the loader stores the data pointer at 0x08.
+ * the loader sets `data`.
  */
 typedef struct ZsdSample {
     uint16_t sampleFile; /* 0x00 index into the sample file table, 0xffff none */
@@ -63,7 +114,11 @@ typedef struct ZsdSampleFileEntry {
     uint32_t size;
 } ZsdSampleFileEntry;
 
-/* Phrase: when bit 0 of the flags is set, `count` entries of {pointer, value} start at 0x10. */
+/*
+ * Phrase (a file record, used in place): when bit 0 of the flags is set, `count` entries of {data, value}
+ * start at 0x10. `data` is an offset in the file; where pointers are 32 bits wide the loader turns it into
+ * the address, as the original did (nothing reads it).
+ */
 typedef struct ZsdPhrase {
     uint8_t flags; /* 0x00 */
     uint8_t count; /* 0x01 */
@@ -74,20 +129,30 @@ typedef struct ZsdPhrase {
     } entries[]; /* 0x10 */
 } ZsdPhrase;
 
+/* Track definition: a sequence for the sequencer (ZsndSeqHeader, zsndseq.h). */
 typedef struct ZsdTrackDef {
-    uint8_t pad00[8];
-    uint32_t data; /* 0x08 */
+    uint8_t volume; /* 0x00 */
+    uint8_t pan;    /* 0x01 */
+    uint8_t voice;  /* 0x02 voice number, 0xff none */
+    uint8_t keymap; /* 0x03 key map number, 0xff none */
+    uint8_t pad04[4];
+    const uint8_t *data; /* 0x08 the event stream; the events start 4 bytes in */
     uint8_t pad0c[2];
-    uint16_t file; /* 0x0e */
+    uint16_t bank; /* 0x0e sound file the voices come from */
 } ZsdTrackDef;
 
-/* Key map: the loader stores the file handle at 0x02. */
+/* Key map (a file record, used in place): the loader stores the file handle at 0x02. */
 typedef struct ZsdKeymap {
     uint8_t pad00[2];
     uint16_t file; /* 0x02 */
 } ZsdKeymap;
 
-/* Header of a loaded .zsd; the offsets at 0x14 .. 0x44 are pointers after loading. */
+/*
+ * A loaded .zsd: the file header with its offsets resolved. Where pointers are 32 bits wide this is the file
+ * header itself, and the sample, track definition, phrase and key map tables are the file's, rewritten in
+ * place as the original did; otherwise the loader builds the header and those tables in a block of their own
+ * beside the image (winload.c, bankCreate).
+ */
 typedef struct ZsdHeader {
     char magic[4];        /* 0x00 "ZSND" */
     char platform[4];     /* 0x04 "WIN " */
@@ -103,14 +168,18 @@ typedef struct ZsdHeader {
     ZsdPhrase **phrases;             /* 0x2c */
     uint32_t trackDefCount;          /* 0x30 */
     ZsdTrackDef *trackDefs;          /* 0x34 */
-    uint8_t pad38[8];
+    union {
+        uint8_t pad38[8]; /* built in place: the file's bytes */
+        uint8_t *image;   /* built beside the image: the file image */
+    };
     uint32_t keymapCount; /* 0x40 */
     ZsdKeymap **keymaps;  /* 0x44 */
 } ZsdHeader;
 
 _Static_assert(sizeof(ZsdVoice) == 0x14, "voice layout");
-_Static_assert(sizeof(ZsdSample) == 0x18, "sample layout");
-_Static_assert(sizeof(ZsdHeader) == 0x48, "header layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZsdSample) == 0x18, "sample layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZsdTrackDef) == 0x10, "track definition layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZsdHeader) == 0x48, "header layout");
 
 typedef struct WinloadFile {
     uint32_t flags;    /* 0x00 */

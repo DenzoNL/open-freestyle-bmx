@@ -1423,6 +1423,7 @@ void ngifDrawGlyph(const void *fontData, const void *glyphData, int mode, int a,
                    int d)
 {
     uint8_t *const font = (uint8_t *)(uintptr_t)fontData;
+    ZPrimFont *const fontRec = (ZPrimFont *)font;
     const uint8_t *const glyph = glyphData;
     uint8_t *const p = (uint8_t *)gNgifPrim;
     uint8_t clut[0x1004];
@@ -1465,14 +1466,14 @@ void ngifDrawGlyph(const void *fontData, const void *glyphData, int mode, int a,
     put16(p, 0x28, glyph[3] + y68);
     put16(p, 0x2a, (uint32_t)glyph[2] + glyph[0]);
     put16(p, 0x2c, (uint32_t)glyph[1] + glyph[3]);
-    if (rd32(font, 0xc) == 0) {
+    if (fontRec->pages == 0) {
         cache = zmemFreeListAlloc(gNgifGlyphPages);
-        memcpy(font + 0xc, (const void *)&cache, sizeof cache);
-        for (uint32_t i = 0; i < 0x80; i += 4) {
-            *(uint32_t *)((uint8_t *)cache + i) = 0;
+        fontRec->pages = bmxSlot32Put(cache);
+        for (uint32_t i = 0; i < 32; i++) {
+            cache[i] = 0;
         }
     }
-    cache = (uint32_t *)(uintptr_t)rd32(font, 0xc);
+    cache = bmxSlot32Get(fontRec->pages);
     if (cache[index] == 0) {
         const uint8_t *const palettes = font + rd32(font, 0x10);
         const uint32_t bytes = (uint32_t)rd16(palettes, 2) * 2 + 4;

@@ -9,6 +9,7 @@
 #ifndef RW_RWPLUGINS_H
 #define RW_RWPLUGINS_H
 
+#include "compat/layout.h"
 #include "rw/rwcore.h"
 
 typedef struct RwSphere {
@@ -124,6 +125,15 @@ typedef struct RpSkinBone {
     RwMatrix matrix;  /* 0x44 */
     uint32_t flags;   /* 0x84 */
 } RpSkinBone;
+
+/* A bone block as the geometry chunk (0x10e) stores it. */
+typedef struct RpSkinBoneBlockFile {
+    int32_t firstVertex;
+    int32_t numVertices;
+    int32_t key;
+} RpSkinBoneBlockFile;
+
+_Static_assert(sizeof(RpSkinBoneBlockFile) == 12, "RpSkinBoneBlockFile layout");
 
 /* A run of vertices driven by one bone; the list ends with a block whose numVertices is 0. */
 typedef struct RpSkinBoneBlock {
@@ -303,6 +313,22 @@ struct RwStream;
  * the plugin's replaces it. `select` returns the level for an atomic (-1: keep the current one).
  */
 typedef int32_t(BMX_CDECL *RpLodSelectCallBack)(RpAtomic *atomic);
+
+/*
+ * The plugin's stream chunk (0x112): the data block as the original kept it in memory, pointers as 32-bit
+ * values. Readers only test `levels[i]` for NULL (a geometry follows); the callbacks are replaced on reading.
+ */
+typedef struct RpLodAtomicFile {
+    int32_t hooked;       /* 0x00 */
+    uint32_t savedRender; /* 0x04 */
+    uint32_t select;      /* 0x08 */
+    float range;          /* 0x0c */
+    float scale;          /* 0x10 */
+    int32_t current;      /* 0x14 */
+    uint32_t levels[10];  /* 0x18 */
+} RpLodAtomicFile;
+
+_Static_assert(sizeof(RpLodAtomicFile) == 0x40, "RpLodAtomicFile layout");
 
 typedef struct RpLodAtomicData {
     int32_t hooked;                     /* 0x00 1 while the atomic's render callback is the plugin's */

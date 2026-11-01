@@ -62,20 +62,110 @@ int winloadLoad(const char *path, int residentSamples, uint16_t *handle)
     return rc;
 }
 
-/* Adds `base` to a stored file offset. */
-static void *relocate(const uint8_t *base, uint32_t offset)
+/*
+ * Where pointers are 32 bits wide the in-memory tables have the file's layout and are built over the file's
+ * own, as the original relocated them in place (the oracle compares the image); otherwise they cannot hold
+ * the pointers and live in a block beside the image.
+ */
+#define kZsdInPlace (sizeof(void *) == sizeof(uint32_t))
+
+_Static_assert(!kZsdInPlace ||
+                   (sizeof(ZsdHeader) == sizeof(ZsdFileHeader) &&
+                    sizeof(ZsdSample) == sizeof(ZsdFileSample) &&
+                    sizeof(ZsdTrackDef) == sizeof(ZsdFileTrackDef) &&
+                    sizeof(ZsdPhrase *) == sizeof(uint32_t) && sizeof(ZsdKeymap *) == sizeof(uint32_t)),
+               "in place, the in-memory tables have the file's layout");
+
+/* Entry `index` of a table of 32-bit offsets at `table` in the image. */
+static uint32_t offsetAt(const uint8_t *image, uint32_t table, uint32_t index)
 {
-    return (void *)(base + offset);
+    uint32_t offset;
+
+    memcpy(&offset, image + table + index * sizeof offset, sizeof offset);
+    return offset;
+}
+
+/*
+ * The in-memory header for the file `file` read from `image`: the image itself in place, otherwise a new
+ * block holding the header and the sample, track definition, phrase and key map tables, with the records'
+ * fields copied (their pointers are set by the caller).
+ */
+static ZsdHeader *bankCreate(uint8_t *image, const ZsdFileHeader *file)
+{
+    ZsdHeader *h;
+    uint8_t *tables;
+    uint32_t i;
+
+    if (kZsdInPlace) {
+        return (ZsdHeader *)image;
+    }
+    h = zmemAlloc(sizeof *h + file->sampleCount * sizeof(ZsdSample) +
+                  file->trackDefCount * sizeof(ZsdTrackDef) + file->phraseCount * sizeof(ZsdPhrase *) +
+                  file->keymapCount * sizeof(ZsdKeymap *));
+    if (h == 0) {
+        zdebugFail("out of memory for the audio asset tables", winloadFile, 0, 0);
+    }
+    memset(h, 0, sizeof *h);
+    memcpy(h->magic, file->magic, sizeof h->magic);
+    memcpy(h->platform, file->platform, sizeof h->platform);
+    h->fileBytes = file->fileBytes;
+    h->tableBytes = file->tableBytes;
+    h->voiceCount = file->voiceCount;
+    h->sampleCount = file->sampleCount;
+    h->sampleFileCount = file->sampleFileCount;
+    h->phraseCount = file->phraseCount;
+    h->trackDefCount = file->trackDefCount;
+    h->keymapCount = file->keymapCount;
+    h->image = image;
+    tables = (uint8_t *)(h + 1);
+    h->samples = (ZsdSample *)tables;
+    tables += file->sampleCount * sizeof(ZsdSample);
+    h->trackDefs = (ZsdTrackDef *)tables;
+    tables += file->trackDefCount * sizeof(ZsdTrackDef);
+    h->phrases = (ZsdPhrase **)tables;
+    tables += file->phraseCount * sizeof(ZsdPhrase *);
+    h->keymaps = (ZsdKeymap **)tables;
+    for (i = 0; i < file->sampleCount; i++) {
+        ZsdFileSample in;
+        ZsdSample *out = &h->samples[i];
+
+        memcpy(&in, image + file->samples + i * sizeof in, sizeof in);
+        out->sampleFile = in.sampleFile;
+        out->format = in.format;
+        out->rate = in.rate;
+        out->data = 0;
+        out->loopStart = in.loopStart;
+        memcpy(out->pad10, in.pad10, sizeof out->pad10);
+        out->file = in.file;
+    }
+    for (i = 0; i < file->trackDefCount; i++) {
+        ZsdFileTrackDef in;
+        ZsdTrackDef *out = &h->trackDefs[i];
+
+        memcpy(&in, image + file->trackDefs + i * sizeof in, sizeof in);
+        out->volume = in.volume;
+        out->pan = in.pan;
+        out->voice = in.voice;
+        out->keymap = in.keymap;
+        memcpy(out->pad04, in.pad04, sizeof out->pad04);
+        out->data = 0;
+        memcpy(out->pad0c, in.pad0c, sizeof out->pad0c);
+        out->bank = in.bank;
+    }
+    return h;
 }
 
 BMX_ADDR(0x0046fd00)
 int winloadRegister(uint8_t *image, int residentSamples, uint16_t *handle)
 {
-    ZsdHeader *h = (ZsdHeader *)image;
+    ZsdFileHeader file;
+    ZsdHeader *h;
     WinloadFile *slot = 0;
     uint32_t i, j;
     int index;
 
+    /* A copy: in place the header is rewritten below. */
+    memcpy(&file, image, sizeof file);
     for (index = 0; index < kWinloadMaxFiles; index++) {
         if ((gWinloadFiles[index].flags & kWinloadLoaded) == 0) {
             slot = &gWinloadFiles[index];
@@ -88,6 +178,7 @@ int winloadRegister(uint8_t *image, int residentSamples, uint16_t *handle)
     if (slot == 0) {
         zdebugFail("too many audio asset files", winloadFile, 0xcb, 0);
     }
+    h = bankCreate(image, &file);
     slot->header = h;
     if (strncmp((const char *)image, "ZSND", 4) != 0) {
         zdebugFail("invalid audio asset file header", winloadFile, 0xce, 0);
@@ -95,12 +186,14 @@ int winloadRegister(uint8_t *image, int residentSamples, uint16_t *handle)
     if (strncmp((const char *)image + 4, "WIN ", 4) != 0) {
         zdebugFail("invalid audio asset file platform", winloadFile, 0xcf, 0);
     }
-    h->voices = relocate(image, (uint32_t)(uintptr_t)h->voices);
-    h->samples = relocate(image, (uint32_t)(uintptr_t)h->samples);
-    h->trackDefs = relocate(image, (uint32_t)(uintptr_t)h->trackDefs);
-    h->sampleFiles = relocate(image, (uint32_t)(uintptr_t)h->sampleFiles);
-    h->phrases = (ZsdPhrase **)relocate(image, (uint32_t)(uintptr_t)h->phrases);
-    h->keymaps = (ZsdKeymap **)relocate(image, (uint32_t)(uintptr_t)h->keymaps);
+    h->voices = (ZsdVoice *)(image + file.voices);
+    h->sampleFiles = (ZsdSampleFileEntry *)(image + file.sampleFiles);
+    if (kZsdInPlace) {
+        h->samples = (ZsdSample *)(image + file.samples);
+        h->trackDefs = (ZsdTrackDef *)(image + file.trackDefs);
+        h->phrases = (ZsdPhrase **)(image + file.phrases);
+        h->keymaps = (ZsdKeymap **)(image + file.keymaps);
+    }
     for (i = 0; i < h->voiceCount; i++) {
         h->voices[i].file = *handle;
     }
@@ -110,11 +203,11 @@ int winloadRegister(uint8_t *image, int residentSamples, uint16_t *handle)
     }
     gWinloadCounts.samples += (int32_t)h->sampleCount;
     for (i = 0; i < h->phraseCount; i++) {
-        ZsdPhrase *phrase;
+        ZsdPhrase *phrase = (ZsdPhrase *)(image + offsetAt(image, file.phrases, i));
 
-        h->phrases[i] = relocate(image, (uint32_t)(uintptr_t)h->phrases[i]);
-        phrase = h->phrases[i];
-        if ((phrase->flags & 1) == 1) {
+        h->phrases[i] = phrase;
+        /* The entries keep their file offsets where they cannot hold an address. */
+        if (kZsdInPlace && (phrase->flags & 1) == 1) {
             for (j = 0; j < phrase->count; j++) {
                 phrase->entries[j].data += (uint32_t)(uintptr_t)image;
             }
@@ -122,12 +215,15 @@ int winloadRegister(uint8_t *image, int residentSamples, uint16_t *handle)
     }
     gWinloadCounts.phrases += (int32_t)h->phraseCount;
     for (i = 0; i < h->trackDefCount; i++) {
-        h->trackDefs[i].data += (uint32_t)(uintptr_t)image;
-        h->trackDefs[i].file = *handle;
+        ZsdFileTrackDef def;
+
+        memcpy(&def, image + file.trackDefs + i * sizeof def, sizeof def);
+        h->trackDefs[i].data = image + def.data;
+        h->trackDefs[i].bank = *handle;
     }
     gWinloadCounts.trackDefs += (int32_t)h->trackDefCount;
     for (i = 0; i < h->keymapCount; i++) {
-        h->keymaps[i] = relocate(image, (uint32_t)(uintptr_t)h->keymaps[i]);
+        h->keymaps[i] = (ZsdKeymap *)(image + offsetAt(image, file.keymaps, i));
         h->keymaps[i]->file = *handle;
     }
     gWinloadCounts.keymaps += (int32_t)h->keymapCount;
@@ -142,7 +238,7 @@ int winloadRegister(uint8_t *image, int residentSamples, uint16_t *handle)
             if (h->sampleFileCount <= sample->sampleFile) {
                 zdebugFail("invalid sample file number", winloadFile, 0xfe, 0);
             }
-            sample->data = relocate(image, h->sampleFiles[sample->sampleFile].offset);
+            sample->data = image + h->sampleFiles[sample->sampleFile].offset;
         }
     }
     gWinloadCounts.residentSampleFiles += (int32_t)h->sampleFileCount;
@@ -316,8 +412,14 @@ void winloadUnloadFile(uint16_t file)
     gWinloadCounts.phrases -= (int32_t)h->phraseCount;
     gWinloadCounts.trackDefs -= (int32_t)h->trackDefCount;
     gWinloadCounts.keymaps -= (int32_t)h->keymapCount;
+    if (!kZsdInPlace) {
+        uint8_t *image = h->image;
+
+        zmemFree(h);
+        h = (ZsdHeader *)image;
+    }
     if ((slot->flags & kWinloadOwnsData) != 0) {
-        zmemFree(slot->header);
+        zmemFree(h);
     }
     slot->flags = 0;
 }

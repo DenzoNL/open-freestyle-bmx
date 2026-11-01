@@ -1465,7 +1465,7 @@ ZPrimAsset *zprimLoadFont(uint32_t id, int keep)
     node->dmm = handle;
     node->offset = offset;
     ZPrimFont *data = zprimAssetData(node);
-    data->pages = NULL;
+    data->pages = 0;
     zprimAssetRelease(node);
     return node;
 }
@@ -1904,17 +1904,18 @@ void zprimAssetFree(ZPrimAsset *a)
         }
     } else if (type == 0x8000) {
         ZPrimFont *data = zprimAssetData(a);
-        int32_t *pages = data->pages;
+        int32_t *pages = bmxSlot32Get(data->pages);
         if (pages != NULL) {
-            for (int off = 0; off < 0x80; off += 4) { /* 32 handles */
-                int32_t tex = *(int32_t *)((uint8_t *)pages + off);
+            for (int i = 0; i < 32; i++) {
+                int32_t tex = pages[i];
                 if (tex != 0) {
                     gRwTextureFree(tex);
-                    *(int32_t *)((uint8_t *)data->pages + off) = 0;
+                    pages[i] = 0;
                 }
             }
-            zmemFreeListFree(gZprimFontPageList, data->pages);
-            data->pages = NULL;
+            zmemFreeListFree(gZprimFontPageList, pages);
+            bmxSlot32Drop(data->pages);
+            data->pages = 0;
         }
     } else {
         locked = 0;
