@@ -121,6 +121,30 @@ the same per-tick BMX_SIM_HASH.
 - **For the user:** `native-run\record.ps1` plays with the personal ini and saves `recordings\rec-<time>.bmxr`.
   Sessions with the DualSense, several levels, tricks, grinds and bails give X1-X3 their reference.
 
+### X1 plan (2026-11-01)
+
+Survey of what still depends on the original's addresses in the native build:
+- 1415 distinct `ORIG_VAR` globals; 166 `ORIG_FN` calls by address; ~370 other raw original addresses (RW plugin
+  and pipeline tables, CRT entry points, a few code addresses such as update-list callbacks); 13 `BMX_HOOK`
+  conditionals in game code.
+- The exe's relocation table lists every absolute address it holds: **1284 pointers in the data** (741 to code:
+  function tables; 543 into data), the rest in code (irrelevant natively). The initialised data is ~130 KB, the
+  zero-initialised part 1.2 MB.
+
+Two stages, each checked with tools/xcheck.py against the user's recording (work/recordings):
+- **X1a, relocated data image.** The native build stops mapping the exe at 0x400000. The loader copies the data
+  sections (0x54d000..0x6a2000) into an ordinary allocation and applies the exe's relocations to the pointers in
+  them: data pointers move with the image, code pointers become our ported functions (the hook table; incremental
+  link thunks resolved to their targets). Game code is compiled in a new mode, `BMX_IMAGE`: `ORIG_VAR(addr)` is
+  the image base plus the offset, raw addresses go through one macro, `BMX_FNPTR` is the function, `ORIG_FN` calls
+  the ported function. No code range, no int3 traps, no jump table. Still reads NgBMX.exe. The hook build (oracle,
+  hook DLL) is unchanged.
+- **X1b, the data into the source.** A generator turns each global into a named C definition with its initialiser
+  (pointers as `&symbol` or a function name), module by module; the image shrinks to nothing, and with it the need
+  for NgBMX.exe. Code that relies on two globals being adjacent (a memset over a range, an index past an array's
+  end) is found by the layout check (each carved global's bytes compared with the image at start-up, in a debug
+  run) and by xcheck.
+
 X1 and X2 are the bulk of the work (thousands of lines touched, mechanical but wide). X3 and X4 should be small
 once X2 is done. X5 and X6 are moderate. The order puts the user's own desktop (X3) first.
 
