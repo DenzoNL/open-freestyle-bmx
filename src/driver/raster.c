@@ -17,7 +17,8 @@ typedef struct DrvCameraExt {
 
 _Static_assert(sizeof(DrvCameraExt) == kDrvCameraExtBytes, "the original's camera plugin size");
 
-/* The matrix globals of engine plugin 0x401 (rw/engine.c): +8 is RwMatrixMultiply's routine. */
+/* The matrix module's data (RwMatrixModule, engine plugin 0x402): its multiply is RwMatrixMultiply's routine.
+ */
 #define rwMatrixGlobalsOffset ORIG_VAR(0x00676970, int32_t, rwMatrixGlobalsOffset)
 
 /* Render order hint (the original's 0x566f20): 1 front to back, 2 back to front (used from step 3 on). */
@@ -120,8 +121,8 @@ int drvCameraBeginUpdate(void *out, void *camera, int32_t in)
     RwRaster *top;
     uint32_t mxcsr;
 
-    *(uint32_t *)((uint8_t *)RwEngineInstance + rwMatrixGlobalsOffset + 8) =
-        (uint32_t)(uintptr_t)BMX_FNPTR(void *, 0x0054b038, rwMatrixMultiplyX87);
+    ((RwMatrixModule *)((uint8_t *)RwEngineInstance + rwMatrixGlobalsOffset))->multiply =
+        BMX_FNPTR(RwMatrixMultiplyFunc, 0x0054b038, rwMatrixMultiplyX87);
     if (rwCameraFpuSet == 0) {
         fpuCameraMode();
         rwCameraFpuSet = 1;

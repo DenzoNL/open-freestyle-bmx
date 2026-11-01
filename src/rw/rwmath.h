@@ -22,12 +22,14 @@ typedef ZVec3 RwV3d;
 typedef RwV3d *(BMX_CDECL *RwV3dTransformFunc)(RwV3d *out, const RwV3d *in, int32_t count,
                                                const RwMatrix *matrix);
 
-/* Plugin data of the engine instance at rwMatrixOffset. */
+/* Plugin data (engine plugin 0x402) of the engine instance at rwMatrixOffset. */
 typedef struct RwMatrixModule {
-    RwFreeList *freeList; /* 0x00 */
-    uint32_t flagMask;    /* 0x04 tested against the identity bit (0x20000) of a matrix */
-    void *multiply;       /* 0x08 matrix product used by the rotate code */
+    RwFreeList *freeList;          /* 0x00 */
+    uint32_t flagMask;             /* 0x04 tested against the identity bit (0x20000) of a matrix */
+    RwMatrixMultiplyFunc multiply; /* 0x08 matrix product (RwMatrixMultiply, the rotate code) */
 } RwMatrixModule;
+
+BMX_LAYOUT32_ASSERT(sizeof(RwMatrixModule) == 0xc, "RwMatrixModule layout");
 
 /* Plugin data of the engine instance at rwFastSqrtOffset. */
 typedef struct RwV3dModule {

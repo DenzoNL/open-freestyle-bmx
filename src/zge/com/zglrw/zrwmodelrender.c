@@ -14,10 +14,24 @@
 #include "rw/rwworld.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zobjcamera.h"
+#include "zge/zgemods/ztaginf.h"
 #include "zge/zmem.h"
 #include "zge/zstring.h"
 
 static const char kZrwModelRenderFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwModelRender.c";
+
+/*
+ * The tree ztaginf.c builds (ZtaginfNode, from its free list, root at 0x6728c4) is the one walked here
+ * (ZrwRenderColNode): the two views must agree wherever both read, on every build. Nothing here reads past
+ * `triangles` (the free list's nodes end there).
+ */
+_Static_assert(offsetof(ZrwRenderColNode, type) == offsetof(ZtaginfNode, kind) &&
+                   offsetof(ZrwRenderColNode, triangleCount) == offsetof(ZtaginfNode, faceCount) &&
+                   offsetof(ZrwRenderColNode, below) == offsetof(ZtaginfNode, child[0]) &&
+                   offsetof(ZrwRenderColNode, above) == offsetof(ZtaginfNode, child[1]) &&
+                   offsetof(ZrwRenderColNode, triangles) == offsetof(ZtaginfNode, faces) &&
+                   offsetof(ZrwRenderColNode, triangles) + sizeof(void *) == sizeof(ZtaginfNode),
+               "ZrwRenderColNode and ZtaginfNode describe the same tree nodes");
 
 /* RenderWare library calls (statically linked in the exe, not ported). */
 typedef void *(BMX_CDECL *RwFrameCallback)(void *frame, void *data);
