@@ -348,6 +348,72 @@ static void testSnap(void)
     CHECK(kHfLimits.objectJump > 0.0 && kHfLimits.cameraJump > 0.0);
 }
 
+/* HF5: hfLerpN, hfSnapFov, hfParticleAt, hfParticleLife. */
+static void testHf5(void)
+{
+    const HfLimits limits = {.fovRatio = 1.5};
+    const float w0[2] = {0.5f, 0.375f}, wEase[2] = {0.6f, 0.45f}, wCut[2] = {0.13f, 0.1f};
+    float w[2];
+
+    hfLerpN(w, w0, wEase, 2, 0.0);
+    CHECK(sameBits(w, w0, 2));
+    hfLerpN(w, w0, wEase, 2, 1.0);
+    CHECK(sameBits(w, wEase, 2));
+    hfLerpN(w, w0, wEase, 2, 0.5);
+    CHECK(fabsf(w[0] - 0.55f) < 1e-6f && fabsf(w[1] - 0.4125f) < 1e-6f);
+    memcpy(w, w0, sizeof w);
+    hfLerpN(w, w, wEase, 2, 0.5); /* aliasing */
+    CHECK(fabsf(w[0] - 0.55f) < 1e-6f);
+    CHECK(hfSnapFov(&limits, w0, wEase) == kHfSnapNone);
+    CHECK(hfSnapFov(&limits, wEase, w0) == kHfSnapNone);
+    CHECK(hfSnapFov(&limits, w0, wCut) == kHfSnapJump);
+    CHECK(hfSnapFov(&limits, wCut, w0) == kHfSnapJump);
+    CHECK(hfSnapFov(&limits, w0, (const float[2]){0.0f, 0.375f}) == kHfSnapJump);
+    CHECK(kHfLimits.fovRatio > 1.0);
+
+    {
+        const HfParticle old = {{0, 0, 0}, {-1, 0, 0}, 2.0f};
+        const HfParticle cur = {{1, 2, 0}, {0, 0, 0}, 4.0f};
+        const HfParticle spawned = {{3, 0, 0}, {1, 0, 0}, 1.0f};
+        HfParticle out;
+
+        /* t >= 1: the tick's bits, whatever the case */
+        hfParticleAt(&out, &old, &cur, 1, 1.0);
+        CHECK(memcmp(&out, &cur, sizeof out) == 0);
+        hfParticleAt(&out, NULL, &spawned, 1, 1.0);
+        CHECK(memcmp(&out, &spawned, sizeof out) == 0);
+        /* a moving particle seen at N - 1: pos and the streak's tail both lerp, size too */
+        hfParticleAt(&out, &old, &cur, 1, 0.25);
+        CHECK(out.pos[0] == 0.25f && out.pos[1] == 0.5f && out.pos[2] == 0.0f);
+        CHECK(out.prev[0] == -0.75f && out.prev[1] == 0.0f);
+        CHECK(out.size == 2.5f);
+        hfParticleAt(&out, &old, &cur, 1, 0.0);
+        CHECK(sameBits(out.pos, old.pos, 3) && sameBits(out.prev, old.prev, 3) && out.size == old.size);
+        /* spawned in the tick: from the spawn point (prev), the tail stays there */
+        hfParticleAt(&out, NULL, &spawned, 1, 0.5);
+        CHECK(out.pos[0] == 2.0f && sameBits(out.prev, spawned.prev, 3) && out.size == spawned.size);
+        hfParticleAt(&out, NULL, &spawned, 1, 0.0);
+        CHECK(sameBits(out.pos, spawned.prev, 3));
+        /* a static particle (poster, ripple) keeps its position, grows */
+        hfParticleAt(&out, &old, &cur, 0, 0.5);
+        CHECK(sameBits(out.pos, cur.pos, 3) && sameBits(out.prev, cur.prev, 3) && out.size == 3.0f);
+    }
+    /* the fade's remaining life never wraps in a draw */
+    CHECK(hfParticleLife(1000, 500, 1200, 8) == 500);
+    CHECK(hfParticleLife(1000, 500, 1492, 8) == 500);
+    CHECK(hfParticleLife(1000, 500, 1493, 8) == 501);          /* 7 left: drawn with 8 */
+    CHECK(hfParticleLife(1000, 500, 1520, 8) == 528);          /* expired 20 ms ago */
+    CHECK(hfParticleLife(0xfffffff0u, 0x40, 0x20, 8) == 0x40); /* across the clock's wrap */
+    CHECK(hfParticleLife(0xfffffff0u, 0x10, 0x20, 8) == 0x38);
+    {
+        const uint32_t birth = 5000, life = 300, now = 5340;
+        const uint32_t drawn = hfParticleLife(birth, life, now, 8);
+        const uint32_t remaining = birth + drawn - now;
+
+        CHECK(remaining == 8 && (remaining >> 1) < 0x200);
+    }
+}
+
 int main(void)
 {
     testLimiter();
@@ -357,6 +423,7 @@ int main(void)
     testNlerp();
     testAlpha();
     testSnap();
+    testHf5();
     printf("bmxhftest: %d checks, %d failures\n", gChecks, gFailures);
     return gFailures != 0;
 }

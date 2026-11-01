@@ -12,6 +12,7 @@ const HfLimits kHfLimits = {
     .cameraJump = 256.0, /* chase and replay cameras <= 128 per tick; view changes >= 512 */
     .cameraTurn = 60.0,
     .cameraCutMove = 0.001,
+    .fovRatio = 1.5, /* HF5: the chase camera's FOV eases (camera.c) */
 };
 
 int hfLimiterTick(uint32_t now, uint32_t *lastTick, float rateA, float rateB, float rateC)
@@ -112,19 +113,24 @@ double hfAlpha(uint64_t nowNs, uint64_t tickNs, uint64_t lengthNs)
     return alpha > 1.0 ? 1.0 : alpha;
 }
 
-void hfLerp3(float out[3], const float a[3], const float b[3], double t)
+void hfLerpN(float *out, const float *a, const float *b, int n, double t)
 {
     if (t <= 0.0) {
-        memcpy(out, a, 3 * sizeof *out);
+        memmove(out, a, (size_t)n * sizeof *out);
         return;
     }
     if (t >= 1.0) {
-        memcpy(out, b, 3 * sizeof *out);
+        memmove(out, b, (size_t)n * sizeof *out);
         return;
     }
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < n; i++) {
         out[i] = (float)((double)a[i] + ((double)b[i] - (double)a[i]) * t);
     }
+}
+
+void hfLerp3(float out[3], const float a[3], const float b[3], double t)
+{
+    hfLerpN(out, a, b, 3, t);
 }
 
 void hfNlerp(float out[4], const float a[4], const float b[4], double t)
@@ -215,6 +221,19 @@ int hfSnapCamera(const HfLimits *limits, const float pos0[3], const float pos1[3
     return kHfSnapNone;
 }
 
+int hfSnapFov(const HfLimits *limits, const float window0[2], const float window1[2])
+{
+    for (int i = 0; i < 2; i++) {
+        const double ratio = (double)window1[i] / (double)window0[i];
+
+        if (!(window0[i] > 0.0f) || !(window1[i] > 0.0f) || !(ratio <= limits->fovRatio) ||
+            !(ratio * limits->fovRatio >= 1.0)) {
+            return kHfSnapJump;
+        }
+    }
+    return kHfSnapNone;
+}
+
 int hfSnapLate(uint64_t intervalNs, uint64_t lengthNs)
 {
     return intervalNs > 2 * lengthNs;
@@ -225,4 +244,29 @@ const char *hfSnapName(int reason)
     static const char *const kNames[] = {"none", "jump", "turn", "cut", "new", "global"};
 
     return reason >= 0 && reason <= kHfSnapGlobal ? kNames[reason] : "?";
+}
+
+void hfParticleAt(HfParticle *out, const HfParticle *old, const HfParticle *cur, int moves, double t)
+{
+    *out = *cur;
+    if (t >= 1.0) {
+        return;
+    }
+    if (moves && old != NULL) {
+        hfLerpN(out->pos, old->pos, cur->pos, 3, t);
+        hfLerpN(out->prev, old->prev, cur->prev, 3, t);
+    } else if (moves) {
+        hfLerpN(out->pos, cur->prev, cur->pos, 3, t);
+    }
+    if (old != NULL) {
+        hfLerpN(&out->size, &old->size, &cur->size, 1, t);
+    }
+}
+
+uint32_t hfParticleLife(uint32_t birth, uint32_t life, uint32_t now, uint32_t minRemaining)
+{
+    if ((int32_t)(birth + life - now) < (int32_t)minRemaining) {
+        return now + minRemaining - birth;
+    }
+    return life;
 }

@@ -66,6 +66,8 @@ int hfSchedNext(const HfSched *s, uint64_t nowNs, uint64_t tickDueNs, uint64_t *
 double hfAlpha(uint64_t nowNs, uint64_t tickNs, uint64_t lengthNs);
 /* out = a + (b - a) * t per component, in double; t <= 0 gives a's bits, t >= 1 b's. */
 void hfLerp3(float out[3], const float a[3], const float b[3], double t);
+/* hfLerp3 for n components (out may alias a or b). */
+void hfLerpN(float *out, const float *a, const float *b, int n, double t);
 /*
  * Normalised linear interpolation of two quaternions (x, y, z, w): b is negated when a . b < 0 (the short
  * way), the sum is normalised in double. t <= 0 gives a's bits, t >= 1 b's (no renormalisation).
@@ -84,6 +86,7 @@ typedef struct HfLimits {
     double cameraJump;    /* game units per tick */
     double cameraTurn;    /* degrees per tick */
     double cameraCutMove; /* an eye moving at least this much while its eyeVel is zero is a cut */
+    double fovRatio;      /* the view window may grow or shrink by this factor per tick (HF5) */
 } HfLimits;
 
 /* The constants of the native exe (docs/HIGHFPS.md "HF4": thresholds). */
@@ -104,9 +107,37 @@ int hfSnapObject(const HfLimits *limits, const float pos0[3], const float pos1[3
 /* The camera's rule: `eyeVel` is the selected camera state's last eye move (zero after a cut). */
 int hfSnapCamera(const HfLimits *limits, const float pos0[3], const float pos1[3], const float rot0[4],
                  const float rot1[4], const float eyeVel[3]);
+/* The FOV's rule (HF5): the view window (tangents of the half angles) changed by more than fovRatio. */
+int hfSnapFov(const HfLimits *limits, const float window0[2], const float window1[2]);
 /* Global rule: 1 when the tick interval exceeds two tick lengths. */
 int hfSnapLate(uint64_t intervalNs, uint64_t lengthNs);
 /* A short name of a kHfSnap* reason, for the log. */
 const char *hfSnapName(int reason);
+
+/* ---- particles (HF5) ---- */
+
+/* What a particle draw reads of the step: its position, the position before the step (spark and lightning
+ * streaks run from there) and its size (ripples grow). */
+typedef struct HfParticle {
+    float pos[3], prev[3], size;
+} HfParticle;
+
+/*
+ * A particle drawn at t between ticks N - 1 and N (one tick behind, like the models). `old` is its record at
+ * N - 1 (NULL: spawned in tick N), `cur` at N; `moves`: kind bit 0 (the step moves it).
+ * - moving, known at N - 1: pos and prev both lerp between the two records (the streak keeps its length);
+ * - moving, new: pos lerps from the spawn point (`cur->prev`, where the spawners put it) to `cur->pos`, prev
+ *   stays at the spawn point (a spark spawned after the step has pos == prev and does not move);
+ * - not moving: pos and prev as at N.
+ * The size lerps when `old` is known. t >= 1 gives `cur`'s bits.
+ */
+void hfParticleAt(HfParticle *out, const HfParticle *old, const HfParticle *cur, int moves, double t);
+/*
+ * The life a particle is drawn with between ticks, so that its renderer's fade (remaining = birth + life -
+ * now, unsigned) does not wrap: a particle whose remaining life at `now` is below `minRemaining` ms (its life
+ * ran out after the tick that keeps it until the next step) is drawn with `minRemaining` left, nearly faded
+ * (the spark renderer would draw a wrapped remaining at full alpha). Otherwise `life` itself.
+ */
+uint32_t hfParticleLife(uint32_t birth, uint32_t life, uint32_t now, uint32_t minRemaining);
 
 #endif
