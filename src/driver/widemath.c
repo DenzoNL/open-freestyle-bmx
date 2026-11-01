@@ -361,17 +361,23 @@ static void boxUnion(int16_t into[4], const int16_t box[4])
     into[3] = box[3] > into[3] ? box[3] : into[3];
 }
 
-/* The anchor of `box`, or of the widest (and wider) text in `texts` that holds it on the same lines. */
+/*
+ * The anchor of `box`, or of the widest (and wider) text in `texts` that holds it on the same lines: x inside
+ * the text, the box's vertical middle inside the text's lines and the box at most twice as tall (a hint's
+ * button glyph is a little taller than its line; the balance meter's frame, 160 tall, only crosses a
+ * caption's line).
+ */
 static uint8_t anchorWithin(const int16_t box[4], int16_t (*texts)[4], const uint8_t *textAnchor, int32_t n,
                             int32_t self)
 {
+    const int32_t twiceMiddle = box[1] + box[3], height = box[3] - box[1];
     int32_t best = -1;
 
     for (int32_t t = 0; t < n; t++) {
         const int16_t *const c = texts[t];
 
-        if (t == self || c[0] > box[0] || c[2] < box[2] || c[1] > box[3] || c[3] < box[1] ||
-            c[2] - c[0] <= box[2] - box[0]) {
+        if (t == self || c[0] > box[0] || c[2] < box[2] || twiceMiddle < 2 * c[1] || twiceMiddle > 2 * c[3] ||
+            height > 2 * (c[3] - c[1]) || c[2] - c[0] <= box[2] - box[0]) {
             continue;
         }
         if (best < 0 || c[2] - c[0] > texts[best][2] - texts[best][0]) {
@@ -452,16 +458,59 @@ void drvWideHudPools(const uint8_t *glyphs, int32_t nGlyphs, const uint8_t *shap
                                                      : (uint8_t)kDrvWideAnchorCentre;
         }
     }
+    /* Shapes that touch or overlap are one element (the balance meter's bars, frame and marker; the height
+     * meter's frame and marker): one anchor from the group's box, so no piece leaves the others. */
+    static int16_t shapeBox[kDrvWideMaxItems][4];
+    static int32_t group[kDrvWideMaxItems];
+    static uint8_t hasBox[kDrvWideMaxItems];
+
     for (int32_t i = 0; i < nShapes; i++) {
         const uint8_t *const it = shapes + (size_t)i * kDrvWideItemSize;
-        int16_t g[4];
+
+        group[i] = i;
+        hasBox[i] = it[kItemKind] != 0 && drvWidePacketBox(it, shapeBox[i]);
+    }
+    /* A shape wider than half the screen (a backdrop or bar, none in the HUD today) joins no group. */
+    for (int32_t i = 0; i < nShapes; i++) {
+        for (int32_t j = i + 1; j < nShapes && hasBox[i] && shapeBox[i][2] - shapeBox[i][0] <= 320; j++) {
+            const int16_t *const a = shapeBox[i], *const b = shapeBox[j];
+
+            if (hasBox[j] && b[2] - b[0] <= 320 && a[0] <= b[2] && b[0] <= a[2] && a[1] <= b[3] &&
+                b[1] <= a[3]) {
+                int32_t ri = i, rj = j;
+
+                while (group[ri] != ri) {
+                    ri = group[ri];
+                }
+                while (group[rj] != rj) {
+                    rj = group[rj];
+                }
+                group[rj > ri ? rj : ri] = rj > ri ? ri : rj;
+            }
+        }
+    }
+    for (int32_t i = 0; i < nShapes; i++) { /* roots come first (lower index), so one pass flattens */
+        group[i] = group[group[i]];
+    }
+    for (int32_t i = 0; i < nShapes; i++) {
+        if (hasBox[i] && group[i] != i) {
+            boxUnion(shapeBox[group[i]], shapeBox[i]);
+        }
+    }
+    for (int32_t i = 0; i < nShapes; i++) {
+        const uint8_t *const it = shapes + (size_t)i * kDrvWideItemSize;
 
         if (it[kItemKind] == 0) {
             shapeAnchor[i] = kDrvWideAnchorNone;
-        } else if (!drvWidePacketBox(it, g)) {
+        } else if (!hasBox[i]) {
             shapeAnchor[i] = kDrvWideAnchorCentre;
-        } else {
-            shapeAnchor[i] = anchorWithin(g, texts, textAnchor, nTexts, -1);
+        } else if (group[i] == i) {
+            shapeAnchor[i] = anchorWithin(shapeBox[i], texts, textAnchor, nTexts, -1);
+        }
+    }
+    for (int32_t i = 0; i < nShapes; i++) {
+        if (hasBox[i] && group[i] != i) {
+            shapeAnchor[i] = shapeAnchor[group[i]];
         }
     }
 }

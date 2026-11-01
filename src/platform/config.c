@@ -58,6 +58,8 @@ static const char *const kKnownKeys[] = {
     "video.interpolate", /* 1: extra draws between the 30 Hz ticks in levels, one tick behind (0: vanilla) */
     "video.max_fps",     /* draws per second with interpolate = 1 (0: the display's refresh rate) */
     "video.vsync",       /* 1: present with vsync (default), 0: immediate (mailbox when not supported) */
+    /* src/native/drawdist.c */
+    "video.full_draw_distance", /* 1: far clip and fog at their maximum, no frame rate adapter (0: vanilla) */
 };
 
 static int known(const char *key)

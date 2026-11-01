@@ -17,6 +17,13 @@ void bmxLogOpen(void);
  */
 int bmxLoadImage(const char *exePath);
 
+struct BmxHook;
+/*
+ * [video] full_draw_distance (drawdist.c): the jump over the ported ngiffxAdaptQuality's entry that keeps the
+ * far clip at 200 when the option is 1, none (count 0) otherwise.
+ */
+const struct BmxHook *bmxDrawDistJumps(uint32_t *count);
+
 /* Write a jump from every reachable original CRT entry point to our C runtime layer (src/native/crt.c). */
 void bmxCrtInstall(void);
 

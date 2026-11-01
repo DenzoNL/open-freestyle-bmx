@@ -386,7 +386,7 @@ in the centre; the "centred or which side" rule matches every element below.
 | Rider name (3) | 3D list run | 0x35.., y 0x3c | left |
 | Combo lines, "TO", combo score (4) | 3D list runs | centred on 0x140 | centre |
 | Height meter (5): frame, ticks, labels, marker | pool rects + 3D list rects / runs | 0x213..0x24b | right |
-| Balance meter (6) | pool gradients, rects | 0xd5..0xf3 | (left; draws nothing on PC) |
+| Balance meter (6) | pool gradients, rects | 0xd5..0xf3, y 0xa0..0x140 | left (one group, see "Playtest") |
 | Caption (7) | pool text | centred 0x140, y 0x132 | centre |
 | Indicator / replay arrow (9) | 3D list run (icon font) | centred on 0x240, y 0x30 | right |
 | Hint lines + button glyphs (10) | pool texts | centred 0x140; buttons inside | centre (buttons by containment) |
@@ -525,3 +525,19 @@ factor of the rgb; the alpha was never forced).
   3440x1440 `menus = 2` riding frame 2200: identical (the in-level frame is untouched). Intended differences only:
   the main menu frames at 3440x1440 and 1280x1024 (5:4, `menus = 0`, f5150: the stale level frame in the top and
   bottom bars is now black; `a54_5150` vs `b54_5150`).
+
+## Playtest (2026-11-01)
+
+**The manual balance meter was sometimes drawn broken** with `hud = 1`. Its seven pool shapes (two gradient bars,
+four frame rects, the marker; x 0xd5..0xf3, y 0xa0..0x140) were anchored one by one, and the containment rule for
+a hint's button glyph ("inside a wider text on the same lines") caught some of them whenever a long centred text
+(a caption at y 0x132) crossed the meter: those pieces moved with the centre, the rest to the left edge. Fix
+(drvWideHudPools):
+- the containment rule needs the element's vertical middle inside the text's lines and the element at most twice the
+  text's height (the button glyph is 30 tall on a 26 line; the meter's frame is 160);
+- shapes that touch or overlap form one group with one anchor from the group's box (shapes wider than 320 join
+  none), so no piece of a meter can leave the others.
+
+`bmxwidetest`: the meter under a 24 glyph caption at every marker position (all seven pieces left); the old code
+failed 45 of those checks.
+

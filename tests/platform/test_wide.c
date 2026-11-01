@@ -549,6 +549,54 @@ static void testHudPools(void)
     CHECK(ga[0] == kDrvWideAnchorLeft && ga[3] == kDrvWideAnchorLeft);
 }
 
+/* A gradient as zoverAddGradient writes it (G4, code 0x38). */
+static void g4(uint8_t *p, int x, int y, int w, int h)
+{
+    p[7] = 0x38;
+    p[0x28] = 0x80;
+    p[0x29] = 0x7f;
+    put16(p, 8, x);
+    put16(p, 10, y);
+    put16(p, 0x10, x + w);
+    put16(p, 0x12, y);
+    put16(p, 0x18, x);
+    put16(p, 0x1a, y + h);
+    put16(p, 0x20, x + w);
+    put16(p, 0x22, y + h);
+}
+
+/*
+ * The balance meter (ovlBalanceInit: two gradient bars, four frame rects, the marker; x 0xd5..0xf3, y
+ * 0xa0..0x140) under a long centred caption at y 0x132 whose x extent holds the meter: every piece stays left
+ * together, at any marker position (the playtest saw pieces of it jump to the centre).
+ */
+static void testHudBalanceMeter(void)
+{
+    uint8_t ga[128], sa[16];
+
+    for (int marker = -0x50; marker <= 0x50; marker += 0x10) {
+        memset(gGlyphs, 0, sizeof gGlyphs);
+        memset(gShapes, 0, sizeof gShapes);
+        addText(0, 24, 0x140 - (24 * 15 - 1) / 2, 0x132, 14, 16);
+        for (int i = 0; i < 2; i++) {
+            g4(gShapes[2 + i], 0xd6, (i * 0x9e >> 1) + 0xa1, 0x1c, 0x4f);
+        }
+        for (int i = 0; i < 4; i++) {
+            f4(gShapes[4 + i], i != 1 ? 0xd5 : 0xf2, i != 3 ? 0xa0 : 0x13f, (i & 2) != 0 ? 0x1e : 1,
+               (i & 2) != 0 ? 1 : 0xa0);
+        }
+        f4(gShapes[8], 0xd6, 0xee + marker, 0x1c, 2);
+        for (int i = 2; i <= 8; i++) {
+            gShapes[i][0x9c] = i < 4 ? 4 : 3;
+        }
+        drvWideHudPools(&gGlyphs[0][0], 128, &gShapes[0][0], 16, ga, sa);
+        CHECK(ga[0] == kDrvWideAnchorCentre);
+        for (int i = 2; i <= 8; i++) {
+            CHECK(sa[i] == kDrvWideAnchorLeft);
+        }
+    }
+}
+
 static void testGlyphRun(void)
 {
     /* zoverDrawText into the 3D list: 0x9c byte packets back to back; draw order is reversed. */
@@ -640,6 +688,7 @@ int main(void)
 {
     testHudAnchor();
     testHudPools();
+    testHudBalanceMeter();
     testGlyphRun();
     testMapHud();
     testViewWindow();

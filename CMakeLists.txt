@@ -51,6 +51,8 @@ if(BMX_NATIVE32)
   set_source_files_properties(src/native/hfguard.c PROPERTIES COMPILE_DEFINITIONS BMX_HOOK=1)
   # The interpolated draws (docs/HIGHFPS.md HF1-HF3) capture and rebuild the game's poses the same way.
   set_source_files_properties(src/native/hfinterp.c PROPERTIES COMPILE_DEFINITIONS BMX_HOOK=1)
+  # [video] full_draw_distance (drawdist.c) sets the game's far clip quality at its original address.
+  set_source_files_properties(src/native/drawdist.c PROPERTIES COMPILE_DEFINITIONS BMX_HOOK=1)
   set_source_files_properties(third_party/dr_flac/dr_flac.c PROPERTIES COMPILE_OPTIONS -w)
   add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/music_edits.c
     COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tools/gen_music_edits.py

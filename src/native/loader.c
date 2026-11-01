@@ -318,39 +318,37 @@ static int loadImage(const uint8_t *file, size_t size)
         writeJump(bmxPngJumps[i].orig, bmxPngJumps[i].impl);
     }
     bmxLog("png: %u jumps\n", (unsigned)bmxPngJumpCount);
-    /* [audio] smooth_resample: the opt-in interpolating mixer replaces the ported winchanMix (which
-     * winchanPump calls directly: the jump goes over our own function's entry in the exe's .text). */
+    /* The opt-in replacements jump over the entries of our own ported functions, which the ported callers
+     * call directly (not over the original's addresses): [audio] smooth_resample, the interpolating mixer
+     * over winchanMix (winchanPump calls it); [video] hud = 1 (with widescreen = 1), the ngifDrawList copy
+     * that anchors the HUD (driver/wide.c; ngifFlushFrame calls it); [video] full_draw_distance over
+     * ngiffxAdaptQuality (drawdist.c; ngifRunFrame calls it). */
     {
-        uint32_t smoothCount;
-        const BmxHook *const smooth = bmxSmoothJumps(&smoothCount);
+        static const struct {
+            const char *what;
+            const BmxHook *(*jumps)(uint32_t *count);
+        } kOptional[] = {
+            {"smooth", bmxSmoothJumps},
+            {"wide hud", drvWideJumps},
+            {"draw distance", bmxDrawDistJumps},
+        };
 
-        for (uint32_t i = 0; i < smoothCount; i++) {
-            DWORD prot;
+        for (size_t k = 0; k < sizeof kOptional / sizeof kOptional[0]; k++) {
+            uint32_t count;
+            const BmxHook *const jumps = kOptional[k].jumps(&count);
 
-            if (!VirtualProtect((void *)(uintptr_t)smooth[i].orig, 5, PAGE_EXECUTE_READWRITE, &prot)) {
-                bmxLog("smooth: cannot patch %#x (error %lu)\n", (unsigned)smooth[i].orig, GetLastError());
-                return -1;
+            for (uint32_t i = 0; i < count; i++) {
+                DWORD prot;
+
+                if (!VirtualProtect((void *)(uintptr_t)jumps[i].orig, 5, PAGE_EXECUTE_READWRITE, &prot)) {
+                    bmxLog("%s: cannot patch %#x (error %lu)\n", kOptional[k].what, (unsigned)jumps[i].orig,
+                           GetLastError());
+                    return -1;
+                }
+                writeJump(jumps[i].orig, jumps[i].impl);
             }
-            writeJump(smooth[i].orig, smooth[i].impl);
+            bmxLog("%s: %u jumps\n", kOptional[k].what, (unsigned)count);
         }
-        bmxLog("smooth: %u jumps\n", (unsigned)smoothCount);
-    }
-    /* [video] hud = 1 (with widescreen = 1): the ngifDrawList copy that anchors the HUD (driver/wide.c), the
-     * same way over the ported ngifDrawList's entry (ngifFlushFrame calls it directly). */
-    {
-        uint32_t wideCount;
-        const BmxHook *const wide = drvWideJumps(&wideCount);
-
-        for (uint32_t i = 0; i < wideCount; i++) {
-            DWORD prot;
-
-            if (!VirtualProtect((void *)(uintptr_t)wide[i].orig, 5, PAGE_EXECUTE_READWRITE, &prot)) {
-                bmxLog("wide: cannot patch %#x (error %lu)\n", (unsigned)wide[i].orig, GetLastError());
-                return -1;
-            }
-            writeJump(wide[i].orig, wide[i].impl);
-        }
-        bmxLog("wide: %u hud jumps\n", (unsigned)wideCount);
     }
     /* [video] widescreen: the hor+ wrapper in the zgl camera slot 0x561d98 (data, no jump; driver/wide.c). */
     drvWideInstall();

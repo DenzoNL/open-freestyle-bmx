@@ -132,6 +132,10 @@ round floats (so the hook build uses SSE2, not x87). Rules are in CONTRIBUTING.m
 - **Exception (2026-10-31, the user's call):** `[ui] confirm_quit` defaults to **0**: the main menu's QUIT no
   longer asks "Do you want to quit the game?" (the MessageBoxA stand-in answers Yes to exactly that box);
   `= 1` shows it as the original did. Every other message box (asserts, errors) still shows.
+- **Option (2026-11-01, the user's call):** `[video] full_draw_distance = 1` (default 0, vanilla) keeps the far
+  clip and fog at their maximum (200). The original's frame rate adapter (ngiffxAdaptQuality) reads the level load as
+  ~2.5 fps, drops the far clip to 60 and needs ~20 s to climb back, so levels start with distant geometry missing.
+  Visual only (BMX_SIM_HASH identical); on in the user's personal ini.
 
 ## Enhancement backlog (P6+, unordered)
 

@@ -669,3 +669,20 @@ the camera raster (likely the known uninitialised-data variation of the 3D scene
   steps.
 - `vsync = 1` at max_fps above the refresh rate: draws wait in the swapchain acquire and the worst-draw estimate
   grows to a refresh period, which lowers the extra draws per tick (by design; `max_fps = 0` avoids it).
+
+## Playtest (2026-11-01)
+
+The user played at 3440x1440 with `widescreen = 1`, `hud = 1`, `menus = 2`, `interpolate = 1` and the FLAC music, for
+a long session. Findings:
+- **Geometry popping in at level start** is the vanilla far clip adapter (P9, "Wall-clock render state"): the load
+  reads as ~2.5 fps, the far clip drops to 60 and climbs back over ~20 s. New opt-in `[video] full_draw_distance = 1`
+  (src/native/drawdist.c, PLAN.md Decisions): a jump over the ported ngiffxAdaptQuality's entry that sets the
+  quality to 200 every tick. Scripted run (3440x1440, 693 ticks): BMX_SIM_HASH identical with 0 and 1; menu frames
+  byte-identical, level frames differ at the distance only. In the user's personal ini.
+- **The manual balance meter sometimes broken:** a widescreen HUD bug (docs/WIDESCREEN.md "Playtest").
+- **Seeing through walls at some spots:** the wider field of view shows level geometry the 4:3 camera never did;
+  fixing it would mean editing the levels (not planned).
+- **CPU competitors scoring 100 in the judged levels:** vanilla. gameJudgeRun (0x4105d0, oracle-tested) gives each
+  other rider `0xa5 + rnd(0..255) / 3 + bias` per run, bias -10..+10 (0x554cc0), clamped to 255 (100.0): the +10
+  rider scores 100 in a run with probability 16/256.
+
