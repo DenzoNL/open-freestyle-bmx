@@ -24,6 +24,11 @@
  *   order (frames not in the record after them) and rwFrameSyncDirtyList: the frames, skin and collision
  *   clump matrices and the world sectors' tie order are the tick's again (HF0 findings, Q3).
  * - **Waiting** sleeps (SDL_DelayNS) up to 2 ms before the tick is due, then spins on the limiter.
+ * - **HF5** (the same seams, docs/HIGHFPS.md "HF5"): the live particles of the effect objects are captured
+ *   too (pos, prev, size, life) and drawn at alpha (hfParticleAt; one whose life ran out since the tick is
+ *   drawn nearly faded in extra draws, hfParticleLife); the FOV is the RwCamera's view window lerped between
+ *   the last two ticks; extra draws lerp the screen shake offset from the one the real draw showed to the one
+ *   its shake node set. The restore writes the tick's particle fields, window and offset back.
  *
  * Dev aids: BMX_HF_ALPHA=<a> draws every frame at alpha a (1: always the tick pose, for byte identity with
  * the option off); BMX_HF_LOG=1 logs pacing, skips and per-tick motion maxima (the H6 thresholds); with
@@ -37,6 +42,7 @@
 #include <string.h>
 
 #include "bmx/com/action/camera.h"
+#include "bmx/com/zge/ngif/ngiffx.h"
 #include "bmx/com/zge/ngif/ngifpsx.h"
 #include "compat/orig.h"
 #include "native/hfmath.h"
@@ -50,7 +56,9 @@
 #include "zge/com/zglrw/zrwcam.h"
 #include "zge/com/zglrw/zrwcol.h"
 #include "zge/com/zglrw/zrwmodel.h"
+#include "zge/com/zglrw/zrwworld.h"
 #include "zge/zgemods/zobjcamera.h"
+#include "zge/zlist.h"
 #include "zge/zmem.h"
 #include "zge/zobj.h"
 #include "zge/zquat.h"
@@ -85,6 +93,9 @@ typedef HfList HfLists[9];
 #define gRateB      ORIG_VAR(0x0054d05c, float, gRateB)
 #define gRateC      ORIG_VAR(0x0054dbb8, float, gRateC)
 #define gFxQuality  ORIG_VAR(0x0055bd08, float, gFxQuality)
+/* The clock the particle renderers fade by (the zgl timeGetTime slot, zrwzgl.h gTimeGetTime). */
+typedef uint32_t(BMX_STDCALL *HfTimeFn)(void);
+#define gFxTime ORIG_VAR(0x00561480, HfTimeFn, gFxTime)
 ORIG_FN(0x0048b570, int, onIdle, (void));
 ORIG_FN(0x0048b690, int, drawFrame, (void));
 ORIG_FN(0x00492eb0, void *, zrwcamFirst, (void));
@@ -99,12 +110,16 @@ enum {
     kShakeNode = 0x00401a4b,  /* ngifpsxUpdate: the screen shake script advances per call */
     kShadowProbe = 0x0049b520 /* zrollerUpdateShadow: 36 line probes (gZrwColBox, gZrwCol, lightFrame) */
 };
+/* The effect objects' ops (zrwworldCreateObject): their host lists the emitters (HF5). */
+enum { kEffectOps = 0x00562098 };
+/* Remaining life (ms) an expired particle is drawn with in an extra draw (hfParticleLife). */
+enum { kFadeMinMs = 8 };
 
 /* ZrwCamera (zrwcam.h): the RwCamera frame's matrix copy and the view (rotation, eye) zrwCameraSetView
  * keeps. */
 enum { kZrwCameraWorld = 0x14, kZrwCameraView = 0x54 };
 
-enum { kMaxModels = 0x100, kMaxParts = 0x1000, kMaxDirty = 512 };
+enum { kMaxModels = 0x100, kMaxParts = 0x1000, kMaxDirty = 512, kMaxParticles = 0x800 };
 static const uint64_t kMarginNs = 1500000; /* kept free before a tick on top of the worst draw */
 static const uint64_t kSpinNs = 2000000;   /* the last stretch before a tick is spun, not slept */
 
@@ -128,12 +143,22 @@ typedef struct HfPart {
     int snap;
 } HfPart;
 
+/* A live particle as the tick's step left it (HF5). Key: the particle, its birth, kind and texture. */
+typedef struct HfSpark {
+    ZfxParticle *p;
+    uint32_t birth, life, kind, texture;
+    HfParticle v;
+    int prev; /* index in the previous capture, -1: none (spawned in this tick) */
+    int snap; /* drawn as the tick left it */
+} HfSpark;
+
 typedef struct HfCapture {
     int valid;
-    int models, parts;
+    int models, parts, sparks;
     uint64_t tickNs;
     HfModel model[kMaxModels];
     HfPart part[kMaxParts];
+    HfSpark spark[kMaxParticles];
     ZObj *camera; /* gNgCamera when zobjUpdateAll updated it, else NULL */
     /* the renderer camera's view as the tick's zobjCameraDraw set it (ZrwCamera.view: rotation and eye),
      * its eye and rotation (zquatFromMatrix), and the selected camera state's last eye move */
@@ -141,6 +166,8 @@ typedef struct HfCapture {
     uint32_t camValid; /* the camera object's cache bits at the capture (BMX_HF_GUARD) */
     float camPos[3], camRot[4], eyeVel[3];
     int camSnap;
+    float window[2]; /* the RwCamera's view window (the FOV, after the widescreen wrapper) */
+    int fovSnap;
 } HfCapture;
 
 /* Histogram buckets: moves by powers of two from 1/16 unit, turns by kTurnEdges degrees. */
@@ -171,6 +198,12 @@ typedef struct HfStats {
     uint32_t ticks, draws, extra, late, overflow;
     uint32_t overruns, oversleeps; /* extra draws that ended / sleeps that woke after the tick was due */
     uint32_t partSnaps;            /* parts drawn at the tick pose (turned more than objectTurn) */
+    /* HF5: particles per tick (matched to N - 1, spawned, jumped), the expired ones drawn faded in extra
+     * draws, the extra draws with an interpolated shake offset / FOV, the FOV's ticks that changed and
+     * snapped, and its largest per-tick window ratio */
+    uint32_t sparkMatched, sparkNew, sparkSnaps, sparkMax, sparkFaded, shakeDraws, fovDraws, fovTicks,
+        fovSnaps;
+    double maxFovRatio;
     double maxOverrunMs, maxOversleepMs;
     uint32_t snaps[kHfSnapGlobal + 1], camSnaps[kHfSnapGlobal + 1];
     uint32_t perTick[10];
@@ -191,11 +224,17 @@ static struct {
     int applied; /* poses applied since the last restore */
     int inLevel; /* the last tick ran in a level */
     int flush, flush2;
+    /* HF5: the screen shake's view offset before and after the real draw (its shake node sets the offset
+     * the next draw's camera sync applies), whether it changed, and whether a draw has written either the
+     * offset or the view window since the restore */
+    RwCamera *shakeCamera;
+    float shakeFrom[2], shakeTo[2];
+    int shake, shakeSet, fovSet;
     uint64_t dueNs; /* the tick's due time as last computed (0: unknown) */
     uint32_t extraThisTick;
     RwFrame *dirty[kMaxDirty];
     int dirtyCount;
-    uint64_t restoreHash[7]; /* BMX_HF_GUARD: the capture's hashes, compared after the restore */
+    uint64_t restoreHash[9]; /* BMX_HF_GUARD: the capture's hashes, compared after the restore */
     uint32_t restoreChecks, restoreMismatches;
     int logged;
     float quality; /* the far clip last logged */
@@ -251,6 +290,14 @@ static void replayDirty(void)
 }
 
 /* ---- capture ---- */
+
+/* The RwCamera of the captured camera object's renderer camera (c->camera must be set). */
+static RwCamera *rwCameraOf(const HfCapture *c)
+{
+    const ZObjCamera *const cam = (const ZObjCamera *)(const void *)c->camera;
+
+    return ((const ZrwCamera *)cam->camera)->rwCamera;
+}
 
 static void addModel(HfCapture *c, ZObj *object)
 {
@@ -357,6 +404,61 @@ static void walkPool(HfCapture *c)
     }
 }
 
+/* The live particles of every effect object's emitters (what zrwworldUpdateEffects' renderers draw). */
+static void walkParticles(HfCapture *c)
+{
+    for (ZMemFreeNode *node = zmemFreeListFirst(gZobjPool); node != NULL; node = zmemFreeNodeNext(node)) {
+        const ZObj *const object = zmemFreeNodePayload(node);
+        const ZrwEffectHost *host;
+
+        if (object->ops != (const ZObjOps *)(uintptr_t)kEffectOps) {
+            continue;
+        }
+        host = *(ZrwEffectHost *const *)&object->pad30[0];
+        if (host == NULL || host->items == NULL) {
+            continue;
+        }
+        for (int i = 0; i < host->items->count; i++) {
+            const ZfxEmitter *const e = host->items->items[i];
+
+            for (int j = 0; e != NULL && e->particles != NULL && j < e->particles->count; j++) {
+                ZfxParticle *const p = e->particles->items[j];
+                HfSpark *s;
+
+                if (c->sparks == kMaxParticles) {
+                    gHf.stats.overflow++;
+                    return;
+                }
+                s = &c->spark[c->sparks++];
+                s->p = p;
+                s->birth = p->birth;
+                s->life = p->life;
+                s->kind = (uint32_t)p->kind;
+                s->texture = p->texture;
+                memcpy(s->v.pos, &p->pos, sizeof s->v.pos);
+                memcpy(s->v.prev, &p->prev, sizeof s->v.prev);
+                s->v.size = p->size;
+                s->prev = -1;
+                s->snap = 0;
+            }
+        }
+    }
+}
+
+/* The particle's record at N - 1: same particle, birth, kind and texture (a reused slot is a new one). */
+static int findSpark(const HfCapture *prev, const HfSpark *s, int hint)
+{
+    for (int k = 0; k < prev->sparks; k++) {
+        const int j = (hint + k) % prev->sparks;
+        const HfSpark *const o = &prev->spark[j];
+
+        if (o->p == s->p && o->birth == s->birth && o->kind == s->kind && o->texture == s->texture) {
+            return j;
+        }
+    }
+    return -1;
+}
+
 static int samePartDefs(const HfCapture *a, const HfModel *ma, const HfCapture *b, const HfModel *mb)
 {
     if (ma->parts != mb->parts) {
@@ -456,6 +558,38 @@ static void classify(HfCapture *c, const HfCapture *prev, int global)
     if (c->camera != NULL) {
         gHf.stats.camSnaps[global ? kHfSnapGlobal : c->camSnap]++;
     }
+    /* HF5: the FOV follows the camera's rules, plus its own ratio limit */
+    c->fovSnap = c->camSnap;
+    if (c->camSnap == kHfSnapNone && memcmp(prev->window, c->window, sizeof c->window) != 0) {
+        const double ratio = (double)c->window[0] / (double)prev->window[0];
+        const double grow = ratio < 1.0 ? 1.0 / ratio : ratio;
+
+        gHf.stats.fovTicks++;
+        c->fovSnap = hfSnapFov(&kHfLimits, prev->window, c->window);
+        gHf.stats.fovSnaps += c->fovSnap != kHfSnapNone;
+        if (c->fovSnap == kHfSnapNone && grow > gHf.stats.maxFovRatio) {
+            gHf.stats.maxFovRatio = grow;
+        }
+    }
+    /* HF5: particles */
+    for (int i = 0, hint = 0; i < c->sparks; i++) {
+        HfSpark *const s = &c->spark[i];
+
+        s->prev = global || !prev->valid ? -1 : findSpark(prev, s, hint);
+        s->snap = global;
+        if (s->prev < 0) {
+            gHf.stats.sparkNew += !global;
+            continue;
+        }
+        hint = s->prev + 1;
+        if (!(hfDistance(prev->spark[s->prev].v.pos, s->v.pos) <= kHfLimits.objectJump)) {
+            s->snap = 1;
+            gHf.stats.sparkSnaps++;
+        } else {
+            gHf.stats.sparkMatched++;
+        }
+    }
+    gHf.stats.sparkMax = (uint32_t)c->sparks > gHf.stats.sparkMax ? (uint32_t)c->sparks : gHf.stats.sparkMax;
 }
 
 static void capture(uint64_t tickNs)
@@ -465,10 +599,11 @@ static void capture(uint64_t tickNs)
     const uint64_t length = (uint64_t)hfLimiterStepMs(gRateA, gRateC) * 1000000u;
     const int global = !prev->valid || hfSnapLate(tickNs - prev->tickNs, length);
 
-    c->models = c->parts = 0;
+    c->models = c->parts = c->sparks = 0;
     c->camera = NULL;
     c->tickNs = tickNs;
     walkPool(c);
+    walkParticles(c);
     if (c->camera != NULL) {
         const ZObjCamera *const cam = (const ZObjCamera *)(void *)c->camera;
         const CameraState *const state = &gCameras[gCameraPlayer < 4 ? gCameraPlayer : 0];
@@ -480,6 +615,7 @@ static void capture(uint64_t tickNs)
         memcpy(c->camRot, &rot, sizeof c->camRot);
         memcpy(c->eyeVel, &state->eyeVel, sizeof c->eyeVel);
         c->camValid = cam->cache->valid;
+        memcpy(c->window, &rwCameraOf(c)->viewWindow, sizeof c->window);
     }
     classify(c, prev, global);
     c->valid = 1;
@@ -547,8 +683,76 @@ static void setCamera(const HfCapture *c, const HfCapture *prev, double alpha)
     gZrwCamSetView(renderer, &view, &eye);
 }
 
+/*
+ * HF5: the particles at alpha, written raw into the live particles (their renderers read pos, prev, size and
+ * the fade's life only). In an extra draw a particle whose life ran out since the tick is drawn nearly
+ * faded instead of with the wrapped remaining life (hfParticleLife). `prev` NULL: the tick's values.
+ */
+static void writeSparks(const HfCapture *c, const HfCapture *prev, double alpha, int extra)
+{
+    const uint32_t now = extra ? gFxTime() : 0;
+
+    for (int i = 0; i < c->sparks; i++) {
+        const HfSpark *const s = &c->spark[i];
+        const HfSpark *const o = prev != NULL && s->prev >= 0 ? &prev->spark[s->prev] : NULL;
+        HfParticle v;
+
+        hfParticleAt(&v, o != NULL ? &o->v : NULL, &s->v, (s->kind & 1) != 0,
+                     prev == NULL || s->snap ? 1.0 : alpha);
+        memcpy(&s->p->pos, v.pos, sizeof v.pos);
+        memcpy(&s->p->prev, v.prev, sizeof v.prev);
+        s->p->size = v.size;
+        s->p->life = extra ? hfParticleLife(s->birth, s->life, now, kFadeMinMs) : s->life;
+        gHf.stats.sparkFaded += s->p->life != s->life;
+    }
+}
+
+/* HF5: the FOV (the RwCamera's view window) at alpha between the last two ticks. Takes effect at the draw's
+ * camera sync. Only written when it differs from what the camera holds (a skip, alpha 1: never). */
+static void setFov(const HfCapture *c, const HfCapture *prev, double alpha, int extra)
+{
+    RwCamera *const rw = rwCameraOf(c);
+    float window[2];
+
+    if (prev != NULL && prev->valid && c->fovSnap == kHfSnapNone) {
+        hfLerpN(window, prev->window, c->window, 2, alpha);
+    } else {
+        memcpy(window, c->window, sizeof window);
+    }
+    if (memcmp(window, &rw->viewWindow, sizeof window) != 0) {
+        const RwV2d v = {window[0], window[1]};
+
+        RwCameraSetViewWindow(rw, &v);
+        gHf.fovSet = 1;
+        gHf.stats.fovDraws += (uint32_t)extra;
+    }
+}
+
+/*
+ * HF5: the screen shake in an extra draw. The real draw's shake node (ngifpsxUpdate) set the next offset
+ * (shakeTo), which the next draw's camera sync applies: the real draw showed shakeFrom and the next real
+ * draw shows shakeTo, so the extra draws between show lerp(shakeFrom, shakeTo, alpha), set before their
+ * camera sync. The node itself stays skipped in extra draws.
+ */
+static void setShake(double alpha)
+{
+    float offset[2];
+
+    if (!gHf.shake) {
+        return;
+    }
+    hfLerpN(offset, gHf.shakeFrom, gHf.shakeTo, 2, alpha);
+    if (memcmp(offset, &gHf.shakeCamera->viewOffset, sizeof offset) != 0) {
+        const RwV2d v = {offset[0], offset[1]};
+
+        RwCameraSetViewOffset(gHf.shakeCamera, &v);
+        gHf.shakeSet = 1;
+        gHf.stats.shakeDraws++;
+    }
+}
+
 /* The poses at alpha written into the fields, the frames rebuilt through the game's own slots. */
-static void apply(double alpha)
+static void apply(double alpha, int extra)
 {
     const HfCapture *const c = &gHf.cap[gHf.cur];
     const HfCapture *const prev = &gHf.cap[gHf.cur ^ 1];
@@ -565,6 +769,11 @@ static void apply(double alpha)
     }
     if (c->camera != NULL) {
         setCamera(c, prev, alpha);
+        setFov(c, prev, alpha, extra);
+    }
+    writeSparks(c, prev->valid ? prev : NULL, alpha, extra);
+    if (extra) {
+        setShake(alpha);
     }
     gHf.applied = 1;
 }
@@ -593,10 +802,10 @@ static uint64_t hashTree(uint64_t h, const RwFrame *frame)
 
 /* BMX_HF_GUARD: what the restore must give back bit for bit, per part (kRestoreParts). Matrices count
  * with their floats and flags; their padding words and the camera cache's are not state. */
-enum { kRestoreParts = 7 };
-static const char *const kRestoreName[kRestoreParts] = {"object pos/rot",   "model fields", "clump frames",
-                                                        "collision frames", "part defs",    "camera pos/rot",
-                                                        "camera matrices"};
+enum { kRestoreParts = 9 };
+static const char *const kRestoreName[kRestoreParts] = {
+    "object pos/rot", "model fields",    "clump frames", "collision frames",  "part defs",
+    "camera pos/rot", "camera matrices", "particles",    "camera view window"};
 
 static uint64_t hashMatrix(uint64_t h, const void *matrix)
 {
@@ -658,6 +867,13 @@ static void restoreHash(uint64_t out[kRestoreParts])
             out[6] = fnv(out[6], &m->at, sizeof m->at);
             out[6] = fnv(out[6], &m->pos, sizeof m->pos);
         }
+        out[8] = fnv(out[8], &rwCameraOf(c)->viewWindow, sizeof(RwV2d));
+        out[8] = fnv(out[8], &rwCameraOf(c)->recipViewWindow, sizeof(RwV2d));
+    }
+    for (int i = 0; i < c->sparks; i++) {
+        const ZfxParticle *const p = c->spark[i].p;
+
+        out[7] = fnv(out[7], p, offsetof(ZfxParticle, corner)); /* kind .. birth */
     }
 }
 
@@ -673,7 +889,18 @@ static void restore(void)
     }
     if (c->camera != NULL) {
         setCamera(c, NULL, 1.0);
+        if (gHf.fovSet) {
+            setFov(c, NULL, 1.0, 0);
+        }
     }
+    gHf.fovSet = 0;
+    if (gHf.shakeSet) {
+        const RwV2d v = {gHf.shakeTo[0], gHf.shakeTo[1]};
+
+        RwCameraSetViewOffset(gHf.shakeCamera, &v); /* as the real draw's shake node left it */
+    }
+    gHf.shakeSet = 0;
+    writeSparks(c, NULL, 1.0, 0);
     replayDirty();
     rwFrameSyncDirtyList();
     if (gHf.guard) {
@@ -785,7 +1012,7 @@ static void extraDraw(void)
     const uint64_t start = bmxTimeNs();
     const HfCapture *const c = &gHf.cap[gHf.cur];
 
-    apply(hfAlpha(start, c->tickNs, (uint64_t)hfLimiterStepMs(gRateA, gRateC) * 1000000u));
+    apply(hfAlpha(start, c->tickNs, (uint64_t)hfLimiterStepMs(gRateA, gRateC) * 1000000u), 1);
     if (gHf.guard) {
         bmxHfGuardExtraBefore();
     }
@@ -868,6 +1095,11 @@ static void summary(void)
         "hf:   interpolated maxima per tick: object move %.4f turn %.2f (parts %.2f; %u part turns skipped), "
         "camera move %.4f turn %.2f\n",
         s->maxObjMove, s->maxObjTurn, s->maxPartTurn, (unsigned)s->partSnaps, s->maxCamMove, s->maxCamTurn);
+    bmxLog("hf:   particles: %u matched, %u spawned, %u jumps (at most %u live), %u drawn faded; shake: %u "
+           "extra draws; fov: %u ticks changed (%u snapped, largest ratio %.4f), %u extra draws\n",
+           (unsigned)s->sparkMatched, (unsigned)s->sparkNew, (unsigned)s->sparkSnaps, (unsigned)s->sparkMax,
+           (unsigned)s->sparkFaded, (unsigned)s->shakeDraws, (unsigned)s->fovTicks, (unsigned)s->fovSnaps,
+           s->maxFovRatio, (unsigned)s->fovDraws);
     histogram("object move", s->objMove, kHfMoveBuckets);
     histogram("object turn", s->objTurn, kHfTurnBuckets);
     histogram("camera move", s->camMove, kHfMoveBuckets);
@@ -925,12 +1157,22 @@ static int tick(uint64_t nowNs)
         gHf.cap[0].valid = gHf.cap[1].valid = 0;
     }
     start = bmxTimeNs();
+    gHf.shake = 0;
+    gHf.shakeCamera = NULL;
     if (gHf.inLevel) {
         const HfCapture *const c = &gHf.cap[gHf.cur];
 
-        apply(hfAlpha(start, c->tickNs, (uint64_t)hfLimiterStepMs(gRateA, gRateC) * 1000000u));
+        apply(hfAlpha(start, c->tickNs, (uint64_t)hfLimiterStepMs(gRateA, gRateC) * 1000000u), 0);
+        if (c->valid && c->camera != NULL) {
+            gHf.shakeCamera = rwCameraOf(c);
+            memcpy(gHf.shakeFrom, &gHf.shakeCamera->viewOffset, sizeof gHf.shakeFrom);
+        }
     }
     drawFrame();
+    if (gHf.shakeCamera != NULL) {
+        memcpy(gHf.shakeTo, &gHf.shakeCamera->viewOffset, sizeof gHf.shakeTo);
+        gHf.shake = memcmp(gHf.shakeFrom, gHf.shakeTo, sizeof gHf.shakeTo) != 0;
+    }
     if (gHf.inLevel) {
         const uint64_t end = bmxTimeNs();
 

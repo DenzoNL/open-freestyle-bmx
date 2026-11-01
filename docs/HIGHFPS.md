@@ -3,8 +3,7 @@
 Decided 2026-10-31: the user took the recommendation for every decision H1..H10 (default off until HF4 is clean
 and the user has played it). Order: HF0 first.
 
-Status 2026-11-01: **HF0-HF3 done, HF4 runs done** (not committed at the time of writing), see "HF1-HF3
-implementation" and "HF4 runs" at the end. `[video] interpolate` defaults to 1 since the user's playtest
+Status 2026-11-01: **HF0-HF5 done**, see "HF1-HF3 implementation", "HF4 runs" and "HF5" at the end. `[video] interpolate` defaults to 1 since the user's playtest
 (2026-11-01, HF6). Earlier: HF0 (measurement) corrected P3 and P4 and added rules for HF1-HF3, see
 "HF0 findings". Scope: the native exe (`bmxnative.exe`) only; the hook
 DLL and the oracle tests stay as they are. Rules that apply (PLAN.md Decisions): vanilla stays vanilla, enhancements
@@ -109,9 +108,9 @@ movies (own loop), ztimerUpdate (no ported code adds a timer). The particle spaw
 | Camera eye / orientation | yes | ZObjCamera pos/rot |
 | Shadow | follows | ZObj `pos` interpolated too, so zrollerUpdateShadow probes under the drawn rider |
 | Sky | follows | moved to the (interpolated) camera by zrwModelRender |
-| FOV | v2 | through the slot 0x561d98; easing steps are small |
-| Screen shake (ngifpsxUpdate) | no | stays per tick (H4) |
-| Particles | no (v1), v2 option | stepped per tick; drawn at their tick position (H4, pitfall P3) |
+| FOV | v2 (HF5 done) | the RwCamera view window the slot 0x561d98 set, lerped ("HF5") |
+| Screen shake (ngifpsxUpdate) | v2 (HF5 done) | per tick in the real draw; extra draws ease the offset ("HF5") |
+| Particles | v2 (HF5 done) | stepped per tick; drawn at lerp(N - 1, N) ("HF5") |
 | HUD, timer, menus, 2D | no | redrawn from the tick's ordering table |
 | Lights, sun | no | static or slow |
 
@@ -158,7 +157,7 @@ lerp in double. A pure maths file with unit tests (like `driver/widemath.c`).
 ### H4. Render-side state the game mutates (pitfalls)
 
 - **P1 Screen shake.** ngifpsxUpdate advances its script per draw; at 144 Hz it would run 5x faster. Kept per tick
-  (A4). v2: interpolate the offset between script steps.
+  (A4). v2: interpolate the offset between script steps (done in HF5).
 - **P2 HUD.** ngifFlushFrame clears `gNgifFlushPending` after the tick draw; without the re-arm the extra draws show
   no HUD (flicker). Check in HF0 that ngifDrawList (0x462350) / ngifDrawPrimitive do not modify packets (draw the OT
   twice in one frame, compare). The wide HUD copy (`wideDrawList`) works per draw already.
@@ -518,7 +517,7 @@ timeGetTime drives it.
 | HF2 | done 2026-11-01: capture / apply / restore, nlerp / lerp, skip rules, `bmxhftest` |
 | HF3 | done 2026-11-01: `hfDrawFrame` |
 | HF4 | runs done 2026-11-01 (below); thresholds set; open: the user's display / resolution pacing, a bail run |
-| HF5 | not started (particles at lerp, FOV and shake interpolation) |
+| HF5 | done 2026-11-01: particles at lerp (and faded past their life), FOV and shake interpolation (below) |
 | HF6 | done 2026-11-01: playtest clean, `interpolate` and `full_draw_distance` default 1 (PLAN.md Decisions) |
 
 ## HF1-HF3 implementation (2026-11-01)
@@ -685,4 +684,84 @@ a long session. Findings:
 - **CPU competitors scoring 100 in the judged levels:** vanilla. gameJudgeRun (0x4105d0, oracle-tested) gives each
   other rider `0xa5 + rnd(0..255) / 3 + bias` per run, bias -10..+10 (0x554cc0), clamped to 255 (100.0): the +10
   rider scores 100 in a run with probability 16/256.
+
+## HF5: particles, FOV, screen shake (2026-11-01)
+
+All three attach at the HF2 seams in `src/native/hfinterp.c` (capture after onIdle, apply before each draw,
+restore before the next tick); no ported function changed. Pure maths in `hfmath.c` (`hfLerpN`, `hfSnapFov`,
+`hfParticleAt`, `hfParticleLife`), unit-tested in `bmxhftest` (`testHf5`).
+
+**Particles.**
+- **Layout** (bmx/com/zge/ngif/ngiffx.h). An effect object (a ZObj with ops 0x562098, zrwworldCreateObject) has a
+  host at +0x30 whose `items` ZList holds the emitters (ZfxEmitter, 0x30 bytes: particle ZList, free list, bounds,
+  `lastUpdate`, effect table at +0x2c). A ZfxParticle (0xa0) has `kind` (bit 0 moves, bit 1 spins its axis), `pos`,
+  **`prev`** (the step's `p->prev = p->pos` before it moves), `vel`, `axis`, `spin`, `rgba`, `size`, `texture`,
+  `life` and `birth` (ms), and four poster corners. The spawners set `prev = pos` (spark, shard, dust), leave it
+  unset (poster, ripple: not moving) or use it as the segment start (lightning, not moving).
+- **What the renderers read** (the +0x20 of the seven tables): `pos` (all), `prev` (spark and lightning streaks:
+  a line or a camera-facing quad from `prev` to `pos`), `size`, `corner` (poster), `axis` (shard), and
+  `birth + life - now` for the fade (wall clock).
+- **Capture:** after onIdle, every live particle of every effect object's emitters (walk of `gZobjPool` as the
+  guard does) with its pointer, `birth`, `life`, `kind`, `texture`, `pos`, `prev` and `size`, in our arrays only.
+  Key for the previous capture: pointer, birth, kind and texture (a freed slot reused by a new spawn is new).
+- **Apply** (`hfParticleAt`, before every draw): a moving particle known at N - 1 is drawn with `pos` and `prev`
+  both lerped between the two captures, so a spark streak keeps its length and trails the drawn rider like the
+  models; a moving particle spawned in tick N goes from its spawn point (its `prev`) to `pos`, with the streak's
+  tail at the spawn point (one spawned after the step has `pos == prev` and stays there); a static one keeps its
+  position. `size` lerps (ripples grow). A move over `objectJump` draws the tick values. The values are written
+  raw into the particle; the restore writes the captured ones back (bit-exact, checked by the guard).
+- **Fade wrap (a v1 bug found here).** The renderers fade by `rem = birth + life - now` as an unsigned number.
+  Vanilla draws right after the step that retires expired particles, so `rem` stays small; an extra draw up to a
+  tick later sees particles whose life ran out after the tick and `rem` wraps to ~4e9. The spark renderer then
+  draws them at **full alpha** (its ramp is `rem < 0x200 ? rem / 2 : 0xff`): every spark flashed at the end of its
+  life in HF1-HF4. In extra draws `hfParticleLife` gives such a particle `kFadeMinMs` (8 ms) left, so it is drawn
+  at the end of its fade (alpha <= 4 / 255) until the next step retires it. The real draw is untouched.
+- **Not interpolated:** the shard axis spin (kind bit 1, steps per tick), and the billboards' orientation, which
+  the renderers take from the camera object's matrix (the tick's, HF2 never touches it) while the view is
+  interpolated: a quad faces the camera of tick N, invisible at these turn rates.
+
+**FOV.** cameraApply calls the slot 0x561d98 every tick (zobjCameraSetFov; widescreen's wideSetFov wraps it), which
+ends in RwCameraSetViewWindow. The capture records the RwCamera's view window (after the wrapper, so hor+ is kept);
+apply lerps it between the last two ticks with `RwCameraSetViewWindow` when it differs from what the camera holds
+(it takes effect at the draw's camera sync), the restore writes the tick's window back. Skipped (tick window) with
+the camera's skip rules, and when a component grows or shrinks by more than `fovRatio` = 1.5 in a tick
+(`hfSnapFov`). The slot itself is not called between ticks: the window is its output, and lerping the window
+(tangents) instead of the ZAngle avoids zmathTan's table steps. The FOV only changes in the replay views (view
+FOV goals 30-65 degrees, eased by 0.03-0.12 per tick) and between camera modes (50 / 60 / 70).
+
+**Screen shake.** fxBurst (impacts over 30, prop and goal collection) starts the script at 0x554724: vertical
+offsets 0, -5, 4, -4, 3, -3, 2, 2, -1 (x 0.005), then the end marker resets to 0; ngifpsxUpdate (list 1 node
+0x401a4b) takes one step per real draw through RwCameraSetViewOffset. The offset only takes effect at the next
+camera sync, so the real draw N shows the step set by draw N - 1 (`shakeFrom`) and sets the next (`shakeTo`).
+hfinterp.c records the RwCamera's view offset before and after the real draw; when it changed, extra draws set
+lerp(shakeFrom, shakeTo, alpha) before their camera sync (the node stays skipped in extra draws), and the
+restore writes `shakeTo` back, as the real draw left it. The real draws see exactly vanilla's offsets. Note: the
+script alternates its sign every step, so the eased shake is a triangle wave of the same amplitude and frequency
+(15 Hz) instead of a square wave; playtest whether it reads as weaker.
+
+**Checks** (from `native-run2`, `-r640.480.16`, the HF4 script, `nice -n 19`, display at 240 Hz):
+
+| Run (2971 level ticks) | Sim hash vs `interpolate = 0` | Frames vs `interpolate = 0` |
+|---|---|---|
+| `interpolate = 1`, max_fps 144, `BMX_HF_ALPHA=1` | identical (2973 lines) | **10 / 10 identical** |
+| `interpolate = 1`, max_fps 144 | identical | (interpolated) |
+| `interpolate = 1`, max_fps 0 (240 Hz, 7 draws per tick) | identical | (interpolated) |
+| `interpolate = 1`, max_fps 144, `BMX_HF_GUARD=1` | identical | (interpolated) |
+
+- **Guard:** in 11064 extra draws sim, rng, colbox, colstate, particles, hud, camera and lightframe changed 0
+  times; all 2970 restores gave back the capture, now including the particle fields (kind .. birth of every
+  captured particle) and the camera's view window / reciprocal.
+- **Counts per run:** up to 12 live particles (sparks and dust of the riding), 1856 particle-ticks matched to
+  N - 1, 64 spawned, 0 jumps; 239-307 particle draws faded by `hfParticleLife` (each one a full-alpha flash before).
+- **The script never shakes and its FOV never changes** (no impact over 30, and the replay ends before a view
+  zooms). A test build (not committed) that started the shake script every 60 ticks, with the replay run to frame
+  7000 under the guard: 2991 extra draws eased the shake, 250 ticks changed the FOV (largest window ratio 1.061
+  per tick, 0 snapped), 972 extra draws drew a lerped FOV; the guard stayed clean (0 changes by extra draws in the
+  sim-visible sub-hashes, 5970 / 5970 restores exact).
+
+**Playtest:** sparks on grinds and dust behind the wheels should now move with the bike instead of stepping ahead of
+it, and should no longer flash bright as they die; replay zooms should be smooth; the impact shake (a bail from
+height) eases instead of jumping (judge whether it feels weaker). Known limits: a spark spawned in a tick is drawn
+at its spawn point (the tick's pegs) while the bike is still up to a tick behind, for that one tick.
+
 
