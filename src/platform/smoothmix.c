@@ -309,7 +309,7 @@ static BmxHook gJumps[1];
 const BmxHook *bmxSmoothJumps(uint32_t *count)
 {
     /* Cubic by default (the user's call, PLAN.md Decisions); 0 gives the original mixer. */
-    const int mode = bmxConfigInt("audio.smooth_resample", 2);
+    const int mode = bmxConfigOption("audio.smooth_resample", 2, 0);
 
     gMode = mode < 0 ? 0 : mode > 2 ? 2 : mode;
     if (mode > 2) {

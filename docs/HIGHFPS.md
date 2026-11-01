@@ -4,8 +4,8 @@ Decided 2026-10-31: the user took the recommendation for every decision H1..H10 
 and the user has played it). Order: HF0 first.
 
 Status 2026-11-01: **HF0-HF3 done, HF4 runs done** (not committed at the time of writing), see "HF1-HF3
-implementation" and "HF4 runs" at the end. `[video] interpolate` stays 0 by default until the user's playtest
-(HF6, `native-run2\fpstest.ps1`). Earlier: HF0 (measurement) corrected P3 and P4 and added rules for HF1-HF3, see
+implementation" and "HF4 runs" at the end. `[video] interpolate` defaults to 1 since the user's playtest
+(2026-11-01, HF6). Earlier: HF0 (measurement) corrected P3 and P4 and added rules for HF1-HF3, see
 "HF0 findings". Scope: the native exe (`bmxnative.exe`) only; the hook
 DLL and the oracle tests stay as they are. Rules that apply (PLAN.md Decisions): vanilla stays vanilla, enhancements
 attach at seams, options are tagged visual-only or gameplay-changing. Everything here is meant to be **visual-only**:
@@ -519,7 +519,7 @@ timeGetTime drives it.
 | HF3 | done 2026-11-01: `hfDrawFrame` |
 | HF4 | runs done 2026-11-01 (below); thresholds set; open: the user's display / resolution pacing, a bail run |
 | HF5 | not started (particles at lerp, FOV and shake interpolation) |
-| HF6 | open: the user's playtest (`native-run2\fpstest.ps1`), then the default (H8) |
+| HF6 | done 2026-11-01: playtest clean, `interpolate` and `full_draw_distance` default 1 (PLAN.md Decisions) |
 
 ## HF1-HF3 implementation (2026-11-01)
 

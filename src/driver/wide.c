@@ -37,16 +37,16 @@ const DrvWideConfig *drvWideConfig(void)
 
     if (!loaded) {
         loaded = 1;
-        cfg.enabled = bmxConfigInt("video.widescreen", 0) != 0;
+        cfg.enabled = bmxConfigOption("video.widescreen", 1, 0) != 0;
         cfg.aspect = bmxConfigInt("video.aspect", 1);
         cfg.fovScale = bmxConfigInt("video.fov_scale", 100);
         cfg.maxHfov = bmxConfigInt("video.max_hfov", 0);
-        cfg.hud = bmxConfigInt("video.hud", 0);
+        cfg.hud = bmxConfigOption("video.hud", 1, 0);
         cfg.hudAspect = bmxConfigInt("video.hud_aspect", 178);
-        cfg.menus = bmxConfigInt("video.menus", 0);
+        cfg.menus = bmxConfigOption("video.menus", 2, 0);
         cfg.movies = bmxConfigInt("video.movies", 0);
         cfg.scaleFilter = bmxConfigInt("video.scale_filter", 0);
-        cfg.uiFilter = bmxConfigInt("video.ui_filter", 0);
+        cfg.uiFilter = bmxConfigOption("video.ui_filter", 2, 0);
         if (cfg.uiFilter < 0 || cfg.uiFilter > 2) {
             bmxLog("wide: ui_filter %d out of range (0..2), using 0\n", cfg.uiFilter);
             cfg.uiFilter = 0;

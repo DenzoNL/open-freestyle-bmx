@@ -74,10 +74,16 @@ void bmxPlatformShutdown(void);
 
 /*
  * bmxnative.ini next to the exe (BMX_CONFIG=<path> names another), read on first use: `key = value` lines,
- * `[section]` headers prefix the keys ("input.dpad_steering"), `#` and `;` start comments. Options are off
- * by default except the input conveniences dpad_steering and stick_8way (on); unknown keys are logged.
+ * `[section]` headers prefix the keys ("input.dpad_steering"), `#` and `;` start comments; unknown keys are
+ * logged. bmxConfigInt: the key's value, or `fallback` when unset.
  */
 int bmxConfigInt(const char *key, int fallback);
+/*
+ * An option with an enhanced default (PLAN.md Decisions, 2026-11-01): the key's value when set, else
+ * `vanilla` when `[general] vanilla = 1`, else `enhanced`. One switch gives the original game back; any
+ * option set in the file still wins.
+ */
+int bmxConfigOption(const char *key, int enhanced, int vanilla);
 /* A text value (paths), NULL when unset or empty. */
 const char *bmxConfigString(const char *key);
 /* Replaces the configuration by the text (tests; `origin` names it in the log). */

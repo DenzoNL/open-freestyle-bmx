@@ -28,7 +28,7 @@ static BmxHook gJumps[1];
 
 const BmxHook *bmxDrawDistJumps(uint32_t *count)
 {
-    const int on = bmxConfigInt("video.full_draw_distance", 0) == 1;
+    const int on = bmxConfigOption("video.full_draw_distance", 1, 0) == 1;
 
     gJumps[0].orig = (uint32_t)(uintptr_t)ngiffxAdaptQuality;
     gJumps[0].impl = (void *)fullDrawDistance;

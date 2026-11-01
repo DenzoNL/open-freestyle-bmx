@@ -1,5 +1,9 @@
 # Widescreen, native resolution and HUD layout (P6 enhancement)
 
+**Defaults since 2026-11-01 (WS7, after the user's playtest; PLAN.md Decisions):** `widescreen = 1`, `hud = 1`,
+`menus = 2`, `ui_filter = 2` and the desktop size (`width = height = 0`), read with bmxConfigOption;
+`[general] vanilla = 1` gives the original's for every option the file does not set.
+
 Status 2026-10-31: **WS1-WS6 implemented** (WS5 and WS6 not committed; "Implementation status" at the end), the
 default stays vanilla until the user's playtest (WS7, `native-run2\widetest.ps1`). The user took the
 recommendation (marked **rec**) for every decision W1..W11; for W9 the default stays vanilla (640x480 4:3) until a
@@ -271,7 +275,7 @@ Integers only (src/platform/config.c), `[video]`, all new keys added to `kKnownK
 | WS4 | Screenshot set and determinism runs at all aspects (W10.1-5); fixes | runs | Sonnet |
 | WS5 | HUD edge anchoring: ngifDrawList copy, zover chain walk, `hud_aspect` | ~250 | Opus |
 | WS6 | `ui_filter` (sharp-bilinear shader variant), blurred menu fill (`menus = 2`) | ~200 + shaders | Sonnet |
-| WS7 | User playtest, default decision (W9), docs (NATIVE.md, PLATFORM.md config list) | - | - |
+| WS7 | User playtest, default decision (W9), docs (NATIVE.md, PLATFORM.md config list) | done 2026-11-01 | - |
 
 WS1-WS4 give a complete 16:9 / 21:9 mode with a centred HUD; WS5-WS6 are polish and can wait.
 

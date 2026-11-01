@@ -136,6 +136,12 @@ round floats (so the hook build uses SSE2, not x87). Rules are in CONTRIBUTING.m
   clip and fog at their maximum (200). The original's frame rate adapter (ngiffxAdaptQuality) reads the level load as
   ~2.5 fps, drops the far clip to 60 and needs ~20 s to climb back, so levels start with distant geometry missing.
   Visual only (BMX_SIM_HASH identical); on in the user's personal ini.
+- **Defaults (2026-11-01, the user's call after a long playtest):** the native exe's enhancements are **on** by
+  default: the desktop resolution (`width = height = 0`), `widescreen = 1`, `hud = 1`, `menus = 2`, `ui_filter = 2`,
+  `interpolate = 1`, `full_draw_distance = 1` (with the earlier `smooth_resample = 2`, `dpad_steering`,
+  `stick_8way`, `confirm_quit = 0`). One switch, `[general] vanilla = 1`, gives the original game for every option
+  the ini does not set (bmxConfigOption, config.c). All of them are visual or input conveniences; none changes the
+  simulation (BMX_SIM_HASH checked for each).
 
 ## Enhancement backlog (P6+, unordered)
 

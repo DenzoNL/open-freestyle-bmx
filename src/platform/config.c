@@ -12,10 +12,11 @@
  *   [ui]
  *   confirm_quit = 0     -> 1: the quit prompt as in the original
  *
- * Read once, on the first query. A missing file means every option at its default (vanilla). Values are
- * integers (decimal or 0x hex), paths are UTF-8 text used as written; unknown keys and bad lines are logged
- * and ignored. Options that would change
- * the simulation would have to go into replays (PLAN.md); none of the current ones does.
+ * Read once, on the first query. A missing file means every option at its default: the enhanced one for the
+ * options read with bmxConfigOption (`[general] vanilla = 1` gives the original's), the original's for the
+ * rest. Values are integers (decimal or 0x hex), paths are UTF-8 text used as written; unknown keys and bad
+ * lines are logged and ignored. Options that would change the simulation would have to go into replays
+ * (PLAN.md); none of the current ones does.
  */
 #include <SDL3/SDL.h>
 
@@ -31,35 +32,36 @@ typedef struct Entry {
 static Entry gEntries[kMaxEntries];
 static int gCount, gLoaded;
 
-/* The keys this build knows (all off by default). */
+/* The keys this build knows. */
 static const char *const kKnownKeys[] = {
+    "general.vanilla",       /* 1: every option without a value in the file at the original's behaviour */
     "input.dpad_steering",   /* P7: the d-pad also sets the stick axes */
     "input.stick_8way",      /* P7-B: the left stick snaps to 8 directions */
     "audio.smooth_resample", /* P9 note: 0 original mixer, 1 linear, 2 cubic resampling (smoothmix.c) */
     "audio.music_dir",       /* the music override: a folder with the user's FLACs (docs/MUSIC.md) */
-    "video.width", /* P16: the mode without the device dialog (default 640 x 480 x 16 full screen) */
+    "video.width", /* P16: the mode without the device dialog (default 0 x 0 x 16 full screen, 0: the desktop
+                      size) */
     "video.height",
     "video.depth",
     "video.fullscreen", /* 0: a window of width x height (the game renders at that size) */
     "ui.confirm_quit",  /* 1: the main menu's QUIT asks "Do you want to quit the game?" (0: quits at once) */
     /* docs/WIDESCREEN.md W9 (width / height 0: the desktop size) */
-    "video.widescreen",   /* 1: hor+ 3D, centred 4:3 HUD and menus, pillarboxed movies (0: a wide mode
-                             stretches) */
+    "video.widescreen",   /* 1 (default): hor+ 3D, pillarboxed menus and movies (0: a wide mode stretches) */
     "video.aspect",       /* 0 stretch, 1 hor+ keeping the 4:3 view inside (default), 2 vert- */
     "video.fov_scale",    /* percent on both view window axes (default 100) */
     "video.max_hfov",     /* cap of the horizontal field of view in degrees (0: none) */
-    "video.hud",          /* 0 centred 4:3 (default), 1 edge anchored (WS5), 2 stretch */
+    "video.hud",          /* 0 centred 4:3, 1 edge anchored (default, WS5), 2 stretch */
     "video.hud_aspect",   /* width of the anchored HUD: aspect * 100 (default 178, 16:9); 0 = full width */
-    "video.menus",        /* 0 pillarbox (default), 1 stretch, 2 pillarbox on a blurred fill */
+    "video.menus",        /* 0 pillarbox, 1 stretch, 2 pillarbox on a blurred fill (default) */
     "video.movies",       /* 0 pillarbox (default), 1 stretch */
     "video.scale_filter", /* present: 0 linear (default), 1 nearest, 2 integer scale */
-    "video.ui_filter",    /* 2D / HUD textures: 0 the game's nearest (default), 1 linear, 2 sharp bilinear */
+    "video.ui_filter",    /* 2D / HUD textures: 0 the game's nearest, 1 linear, 2 sharp bilinear (default) */
     /* docs/HIGHFPS.md H8 */
-    "video.interpolate", /* 1: extra draws between the 30 Hz ticks in levels, one tick behind (0: vanilla) */
+    "video.interpolate", /* 1 (default): extra draws between the 30 Hz ticks in levels, one tick behind */
     "video.max_fps",     /* draws per second with interpolate = 1 (0: the display's refresh rate) */
     "video.vsync",       /* 1: present with vsync (default), 0: immediate (mailbox when not supported) */
     /* src/native/drawdist.c */
-    "video.full_draw_distance", /* 1: far clip and fog at their maximum, no frame rate adapter (0: vanilla) */
+    "video.full_draw_distance", /* 1 (default): far clip and fog at their maximum, no frame rate adapter */
 };
 
 static int known(const char *key)
@@ -159,7 +161,7 @@ static void load(void)
     }
     text = SDL_LoadFile(path, NULL);
     if (text == NULL) {
-        bmxLog("config: no %s, every option off\n", path);
+        bmxLog("config: no %s, every option at its default\n", path);
     } else {
         bmxLog("config: %s\n", path);
         bmxConfigLoadText(text, path);
@@ -199,4 +201,11 @@ int bmxConfigInt(const char *key, int fallback)
         }
     }
     return fallback;
+}
+
+int bmxConfigOption(const char *key, int enhanced, int vanilla)
+{
+    const int fallback = bmxConfigInt("general.vanilla", 0) == 1 ? vanilla : enhanced;
+
+    return bmxConfigInt(key, fallback);
 }

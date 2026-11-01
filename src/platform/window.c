@@ -274,8 +274,9 @@ static void applyMinMax(void)
 
 void bmxVideoSize(int *width, int *height, int fallbackW, int fallbackH)
 {
-    *width = bmxConfigInt("video.width", fallbackW);
-    *height = bmxConfigInt("video.height", fallbackH);
+    /* The desktop size by default (0), the caller's (the original's 640 x 480) with vanilla = 1. */
+    *width = bmxConfigOption("video.width", 0, fallbackW);
+    *height = bmxConfigOption("video.height", 0, fallbackH);
     if (*width == 0 || *height == 0) {
         const SDL_DisplayMode *desktop = NULL;
 
@@ -636,7 +637,7 @@ int32_t BMX_WINAPI bmxStandMessageBoxA(void *owner, const char *text, const char
     int32_t answer;
 
     if (text != NULL && strcmp(text, kQuitPrompt) == 0 && type == kQuitPromptType &&
-        bmxConfigInt("ui.confirm_quit", 0) == 0) {
+        bmxConfigOption("ui.confirm_quit", 0, 1) == 0) {
         bmxLog("window: quit prompt answered Yes without a box ([ui] confirm_quit = 0)\n");
         return kIdYes;
     }

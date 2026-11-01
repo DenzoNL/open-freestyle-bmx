@@ -1086,8 +1086,8 @@ int32_t BMX_WINAPI bmxStandDirectInputCreateEx(void *instance, uint32_t version,
         gStarted = 1;
         gScripted = bmxKeysScripted();
         /* On by default (the user's call, PLAN.md Decisions): input conveniences; 0 gives vanilla. */
-        gDpadSteering = bmxConfigInt("input.dpad_steering", 1);
-        gStick8Way = bmxConfigInt("input.stick_8way", 1);
+        gDpadSteering = bmxConfigOption("input.dpad_steering", 1, 0);
+        gStick8Way = bmxConfigOption("input.stick_8way", 1, 0);
         if (gScripted) {
             bmxLog("input: scripted keyboard (BMX_KEYS), no pad, focus ignored\n");
         } else {

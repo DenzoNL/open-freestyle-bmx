@@ -1083,6 +1083,15 @@ static void testConfig(void)
     CHECK(bmxConfigInt("input.dpad_steering", 0) == 0, "not a number -> default");
     bmxConfigLoadText("", "test");
     CHECK(bmxConfigInt("input.dpad_steering", 0) == 0, "empty");
+    /* Enhanced defaults; [general] vanilla = 1 gives the original's; a value in the file wins either way. */
+    CHECK(bmxConfigOption("video.interpolate", 1, 0) == 1, "option: enhanced default");
+    bmxConfigLoadText("[general]\nvanilla = 1\n[video]\nhud = 2\n", "test");
+    CHECK(bmxConfigOption("video.interpolate", 1, 0) == 0, "option: vanilla = 1");
+    CHECK(bmxConfigOption("video.hud", 1, 0) == 2, "option: set value wins over vanilla");
+    bmxConfigLoadText("[general]\nvanilla = 0\n[video]\ninterpolate = 0\n", "test");
+    CHECK(bmxConfigOption("video.interpolate", 1, 0) == 0, "option: set value wins over the default");
+    CHECK(bmxConfigOption("video.menus", 2, 0) == 2, "option: vanilla = 0");
+    bmxConfigLoadText("", "test");
 }
 
 /* ---- files ---- */

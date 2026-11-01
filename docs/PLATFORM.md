@@ -348,6 +348,13 @@ pass need handling (GENERIC_READ, OPEN_EXISTING, FILE_BEGIN/CURRENT).
   that change gameplay must also go into replays (PLAN); none in this document do.
 - B: command line / environment only (as the dev aids today).
 
+  **Defaults (2026-11-01, PLAN.md Decisions):** the enhancements are on unless the file sets them;
+  `[general] vanilla = 1` gives the original's behaviour for every option the file does not set (bmxConfigOption):
+  `width`/`height` 640 x 480, `widescreen`, `hud`, `menus`, `ui_filter`, `interpolate`, `full_draw_distance`,
+  `smooth_resample`, `dpad_steering`, `stick_8way` 0 and `confirm_quit` 1. The values below in parentheses are the
+  originals'; the enhanced defaults are `width = height = 0`, `widescreen = 1`, `hud = 1`, `menus = 2`,
+  `ui_filter = 2`, `interpolate = 1`, `full_draw_distance = 1` (far clip and fog at their maximum, src/native/drawdist.c).
+
   The `[video]` keys (config.c `kKnownKeys`; all integers): `width`, `height` (default 640 x 480; `0` = the
   primary display's desktop size, docs/WIDESCREEN.md W1), `depth` (16), `fullscreen` (1; 0 = a window of width x
   height, rendered at that size); the widescreen options of docs/WIDESCREEN.md W9 (WS1-WS3): `widescreen` (0; 1

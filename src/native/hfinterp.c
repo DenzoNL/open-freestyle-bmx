@@ -994,7 +994,7 @@ int bmxHfInstall(int guard)
     const char *const log = getenv("BMX_HF_LOG");
     int fps = bmxConfigInt("video.max_fps", 0);
 
-    gHf.on = bmxConfigInt("video.interpolate", 0) == 1;
+    gHf.on = bmxConfigOption("video.interpolate", 1, 0) == 1;
     if (!gHf.on) {
         bmxLog("hf: off\n");
         return 0;

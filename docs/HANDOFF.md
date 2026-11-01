@@ -113,8 +113,8 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   width untextured = cover, stays stretched; everything else mapped into the centred 4:3 area and clipped to it);
   movies pillarboxed in the DrawDib stand-in; `width = height = 0` = desktop size; `scale_filter` for the present.
   Off, and on at an exact 4:3 mode, BMX_SHOT frames are byte-identical to the build before; `BMX_SIM_HASH` per-tick
-  hashes are equal on / off at every aspect tried. Unit tests: `bmxwidetest`. Default stays vanilla (W9) until the
-  user's playtest: `native-run2\widetest.ps1` (default 3440x1440 21:9; `-Aspect 16:9` for 1920x1080). **Next:**
+  hashes are equal on / off at every aspect tried. Unit tests: `bmxwidetest`. Defaults on since 2026-11-01 (PLAN.md Decisions; `[general] vanilla = 1` for the original). Before: vanilla
+  until the user's playtest: `native-run2\widetest.ps1` (default 3440x1440 21:9; `-Aspect 16:9` for 1920x1080). **Next:**
   that playtest, then WS6 (done 2026-10-31, not committed: `ui_filter` 0/1/2 and `menus = 2`, docs/WIDESCREEN.md "WS6").
   **WS5 done 2026-10-31** (not committed): `[video] hud = 1` anchors the HUD per element (timer, name, flash left;
   score, height meter, replay arrow, icon right; combo, caption, hints, messages centred) within a centred
