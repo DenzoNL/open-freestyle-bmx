@@ -136,7 +136,7 @@ static ZObj *newHostObject(ZrwEffectType **types, int n)
     for (int i = 0; i < n; i++) {
         S5_LIST_INSERT(host->items, newItem(types[i]));
     }
-    *(ZrwEffectHost **)&o->pad30[0] = host;
+    o->data = host;
     return o;
 }
 

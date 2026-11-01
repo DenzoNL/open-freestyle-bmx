@@ -17,6 +17,15 @@
 #include "rw/rwmath.h"
 #include "rw/rwworld.h"
 
+/*
+ * The instanced data of an atomic: the work record, then the vertices and the triangles. A world sector's
+ * record stops before the matrix (it is drawn in world space). The resource entry header is not counted in
+ * the size asked for.
+ */
+#define kSectorWork     offsetof(RwD3DIm3DWork, combined)
+#define kAtomicWorkData (sizeof(RwD3DIm3DWork) - sizeof(RwResEntry))
+#define kSectorWorkData (kSectorWork - sizeof(RwResEntry))
+
 /* A float the routines read from the driver's data (values in the original: 1/128, 1/255, 255, 1, 0, -1). */
 #define K(addr) ORIG_VAR(addr, const float, rwD3DK##addr)
 /* The prelit colour of vertices without one (opaque black), for atomics and for world sectors. */
@@ -56,7 +65,7 @@ static uint32_t meshTriangles(const RpMeshHeader *mesh)
 static void instanceTriangles(RwD3DIm3DWork *work, const RpMeshHeader *mesh)
 {
     uint8_t *out = work->triangles + work->triangleOffset;
-    const RpMesh *m = (const RpMesh *)((const uint8_t *)mesh + 0x10 + mesh->firstMeshOffset);
+    const RpMesh *m = (const RpMesh *)((const uint8_t *)mesh + sizeof(RpMeshHeader) + mesh->firstMeshOffset);
 
     if ((mesh->flags & 1) != 0) {
         for (uint32_t n = mesh->numMeshes; n != 0; n--, m++) {
@@ -179,19 +188,20 @@ RwD3DIm3DWork *rwD3DAtomicInstance(RpAtomic *atomic)
         if (work != NULL) {
             RwResourcesFreeResEntry(&work->entry);
         }
-        if (RwResourcesAllocateResEntry(atomic, &atomic->repEntry,
-                                        (int32_t)(numTriangles * 6 + 0x70 + (uint32_t)numVertices * stride),
-                                        NULL) == NULL) {
+        if (RwResourcesAllocateResEntry(
+                atomic, &atomic->repEntry,
+                (int32_t)(numTriangles * 6 + kAtomicWorkData + (uint32_t)numVertices * stride),
+                NULL) == NULL) {
             return NULL;
         }
         work = (RwD3DIm3DWork *)atomic->repEntry;
         work->numTriangles = numTriangles;
         work->triangleOffset = 0;
-        work->triangles = (uint8_t *)work + (uint32_t)numVertices * stride + 0x88;
+        work->triangles = (uint8_t *)work + (uint32_t)numVertices * stride + sizeof(RwD3DIm3DWork);
         work->triangleStride = 6;
         work->stride = (int32_t)stride;
         work->numVertices = numVertices;
-        work->vertices = (uint8_t *)work + 0x88;
+        work->vertices = (uint8_t *)work + sizeof(RwD3DIm3DWork);
         work->matrix = &work->combined;
         work->mesh = mesh;
         work->type = rpPipelineTypes[textured];
@@ -264,21 +274,21 @@ RwD3DIm3DWork *rwD3DSectorInstance(RpWorldSector *sector)
         uint8_t *out;
         uint32_t flags;
 
-        if (numTriangles == 0 ||
-            RwResourcesAllocateResEntry(sector, &sector->repEntry,
-                                        (int32_t)(numTriangles * 6 + 0x30 + (uint32_t)numVertices * stride),
-                                        NULL) == NULL) {
+        if (numTriangles == 0 || RwResourcesAllocateResEntry(sector, &sector->repEntry,
+                                                             (int32_t)(numTriangles * 6 + kSectorWorkData +
+                                                                       (uint32_t)numVertices * stride),
+                                                             NULL) == NULL) {
             return NULL;
         }
         work = (RwD3DIm3DWork *)sector->repEntry;
         work->mesh = mesh;
         work->type = (uint16_t)type;
-        work->triangles = (uint8_t *)work + (uint32_t)numVertices * stride + 0x48;
+        work->triangles = (uint8_t *)work + (uint32_t)numVertices * stride + kSectorWork;
         work->triangleOffset = 0;
         work->numTriangles = numTriangles;
         work->triangleStride = 6;
         work->numVertices = numVertices;
-        work->vertices = (uint8_t *)work + 0x48;
+        work->vertices = (uint8_t *)work + kSectorWork;
         work->stride = (int32_t)stride;
         work->serialNum = mesh->serialNum;
         work->flags = RpWorldGetFlags(world);
@@ -916,7 +926,7 @@ void rwD3DRenderMeshes(RwD3DIm3DWork *work)
     if ((work->flags & 0x40) != 0) {
         modulate = 1;
     }
-    mesh = (const RpMesh *)((const uint8_t *)header + 0x10 + header->firstMeshOffset);
+    mesh = (const RpMesh *)((const uint8_t *)header + sizeof(RpMeshHeader) + header->firstMeshOffset);
     for (int32_t m = 0; m < numMeshes; m++, mesh++) {
         const uint8_t *triangles =
             work->triangles + work->triangleOffset + first * (uint32_t)work->triangleStride;

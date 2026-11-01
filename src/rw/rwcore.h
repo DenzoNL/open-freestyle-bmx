@@ -177,7 +177,8 @@ typedef struct RwGlobals {
     void *curWorld;                            /* 0x04 */
     uint16_t renderFrame;                      /* 0x08 */
     uint16_t lightFrame;                       /* 0x0a */
-    uint8_t pad0c[4];                          /* 0x0c */
+    uint16_t lightVisit;                       /* 0x0c stamp of the light walk (rpLightVisitOnce) */
+    uint8_t pad0e[2];                          /* 0x0e */
     RwDevice dOpenDevice;                      /* 0x10 */
     uint32_t stdFunc[rwSTANDARDNUMOFSTANDARD]; /* 0x48 */
     RwLLLink dirtyFrameList;                   /* 0xb8 frame hierarchies waiting for a sync */

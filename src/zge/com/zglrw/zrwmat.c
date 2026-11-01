@@ -147,7 +147,7 @@ void zrwmatSetSkeleton(void *object, void *skeleton)
 {
     ZObj *obj = object;
 
-    *(void **)&obj->pad30[0] = skeleton;
+    obj->data = skeleton;
     gZrwVtSkeleton(obj->model, skeleton);
 }
 

@@ -13,6 +13,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "bmx/com/action/physics_types.h"
 #include "compat/orig.h"
 #include "zge/zstring.h"
 
@@ -123,9 +124,13 @@ enum {
     kOvlRiderTrickBits = 0xf7, /* bitmap of the tricks the rider has landed */
 };
 
-/* Per player record at 0x691f40, 0xf70 bytes each. */
+/*
+ * The player records at 0x691f40 are the riders (PhysRider, gPhysRiders); the overlay reads them by these
+ * byte offsets, all before the record's first pointer (asserted in physics_types.h), so they hold on every
+ * build.
+ */
 enum {
-    kOvlPlayerStride = 0xf70,
+    kOvlPlayerStride = sizeof(PhysRider),
     kOvlPlayerNameLen = 0x05,
     kOvlPlayerName = 0x06, /* button glyph codes */
     kOvlPlayerReady = 0x5c,

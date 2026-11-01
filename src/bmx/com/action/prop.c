@@ -585,7 +585,7 @@ void propHitFace(int player, PhysFace *face)
         const ZVec3 *const at = zobjGetPosition(node->frame);
         const ZVec3 pos = {at->x, at->y, at->z};
 
-        fxShards(&pos, (const ZVec3 *)((const uint8_t *)&gPhysRiders[player] + 0x448));
+        fxShards(&pos, &gPhysRiders[player].vel);
         bmxSoundPlayAt(kSoundBreak, &pos, 3, 3, 0x7f);
     }
     gameCheckGrindGoal(player, (const PhysEdge *)(const void *)face);
@@ -603,7 +603,8 @@ BMX_ADDR(0x0042f0d0)
 void propSwitch(PropRecord *prop, uint32_t player, int release)
 {
     const PropDef *const def = propDef(prop);
-    const PhysRider *const rider = (const PhysRider *)((const uint8_t *)&gPhysRiders[0] + player * 0xf70u);
+    const PhysRider *const rider =
+        (const PhysRider *)((const uint8_t *)&gPhysRiders[0] + player * (uint32_t)sizeof(PhysRider));
     int solid = 0;
     uint32_t mode;
 

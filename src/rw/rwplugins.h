@@ -88,14 +88,13 @@ _Static_assert(sizeof(RpInterpolator) == 0x14, "RpInterpolator layout");
 
 /* An RpClump: atomics on a frame hierarchy (parent is the root frame). */
 struct RpClump {
-    RwObject object;     /* 0x00 type 2 */
-    RwLLLink atomicList; /* 0x08 */
-    uint8_t pad10[2];    /* 0x10 */
-    uint8_t stamp;       /* 0x12 incremented when the clump changes */
-    uint8_t pad13;       /* 0x13 */
-    uint32_t reserved14; /* 0x14 */
-    uint32_t reserved18; /* 0x18 */
-    void *callback;      /* 0x1c */
+    RwObject object;      /* 0x00 type 2 */
+    RwLLLink atomicList;  /* 0x08 */
+    uint8_t pad10[2];     /* 0x10 */
+    uint8_t stamp;        /* 0x12 incremented when the clump changes */
+    uint8_t pad13;        /* 0x13 */
+    RwLLLink inWorldLink; /* 0x14 in the world's list of clumps */
+    void *callback;       /* 0x1c */
 };
 
 _Static_assert(offsetof(RpClump, stamp) == 0x12, "RpClump layout");

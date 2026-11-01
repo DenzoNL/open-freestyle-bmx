@@ -108,21 +108,21 @@ static RpWorld **lightWorldSlot(const RpLight *light)
     return (RpWorld **)((uint8_t *)light + rpWorldLightOffset);
 }
 
-/* RpClump fields this module uses (the clump type itself is in rw/clump.c): its link in the world's list. */
+/* RpClump fields this module uses: its link in the world's list. */
 static RwLLLink *clumpInWorldLink(RpClump *clump)
 {
-    return (RwLLLink *)((uint8_t *)clump + 0x14);
+    return &clump->inWorldLink;
 }
 
 static uint8_t *clumpStamp(RpClump *clump)
 {
-    return (uint8_t *)clump + 0x12;
+    return &clump->stamp;
 }
 
 /* The list of sector ties of an atomic (RpTie.lWorldSectorInAtomic links). */
 static RwLLLink *atomicSectorList(const RpAtomic *atomic)
 {
-    return (RwLLLink *)((uint8_t *)atomic + 0x68);
+    return (RwLLLink *)&atomic->llWorldSectorsInAtomic;
 }
 
 static RpTieGlobals *tieGlobals(void)

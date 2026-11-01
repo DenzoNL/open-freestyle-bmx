@@ -57,7 +57,8 @@ typedef struct ZObj {
     ZObjLinks *links;   /* 0x24 */
     const ZObjOps *ops; /* 0x28 */
     void *model;        /* 0x2c renderer handle of the type (model, light, camera) */
-    uint8_t pad30[8];   /* 0x30 */
+    void *data;         /* 0x30 by type: the skeleton (models), the effect host (effects), the transform */
+    uint8_t pad34[4];   /* 0x34 */
     ZObjEvents *events; /* 0x38 */
 } ZObj;
 

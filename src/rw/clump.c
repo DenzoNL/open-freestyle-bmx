@@ -467,8 +467,8 @@ static RpClump *clumpCreate(void)
     RpClump *clump = RwEngineInstance->freeListAlloc(clumpGlobals()->clumpFreeList);
     if (clump != NULL) {
         clump->stamp = 0;
-        clump->reserved14 = 0;
-        clump->reserved18 = 0;
+        clump->inWorldLink.next = NULL;
+        clump->inWorldLink.prev = NULL;
         clump->object.parent = NULL;
         clump->object.privateFlags = 0;
         clump->object.flags = 0;

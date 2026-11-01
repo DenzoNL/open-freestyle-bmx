@@ -7,6 +7,7 @@
 #include "compat/crt.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zobjcamera.h"
+#include "zge/zobj.h"
 #include "zge/zstring.h"
 
 /*
@@ -145,7 +146,7 @@ void fxSpawn(const void *obj, int index, const ZVec3 *pos, uint32_t seed)
     const uint8_t *const node = ngiffxGetNode(obj, index);
 
     if (node != NULL) {
-        const float *const target = *(const float *const *)(node + 0x30);
+        const float *const target = ((const ZObj *)node)->data;
 
         spark.pos.x = (float)((double)pos->x - target[2]);
         spark.pos.y = (float)((double)pos->y - target[3]);
@@ -186,7 +187,7 @@ void fxImpactSparks(const ZVec3 *pos, const ZVec3 *vel)
     const uint8_t *const node = ngiffxGetNode(gFxRider->actor, 0);
 
     if (node != NULL) {
-        const float *const target = *(const float *const *)(node + 0x30);
+        const float *const target = ((const ZObj *)node)->data;
 
         impact.pos.x = (float)((double)pos->x - target[2]);
         impact.pos.y = (float)(((double)pos->y - target[3]) - 20.0f);
@@ -281,7 +282,7 @@ void fxShards(const ZVec3 *pos, const ZVec3 *vel)
     if (node == NULL) {
         return;
     }
-    const float *const target = *(const float *const *)(node + 0x30);
+    const float *const target = ((const ZObj *)node)->data;
 
     for (int i = 0x20; i != 0; i--) {
         shard.pos.x = (float)(((double)pos->x - target[2]) + (double)(int16_t)(zmathRandom() % 600 - 300));
@@ -361,7 +362,7 @@ void fxSkidMark(const ZVec3 *from, const ZVec3 *to, int flags, const ZVec3 *norm
     if (node == NULL) {
         return;
     }
-    const float *const target = *(const float *const *)(node + 0x30);
+    const float *const target = ((const ZObj *)node)->data;
     const double hx = (double)up.x * 0.5f;
     const double hy = (double)up.y * 0.5f;
     const double hz = (double)up.z * 0.5f;
@@ -447,7 +448,7 @@ void fxWaterSplash(const uint8_t *obj, int unused, const float *offset)
     if (node == NULL) {
         return;
     }
-    const float *target = *(const float *const *)(node + 0x30);
+    const float *target = ((const ZObj *)node)->data;
     const float objX = rdFloat(obj, 0xc);
     const float objY = rdFloat(obj, 0x10);
     const float objZ = rdFloat(obj, 0x14);

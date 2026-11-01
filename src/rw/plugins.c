@@ -818,7 +818,7 @@ int RpSkinClumpUpdate(RpClump *clump)
     inverse.right.x = 1.0f;
     inverse.up.y = 1.0f;
     inverse.at.z = 1.0f;
-    RwMatrixInvert(&inverse, (const RwMatrix *)((const uint8_t *)atomic->object.object.parent + 0x1c));
+    RwMatrixInvert(&inverse, &((const RwFrame *)atomic->object.object.parent)->modelling);
     void *geometry = atomic->geometry;
     RpMorphTarget *morphTarget = RpGeometryGetMorphTarget(geometry, 0);
     ZVec3 *verts = RpMorphTargetGetVertices(morphTarget);
@@ -1291,18 +1291,18 @@ void *rpAnimClumpCopy(void *destination, const void *source)
     return destination;
 }
 
-/* Frees the two blocks an animation interpolator owns (at +0x2c and +0x30); returns the interpolator. */
+/* Frees the two blocks an animation interpolator owns (a and b); returns the interpolator. */
 BMX_ADDR(0x005029e0)
 void *rpAnimInterpolatorDeinit(void *interpolator)
 {
-    void **blocks = (void **)((uint8_t *)interpolator + 0x2c);
-    if (blocks[0] != NULL) {
-        RwEngineInstance->memoryFuncs.rwfree(blocks[0]);
-        blocks[0] = NULL;
+    RpAnimInterpolator *state = interpolator;
+    if (state->a != NULL) {
+        RwEngineInstance->memoryFuncs.rwfree(state->a);
+        state->a = NULL;
     }
-    if (blocks[1] != NULL) {
-        RwEngineInstance->memoryFuncs.rwfree(blocks[1]);
-        blocks[1] = NULL;
+    if (state->b != NULL) {
+        RwEngineInstance->memoryFuncs.rwfree(state->b);
+        state->b = NULL;
     }
     return interpolator;
 }

@@ -263,6 +263,8 @@ typedef struct PhysRider {
 } PhysRider;
 
 _Static_assert(sizeof(PhysRider) == 0xf70, "PhysRider size");
+/* No pointer before `contact`: the overlay reads the record by byte offset (kOvlPlayer*, overlay.h). */
+_Static_assert(offsetof(PhysRider, contact) == 0x488, "PhysRider.contact");
 _Static_assert(offsetof(PhysRider, look) == 0x0, "PhysRider.look");
 _Static_assert(offsetof(PhysRider, bikeLook) == 0x2, "PhysRider.bikeLook");
 _Static_assert(offsetof(PhysRider, padIndex) == 0x4, "PhysRider.padIndex");

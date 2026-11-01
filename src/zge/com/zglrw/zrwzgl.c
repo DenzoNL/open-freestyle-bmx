@@ -10,6 +10,7 @@
 #include "rw/rwplugins.h"
 #include "rw/rwtexture.h"
 #include "rw/rwworld.h"
+#include "zge/com/zglrw/zrwcam.h"
 #include "zge/pc/pcinput.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zramdisk.h"
@@ -677,7 +678,7 @@ int zrwDrawFrame(void)
     }
     if (gZrwClearOn != 0) {
         for (camera = zrwcamFirst(); camera != NULL; camera = zrwcamNext(camera)) {
-            if ((((const uint8_t *)camera)[8] & 4) != 0) {
+            if ((((const ZrwCamera *)camera)->state & 4) != 0) {
                 RwCameraClear(zrwcamHandle(camera), &gZrwClearColor, 3);
             }
         }
@@ -686,7 +687,7 @@ int zrwDrawFrame(void)
     for (camera = zrwcamFirst(); camera != NULL; camera = zrwcamNext(camera)) {
         RwError error;
 
-        if ((((const uint8_t *)camera)[8] & 4) == 0) {
+        if ((((const ZrwCamera *)camera)->state & 4) == 0) {
             continue;
         }
         RwErrorGet(&error);
