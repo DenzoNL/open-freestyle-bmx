@@ -156,6 +156,7 @@ void drvDrawFlush(void);
 void drvDrawSetTarget(struct SDL_GPUTexture *color, struct SDL_GPUTexture *depth, int32_t width,
                       int32_t height, int32_t x, int32_t y, int32_t w, int32_t h);
 void drvDrawSetUiMode(int mode);
+void drvDrawFillRect(float x0, float y0, float x1, float y1);
 void drvDrawTextureChanged(RwRaster *raster);
 void drvDrawForgetRaster(RwRaster *raster);
 

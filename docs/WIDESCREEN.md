@@ -489,3 +489,39 @@ ngiffxAdaptQuality 0x45c710, and the chain runs:
 
 The fix for comparisons: diff frames after the settle (f1800 and later in that script). The BMX_HF_GUARD log line
 `quality (far clip)` shows the value per tick (docs/HIGHFPS.md "HF0 findings").
+
+## Stale content in the pillarbox bars (2026-11-01, not committed)
+
+**Bug (playtest, 3440x1440, `menus = 2`, `hud = 1`, `ui_filter = 2`).** After END RUN and EXIT TO MAIN MENU the areas
+beside the pillarboxed 4:3 main menu showed the last level frame, slightly dimmed.
+
+**Cause (reproduced with BMX_KEYS: ProQuest, pause, END RUN? yes, "exit to main menu" (5 downs from "another run"),
+EXIT? yes, then a BMX_SHOT in the main menu).** The frontend never clears the camera raster. At 4:3 the backdrop covers
+all of it, so nothing ever needed to. Pillarboxed, the backdrop covers only the centre and the bars keep whatever the
+raster held: the last level frame (WS4's loading icons were the same thing). With `menus = 0` the bars are the stale
+frame as is. With `menus = 2` the fill was drawn with the game's render state, alpha blending included, so the
+darkening was a blend with the stale frame instead of a replacement (`fogColor[3] = 0.5` is only the brightness
+factor of the rgb; the alpha was never forced).
+
+**Fix.**
+- `drvWideBars` (widemath.c, unit tested incl. 21:9, 5:4 letterbox, 4:3, other classes, `menus = 1`): for a backdrop
+  with `menus != 1` at a non-4:3 size, the two bars outside the centred 4:3 area (left / right, or top / bottom at
+  5:4). `wideIm2DPrimitive` draws them first through `drvDrawFillRect` (draw.c): an opaque black quad in the normal
+  batch (no texture, blend / z / fog / specular / alpha test off, vertex colour; the game's state is restored). Only
+  the bars, not the whole screen, so several backdrop primitives in one frame cannot erase each other.
+- `menus = 2`: the blur fill (mode 3) draws with blending and alpha test off: an opaque, darkened copy.
+- Movies: nothing to fix. Their target (`gTarget`, movie.c) is cleared to black when created and DrawDibDraw only
+  writes the 4:3 rectangle into it, so the bars cannot go stale.
+- Vanilla / 4:3: `wideIm2DPrimitive` returns before the classifier for 4:3 and `drvWideBars` returns 0 at 4:3; mode 3
+  is only used by the blur fill.
+
+**Verification** (3440x1440 borderless, scripts and shots in the scratchpad `menufix\`: `b0_5150` before menus 0,
+`b2_5150` before menus 2, `a0_5150` / `a2_5150` after; frame 5150 = main menu after the exit):
+- Before, menus 0: the bars show the level frame (fence and crate, dimmed by the menu fade). Before, menus 2: the same
+  frame under a blurred menu picture. After, menus 0: black bars. After, menus 2: the blurred, darkened picture only.
+- `bmxwidetest` 761 checks, 0 failures; clang-format 21 and clang-tidy clean.
+- Byte identity before vs after (BMX_SHOT frames 2200 = riding after the far clip settle, 5150 = main menu):
+  `widescreen = 0` at 3440x1440: 2/2 identical; exact 4:3 (1024x768, `widescreen = 1`, `menus = 2`): 2/2 identical;
+  3440x1440 `menus = 2` riding frame 2200: identical (the in-level frame is untouched). Intended differences only:
+  the main menu frames at 3440x1440 and 1280x1024 (5:4, `menus = 0`, f5150: the stale level frame in the top and
+  bottom bars is now black; `a54_5150` vs `b54_5150`).

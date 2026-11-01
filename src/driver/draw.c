@@ -448,6 +448,9 @@ static void appendDraw(uint32_t type, const RwD3DTLVertex *vertices, uint32_t nu
         mode = boundTexture == NULL ? 0 : uiMode == 3 ? 3 : nearest ? uiMode : 0;
     }
     key.ui = mode == 2 || mode == 3;
+    if (mode == 3) {
+        key.blend = 0; /* the blurred fill replaces what was there (a stale frame must not show through) */
+    }
     draw.draws = grow(draw.draws, &draw.capDraws, draw.numDraws + 1, sizeof *draw.draws);
     cmd = &draw.draws[draw.numDraws++];
     memset(cmd, 0, sizeof *cmd);
@@ -459,7 +462,7 @@ static void appendDraw(uint32_t type, const RwD3DTLVertex *vertices, uint32_t nu
     cmd->ps.ops[0] = (int32_t)tss[kTssColorOp];
     cmd->ps.ops[1] = (int32_t)tss[kTssAlphaOp];
     cmd->ps.ops[2] = boundTexture != NULL;
-    cmd->ps.ops[3] = rs[kRsAlphaTestEnable] != 0 ? (int32_t)rs[kRsAlphaFunc] : 8;
+    cmd->ps.ops[3] = rs[kRsAlphaTestEnable] != 0 && mode != 3 ? (int32_t)rs[kRsAlphaFunc] : 8;
     cmd->ps.params[0] = (float)(rs[kRsAlphaRef] & 0xff) / 255.0f;
     cmd->ps.params[1] = rs[kRsFogEnable] != 0 ? 1.0f : 0.0f;
     cmd->ps.params[2] = rs[kRsSpecularEnable] != 0 ? 1.0f : 0.0f;
@@ -618,6 +621,38 @@ void drvDrawSetTarget(struct SDL_GPUTexture *color, struct SDL_GPUTexture *depth
 void drvDrawSetUiMode(int mode)
 {
     uiMode = mode;
+}
+
+/* An opaque black screen rectangle through the normal draw path (the bars around a pillarboxed backdrop). */
+void drvDrawFillRect(float x0, float y0, float x1, float y1)
+{
+    const uint32_t keep[] = {rs[kRsZEnable],          rs[kRsZWriteEnable], rs[kRsAlphaTestEnable],
+                             rs[kRsAlphaBlendEnable], rs[kRsFogEnable],    rs[kRsSpecularEnable],
+                             rs[kRsCullMode],         tss[kTssColorOp],    tss[kTssAlphaOp]};
+    RwRaster *const texture = boundTexture;
+    const RwD3DTLVertex quad[4] = {
+        {x0, y0, 0.0f, 1.0f, 0xff000000u, 0xff000000u, 0.0f, 0.0f},
+        {x1, y0, 0.0f, 1.0f, 0xff000000u, 0xff000000u, 0.0f, 0.0f},
+        {x1, y1, 0.0f, 1.0f, 0xff000000u, 0xff000000u, 0.0f, 0.0f},
+        {x0, y1, 0.0f, 1.0f, 0xff000000u, 0xff000000u, 0.0f, 0.0f},
+    };
+
+    rs[kRsZEnable] = rs[kRsZWriteEnable] = rs[kRsAlphaTestEnable] = rs[kRsAlphaBlendEnable] = 0;
+    rs[kRsFogEnable] = rs[kRsSpecularEnable] = 0;
+    rs[kRsCullMode] = 1;
+    tss[kTssColorOp] = tss[kTssAlphaOp] = 3; /* the vertex colour */
+    boundTexture = NULL;
+    appendDraw(6, quad, 4, NULL, 0);
+    boundTexture = texture;
+    rs[kRsZEnable] = keep[0];
+    rs[kRsZWriteEnable] = keep[1];
+    rs[kRsAlphaTestEnable] = keep[2];
+    rs[kRsAlphaBlendEnable] = keep[3];
+    rs[kRsFogEnable] = keep[4];
+    rs[kRsSpecularEnable] = keep[5];
+    rs[kRsCullMode] = keep[6];
+    tss[kTssColorOp] = keep[7];
+    tss[kTssAlphaOp] = keep[8];
 }
 
 /* A texture's CPU copy changed: draws already batched must see the old pixels, so flush them first. */

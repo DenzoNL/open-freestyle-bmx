@@ -536,6 +536,28 @@ int drvWideMapHud(float *xy, size_t stride, int32_t n, int32_t w, int32_t h, int
     return 0;
 }
 
+int drvWideBars(const DrvWideConfig *cfg, int cls, int32_t w, int32_t h, float rects[2][4])
+{
+    float lo = 0.0f, hi = 0.0f;
+    const int axis = drvWideArea(w, h, &lo, &hi);
+
+    if (cls != kDrvWideBackdrop || cfg->menus == 1 || axis < 0) {
+        return 0;
+    }
+    if (axis == 0) {
+        const float r0[4] = {0.0f, 0.0f, lo, (float)h}, r1[4] = {hi, 0.0f, (float)w, (float)h};
+
+        memcpy(rects[0], r0, sizeof r0);
+        memcpy(rects[1], r1, sizeof r1);
+    } else {
+        const float r0[4] = {0.0f, 0.0f, (float)w, lo}, r1[4] = {0.0f, hi, (float)w, (float)h};
+
+        memcpy(rects[0], r0, sizeof r0);
+        memcpy(rects[1], r1, sizeof r1);
+    }
+    return 2;
+}
+
 int drvWideBlurFill(const DrvWideConfig *cfg, int cls)
 {
     return cls == kDrvWideBackdrop && cfg->menus == 2;

@@ -174,6 +174,14 @@ static int BMX_CDECL wideIm2DPrimitive(int32_t type, void *vertices, int32_t num
     if (!drvWideMoves(cfg, cls) || !grow(numVertices + 2)) {
         return drawNext(type, vertices, numVertices, ui);
     }
+    {
+        float bars[2][4];
+        const int nBars = drvWideBars(cfg, cls, w, h, bars);
+
+        for (int i = 0; i < nBars; i++) {
+            drvDrawFillRect(bars[i][0], bars[i][1], bars[i][2], bars[i][3]);
+        }
+    }
     if (drvWideBlurFill(cfg, cls)) {
         /* menus = 2: the backdrop stretched over the whole screen, blurred and darkened, under the 4:3 one.
          */

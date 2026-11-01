@@ -211,6 +211,25 @@ static void testClassify(void)
         cfg.menus = 2;
         CHECK(drvWideBlurFill(&cfg, kDrvWideBackdrop) && drvWideMoves(&cfg, kDrvWideBackdrop));
         CHECK(!drvWideBlurFill(&cfg, kDrvWideOther) && !drvWideBlurFill(&cfg, kDrvWideCover));
+        /* The bars around a pillarboxed backdrop are blackened (menus 0 and 2). */
+        {
+            float r[2][4];
+
+            CHECK(drvWideBars(&cfg, kDrvWideBackdrop, 3440, 1440, r) == 2);
+            CHECK(r[0][0] == 0.0f && r[0][2] == 760.0f && r[1][0] == 2680.0f && r[1][2] == 3440.0f);
+            CHECK(r[0][3] == 1440.0f && r[1][3] == 1440.0f);
+            CHECK(drvWideBars(&cfg, kDrvWideBackdrop, 1280, 1024, r) == 2); /* 5:4: letterbox */
+            CHECK(r[0][1] == 0.0f && r[0][3] == 32.0f && r[1][1] == 992.0f && r[1][3] == 1024.0f);
+            CHECK(r[0][2] == 1280.0f && r[1][2] == 1280.0f);
+            CHECK(drvWideBars(&cfg, kDrvWideBackdrop, 1024, 768, r) == 0);
+            CHECK(drvWideBars(&cfg, kDrvWideOther, 3440, 1440, r) == 0);
+            CHECK(drvWideBars(&cfg, kDrvWideCover, 3440, 1440, r) == 0);
+            cfg.menus = 0;
+            CHECK(drvWideBars(&cfg, kDrvWideBackdrop, 3440, 1440, r) == 2);
+            cfg.menus = 1;
+            CHECK(drvWideBars(&cfg, kDrvWideBackdrop, 3440, 1440, r) == 0);
+            cfg.menus = 2;
+        }
     }
 }
 

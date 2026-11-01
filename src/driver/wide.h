@@ -170,6 +170,13 @@ void drvWideMapRect(int32_t rect[4], int32_t w, int32_t h);
  */
 int drvWidePresentRect(int filter, int32_t width, int32_t height, uint32_t w, uint32_t h, uint32_t out[4]);
 
+/*
+ * The bars around the 4:3 area to blacken before a pillarboxed backdrop (menus 0 and 2; the frontend never
+ * clears the screen, so the last frame would stay in them): fills rects[i] = {x0, y0, x1, y1} and returns 2,
+ * or 0 (not a backdrop, menus = 1, 4:3).
+ */
+int drvWideBars(const DrvWideConfig *cfg, int cls, int32_t w, int32_t h, float rects[2][4]);
+
 /* Whether a primitive of that class gets the blurred fill drawn stretched behind it (menus = 2: backdrops).
  */
 int drvWideBlurFill(const DrvWideConfig *cfg, int cls);
