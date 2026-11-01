@@ -505,10 +505,10 @@ int zsceneInitialize(const char *path)
 }
 
 /* Tables of {chunk id, handler} for the scene components (in the exe's data). */
-#define kSceneTagChunks  ((const void *)0x00561900)
-#define kSceneScptChunks ((const void *)0x00561908)
-#define kScenePdblChunks ((const void *)0x00561918)
-#define kScenePrblChunks ((const void *)0x00561920)
+#define kSceneTagChunks  ((const void *)BMX_ORIG(0x00561900))
+#define kSceneScptChunks ((const void *)BMX_ORIG(0x00561908))
+#define kScenePdblChunks ((const void *)BMX_ORIG(0x00561918))
+#define kScenePrblChunks ((const void *)BMX_ORIG(0x00561920))
 
 BMX_ADDR(0x004911c0)
 int zsceneOpen(const char *name)

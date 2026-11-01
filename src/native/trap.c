@@ -1,6 +1,7 @@
 /*
- * Reports int3 traps: the first unported function the game reaches. Names come from data/functions.csv
- * and work/labels.raw when they can be found (development convenience, not required).
+ * Reports traps (an unported original function reached through a trap stub, see bmxOrigTrap) and faults.
+ * Names come from data/functions.csv and work/labels.raw when they can be found (development convenience, not
+ * required).
  */
 #include <stdarg.h>
 #include <stdio.h>
@@ -9,7 +10,6 @@
 
 #include <windows.h>
 
-#include "hook/hook.h"
 #include "native/native.h"
 
 enum { kImageEnd = 0x6b3000 };
@@ -23,7 +23,6 @@ typedef struct Sym {
 static Sym *syms;
 static size_t symCount, symCap;
 static FILE *logFile;
-static int skipLeft;
 
 void bmxLogOpen(void)
 {
@@ -133,13 +132,13 @@ static void describe(uint32_t a, char *out, size_t n)
             return;
         }
     } else {
-        const BmxHook *best = NULL;
+        const BmxOrigEntry *best = NULL;
 
-        for (uint32_t i = 0; i < bmxHookCount; i++) {
-            const uint32_t impl = (uint32_t)(uintptr_t)bmxHooks[i].impl;
+        for (uint32_t i = 0; i < bmxOrigMapCount; i++) {
+            const uint32_t impl = (uint32_t)(uintptr_t)bmxOrigMap[i].impl;
 
             if (impl <= a && (!best || impl > (uint32_t)(uintptr_t)best->impl)) {
-                best = &bmxHooks[i];
+                best = &bmxOrigMap[i];
             }
         }
         if (best) {
@@ -151,6 +150,28 @@ static void describe(uint32_t a, char *out, size_t n)
         }
     }
     snprintf(out, n, "?");
+}
+
+void bmxDescribeAddress(uint32_t addr, char *out, size_t size)
+{
+    if (symCount == 0) {
+        loadSymbols();
+    }
+    describe(addr, out, size);
+}
+
+void bmxOrigTrap(uint32_t orig, uint32_t callerRet)
+{
+    char what[160], who[200];
+
+    bmxDescribeAddress(orig, what, sizeof what);
+    bmxDescribeAddress(callerRet, who, sizeof who);
+    bmxLog("TRAP: unported original function %08x %s reached\n  caller: %08x %s\n", (unsigned)orig, what,
+           (unsigned)callerRet, who);
+    if (logFile) {
+        fclose(logFile);
+    }
+    ExitProcess(3);
 }
 
 static LONG CALLBACK trapHandler(EXCEPTION_POINTERS *ep)
@@ -172,29 +193,20 @@ static LONG CALLBACK trapHandler(EXCEPTION_POINTERS *ep)
     }
     describe(eip, what, sizeof what);
     describe(ret, who, sizeof who);
-    /* BMX_TRAP_SKIP=N: log the first N traps and fake a cdecl "return 1" (success for most init calls)
-     * instead of stopping, to list what the game needs next. Only a survey aid: the game state is bogus after
-     * the first skip. */
-    if (code == EXCEPTION_BREAKPOINT && skipLeft > 0) {
-        skipLeft--;
-        bmxLog("TRAP (skipped): %08x %s  <- %08x %s\n", (unsigned)eip, what, (unsigned)ret, who);
-        ep->ContextRecord->Eax = 1;
-        ep->ContextRecord->Eip = ret;
-        ep->ContextRecord->Esp = esp + 4;
-        return EXCEPTION_CONTINUE_EXECUTION;
-    }
     if (InterlockedExchange(&reported, 1)) {
         ExitProcess(3);
     }
-    if (code == EXCEPTION_BREAKPOINT) {
-        bmxLog("TRAP: unported code reached at %08x  %s\n", (unsigned)eip, what);
-    } else {
-        bmxLog("EXCEPTION %08lx at %08x  %s\n", code, (unsigned)eip, what);
-        if (code == EXCEPTION_ACCESS_VIOLATION) {
-            bmxLog("  access address %08lx (%s)\n",
-                   (unsigned long)ep->ExceptionRecord->ExceptionInformation[1],
-                   ep->ExceptionRecord->ExceptionInformation[0] ? "write" : "read");
-        }
+    bmxLog("EXCEPTION %08lx at %08x  %s\n", code, (unsigned)eip, what);
+    if (code == EXCEPTION_ACCESS_VIOLATION) {
+        const uint32_t addr = (uint32_t)ep->ExceptionRecord->ExceptionInformation[1];
+
+        bmxLog("  access address %08lx (%s)%s\n", (unsigned long)addr,
+               ep->ExceptionRecord->ExceptionInformation[0] ? "write" : "read",
+               addr >= kBmxImageBase && addr < kImageEnd ? ": an original address, not converted?" : "");
+    }
+    if (eip >= kBmxImageBase && eip < kImageEnd) {
+        bmxLog(
+            "  (a jump to original code, which is not loaded: an ORIG_FN or code pointer not converted?)\n");
     }
     bmxLog("  caller (return address at esp): %08x  %s\n", (unsigned)ret, who);
     for (int i = 1; i < 5 && !IsBadReadPtr((void *)(uintptr_t)(esp + (uint32_t)i * 4), 4); i++) {
@@ -209,9 +221,8 @@ static LONG CALLBACK trapHandler(EXCEPTION_POINTERS *ep)
 
 void bmxTrapInstall(void)
 {
-    const char *skip = getenv("BMX_TRAP_SKIP");
-
-    skipLeft = skip ? atoi(skip) : 0;
-    loadSymbols();
+    if (symCount == 0) {
+        loadSymbols();
+    }
     AddVectoredExceptionHandler(1, trapHandler);
 }

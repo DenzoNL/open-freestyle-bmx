@@ -7,6 +7,7 @@
 
 #include "driver/driver.h"
 #include "rw/rwd3d.h"
+#include "rw/rwmath.h"
 
 /* The driver's camera plugin data (0x20 bytes, like the original's). */
 typedef struct DrvCameraExt {
@@ -83,7 +84,7 @@ static struct SDL_GPUTexture *rasterTexture(RwRaster *raster)
 /* The camera being updated, and the render target the device calls draw to (the primary surface's context).
  */
 #define rwD3DCurrentCamera  ORIG_VAR(0x00697348, RwCamera *, rwD3DCurrentCamera)
-#define rwD3DPrimaryContext ((uint8_t *)(uintptr_t)0x00697320)
+#define rwD3DPrimaryContext ((uint8_t *)BMX_ORIG(0x00697320))
 #define rwD3DFogRange       ORIG_VAR(0x0069b98c, float, rwD3DFogRange)
 
 static uint16_t savedFpuControl;
@@ -119,7 +120,8 @@ int drvCameraBeginUpdate(void *out, void *camera, int32_t in)
     RwRaster *top;
     uint32_t mxcsr;
 
-    *(uint32_t *)((uint8_t *)RwEngineInstance + rwMatrixGlobalsOffset + 8) = 0x0054b038;
+    *(uint32_t *)((uint8_t *)RwEngineInstance + rwMatrixGlobalsOffset + 8) =
+        (uint32_t)(uintptr_t)BMX_FNPTR(void *, 0x0054b038, rwMatrixMultiplyX87);
     if (rwCameraFpuSet == 0) {
         fpuCameraMode();
         rwCameraFpuSet = 1;

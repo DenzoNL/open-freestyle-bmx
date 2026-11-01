@@ -3,8 +3,9 @@
  * data/functions-rw.csv, third-party code we do not port). It provides exactly the entry points
  * RtPNGImageRead (rw/texture.c) calls, with the same arguments and the same results for the transforms it
  * requests: strip_16, packing, gray_1_2_4_to_8, gray_to_rgb, filler, the PLTE / tRNS getters, and Adam7
- * deinterlacing inside png_read_image. Native exe only: the loader writes a jump from each original entry
- * point to ours (bmxPngJumps), like the SDL3 driver; the hook DLL keeps the original libpng.
+ * deinterlacing inside png_read_image. Native exe only: each original entry point is served by ours
+ * (bmxPngJumps, read by tools/gen_origmap.py), like the SDL3 driver's; the hook DLL keeps the original
+ * libpng.
  *
  * Like libpng:
  * - the png struct starts with the MSVC jmp_buf RtPNGImageRead fills with _setjmp3, and the read function
@@ -108,7 +109,7 @@ _Static_assert(offsetof(PngStruct, readFn) == 0x50 && offsetof(PngStruct, ioPtr)
 /* ---- errors, memory, input ----------------------------------------------------------------------------- */
 
 /* libpng's png_error: the error callback (none in the game), then longjmp(jmpbuf, 1). */
-static void pngError(void *png, const char *message)
+void pngError(void *png, const char *message)
 {
     PngStruct *p = png;
     if (p->errorFn != NULL) {
@@ -788,8 +789,8 @@ static int transformPixel(const PngStruct *p, const uint8_t *row, uint32_t x, ui
 /* ---- the libpng entry points
  * --------------------------------------------------------------------------------- */
 
-static void *bmxPngCreateReadStruct2(const char *version, void *errorPtr, void *errorFn, void *warnFn,
-                                     void *memPtr, void *mallocFn, void *freeFn)
+void *bmxPngCreateReadStruct2(const char *version, void *errorPtr, void *errorFn, void *warnFn, void *memPtr,
+                              void *mallocFn, void *freeFn)
 {
     (void)version;
     PngStruct dummy = {0};
@@ -811,7 +812,7 @@ static void *bmxPngCreateReadStruct2(const char *version, void *errorPtr, void *
     return p;
 }
 
-static void *bmxPngCreateInfoStruct(void *png)
+void *bmxPngCreateInfoStruct(void *png)
 {
     PngStruct *p = png;
     if (p == NULL) {
@@ -827,7 +828,7 @@ static void *bmxPngCreateInfoStruct(void *png)
     return info;
 }
 
-static void bmxPngSetReadFn(void *png, void *ioPtr, void *readFn)
+void bmxPngSetReadFn(void *png, void *ioPtr, void *readFn)
 {
     PngStruct *p = png;
     p->ioPtr = ioPtr;
@@ -835,7 +836,7 @@ static void bmxPngSetReadFn(void *png, void *ioPtr, void *readFn)
 }
 
 /* Signature and chunks up to the first IDAT, whose header stays in chunkLength / chunkType. */
-static void bmxPngReadInfo(void *png, void *info)
+void bmxPngReadInfo(void *png, void *info)
 {
     static const uint8_t kSignature[8] = {137, 80, 78, 71, 13, 10, 26, 10};
     PngStruct *p = png;
@@ -881,8 +882,8 @@ static void bmxPngReadInfo(void *png, void *info)
     *(PngInfo *)info = p->header;
 }
 
-static uint32_t bmxPngGetIhdr(void *png, void *info, uint32_t *width, uint32_t *height, int *bitDepth,
-                              int *colorType, int *interlace, int *compression, int *filter)
+uint32_t bmxPngGetIhdr(void *png, void *info, uint32_t *width, uint32_t *height, int *bitDepth,
+                       int *colorType, int *interlace, int *compression, int *filter)
 {
     const PngInfo *h = info;
     if (png == NULL || h == NULL || width == NULL || height == NULL || bitDepth == NULL ||
@@ -905,12 +906,12 @@ static uint32_t bmxPngGetIhdr(void *png, void *info, uint32_t *width, uint32_t *
     return 1;
 }
 
-static void bmxPngSetStrip16(void *png)
+void bmxPngSetStrip16(void *png)
 {
     ((PngStruct *)png)->transforms |= kXformStrip16;
 }
 
-static void bmxPngSetPacking(void *png)
+void bmxPngSetPacking(void *png)
 {
     PngStruct *p = png;
     if (p->header.bitDepth < 8) {
@@ -918,17 +919,17 @@ static void bmxPngSetPacking(void *png)
     }
 }
 
-static void bmxPngSetGray124To8(void *png)
+void bmxPngSetGray124To8(void *png)
 {
     ((PngStruct *)png)->transforms |= kXformExpand;
 }
 
-static void bmxPngSetGrayToRgb(void *png)
+void bmxPngSetGrayToRgb(void *png)
 {
     ((PngStruct *)png)->transforms |= kXformGrayToRgb;
 }
 
-static void bmxPngSetFiller(void *png, uint32_t filler, int where)
+void bmxPngSetFiller(void *png, uint32_t filler, int where)
 {
     PngStruct *p = png;
     p->transforms |= kXformFiller;
@@ -936,12 +937,12 @@ static void bmxPngSetFiller(void *png, uint32_t filler, int where)
     p->fillerAfter = where == 1;
 }
 
-static uint32_t bmxPngGetValid(void *png, void *info, uint32_t flag)
+uint32_t bmxPngGetValid(void *png, void *info, uint32_t flag)
 {
     return (png != NULL && info != NULL) ? ((const PngInfo *)info)->valid & flag : 0;
 }
 
-static uint32_t bmxPngGetPlte(void *png, void *info, uint8_t **palette, int *numPalette)
+uint32_t bmxPngGetPlte(void *png, void *info, uint8_t **palette, int *numPalette)
 {
     PngInfo *h = info;
     if (png == NULL || h == NULL || (h->valid & kInfoPlte) == 0 || palette == NULL) {
@@ -952,7 +953,7 @@ static uint32_t bmxPngGetPlte(void *png, void *info, uint8_t **palette, int *num
     return kInfoPlte;
 }
 
-static uint32_t bmxPngGetTrns(void *png, void *info, uint8_t **trans, int *numTrans, void **transValues)
+uint32_t bmxPngGetTrns(void *png, void *info, uint8_t **trans, int *numTrans, void **transValues)
 {
     PngInfo *h = info;
     if (png == NULL || h == NULL || (h->valid & kInfoTrns) == 0) {
@@ -1001,7 +1002,7 @@ static void readImageData(PngStruct *p)
     }
 }
 
-static void bmxPngReadImage(void *png, uint8_t **rows)
+void bmxPngReadImage(void *png, uint8_t **rows)
 {
     PngStruct *p = png;
     const PngInfo *h = &p->header;
@@ -1067,7 +1068,7 @@ static void bmxPngReadImage(void *png, uint8_t **rows)
 }
 
 /* The chunks after the image data, up to IEND. */
-static void bmxPngReadEnd(void *png, void *info)
+void bmxPngReadEnd(void *png, void *info)
 {
     (void)info;
     PngStruct *p = png;
@@ -1087,7 +1088,7 @@ static void bmxPngReadEnd(void *png, void *info)
     }
 }
 
-static void bmxPngDestroyReadStruct(void **png, void **info, void **endInfo)
+void bmxPngDestroyReadStruct(void **png, void **info, void **endInfo)
 {
     PngStruct *p = png != NULL ? *png : NULL;
     if (p == NULL) {

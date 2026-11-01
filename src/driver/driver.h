@@ -3,10 +3,10 @@
  * data/functions-rw.csv) behind RW's device interface. See docs/SDL3-DRIVER.md.
  *
  * Native exe only (never the hook DLL). The original's device table (0x566fe4), standards table (0x56701c)
- * and core extension table (0x69bee0) stay as they are in the copied data; the loader writes a jump from
- * each original driver entry point we implement to our function (bmxDriverJumps). Every pointer the driver
- * hands to RenderWare is therefore the original's address, and an entry point we do not implement yet stays
- * an int3 that the trap handler reports by name.
+ * and core extension table (0x69bee0) stay as they are in the copied data; each original driver entry point
+ * we implement is served by our function (bmxDriverJumps, read by tools/gen_origmap.py), so the loader
+ * relocates those tables' pointers to them. An entry point we do not implement becomes a trap stub that
+ * reports its address.
  */
 #ifndef BMX_DRIVER_DRIVER_H
 #define BMX_DRIVER_DRIVER_H
@@ -19,7 +19,8 @@
 #include "rw/rwcore.h"
 #include "rw/rwtexture.h"
 
-/* (original address, our function) pairs; written as jumps by the native loader after the hook table. */
+/* (original address, our function) pairs: these override a port of the same address (tools/gen_origmap.py).
+ */
 extern const BmxHook bmxDriverJumps[];
 extern const uint32_t bmxDriverJumpCount;
 

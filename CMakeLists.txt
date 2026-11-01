@@ -8,7 +8,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(BMX_HOOK "Build against the original NgBMX.exe (i686 hook/oracle phase)" ON)
 
-option(BMX_NATIVE32 "Build bmxnative.exe: our own 32-bit exe that rebuilds the original address space" OFF)
+option(BMX_NATIVE32 "Build bmxnative.exe: our own 32-bit exe on a relocated copy of the original's data" OFF)
 set(BMX_WORK_DIR "${CMAKE_SOURCE_DIR}/work" CACHE PATH "Directory with labels.raw (names in trap reports)")
 
 set(BMX_WARNINGS -Wall -Wextra -Werror -Wno-unused-parameter -Wno-microsoft-anon-tag)
@@ -36,22 +36,27 @@ endif()
 
 if(BMX_NATIVE32)
   # The hook toolchain is freestanding; here only the game objects are (the loader is hosted C).
+  # -Wno-sign-compare: enum constants are unsigned under the mingw target's ABI, int under msvc's.
+  # -Wno-cast-function-type-mismatch: natively (BMX_IMAGE) an ORIG_FN name is a function, not a pointer constant,
+  # and the callback casts the original's code made between function types become casts of functions.
   target_compile_options(bmx_game PRIVATE -ffreestanding -fno-builtin -fno-stack-protector
-    -Wno-sign-compare) # enum constants are unsigned under the mingw target's ABI, int under msvc's
+    -Wno-sign-compare -Wno-cast-function-type-mismatch)
   enable_language(ASM)
   file(GLOB BMX_NATIVE_SOURCES CONFIGURE_DEPENDS src/native/*.c src/platform/*.c)
-  # The smooth resampling mixer reads the game's mixer state at its original addresses (like src/driver).
+  # Native files that read the game's globals (ORIG_VAR) are compiled like the game objects: BMX_HOOK for the
+  # target conventions, plus the target-wide BMX_IMAGE (the relocated data copy).
+  # The smooth resampling mixer reads the game's mixer state (like src/driver).
   set_source_files_properties(src/platform/smoothmix.c PROPERTIES COMPILE_DEFINITIONS BMX_HOOK=1)
   # The music override (docs/MUSIC.md "Override"): musicgame.c reads the game's music stream like smoothmix.c;
   # the edit list is compiled in from data/music-edits.json; dr_flac (third_party) is built without warnings.
   set_source_files_properties(src/platform/musicgame.c PROPERTIES COMPILE_DEFINITIONS BMX_HOOK=1)
-  # BMX_SIM_HASH (docs/WIDESCREEN.md W10.5) reads the rider and camera state at their original addresses too.
+  # BMX_SIM_HASH (docs/WIDESCREEN.md W10.5) reads the rider and camera state too.
   set_source_files_properties(src/native/simhash.c PROPERTIES COMPILE_DEFINITIONS BMX_HOOK=1)
   # BMX_HF_GUARD (docs/HIGHFPS.md HF0) hashes the game's render and simulation state the same way.
   set_source_files_properties(src/native/hfguard.c PROPERTIES COMPILE_DEFINITIONS BMX_HOOK=1)
   # The interpolated draws (docs/HIGHFPS.md HF1-HF3) capture and rebuild the game's poses the same way.
   set_source_files_properties(src/native/hfinterp.c PROPERTIES COMPILE_DEFINITIONS BMX_HOOK=1)
-  # [video] full_draw_distance (drawdist.c) sets the game's far clip quality at its original address.
+  # [video] full_draw_distance (drawdist.c) sets the game's far clip quality.
   set_source_files_properties(src/native/drawdist.c PROPERTIES COMPILE_DEFINITIONS BMX_HOOK=1)
   set_source_files_properties(third_party/dr_flac/dr_flac.c PROPERTIES COMPILE_OPTIONS -w)
   add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/music_edits.c
@@ -59,7 +64,20 @@ if(BMX_NATIVE32)
             ${CMAKE_SOURCE_DIR}/data/music-edits.json ${CMAKE_BINARY_DIR}/music_edits.c
     DEPENDS ${CMAKE_SOURCE_DIR}/data/music-edits.json ${CMAKE_SOURCE_DIR}/tools/gen_music_edits.py)
   set(BMX_MUSIC_SOURCES src/platform/music.c third_party/dr_flac/dr_flac.c ${CMAKE_BINARY_DIR}/music_edits.c)
-  # range.S must be the first object on the link line: its block has to start the image.
+  # BMX_IMAGE (src/compat/orig.h, docs/NATIVE.md "Relocated data image"): the original's data is a relocated copy,
+  # its code is gone. tools/gen_origmap.py maps every original code address to the function serving it, from the
+  # ports, the C runtime layer, the driver and the PNG reader (origmap.h for ORIG_FN, origmap.c for the loader).
+  file(GLOB_RECURSE BMX_ORIGMAP_INPUTS CONFIGURE_DEPENDS src/*.c src/*.h)
+  add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/gen/origmap.h ${CMAKE_BINARY_DIR}/gen/origmap.c
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/gen
+    COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tools/gen_origmap.py ${CMAKE_BINARY_DIR}/gen ${CMAKE_SOURCE_DIR}/src
+    DEPENDS ${BMX_ORIGMAP_INPUTS} ${CMAKE_SOURCE_DIR}/tools/gen_origmap.py ${CMAKE_SOURCE_DIR}/tools/gen_hooks.py)
+  add_custom_target(bmx_origmap DEPENDS ${CMAKE_BINARY_DIR}/gen/origmap.h ${CMAKE_BINARY_DIR}/gen/origmap.c)
+  target_compile_definitions(bmx_game PUBLIC BMX_IMAGE=1)
+  target_include_directories(bmx_game PUBLIC ${CMAKE_BINARY_DIR}/gen)
+  add_dependencies(bmx_game bmx_origmap)
+  # bmxplatformtest keeps the fixed-address mode for winchan.c (the real mixer against the smooth one): range.S
+  # must be the first object on its link line, its block has to start the image.
   add_library(bmx_range OBJECT src/native/range.S)
   # The driver would put the C runtime start files (crt2.o, crtbegin.o) before it: pass them ourselves, after.
   foreach(crt crt2.o crtbegin.o)
@@ -74,11 +92,13 @@ if(BMX_NATIVE32)
   set(BMX_SDL3_DIR "${BMX_SDL3_GUESS_LAST}" CACHE PATH "SDL3 i686-w64-mingw32 prefix (bin/SDL3.dll, lib/cmake/SDL3)")
   find_package(SDL3 REQUIRED CONFIG PATHS "${BMX_SDL3_DIR}" NO_DEFAULT_PATH)
   # The SDL3 render driver (src/driver): native exe only, the hook DLL keeps running the original D3D7 driver.
-  # Compiled like the game objects (BMX_HOOK: RW globals at their original addresses) but hosted.
+  # Compiled like the game objects (BMX_HOOK, BMX_IMAGE: RW globals in the relocated data copy) but hosted.
   file(GLOB BMX_DRIVER_SOURCES CONFIGURE_DEPENDS src/driver/*.c)
   add_library(bmx_driver OBJECT ${BMX_DRIVER_SOURCES})
   target_include_directories(bmx_driver PRIVATE src)
-  target_compile_definitions(bmx_driver PRIVATE BMX_HOOK=1)
+  target_compile_definitions(bmx_driver PRIVATE BMX_HOOK=1 BMX_IMAGE=1)
+  target_include_directories(bmx_driver PRIVATE ${CMAKE_BINARY_DIR}/gen)
+  add_dependencies(bmx_driver bmx_origmap)
   target_compile_options(bmx_driver PRIVATE ${BMX_WARNINGS} -Wno-sign-compare)
   target_link_libraries(bmx_driver PRIVATE SDL3::SDL3)
   # Our PNG reader in place of libpng 1.0.5 (src/png): native exe only, the hook DLL keeps the original.
@@ -86,21 +106,21 @@ if(BMX_NATIVE32)
   file(GLOB BMX_PNG_SOURCES CONFIGURE_DEPENDS src/png/*.c)
   add_library(bmx_png OBJECT ${BMX_PNG_SOURCES})
   target_include_directories(bmx_png PRIVATE src)
-  target_compile_definitions(bmx_png PRIVATE BMX_HOOK=1)
+  target_compile_definitions(bmx_png PRIVATE BMX_HOOK=1 BMX_IMAGE=1)
+  target_include_directories(bmx_png PRIVATE ${CMAKE_BINARY_DIR}/gen)
+  add_dependencies(bmx_png bmx_origmap)
   target_compile_options(bmx_png PRIVATE ${BMX_WARNINGS} -ffreestanding -fno-builtin -fno-stack-protector)
-  add_executable(bmxnative $<TARGET_OBJECTS:bmx_range> ${BMX_CRT_STARTFILES} $<TARGET_OBJECTS:bmx_game>
-    $<TARGET_OBJECTS:bmx_driver> $<TARGET_OBJECTS:bmx_png> ${BMX_NATIVE_SOURCES} src/native/crtasm.S ${CMAKE_BINARY_DIR}/hooks_table.c
+  add_executable(bmxnative $<TARGET_OBJECTS:bmx_game> $<TARGET_OBJECTS:bmx_driver> $<TARGET_OBJECTS:bmx_png>
+    ${BMX_NATIVE_SOURCES} src/native/crtasm.S ${CMAKE_BINARY_DIR}/gen/origmap.c
     third_party/dr_flac/dr_flac.c ${CMAKE_BINARY_DIR}/music_edits.c)
-  target_link_options(bmxnative PRIVATE -nostartfiles)
-  target_include_directories(bmxnative PRIVATE src)
+  target_include_directories(bmxnative PRIVATE src ${CMAKE_BINARY_DIR}/gen)
   target_include_directories(bmxnative SYSTEM PRIVATE third_party/dr_flac)
-  target_compile_definitions(bmxnative PRIVATE _WIN32_WINNT=0x0A00 BMX_SOURCE_DIR="${CMAKE_SOURCE_DIR}" BMX_WORK_DIR="${BMX_WORK_DIR}")
+  target_compile_definitions(bmxnative PRIVATE _WIN32_WINNT=0x0A00 BMX_IMAGE=1 BMX_SOURCE_DIR="${CMAKE_SOURCE_DIR}" BMX_WORK_DIR="${BMX_WORK_DIR}")
   target_compile_options(bmxnative PRIVATE ${BMX_WARNINGS})
-  # Fixed base, no ASLR. Headers sit at 0x3f0000 and the first section (.orig, src/native/range.c) at
-  # 0x400000, so the exe itself owns the range the rebuilt original image needs. Everything else follows
-  # above 0x6b3000.
-  target_link_options(bmxnative PRIVATE -Wl,--image-base=0x3f0000 -Wl,--section-alignment=0x10000
-    -Wl,--disable-dynamicbase -Wl,--disable-high-entropy-va)
+  # Fixed base, no ASLR (runs stay alike), well away from the original's 0x400000..0x6b3000: nothing of ours may
+  # sit at an original address, where a leftover raw address would silently reach it.
+  target_link_options(bmxnative PRIVATE -Wl,--image-base=0x20000000 -Wl,--disable-dynamicbase
+    -Wl,--disable-high-entropy-va)
   target_link_libraries(bmxnative PRIVATE bcrypt SDL3::SDL3)
   # Checks of the platform stand-ins against Windows (tests/platform): hosted, no game image.
   add_executable(bmxplatformtest $<TARGET_OBJECTS:bmx_range> ${BMX_CRT_STARTFILES} tests/platform/test_platform.c src/platform/kernel.c src/platform/winmm.c

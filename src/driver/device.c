@@ -175,8 +175,8 @@ intptr_t BMX_WINAPI bmxStandDialogBoxParamA(void *instance, const char *name, vo
 }
 
 /* 0x4dd270: RwRasterRegisterPlugin (in the driver's part of the exe, but plain RW). */
-static int32_t drvRasterRegisterPlugin(int32_t size, int32_t pluginID, RwPluginObjectConstructor constructCB,
-                                       RwPluginObjectDestructor destructCB, RwPluginObjectCopy copyCB)
+int32_t drvRasterRegisterPlugin(int32_t size, int32_t pluginID, RwPluginObjectConstructor constructCB,
+                                RwPluginObjectDestructor destructCB, RwPluginObjectCopy copyCB)
 {
     return _rwPluginRegistryAddPlugin(&rwRasterRegistry, size, pluginID, constructCB, destructCB, copyCB);
 }
@@ -400,13 +400,15 @@ static int systemSetSubSystem(int32_t index)
     return 1;
 }
 
+int drvNullStandard(void *out, void *inOut, int32_t in);
+
 /* rwDEVICESYSTEMSTANDARDS (0x4ede90): the null standard everywhere, then the original's (id, fn) pairs. */
 static void systemStandards(uint32_t *out, int32_t count)
 {
-    const uint32_t *table = (const uint32_t *)(uintptr_t)0x0056701c;
+    const uint32_t *table = (const uint32_t *)BMX_ORIG(0x0056701c);
 
     for (int32_t i = 0; i < count; i++) {
-        out[i] = 0x004ebfc0; /* D3D3NullStandard */
+        out[i] = (uint32_t)(uintptr_t)BMX_FNPTR(void *, 0x004ebfc0, drvNullStandard); /* D3D3NullStandard */
     }
     for (int i = 0; i < 0x1b; i++) {
         const int32_t id = (int32_t)table[i * 2];
@@ -418,7 +420,7 @@ static void systemStandards(uint32_t *out, int32_t count)
 }
 
 /* 0x4ebfc0: the standard of every slot the driver does not fill. */
-static int drvNullStandard(void *out, void *inOut, int32_t in)
+int drvNullStandard(void *out, void *inOut, int32_t in)
 {
     return 0;
 }
@@ -428,13 +430,13 @@ static int drvNullStandard(void *out, void *inOut, int32_t in)
  * primitive. In the original D3D7 driver all four are `mov eax, 1; ret` and nothing replaces them, so Im2D
  * draws nothing in the original game either (zrwprimDrawPolys calls the primitive one).
  */
-static int drvIm2DNothing(void)
+int drvIm2DNothing(void)
 {
     return 1;
 }
 
 /* 0x4ee010: RwDevice.fpSystem. Requests the original does not handle return 0. */
-static int drvSystem(int32_t request, void *out, void *inOut, int32_t in)
+int drvSystem(int32_t request, void *out, void *inOut, int32_t in)
 {
     DRV_TRACE("drvSystem", (uint32_t)request, (uint32_t)(uintptr_t)out, (uint32_t)in);
     switch (request) {
@@ -460,7 +462,7 @@ static int drvSystem(int32_t request, void *out, void *inOut, int32_t in)
     case 8: /* switch between exclusive and windowed (0x4ecab0): needs a started device */
         return drvState.started;
     case rwDEVICESYSTEMPIPELINE: /* 0x4ee150: the pipeline's render stage */
-        ((uint32_t *)inOut)[1] = 0x004f97c0;
+        ((uint32_t *)inOut)[1] = (uint32_t)(uintptr_t)BMX_FNPTR(void *, 0x004f97c0, rwD3DIm3DTransform);
         return 1;
     case rwDEVICESYSTEMGETMODE:
         *(int32_t *)out = drvState.currentMode;
@@ -492,7 +494,7 @@ static int drvSystem(int32_t request, void *out, void *inOut, int32_t in)
 /* ---- core extension (0x69bee0) ------------------------------------------------------------------------ */
 
 /* Entry 0 (0x4eac90): attach. */
-static int drvCoreExtAttach(void)
+int drvCoreExtAttach(void)
 {
     return RwEngineRegisterPlugin(0, kDrvCoreExtId, RW_CTOR(0x004eaaa0), RW_DTOR(0x004eabd0)) >= 0;
 }

@@ -4,7 +4,71 @@ Goal: an exe of our own that runs the ported game code without the original's co
 as the first step of the platform flip. 64-bit cleanliness (Mac, Android, Linux x64) comes after, as a
 separate step.
 
-## Idea: recreate the original's address space, without its code
+## Relocated data image (since X1a, 2026-11-01)
+
+The layout described under "Idea" below (the original's image rebuilt at 0x400000, its code range full of jumps)
+was the native exe's until docs/PORTING.md slice X1a. Since then nothing of the original is mapped at its
+addresses and none of its code is loaded:
+
+- **Compile mode `BMX_IMAGE`** (src/compat/orig.h) for everything in bmxnative.exe (game objects, src/driver,
+  src/png, src/native, src/platform). `BMX_HOOK` stays defined for the game objects for what it says about the
+  target (i686 MSVC-style conventions, x87 asm, the assembler names of stdcall functions, the compat/crt.h shims);
+  BMX_IMAGE only replaces the address machinery:
+  - `ORIG_VAR(addr, type, name)` reads `*(type *)BMX_ORIG(addr)`, `BMX_ORIG(addr) = addr + gBmxImageDelta`: the
+    original's data is a copy at an address of the loader's choosing.
+  - `ORIG_FN*(addr, ...)` declares a function whose assembler name is the generated `BMX_ORIGFN_<addr>`: the
+    ported function serving that address, whatever its C name (tools/gen_origmap.py, below).
+  - `BMX_FNPTR(type, addr, fn)` is `fn` (the hook build keeps the address).
+  - `RW_CB(type, addr)` (rw/rwcore.h) is `BMX_ORIG_PTR(addr)`, a lookup at run time (`bmxOrigPtr`, loader.c):
+    RenderWare's code passes values read from tables of original addresses (the attach routines'), so a
+    compile-time name is not possible there. Data addresses give their place in the copy, code addresses the
+    function serving them.
+  - Raw original data addresses in the code (tables, strings, arrays used by address) are written as
+    `BMX_ORIG(0x...)`; raw code addresses used as values (update callbacks registered by address, the high frame
+    rate's node filters, the driver's standards) as `BMX_FNPTR` with the function's name.
+- **tools/gen_origmap.py** (run by CMake like gen_hooks.py) builds the map original code address -> function
+  from every table that used to put a jump at an original address: the `BMX_ADDR` annotations (2925 ports), the
+  C runtime layer's `E()` table (src/native/crt.c, 54), the SDL3 driver's `bmxDriverJumps` (24) and the PNG
+  reader's `bmxPngJumps` (17), in the old loader's order (driver and PNG reader over a port, the CRT only where
+  no port is). Special cases: RpWorldDestroy (0x4ba9c0, a four byte stub falling into the ported
+  rpWorldDestroyBody) is `bmxRpWorldDestroy`; 19 unported addresses that ORIG_FN declarations name but nothing
+  reaches (the tri-strip generator, the palette quantiser and two other D3D7 driver functions, the CRT's float
+  exception hooks that pcprofile.c's crtFpInit would install, EpicFail) get generated stubs that report and stop,
+  as the int3 traps did; the 21 `jmp [import slot]` thunks of the exe that ported code calls (AVIFile, DrawDib,
+  DirectInputCreateEx) get stubs that jump through the same slot in the copy. Output: `origmap.h`
+  (`#define BMX_ORIGFN_0x004a50d2 "_crtMalloc"` per address) and `origmap.c` (the sorted table `bmxOrigMap`, the
+  stubs). The generator fails on an `ORIG_FN` address nothing serves, on an address not written `0x%08x`, and on a
+  `BMX_FNPTR` whose function is not the one serving its address (incremental-link thunk addresses excepted: only
+  the exe knows their targets).
+- **The loader** (src/native/loader.c) checks the exe's hash, allocates the data range (0x54d000..0x6a2000: .rdata,
+  .data with its zero tail, .idata, .data1, _rwdseg, .rsrc; 1.4 MB) anywhere, copies the sections, sets
+  `gBmxImageDelta`, fills the import slots in the copy, finds the exe's own import thunks (141), points the
+  generated thunk stubs at their slots, then applies the exe's base relocations (.reloc, type HIGHLOW) to every
+  location in the copy: of the 1284, 543 point into the data (moved by the delta) and 741 at code: 478 at a
+  served address, 17 through an incremental-link thunk (`E9 rel32` at 0x401005..0x402617, followed to its
+  target), 2 at dinput.lib's object tables in .text (0x4afc60..0x4b0f20, which only BMX_INPUT_CHECK's real
+  DirectInput reads: they point into a copy of those bytes) and 244 at addresses nothing serves (mostly switch
+  tables inside unported CRT and D3D7 driver code, and the D3D7 driver's own entry points), which get trap stubs
+  that name the address if ever called (`BMX_RELOC_LOG=1` lists them). The log line:
+  `relocations: 1284 in the data (543 data, 478 code, 17 via thunks, 0 imports, 2 input tables, 244 trap stubs
+  for 237 addresses), 25388 in the code (ignored)`.
+- **No code range**: no int3 fill, no hook / driver / PNG / CRT jumps at original addresses, no `.orig` section
+  (range.S is now only linked into bmxplatformtest, whose winchan.c keeps the fixed-address mode). The exe is
+  linked at 0x20000000, away from the original's range. The jumps over our own functions' entries (smooth mixer,
+  wide HUD, draw distance) stay. The trap handler reports faults; an address in 0x400000..0x6b3000 there is an
+  original one that was not converted.
+- **Retired**: `BMX_PNG_CHECK` (src/native/pngcheck.c ran the original libpng from the code range; its result, 112
+  files identical, stands; tools/png_cases.py still makes the synthetic set) and `BMX_TRAP_SKIP` (no int3 traps).
+- **Still read from NgBMX.exe**: the data itself (X1b moves it into the source, docs/PORTING.md).
+
+Verification (X1a): the user's recording (5594 ticks, DualSense, several levels) and the scripted ride (1014
+ticks) replayed with tools/xcheck.py give per-tick simulation hashes identical to the fixed-address build; the hook
+build's code is unchanged (bmxtest.dll identical, dinput.dll identical apart from data addresses shifted by the
+embedded source path).
+
+## Idea (until X1a): recreate the original's address space, without its code
+
+History from here on: the steps that got the native exe running, in the fixed-address layout. Where they mention jumps, int3 traps or the code range, read "the function serving that address" (above).
 
 All ported code is compiled exactly as in the hook build (`BMX_HOOK`: `ORIG_VAR` and `ORIG_FN` are fixed
 addresses). Our exe (`bmxnative.exe`, linked at a high base such as 0x20000000, no ASLR) then rebuilds
@@ -36,8 +100,8 @@ the original's memory layout at 0x400000..0x6b3000 before running any game code:
   library and Windows headers, unlike the freestanding hook toolchain. Same SSE2 flags as the hook build
   (`-msse2 -mfpmath=sse`), so the game code behaves exactly as tested.
 - SDL3 (`~/tools/sdl3/SDL3-*/i686-w64-mingw32`). Step 1 only uses it for the window and timer.
-- CMake preset `native32` with its own toolchain file; the game objects are built with `BMX_HOOK=1`
-  (fixed addresses), the loader without it.
+- CMake preset `native32` with its own toolchain file; the game objects are built with `BMX_HOOK=1` and
+  `BMX_IMAGE=1` (the relocated data copy, see above), the loader with `BMX_IMAGE=1`.
 
 ## What the original exe still provides at this step (and later replaces)
 
@@ -100,7 +164,7 @@ Environment (dev aids):
 
 | Variable | Effect |
 |---|---|
-| `BMX_TRAP_SKIP=N` | log the first N traps and fake a `return 1` from each instead of stopping (a survey; state is bogus after the first skip) |
+| `BMX_RELOC_LOG=1` | list the relocated pointers in the original's data that point at code nothing serves (they get trap stubs that report the address if called) |
 | `BMX_NO_MOVIES=1` | sets the original's own movie skip switch (0x67288c, which the game never sets): no ACCLAIM/ZAXIS/INTRO.AVI |
 | `BMX_MUTE=1` | the DirectSound and waveOut (movies) stand-ins output silence (they still consume their data at the normal pace, so cursors and MM_WOM_DONE run as in an audible run); since S11 there is no WASAPI session mute (a machine whose last run was an old BMX_MUTE=1 run may need bmxnative.exe unmuted once in the Windows volume mixer) |
 | `BMX_SOUND_CHECK=1` | repeat every DirectSound call of the game on the real dsound.dll and compare (log lines `soundcheck:`, last line `soundcheck: RESULT clean\|DIFFERENCES`); the real buffers get no data, so nothing is heard twice |
@@ -109,7 +173,6 @@ Environment (dev aids):
 | `BMX_KEYS=<script>` | scripted keyboard, see "Scripted input" below: e.g. `f300:enter,+150:enter,+100:up*400,+20:up+e*30`; `t<ms>:` events count milliseconds since the start instead of frames (movies show no frames): `t4000:up` aborts the first startup movie |
 | `BMX_MOVIE_SHOT=<file.bmp>`, `BMX_MOVIE_SHOT_FRAME=N[,M...]` | save the movie picture after the N-th DrawDibDraw of the process (a `%d` in the file name becomes N; GPU readback) and log which movie frame it showed |
 | `BMX_DRIVER_TRACE=1` | log every SDL3 driver entry with its first arguments |
-| `BMX_PNG_CHECK=1` or `=<folder>` | compare our PNG reader with the original libpng on every PNG read (and on every `*.png` in the folder), see "PNG reader" |
 | `BMX_TIME_BASE=<n>` | the value timeGetTime / GetTickCount show at process start (default 0x36ee80; `0xfffff000` runs through the 32-bit wrap) |
 | `BMX_TIMER_LOG=1` | log the sound timer's statistics (calls, interval mean / min / max / sd, late calls, callback time) whenever the timer is stopped and at `BMX_QUIT_FRAMES` |
 | `BMX_FILE_LOG=1` | log every sound file the game opens: reads, bytes, FNV-1a 64 hash of the bytes read |
@@ -126,14 +189,14 @@ the window shows black while the D3D12 swapchain is presented as an independent 
 `PW_RENDERFULLCONTENT` sees the real content.
 
 Sources: `src/native/loader.c` (hash check, image, imports, jumps), `trap.c` (exception handler, names),
-`main.c` (WinMain's job), `keys.c` (BMX_KEYS), `range.S` (see below), the SDL3 render driver in `src/driver/` (docs/SDL3-DRIVER.md)
+`main.c` (WinMain's job), `keys.c` (BMX_KEYS), the generated `origmap.c` (tools/gen_origmap.py), the SDL3 render driver in `src/driver/` (docs/SDL3-DRIVER.md)
 and the platform stand-ins in `src/platform/` (docs/PLATFORM.md, "Platform layer" below).
 The game objects are compiled with `BMX_HOOK=1`, `-ffreestanding -fno-builtin` and the hook build's SSE2 flags; the
 loader is hosted C. The driver (object library `bmx_driver`) is hosted C with `BMX_HOOK=1` (RW globals at their
 original addresses) and is never part of the hook DLL. It is not in build/hook's compile database, so `tools/check.sh`
 leaves it out of clang-tidy; tidy it with `clang-tidy -p build/native32 src/driver/*.c` (clang-tidy 21). The same holds for
-the PNG reader in `src/png/` (object library `bmx_png`, freestanding, see "PNG reader instead of libpng") and
-`src/native/pngcheck.c`: `clang-tidy -p build/native32 src/png/*.c src/native/pngcheck.c`. `src/platform/*.c` and `tests/platform/test_platform.c` are
+the PNG reader in `src/png/` (object library `bmx_png`, freestanding, see "PNG reader instead of libpng"):
+`clang-tidy -p build/native32 src/png/*.c`. `src/platform/*.c` and `tests/platform/test_platform.c` are
 left out of the hook tidy list too (`clang-tidy -p build/native32 src/platform/*.c tests/platform/test_platform.c`).
 
 ### Loader additions for the driver step (2026-10-29)
@@ -153,7 +216,7 @@ left out of the hook tidy list too (`clang-tidy -p build/native32 src/platform/*
   (`bmxImportKeepsDll`, although the only slot is a stand-in) and patches the range too; bmxnative's own jumps are written after it, so they win. It still installs its crash
   handler and trace in the native process. Not a problem so far, but worth knowing.
 
-### Design change found while building: the exe owns the range
+### Design change found while building: the exe owns the range (until X1a)
 
 `VirtualAlloc(0x400000, ...)` fails with `ERROR_INVALID_ADDRESS` (487) in a normal exe: before any of our
 code runs, the kernel maps the code page tables (`C_437.NLS` and others) into the lowest free addresses,
@@ -303,7 +366,7 @@ another platform build unchanged.
 **The game's PNGs** are not loose files: 111 PNG images are embedded in the `.ZMD`/`.zmd` model files under
 `assets/` (bike and rider textures), 22 distinct ones, all 8-bit RGBA (colour type 6), not interlaced, no tRNS.
 
-**Verification** (`BMX_PNG_CHECK`, src/native/pngcheck.c): the loader then also keeps the original's libpng/zlib code
+**Verification** (`BMX_PNG_CHECK`, src/native/pngcheck.c, retired in X1a with the code range): the loader then also kept the original's libpng/zlib code
 (0x506e40..0x51ce10, up to the next ported function; zlib code past the last labelled function is reached) instead of int3 and remembers the five entry bytes of each replaced function; RtPNGImageRead's
 entry goes to a checker that runs the ported RtPNGImageRead once with the original libpng and once with ours and
 compares width, height, depth, stride, every pixel byte the reader writes (`width` bytes per row for depths 4/8,

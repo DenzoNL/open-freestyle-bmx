@@ -84,7 +84,9 @@ ORIG_FN(0x00492fe0, int, zrwcamEnd, (void));
 ORIG_FN(0x00493060, void *, zrwcamHandle, (void *camera));
 ORIG_FN(0x00497620, int, zrwtxrFlush, (void));
 
-enum { kShakeNode = 0x00401a4b, kEffectOps = 0x00562098 };
+/* The screen shake's update node (ngifpsxUpdate) as its registration stores it; the effect objects' ops. */
+#define kShakeNode ((uint32_t)(uintptr_t)BMX_FNPTR(void *, 0x00401a4b, ngifpsxUpdate))
+#define kEffectOps ((const ZObjOps *)BMX_ORIG(0x00562098))
 enum {
     kSim,
     kRng,
@@ -286,7 +288,7 @@ static void hashAll(Hashes *out)
                     hashFrames(out->h[kFrames],
                                model->collisionClump ? RpClumpGetFrame(model->collisionClump) : NULL, part);
             }
-        } else if (object->ops == (const ZObjOps *)(uintptr_t)kEffectOps) {
+        } else if (object->ops == kEffectOps) {
             const ZList *items = (*(ZrwEffectHost *const *)&object->pad30[0])->items;
 
             gEmitters = (uint32_t)items->count > gEmitters ? (uint32_t)items->count : gEmitters;

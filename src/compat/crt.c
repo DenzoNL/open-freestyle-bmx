@@ -6,9 +6,14 @@ int _fltused = 0;
 
 /*
  * Stack probe for frames over 4 KB (MSVC convention: eax = bytes, the routine moves esp). Forwards to the
- * exe's own probe (0x004a4d50) by returning into it.
+ * exe's own probe (0x004a4d50) by returning into it; natively (BMX_IMAGE) to the function serving that
+ * address.
  */
+#if defined(BMX_IMAGE)
+__asm__(".text\n.globl __chkstk\n__chkstk:\n\tjmp " BMX_ORIGFN_0x004a4d50 "\n");
+#else
 __asm__(".text\n.globl __chkstk\n__chkstk:\n\tpushl $0x004a4d50\n\tretl\n");
+#endif
 
 /* rep movsb / rep stosb: same results as byte loops, but far cheaper under the emulator. */
 void *memcpy(void *dst, const void *src, size_t n)
@@ -124,11 +129,19 @@ char *strchr(const char *s, int c)
  * shifts). The exe contains the MSVC6 versions; forward to them so the calling convention (arguments on
  * the stack, callee pops) matches exactly.
  */
+#if defined(BMX_IMAGE)
+#define BMX_FORWARD(name, addr)                                                                              \
+    __attribute__((naked)) void name(void)                                                                   \
+    {                                                                                                        \
+        __asm__ volatile("jmp " BMX_ORIGFN_##addr);                                                          \
+    }
+#else
 #define BMX_FORWARD(name, addr)                                                                              \
     __attribute__((naked)) void name(void)                                                                   \
     {                                                                                                        \
         __asm__ volatile("movl $" #addr ", %eax\n\tjmp *%eax");                                              \
     }
+#endif
 BMX_FORWARD(_allmul, 0x004ab3b0)
 BMX_FORWARD(_aulldiv, 0x004ad3f0)
 BMX_FORWARD(_aullrem, 0x004ad460)

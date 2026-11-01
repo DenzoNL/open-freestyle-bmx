@@ -1,8 +1,10 @@
 /*
- * C runtime layer of bmxnative.exe. The original NgBMX.exe links MSVC6's C runtime statically, and its
- * code range is int3 here, so every CRT entry the game or RenderWare reaches gets a jump to an
- * implementation in this file (or in crtasm.S for the compiler helpers with special calling conventions).
- * The table below lists each original address and its replacement; bmxCrtInstall writes the jumps.
+ * C runtime layer of bmxnative.exe. The original NgBMX.exe links MSVC6's C runtime statically, and none of
+ * its code is loaded here, so every CRT entry the game or RenderWare reaches has an implementation in this
+ * file (or in crtasm.S for the compiler helpers with special calling conventions). The table below lists each
+ * original address and its replacement: tools/gen_origmap.py reads it, so ORIG_FN declarations of those
+ * addresses call these functions and the CRT pointers in the original's data (RenderWare's string and file
+ * tables) are relocated to them. The functions are global for that reason.
  *
  * Where the game can observe a difference from the host's C library the MSVC6 behaviour is reproduced:
  * string compares return -1/0/1, qsort is MSVC's algorithm (not stable, so the order of equal elements
@@ -28,18 +30,18 @@
 /* Memory                                                                                            */
 /* ------------------------------------------------------------------------------------------------ */
 
-static void *crtMalloc(size_t size)
+void *crtMalloc(size_t size)
 {
     /* MSVC6 malloc(0) returns a valid block. */
     return malloc(size ? size : 1);
 }
 
-static void crtFree(void *p)
+void crtFree(void *p)
 {
     free(p);
 }
 
-static void *crtRealloc(void *p, size_t size)
+void *crtRealloc(void *p, size_t size)
 {
     if (!p) {
         return crtMalloc(size);
@@ -60,39 +62,39 @@ static int sign3(int d)
     return (d > 0) - (d < 0);
 }
 
-static size_t crtStrlen(const char *s)
+size_t crtStrlen(const char *s)
 {
     return strlen(s);
 }
 
-static char *crtStrcpy(char *dst, const char *src)
+char *crtStrcpy(char *dst, const char *src)
 {
     return strcpy(dst, src);
 }
 
-static char *crtStrcat(char *dst, const char *src)
+char *crtStrcat(char *dst, const char *src)
 {
     return strcat(dst, src);
 }
 
-static char *crtStrncpy(char *dst, const char *src, size_t n)
+char *crtStrncpy(char *dst, const char *src, size_t n)
 {
     return strncpy(dst, src, n); /* pads with NULs like MSVC */
 }
 
-static char *crtStrncat(char *dst, const char *src, size_t n)
+char *crtStrncat(char *dst, const char *src, size_t n)
 {
     return strncat(dst, src, n);
 }
 
-static int crtStrcmp(const char *a, const char *b)
+int crtStrcmp(const char *a, const char *b)
 {
     for (; *a && *a == *b; a++, b++) {
     }
     return sign3((unsigned char)*a - (unsigned char)*b);
 }
 
-static int crtStrncmp(const char *a, const char *b, size_t n)
+int crtStrncmp(const char *a, const char *b, size_t n)
 {
     for (; n; n--, a++, b++) {
         if (*a != *b || !*a) {
@@ -108,7 +110,7 @@ static int lowerAscii(int c)
 }
 
 /* _strcmpi / _stricmp (0x51d390): compares lower-cased bytes, result -1/0/1. */
-static int crtStrcmpi(const char *a, const char *b)
+int crtStrcmpi(const char *a, const char *b)
 {
     for (;; a++, b++) {
         const int x = lowerAscii((unsigned char)*a);
@@ -123,7 +125,7 @@ static int crtStrcmpi(const char *a, const char *b)
     }
 }
 
-static char *crtStrupr(char *s)
+char *crtStrupr(char *s)
 {
     for (char *p = s; *p; p++) {
         if (*p >= 'a' && *p <= 'z') {
@@ -133,29 +135,29 @@ static char *crtStrupr(char *s)
     return s;
 }
 
-static char *crtStrchr(const char *s, int c)
+char *crtStrchr(const char *s, int c)
 {
     return strchr(s, c);
 }
 
-static char *crtStrstr(const char *s, const char *sub)
+char *crtStrstr(const char *s, const char *sub)
 {
     return strstr(s, sub);
 }
 
-static char *crtStrtok(char *s, const char *delim)
+char *crtStrtok(char *s, const char *delim)
 {
     return strtok(s, delim);
 }
 
-static int crtToupper(int c)
+int crtToupper(int c)
 {
     return (c >= 'a' && c <= 'z') ? c - 0x20 : c;
 }
 
 /* RenderWare's own string helpers (0x4ee1d0..0x4ee2d0, not CRT but the engine's string table points there).
  */
-static int rwStricmp(const char *a, const char *b)
+int rwStricmp(const char *a, const char *b)
 {
     if (!a || !b) {
         return 0;
@@ -173,7 +175,7 @@ static int rwStricmp(const char *a, const char *b)
     }
 }
 
-static char *rwStrupr(char *s)
+char *rwStrupr(char *s)
 {
     if (s) {
         crtStrupr(s);
@@ -181,7 +183,7 @@ static char *rwStrupr(char *s)
     return s;
 }
 
-static char *rwStrlwr(char *s)
+char *rwStrlwr(char *s)
 {
     if (s) {
         for (char *p = s; *p; p++) {
@@ -191,7 +193,7 @@ static char *rwStrlwr(char *s)
     return s;
 }
 
-static char *rwStrrchr(const char *s, int c)
+char *rwStrrchr(const char *s, int c)
 {
     const char *last = NULL;
 
@@ -205,7 +207,7 @@ static char *rwStrrchr(const char *s, int c)
     }
 }
 
-static int crtAtoi(const char *s)
+int crtAtoi(const char *s)
 {
     uint32_t v = 0;
     int neg = 0;
@@ -223,7 +225,7 @@ static int crtAtoi(const char *s)
     return (int)(neg ? 0u - v : v);
 }
 
-static unsigned long crtStrtoul(const char *s, char **end, int base)
+unsigned long crtStrtoul(const char *s, char **end, int base)
 {
     return strtoul(s, end, base);
 }
@@ -260,7 +262,7 @@ static void shortSort(char *lo, char *hi, size_t width, CmpFn cmp)
     }
 }
 
-static void crtQsort(void *base, size_t num, size_t width, CmpFn cmp)
+void crtQsort(void *base, size_t num, size_t width, CmpFn cmp)
 {
     char *lostk[30], *histk[30];
     int stk = 0;
@@ -781,12 +783,12 @@ static int formatTo(char *dst, size_t cap, const char *fmt, va_list ap)
     return (int)o.len;
 }
 
-static int crtVsprintf(char *dst, const char *fmt, va_list ap)
+int crtVsprintf(char *dst, const char *fmt, va_list ap)
 {
     return formatTo(dst, (size_t)0x7fffffff, fmt, ap);
 }
 
-static int crtSprintf(char *dst, const char *fmt, ...)
+int crtSprintf(char *dst, const char *fmt, ...)
 {
     va_list ap;
     int n;
@@ -816,7 +818,7 @@ static int vfprintfMsvc(FILE *f, const char *fmt, va_list ap)
     return n;
 }
 
-static int crtPrintf(const char *fmt, ...)
+int crtPrintf(const char *fmt, ...)
 {
     va_list ap;
     int n;
@@ -827,7 +829,7 @@ static int crtPrintf(const char *fmt, ...)
     return n;
 }
 
-static int crtFprintf(FILE *f, const char *fmt, ...)
+int crtFprintf(FILE *f, const char *fmt, ...)
 {
     va_list ap;
     int n;
@@ -838,7 +840,7 @@ static int crtFprintf(FILE *f, const char *fmt, ...)
     return n;
 }
 
-static int crtSscanf(const char *s, const char *fmt, ...)
+int crtSscanf(const char *s, const char *fmt, ...)
 {
     va_list ap;
     int n;
@@ -853,59 +855,59 @@ static int crtSscanf(const char *s, const char *fmt, ...)
 /* stdio (the FILE is the host's: the engine only passes it back)                                    */
 /* ------------------------------------------------------------------------------------------------ */
 
-static FILE *crtFopen(const char *name, const char *mode)
+FILE *crtFopen(const char *name, const char *mode)
 {
     return fopen(bmxPathResolve(name), mode);
 }
 
-static int crtFclose(FILE *f)
+int crtFclose(FILE *f)
 {
     return fclose(f);
 }
 
-static size_t crtFread(void *buf, size_t size, size_t count, FILE *f)
+size_t crtFread(void *buf, size_t size, size_t count, FILE *f)
 {
     return fread(buf, size, count, f);
 }
 
-static size_t crtFwrite(const void *buf, size_t size, size_t count, FILE *f)
+size_t crtFwrite(const void *buf, size_t size, size_t count, FILE *f)
 {
     return fwrite(buf, size, count, f);
 }
 
-static char *crtFgets(char *buf, int n, FILE *f)
+char *crtFgets(char *buf, int n, FILE *f)
 {
     return fgets(buf, n, f);
 }
 
-static int crtFputs(const char *s, FILE *f)
+int crtFputs(const char *s, FILE *f)
 {
     return fputs(s, f) >= 0 ? 0 : -1; /* the original returns 0 or -1 */
 }
 
-static int crtFeof(FILE *f)
+int crtFeof(FILE *f)
 {
     return feof(f);
 }
 
-static int crtFseek(FILE *f, long offset, int whence)
+int crtFseek(FILE *f, long offset, int whence)
 {
     return fseek(f, offset, whence);
 }
 
-static long crtFtell(FILE *f)
+long crtFtell(FILE *f)
 {
     return ftell(f);
 }
 
-static int crtFflush(FILE *f)
+int crtFflush(FILE *f)
 {
     return fflush(f);
 }
 
 /* RenderWare's rwfexist (0x4e8290): opens the file through the engine's own file table and closes it again.
  */
-static int rwFexist(const char *name)
+int rwFexist(const char *name)
 {
     typedef void *(*OpenFn)(const char *, const char *);
     typedef int (*CloseFn)(void *);
@@ -919,17 +921,17 @@ static int rwFexist(const char *name)
     return 1;
 }
 
-static int crtFinite(double v)
+int crtFinite(double v)
 {
     return isfinite(v);
 }
 
-static double crtCeil(double v)
+double crtCeil(double v)
 {
     return ceil(v);
 }
 
-static double crtPow(double base, double exponent)
+double crtPow(double base, double exponent)
 {
     return pow(base, exponent);
 }
@@ -938,14 +940,14 @@ static double crtPow(double base, double exponent)
 /* Process                                                                                           */
 /* ------------------------------------------------------------------------------------------------ */
 
-static void crtAssert(const char *expr, const char *file, unsigned line)
+void crtAssert(const char *expr, const char *file, unsigned line)
 {
     bmxLog("Assertion failed: %s, file %s, line %u\n", expr, file, line);
     fflush(NULL);
     ExitProcess(3);
 }
 
-static void crtExit(int code)
+void crtExit(int code)
 {
     fflush(NULL);
     ExitProcess((UINT)code);
@@ -966,7 +968,7 @@ typedef struct {
 
 #define E(addr, fn, name) {addr, (const void *)(fn), name}
 
-static const CrtEntry kCrt[] = {
+const CrtEntry bmxCrtTable[] = {
     /* compiler helpers (assembly) */
     E(0x004a4a80, bmxCrtFtol, "_ftol"),
     E(0x004a5390, bmxCrtCIsqrt, "_CIsqrt"),
@@ -1029,22 +1031,3 @@ static const CrtEntry kCrt[] = {
     E(0x004ee2d0, rwStrrchr, "rwstrrchr"),
     E(0x004e8290, rwFexist, "rwfexist"),
 };
-
-void bmxCrtInstall(void)
-{
-    int n = 0;
-
-    for (size_t i = 0; i < sizeof kCrt / sizeof kCrt[0]; i++) {
-        uint8_t *p = (uint8_t *)(uintptr_t)kCrt[i].orig;
-        const int32_t rel = (int32_t)((uintptr_t)kCrt[i].impl - (kCrt[i].orig + 5));
-
-        if (p[0] == 0xE9) {
-            bmxLog("crt: %s at %#x is already hooked, left alone\n", kCrt[i].name, (unsigned)kCrt[i].orig);
-            continue;
-        }
-        p[0] = 0xE9;
-        memcpy(p + 1, &rel, 4);
-        n++;
-    }
-    bmxLog("crt: %d jumps\n", n);
-}

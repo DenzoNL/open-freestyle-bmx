@@ -180,7 +180,7 @@ typedef struct RwD3DIndexList {
 #define rwD3DCamBase     ORIG_VAR(0x0069695c, RwD3DCamVertex *, rwD3DCamBase)
 #define rwD3DIm3DDepth   ORIG_VAR(0x00696964, uint32_t, rwD3DIm3DDepth)
 #define rwD3DIm3DLevel   ORIG_VAR(0x00696968, RwD3DIm3DLevel *, rwD3DIm3DLevel)
-#define rwD3DIm3DLevels  ((RwD3DIm3DLevel *)(uintptr_t)0x0069696c)
+#define rwD3DIm3DLevels  ((RwD3DIm3DLevel *)BMX_ORIG(0x0069696c))
 #define rwD3DTriIndices  ORIG_VAR(0x00696a64, RwD3DIndexList, rwD3DTriIndices)
 #define rwD3DLineIndices ORIG_VAR(0x00696a70, RwD3DIndexList, rwD3DLineIndices)
 #define rwD3DTLBuffer    ORIG_VAR(0x00696a7c, RwD3DTLVertex *, rwD3DTLBuffer)
@@ -203,7 +203,7 @@ typedef struct RwD3DIndexList {
 #define rwD3DFogEnd   ORIG_VAR(0x00697358, float, rwD3DFogEnd)
 #define rwD3DFogScale ORIG_VAR(0x0069735c, float, rwD3DFogScale)
 /* Specular colour (fog factor in alpha) per fog index 0..255. */
-#define rwD3DFogTable ((const uint32_t *)(uintptr_t)0x00696b00)
+#define rwD3DFogTable ((const uint32_t *)BMX_ORIG(0x00696b00))
 /* The 1.0f the transform uses for 1/w and the parallel clip limit. */
 #define rwD3DOne ORIG_VAR(0x0069c5c0, float, rwD3DOne)
 
@@ -276,10 +276,10 @@ _Static_assert(sizeof(RwD3DStateCache) == 0x160, "RwD3DStateCache layout");
 /* 1 when the device can alpha test (greater or not equal). */
 #define rwD3DAlphaTestCaps ORIG_VAR(0x00676cc4, int32_t, rwD3DAlphaTestCaps)
 /* Fog: the specular colour per fog index and the source tables of the fog types. */
-#define rwD3DFogSpecular ((uint32_t *)(uintptr_t)0x00696b00)
-#define rwD3DFogLinear   ((uint8_t *)(uintptr_t)0x00676bc4)
-#define rwD3DFogExp      ((const uint8_t *)(uintptr_t)0x006769a4)
-#define rwD3DFogExp2     ((const uint8_t *)(uintptr_t)0x00676aa4)
+#define rwD3DFogSpecular ((uint32_t *)BMX_ORIG(0x00696b00))
+#define rwD3DFogLinear   ((uint8_t *)BMX_ORIG(0x00676bc4))
+#define rwD3DFogExp      ((const uint8_t *)BMX_ORIG(0x006769a4))
+#define rwD3DFogExp2     ((const uint8_t *)BMX_ORIG(0x00676aa4))
 
 /* The raster plugin data the texture state reads: +4 colour key on, +0xc texture handle, +0x10 this. */
 typedef struct RwD3DRasterInfo {

@@ -322,8 +322,9 @@ BMX_ADDR(0x0045ab50)
 void ngappRegisterTick(void)
 {
     if (gNgTickNode == NULL) {
-        /* The original passes the address of the jump to the (unported) callback at 0x45a4d0. */
-        gNgTickNode = zrwRegisterUpdateFunction(2, (ZrwUpdateFn)(uintptr_t)0x00401708, NULL, 1);
+        /* The original passes the address of the incremental-link jump to ngappDrawDebug (0x45a4d0). */
+        gNgTickNode =
+            zrwRegisterUpdateFunction(2, BMX_FNPTR(ZrwUpdateFn, 0x00401708, ngappDrawDebug), NULL, 1);
     }
 }
 
@@ -904,7 +905,8 @@ dispatch:
             }
         }
         gNgLoadFlag = 0;
-        gNgLoadNode = zrwRegisterUpdateFunction(6, (ZrwUpdateFn)(uintptr_t)0x0045c150, gNgLoadTexture, 0);
+        gNgLoadNode = zrwRegisterUpdateFunction(6, BMX_FNPTR(ZrwUpdateFn, 0x0045c150, ngappDrawLoading),
+                                                gNgLoadTexture, 0);
         zmemNop();
         if (gNgPlayerCount == 0) {
             actionPickDemo();

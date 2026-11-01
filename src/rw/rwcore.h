@@ -19,10 +19,12 @@ typedef ZMatrix RwMatrix;
 typedef void(BMX_CDECL *RwMatrixMultiplyFunc)(RwMatrix *out, const RwMatrix *a, const RwMatrix *b);
 
 /*
- * Address of a callback that is still original code (or code of another slice): the plugin registries and
- * the engine only store it. In the native exe the address holds a jump to our port once there is one.
+ * A callback (or table) by its original address, as RenderWare's own code wrote it: the plugin registries and
+ * the engine only store it. In the hook build it is that address; in the native exe (BMX_IMAGE) the function
+ * serving it, or the address in the relocated data copy for a table. addr may also be a value read from a
+ * table of original addresses (the attach routines'), so this is a lookup at run time (BMX_ORIG_PTR).
  */
-#define RW_CB(type, addr) ((type)(uintptr_t)(addr))
+#define RW_CB(type, addr) ((type)BMX_ORIG_PTR(addr))
 
 /* Intrusive circular list link; a list head is a link that points at itself when empty. */
 typedef struct RwLLLink {

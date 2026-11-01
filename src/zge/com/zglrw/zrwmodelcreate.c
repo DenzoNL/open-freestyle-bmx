@@ -70,7 +70,7 @@ ORIG_FN(0x004b4720, int, RpGeometryGetNumTrianglesWithArg, (void *geometry, int 
 /* TODO(file): 0x49bd10 and 0x49c080 have no asserts; their "ZCOMPRES:" messages suggest a source file of
  * their own between zrwShadow.c and zrwModelCreate.c. */
 #ifdef BMX_HOOK
-#define kHashDummy ((const uint8_t *)(uintptr_t)0x00562c04)
+#define kHashDummy ((const uint8_t *)BMX_ORIG(0x00562c04))
 #else
 static const uint8_t kHashDummy[] = "123456789012345678";
 #endif

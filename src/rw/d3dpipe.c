@@ -23,7 +23,7 @@
 #define rwD3DAtomicDefaultColor ORIG_VAR(0x005668a0, uint32_t, rwD3DAtomicDefaultColor)
 #define rwD3DSectorDefaultColor ORIG_VAR(0x005668b0, uint32_t, rwD3DSectorDefaultColor)
 /* The colour of meshes without a material. */
-#define rwD3DNoMaterialColor ((const RwRGBA *)(uintptr_t)0x0069b600)
+#define rwD3DNoMaterialColor ((const RwRGBA *)BMX_ORIG(0x0069b600))
 
 /* RwRenderState values the render stage sets, and rwTEXTUREADDRESSBORDER. */
 enum {

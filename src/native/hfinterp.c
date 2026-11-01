@@ -44,6 +44,7 @@
 #include "bmx/com/action/camera.h"
 #include "bmx/com/zge/ngif/ngiffx.h"
 #include "bmx/com/zge/ngif/ngifpsx.h"
+#include "bmx/com/zge/ngif/ngifzroller.h"
 #include "compat/orig.h"
 #include "native/hfmath.h"
 #include "native/native.h"
@@ -105,13 +106,13 @@ ORIG_FN(0x00492fe0, int, zrwcamEnd, (void));
 ORIG_FN(0x00493060, void *, zrwcamHandle, (void *camera));
 ORIG_FN(0x00497620, int, zrwtxrFlush, (void));
 
-/* Update list nodes the extra draws treat specially (node->fn, HF0 findings Q2). */
-enum {
-    kShakeNode = 0x00401a4b,  /* ngifpsxUpdate: the screen shake script advances per call */
-    kShadowProbe = 0x0049b520 /* zrollerUpdateShadow: 36 line probes (gZrwColBox, gZrwCol, lightFrame) */
-};
+/* Update list nodes the extra draws treat specially (node->fn, HF0 findings Q2), as their registrations store
+ * them. ngifpsxUpdate: the screen shake script advances per call; zrollerUpdateShadow: 36 line probes
+ * (gZrwColBox, gZrwCol, lightFrame). */
+#define kShakeNode   ((uint32_t)(uintptr_t)BMX_FNPTR(void *, 0x00401a4b, ngifpsxUpdate))
+#define kShadowProbe ((uint32_t)(uintptr_t)BMX_FNPTR(void *, 0x0049b520, zrollerUpdateShadow))
 /* The effect objects' ops (zrwworldCreateObject): their host lists the emitters (HF5). */
-enum { kEffectOps = 0x00562098 };
+#define kEffectOps ((const ZObjOps *)BMX_ORIG(0x00562098))
 /* Remaining life (ms) an expired particle is drawn with in an extra draw (hfParticleLife). */
 enum { kFadeMinMs = 8 };
 
@@ -411,7 +412,7 @@ static void walkParticles(HfCapture *c)
         const ZObj *const object = zmemFreeNodePayload(node);
         const ZrwEffectHost *host;
 
-        if (object->ops != (const ZObjOps *)(uintptr_t)kEffectOps) {
+        if (object->ops != kEffectOps) {
             continue;
         }
         host = *(ZrwEffectHost *const *)&object->pad30[0];

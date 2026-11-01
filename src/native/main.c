@@ -1,41 +1,40 @@
 /*
  * bmxnative: our own exe. main() does the job of the original WinMain (0x48a460, not ported): command
- * line, window, init calls, message/frame loop. The functions it calls live at their original addresses,
- * where the loader put a jump to our port or an int3 trap.
+ * line, window, init calls, message/frame loop. It calls the ports of the functions WinMain called, and keeps
+ * WinMain's globals in the original's data (the loader's relocated copy).
  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "compat/orig.h"
 #include "native/native.h"
 #include "platform/platform.h"
 #include "platform/standins.h"
 
-#define VAR(addr, type) (*(type *)(uintptr_t)(addr))
+/* Globals of the original's window code (all in the exe's .data, now the relocated copy). */
+#define gHwnd       ORIG_VAR(0x00697780, void *, gHwnd)
+#define gHinstance  ORIG_VAR(0x00697784, void *, gHinstance)
+#define gFullscreen ORIG_VAR(0x00697788, int, gFullscreen)
+#define gAppTitle   ORIG_VAR(0x00697794, const char *, gAppTitle)
+#define gWidth      ORIG_VAR(0x00697798, int, gWidth)
+#define gHeight     ORIG_VAR(0x0069779c, int, gHeight)
+#define gResX       ORIG_VAR(0x006977a0, int, gResX)
+#define gResY       ORIG_VAR(0x006977a4, int, gResY)
+#define gResZ       ORIG_VAR(0x006977a8, int, gResZ)
+#define gQuit       ORIG_VAR(0x006977ac, int, gQuit)
+#define gLastTick   ORIG_VAR(0x0067275c, uint32_t, gLastTick)
+#define gRateA      ORIG_VAR(0x0069771c, float, gRateA)
+#define gRateB      ORIG_VAR(0x0054d05c, float, gRateB)
+#define gRateC      ORIG_VAR(0x0054dbb8, float, gRateC)
 
-/* Globals of the original's window code (all in the exe's .data). */
-#define gHwnd       VAR(0x00697780, void *)
-#define gHinstance  VAR(0x00697784, void *)
-#define gFullscreen VAR(0x00697788, int)
-#define gAppTitle   VAR(0x00697794, const char *)
-#define gWidth      VAR(0x00697798, int)
-#define gHeight     VAR(0x0069779c, int)
-#define gResX       VAR(0x006977a0, int)
-#define gResY       VAR(0x006977a4, int)
-#define gResZ       VAR(0x006977a8, int)
-#define gQuit       VAR(0x006977ac, int)
-#define gLastTick   VAR(0x0067275c, uint32_t)
-#define gRateA      VAR(0x0069771c, float)
-#define gRateB      VAR(0x0054d05c, float)
-#define gRateC      VAR(0x0054dbb8, float)
-
-typedef int(__cdecl *IntFn)(void);
-typedef int(__cdecl *IntFnPtr)(void *);
-#define attachPlugins ((IntFnPtr)0x0048b1a0)
-#define initApp       ((IntFnPtr)0x0048b450)
-#define onIdle        ((IntFn)0x0048b570)
-#define drawCall      ((IntFn)0x0048b690)
-#define mainWndProc   ((BmxWndProc)0x0048a800)
+/* The functions WinMain calls (ported: zrwzgl.c). */
+ORIG_FN(0x0048b1a0, int, attachPlugins, (void *window));
+ORIG_FN(0x0048b450, int, initApp, (const char *commandLine));
+ORIG_FN(0x0048b570, int, onIdle, (void));
+ORIG_FN(0x0048b690, int, drawCall, (void));
+ORIG_FN_STDCALL(0x0048a800, intptr_t, mainWndProc,
+                (void *window, uint32_t message, uintptr_t wParam, uintptr_t lParam));
 
 enum { kWmQuit = 0x12 };
 
@@ -107,15 +106,15 @@ static void commandLineText(char *out, size_t size, int argc, char **argv)
 
 static void initGlobals(void)
 {
-    memset((void *)(uintptr_t)0x00697780, 0, 0x34);
-    gAppTitle = (const char *)(uintptr_t)0x0056137c;
+    memset((void *)BMX_ORIG(0x00697780), 0, 0x34);
+    gAppTitle = (const char *)BMX_ORIG(0x0056137c);
     gWidth = 0x280;
     gHeight = 0x1e0;
     gResX = gResY = gResZ = 0;
     gQuit = 0;
     gFullscreen = 0;
-    VAR(0x0069778c, int) = 0;
-    VAR(0x00697790, int) = 0;
+    ORIG_VAR(0x0069778c, int, gWindow0) = 0;
+    ORIG_VAR(0x00697790, int, gWindow1) = 0;
 }
 
 /* The exe's own base address, which is its HINSTANCE (the linker defines the symbol). */
@@ -139,7 +138,7 @@ int main(int argc, char **argv)
     /* Dev aids: BMX_NO_MOVIES=1 sets the original's own movie skip switch (0x67288c, never set by the game);
      * BMX_MUTE=1 is the audio stand-ins' (dsound.c, waveout.c: they output silence). */
     if (getenv("BMX_NO_MOVIES")) {
-        VAR(0x0067288c, int) = 1;
+        ORIG_VAR(0x0067288c, int, gNoMovies) = 1;
     }
     /* BMX_KEYS: scripted keyboard (keys.c); BMX_REPLAY: a recorded session (replay.c). Such a run must not
      * take the focus from what the user is doing: its window is never focused or activated (window.c). */

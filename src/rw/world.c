@@ -7,12 +7,13 @@
  */
 #include "rw/rwworld.h"
 
+#include "rw/rwcamera.h"
 #include "rw/rwclump.h"
 #include "rw/rwcollision.h"
 #include "rw/rwim.h"
 
 /*
- * The camera set-up of the PVS generation (0x4ce6d0, original code of the camera group): EAX = world, EDX =
+ * The camera set-up of the PVS generation (0x4ce6d0, rwPvsCameraCreate in rw/camera.c): EAX = world, EDX =
  * raster, ECX = z raster and the far clip plane on the x87 stack (popped by the callee). It creates the
  * camera and image the generation renders with (rpPVSCamera, rpPVSImage).
  */
@@ -21,7 +22,7 @@ static void rpPVSCameraCreate(RpWorld *world, RwRaster *raster, RwRaster *zRaste
 {
     __asm__ volatile("flds %[far]\n\tcall *%[fn]"
                      : "+a"(world), "+d"(raster), "+c"(zRaster)
-                     : [far] "m"(farClip), [fn] "r"((uintptr_t)0x004ce6d0)
+                     : [far] "m"(farClip), [fn] "r"(BMX_FNPTR(uintptr_t, 0x004ce6d0, rwPvsCameraCreate))
                      : "memory", "cc", "st");
 }
 #else
@@ -636,6 +637,15 @@ __attribute__((regparm(1))) int rpWorldDestroyBody(RpWorld *world)
     engineFree(world);
     return 1;
 }
+
+#ifdef BMX_IMAGE
+/* The stub at 0x4ba9c0 as a function of its own, for the native exe, where no original code runs: ORIG_FN
+ * declarations of RpWorldDestroy call it (tools/gen_origmap.py, SPECIAL). */
+int bmxRpWorldDestroy(RpWorld *world)
+{
+    return rpWorldDestroyBody(world);
+}
+#endif
 
 /* ---- creation ---------------------------------------------------------------------------------------- */
 

@@ -140,7 +140,7 @@ uint32_t *ngifzresGetBikeEntry(uint32_t index)
     if (index > 0x2b) {
         zdebugFail("bike number out of range", kResFile, 0x199, 0);
     }
-    return (uint32_t *)(uintptr_t)(0x0055d8c8 + index * 4);
+    return (uint32_t *)BMX_ORIG(0x0055d8c8 + index * 4);
 }
 
 BMX_ADDR(0x0046bc20)

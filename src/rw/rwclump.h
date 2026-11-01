@@ -121,10 +121,10 @@ int rpMeshCompareMaterials(const RpMesh *const *a, const RpMesh *const *b);
  * textured flag (index 0 or 4): rpWorldPipelineInit fills the first pair, which the atomic instance stage
  * (0x4c8e30) reads, rpAtomicPipelineInit the second, which the world sector instance stage (0x4c92d0) reads.
  */
-#define rpPipelineTypes  ((uint8_t *)(uintptr_t)0x006767f0)
-#define rpPipelineSizes  ((uint8_t *)(uintptr_t)0x006767f8)
-#define rpPipelineSizesB ((uint8_t *)(uintptr_t)0x00676800)
-#define rpPipelineTypesB ((uint8_t *)(uintptr_t)0x00676808)
+#define rpPipelineTypes  ((uint8_t *)BMX_ORIG(0x006767f0))
+#define rpPipelineSizes  ((uint8_t *)BMX_ORIG(0x006767f8))
+#define rpPipelineSizesB ((uint8_t *)BMX_ORIG(0x00676800))
+#define rpPipelineTypesB ((uint8_t *)BMX_ORIG(0x00676808))
 int rpWorldPipelineInit(struct RwIm3DPipeline *pipeline);
 int rpAtomicPipelineInit(struct RwIm3DPipeline *pipeline);
 RpAtomic *RpAtomicSetGeometry(RpAtomic *atomic, RpGeometry *geometry, uint32_t flags);

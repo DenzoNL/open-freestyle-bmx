@@ -9,11 +9,9 @@
 
 #include "hook/hook.h"
 
-/* (original libpng address, our function) pairs; the native loader writes them as jumps after the hooks. */
+/* (original libpng address, our function) pairs: tools/gen_origmap.py makes calls and pointers to those
+ * addresses reach our functions in the native exe (over a port of the same address, if there were one). */
 extern const BmxHook bmxPngJumps[];
 extern const uint32_t bmxPngJumpCount;
-
-/* The original's libpng and zlib code (lib/libpng, lib/zlib; up to the next ported function 0x51ce10). */
-enum { kBmxPngCodeStart = 0x00506e40, kBmxPngCodeEnd = 0x0051ce10 };
 
 #endif

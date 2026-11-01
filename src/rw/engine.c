@@ -2,6 +2,7 @@
 #include "rw/rwcore.h"
 
 #include "compat/crt.h"
+#include "rw/rwmath.h"
 #include "rw/rwplugins.h"
 #include "rw/rwstream.h"
 #include "rw/rwtexture.h"

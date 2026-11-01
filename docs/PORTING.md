@@ -145,6 +145,43 @@ Two stages, each checked with tools/xcheck.py against the user's recording (work
   end) is found by the layout check (each carved global's bytes compared with the image at start-up, in a debug
   run) and by xcheck.
 
+### X1a (done 2026-11-01): relocated data image
+
+bmxnative.exe no longer maps anything at 0x400000 and loads none of the original's code; details in docs/NATIVE.md
+"Relocated data image".
+- **`BMX_IMAGE`** (src/compat/orig.h), defined for everything in bmxnative.exe; `BMX_HOOK` stays on for the game
+  objects as the target's conventions. `ORIG_VAR` = `*(type *)BMX_ORIG(addr)`, `BMX_ORIG(addr)` = addr +
+  `gBmxImageDelta`; `BMX_FNPTR` = the function; `ORIG_FN*` declare the function with the generated assembler name
+  of what serves the address; `RW_CB` = `BMX_ORIG_PTR` (a run-time lookup: RenderWare passes values from tables
+  of original addresses). In the hook build every macro expands as before (bmxtest.dll's code is identical,
+  dinput.dll's differs only in data addresses shifted by the embedded source path).
+- **tools/gen_origmap.py**: the union of the ports (2925), crt.c's table (54), bmxDriverJumps (24), bmxPngJumps
+  (17), RpWorldDestroy's stub (a cdecl wrapper), 19 trap stubs for unported addresses that ORIG_FN names but nothing
+  reaches, and 21 stubs for the exe's import thunks that ported code calls (AVIFile, DrawDib,
+  DirectInputCreateEx) = 3061 addresses. It fails on an unserved or non-canonical `ORIG_FN` address and on a
+  `BMX_FNPTR` that names another function than the one serving its address. The CRT, driver and PNG functions in
+  those tables became global for it.
+- **Loader**: copies 0x54d000..0x6a2000 into an allocation, fills the imports there, applies the 1284 relocations
+  in the data: 543 data, 478 code, 17 through incremental-link thunks, 2 into a copy of dinput.lib's object
+  tables, 244 to code nothing serves (switch tables of unported CRT / D3D7 code; trap stubs). No int3 range, no
+  jumps at original addresses, no `.orig` section in bmxnative (range.S stays for bmxplatformtest); the exe is
+  linked at 0x20000000. BMX_PNG_CHECK and BMX_TRAP_SKIP are retired (they needed the original's code range).
+- **Raw addresses converted by hand** (the ones not behind ORIG_VAR / ORIG_FN / BMX_FNPTR / RW_CB): data addresses
+  as `BMX_ORIG` (rwd3d.h fog and Im3D tables, rwclump.h pipeline tables, d3dpipe.c, the driver's primary context
+  and standards table, zscene.c chunk lists, ngifzres.c, zrwmodelcreate.c's hash dummy, the high frame rate's
+  effect ops, main.c's WinMain globals); code addresses used as values as `BMX_FNPTR` (ngapp.c's two update
+  callbacks, one of them an incremental-link thunk; the high frame rate's node filters; the driver's null standard,
+  Im3D transform and matrix multiply; the PVS camera call in world.c; main.c's WinMain callees as ORIG_FN);
+  compat/crt.c's `__chkstk` and 64-bit helper forwards jump to the generated names.
+- **Verified**: tools/xcheck.py on the user's recording (rec-20261101-140610, 5594 ticks): identical to the
+  fixed-address build on every tick (also equal to the 84da8fd hash file); the scripted ride (1014 ticks)
+  identical; the gate.
+
+What X1b needs: the data copy is now one block addressed through `BMX_ORIG` / `ORIG_VAR`, and every pointer in it
+is known from the relocations, so a generator can carve it into named C definitions (pointers as `&symbol` or the
+serving function from bmxOrigMap) and drop NgBMX.exe; `RW_CB`'s run-time lookup then becomes compile-time where
+the tables of original addresses (rw/plugins.c attach routines) turn into tables of functions.
+
 X1 and X2 are the bulk of the work (thousands of lines touched, mechanical but wide). X3 and X4 should be small
 once X2 is done. X5 and X6 are moderate. The order puts the user's own desktop (X3) first.
 
