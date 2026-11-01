@@ -11,6 +11,10 @@
 
 static const char zprimFile[] = "C:\\zaxis\\Bmx\\src\\com\\zge\\zprim.c";
 
+/* The state stack (zprimStatePush lets the depth reach 10, one past it: an original quirk) and the asset
+ * table. */
+enum { kZprimStateDepth = 10, kZprimAssetCount = 0x80 };
+
 /*
  * Every state accessor opens the state stack the same way: if no caller has it locked, lock the DMM block
  * and remember to unlock it again on the way out.
@@ -41,26 +45,26 @@ int zprimInit(void)
     if (ngifInit() != 0) {
         return 1;
     }
-    gZprimHandle = zmemdmmAlloc(0x348);
+    gZprimHandle = zmemdmmAlloc(kZprimStateDepth * sizeof(ZPrimState));
     if (gZprimHandle != 0) {
         ZPrimState *states = zmemdmmLock(gZprimHandle);
         gZprimStates = states;
         gZprimDepth = 0;
-        zmemFill(states, 0, 0xd2 * 4);
-        zmemFill(states, 0, 0x15 * 4);
+        zmemFill(states, 0, kZprimStateDepth * sizeof(ZPrimState));
+        zmemFill(states, 0, sizeof(ZPrimState));
         zprimStateReset();
         zprimStatePush();
         zmemdmmUnlock(gZprimHandle);
         zmemFill(&gZprimLibrary, 0, 10 * 4); /* library, pool, free, used, clip, groups */
         zprimSetClip(0, 0, 0x27f, 0x1df);
-        ZPrimAsset *pool = zmemStaticAlloc(0x800);
+        ZPrimAsset *pool = zmemStaticAlloc(kZprimAssetCount * sizeof(ZPrimAsset));
         gZprimPool = pool;
         if (pool != NULL) {
-            zmemFill(pool, 0, 0x800);
+            zmemFill(pool, 0, kZprimAssetCount * sizeof(ZPrimAsset));
             gZprimFree = pool;
-            for (int i = 0; i < 0x80; i++) {
+            for (int i = 0; i < kZprimAssetCount; i++) {
                 pool = gZprimPool;
-                if (i == 0x7f) {
+                if (i == kZprimAssetCount - 1) {
                     pool[i].next = NULL;
                 } else {
                     pool[i].next = pool + (i + 1);

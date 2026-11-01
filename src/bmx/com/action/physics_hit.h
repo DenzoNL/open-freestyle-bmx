@@ -10,13 +10,6 @@
 #include "zge/zmath.h"
 
 /* Dynamic collision object (props). */
-typedef struct PhysCollObject {
-    uint8_t pad000[0x1ec];
-    int32_t propId; /* 0 when the object is not a prop */
-} PhysCollObject;
-
-_Static_assert(sizeof(PhysCollObject) == 0x1f0, "PhysCollObject size");
-
 /* Prop record behind a collision object: facing direction at +0x3c. */
 typedef struct PhysPropInfo {
     uint8_t pad00[0x3c];
@@ -82,6 +75,12 @@ _Static_assert(offsetof(PhysPropObject, edges) == 0x24, "PhysPropObject.edges");
 _Static_assert(offsetof(PhysPropObject, prop) == 0x1ec, "PhysPropObject.prop");
 _Static_assert(offsetof(PhysPropObject, node) == 0x1f0, "PhysPropObject.node");
 
+/* The prop record of a collision object (a PhysPropObject); NULL when the object is not a prop. */
+static inline void *physObjectProp(const void *object)
+{
+    return (void *)((const PhysPropObject *)object)->prop;
+}
+
 /*
  * Line test / ray result (cleared to 0xd8 bytes by zcollideRay; the global copy at 0x56c128 uses the
  * first 0x44). First word: 1 = terrain face hit (the face record at +0x30 is valid), 2 = prop hit. A prop
@@ -110,7 +109,7 @@ typedef struct PhysRayHit {
     const uint32_t *material; /* bits 0-3 surface material, bits 19-20 hazard kind */
     int32_t object;           /* collision object handle */
     union {
-        PhysCollObject *objectData;
+        PhysPropObject *objectData;
         PhysEdge *edge;
     };
     uint8_t pad44[0x4];

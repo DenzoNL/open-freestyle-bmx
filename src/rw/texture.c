@@ -1573,7 +1573,7 @@ void *_rwImageOpen(void *engine, int32_t offset)
     if (imageGlobals()->imageFreeList == NULL) {
         return NULL;
     }
-    imageGlobals()->formatFreeList = RwFreeListCreate(0x34, 3, 0);
+    imageGlobals()->formatFreeList = RwFreeListCreate(sizeof(RwImageFormat), 3, 0);
     if (imageGlobals()->formatFreeList == NULL) {
         RwFreeListDestroy(imageGlobals()->imageFreeList);
         imageGlobals()->imageFreeList = NULL;

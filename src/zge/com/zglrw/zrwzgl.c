@@ -417,7 +417,7 @@ int zrwGraphicLibraryInitialize(void)
         zrwApplicationError("Cannot create world.");
         return 0;
     }
-    gZrwNodePool = zmemFreeListCreate(0x14, 0x20, NULL);
+    gZrwNodePool = zmemFreeListCreate(sizeof(ZrwUpdateNode), 0x20, NULL);
     return 1;
 }
 

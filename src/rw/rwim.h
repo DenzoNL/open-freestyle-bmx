@@ -41,10 +41,11 @@ typedef struct RwIm3DGlobals {
     RwIm3DBeginFunc begin;        /* 0x04 */
     RwIm3DEndFunc end;            /* 0x08 */
     int32_t depth;                /* 0x0c number of pipelines on the stack */
-    RwIm3DPipeline *stack[1];     /* 0x10 grows with depth */
+    RwIm3DPipeline *stack[10];    /* 0x10 the pipelines on the stack */
 } RwIm3DGlobals;
 
 _Static_assert(offsetof(RwIm3DGlobals, stack) == 0x10, "RwIm3DGlobals layout");
+BMX_LAYOUT32_ASSERT(sizeof(RwIm3DGlobals) == 0x38, "RwIm3DGlobals size");
 
 /* Offsets of plugin data inside the engine instance. */
 #define rwIm3DOffset         ORIG_VAR(0x00676d70, int32_t, rwIm3DOffset)

@@ -429,8 +429,8 @@ int zrwTextureSystemInitialize(void)
     }
     memset(&gZrwTxr, 0, sizeof gZrwTxr);
     gZrwTxr.initialized = 1;
-    gZrwTxr.textures =
-        zmemFreeListCreate(0x28, 0x100, BMX_FNPTR(ZMemDestroyFn, 0x00498810, zrwTextureRelease));
+    gZrwTxr.textures = zmemFreeListCreate(sizeof(ZrwTexture), 0x100,
+                                          BMX_FNPTR(ZMemDestroyFn, 0x00498810, zrwTextureRelease));
     memcpy(gZrwTxr.key, &key, sizeof key);
     ziffSetupCallback(0x504d4254, BMX_FNPTR(int(BMX_CDECL *)(void *), 0x004981f0, ReadTBMP), 0);
     ziffSetupCallback(0x474e5054, BMX_FNPTR(int(BMX_CDECL *)(void *), 0x004982a0, ReadTPNG), 0);
@@ -627,7 +627,9 @@ BMX_ADDR(0x00498b10)
 int zrwMatRegisterPlugin(void)
 {
     gZrwMatPluginOffset =
-        RwTextureRegisterPlugin(4, 0xff01, BMX_FNPTR(RwPluginObjectConstructor, 0x00497a90, rwMatConstructor),
+        /* The texture's material (zrwTextureSetUserData; X2e: still handed over as a 32-bit word). */
+        RwTextureRegisterPlugin(sizeof(void *), 0xff01,
+                                BMX_FNPTR(RwPluginObjectConstructor, 0x00497a90, rwMatConstructor),
                                 BMX_FNPTR(RwPluginObjectDestructor, 0x00497ab0, rwMatDestructor), NULL);
     return gZrwMatPluginOffset != -1;
 }

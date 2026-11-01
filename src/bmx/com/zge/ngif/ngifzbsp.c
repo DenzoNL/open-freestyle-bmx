@@ -399,7 +399,7 @@ BMX_ADDR(0x00468bc0)
 void zbspBuildCollObject(PhysPropNode *node)
 {
     const PhysPropTag *tag = node->tag;
-    PhysPropObject *o = zmemFill(zmemAlloc(500), 0, 500);
+    PhysPropObject *o = zmemFill(zmemAlloc(sizeof(PhysPropObject)), 0, sizeof(PhysPropObject));
 
     node->object = o;
     node->destroy = BMX_FNPTR(void(BMX_CDECL *)(PhysPropObject *), 0x00402414, zbspFreeCollObject);

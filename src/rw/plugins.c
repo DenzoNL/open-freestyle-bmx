@@ -8,6 +8,7 @@
 #include "compat/x87.h"
 #include "rw/rwanim.h"
 #include "rw/rwclump.h"
+#include "rw/rwim.h"
 #include "rw/rwmath.h"
 
 /* The error record the RpWorld module (plugin id 2) reports. */
@@ -190,17 +191,23 @@ typedef struct RwEnginePlugin {
 BMX_ADDR(0x004cf520)
 int CorePluginAttach(void)
 {
+    /* Each module's data in the engine instance: its globals, or the pointer to its free list. */
     static const RwEnginePlugin first[] = {
-        {8, 0x40f, 0x004dee30, 0x004dee20},    {0x10, 0x401, 0x004d3b50, 0x004d3b30},
-        {0, 0x40d, 0x004eb2a0, 0x004eb2b0},    {0xc, 0x402, 0x004d2080, 0x004d2040},
-        {4, 0x403, 0x004d2280, 0x004d2310},    {4, 0x404, 0x004e2350, 0x004e23b0},
-        {4, 0x405, 0x004dd430, 0x004dd490},    {0x220, 0x406, 0x004e33d0, 0x004e36e0},
-        {0x68, 0x407, 0x004dc9e0, 0x004dcac0}, {0x2c, 0x408, 0x004df120, 0x004df380},
-        {0x38, 0x409, 0x004e83e0, 0x004e8480},
+        {sizeof(RwError), 0x40f, 0x004dee30, 0x004dee20},
+        {sizeof(RwV3dModule), 0x401, 0x004d3b50, 0x004d3b30},
+        {0, 0x40d, 0x004eb2a0, 0x004eb2b0},
+        {sizeof(RwMatrixModule), 0x402, 0x004d2080, 0x004d2040},
+        {sizeof(RwFreeList *), 0x403, 0x004d2280, 0x004d2310}, /* frames */
+        {sizeof(RwFreeList *), 0x404, 0x004e2350, 0x004e23b0}, /* streams */
+        {sizeof(RwFreeList *), 0x405, 0x004dd430, 0x004dd490}, /* cameras */
+        {sizeof(RwImageGlobals), 0x406, 0x004e33d0, 0x004e36e0},
+        {sizeof(RwRasterGlobals), 0x407, 0x004dc9e0, 0x004dcac0},
+        {sizeof(RwTextureGlobals), 0x408, 0x004df120, 0x004df380},
+        {sizeof(RwIm3DGlobals), 0x409, 0x004e83e0, 0x004e8480},
     };
     static const RwEnginePlugin last[] = {
-        {4, 0x40a, 0x004dee70, 0x004deec0},
-        {0x24, 0x40b, 0x004dc210, 0x004dc250},
+        {sizeof(RwIm3DPipeline *), 0x40a, 0x004dee70, 0x004deec0},
+        {sizeof(RwResourcesGlobals), 0x40b, 0x004dc210, 0x004dc250},
     };
     int32_t status = 0;
     for (size_t i = 0; i < sizeof(first) / sizeof(first[0]); i++) {
@@ -236,18 +243,20 @@ int rpWorldExtPluginAttach(void)
 BMX_ADDR(0x004b8e00)
 int _rpWorldObjRegisterExtensions(void)
 {
-    int32_t status = RwEngineRegisterPlugin(8, 0x509, RW_CTOR(0x004b7570), RW_DTOR(0x004b7650));
-    rpWorldCameraOffset =
-        RwCameraRegisterPlugin(0x1c, 0x509, RW_CTOR(0x004b90c0), RW_DTOR(0x004b9080), RW_COPY(0x004b77a0));
+    int32_t status =
+        RwEngineRegisterPlugin(sizeof(RpTieGlobals), 0x509, RW_CTOR(0x004b7570), RW_DTOR(0x004b7650));
+    rpWorldCameraOffset = RwCameraRegisterPlugin(sizeof(RpWorldCameraData), 0x509, RW_CTOR(0x004b90c0),
+                                                 RW_DTOR(0x004b9080), RW_COPY(0x004b77a0));
     status |= rpWorldCameraOffset;
-    rpWorldAtomicOffset =
-        RpAtomicRegisterPlugin(8, 0x509, RW_CTOR(0x004b9040), RW_DTOR(0x004b9010), RW_COPY(0x004b7b00));
+    rpWorldAtomicOffset = RpAtomicRegisterPlugin(sizeof(RpWorldAtomicData), 0x509, RW_CTOR(0x004b9040),
+                                                 RW_DTOR(0x004b9010), RW_COPY(0x004b7b00));
     status |= rpWorldAtomicOffset;
-    rpWorldClumpOffset =
-        RpClumpRegisterPlugin(4, 0x509, RW_CTOR(0x004b8ff0), RW_DTOR(0x004b8fe0), RW_COPY(0x004b7b10));
+    /* A clump's data is the world it is in. */
+    rpWorldClumpOffset = RpClumpRegisterPlugin(sizeof(RpWorld *), 0x509, RW_CTOR(0x004b8ff0),
+                                               RW_DTOR(0x004b8fe0), RW_COPY(0x004b7b10));
     status |= rpWorldClumpOffset;
-    rpWorldLightOffset =
-        RpLightRegisterPlugin(8, 0x509, RW_CTOR(0x004b8fc0), RW_DTOR(0x004b8fa0), RW_COPY(0x004b7e50));
+    rpWorldLightOffset = RpLightRegisterPlugin(sizeof(RpWorldLightData), 0x509, RW_CTOR(0x004b8fc0),
+                                               RW_DTOR(0x004b8fa0), RW_COPY(0x004b7e50));
     status |= rpWorldLightOffset;
     status |= RpGeometryRegisterPlugin(0, 0x50e, NULL, NULL, NULL);
     status |= RpWorldSectorRegisterPlugin(0, 0x50e, NULL, NULL, NULL);
@@ -265,12 +274,18 @@ int _rpWorldObjRegisterExtensions(void)
 BMX_ADDR(0x004bc1c0)
 int RpWorldPluginAttach(void)
 {
+    /* Each module's data in the engine instance: its globals, or the pointer to its free list. */
     static const RwEnginePlugin plugins[] = {
-        {4, 0x501, 0x004b9150, 0x004b91b0},    {8, 0x502, 0x004c4710, 0x004c4740},
-        {4, 0x503, 0x004b3390, 0x004b3400},    {0xc, 0x504, 0x004b0f20, 0x004b1080},
-        {4, 0x505, 0x004c2310, 0x004c2380},    {0, 0x506, 0x004bc3a0, 0x004bc3b0},
-        {0, 0x50c, 0x004c56b0, 0x004c56c0},    {0, 0x50a, 0x004c2020, 0x004c2030},
-        {0x10, 0x507, 0x004bc090, 0x004bc020}, {0, 0x50b, 0x004c2c30, 0x004c2c40},
+        {sizeof(RwFreeList *), 0x501, 0x004b9150, 0x004b91b0}, /* materials */
+        {8, 0x502, 0x004c4710, 0x004c4740},                    /* meshes: a 16-bit word (and padding) */
+        {sizeof(RwFreeList *), 0x503, 0x004b3390, 0x004b3400}, /* geometries */
+        {sizeof(RpClumpGlobals), 0x504, 0x004b0f20, 0x004b1080},
+        {sizeof(RwFreeList *), 0x505, 0x004c2310, 0x004c2380}, /* lights */
+        {0, 0x506, 0x004bc3a0, 0x004bc3b0},
+        {0, 0x50c, 0x004c56b0, 0x004c56c0},
+        {0, 0x50a, 0x004c2020, 0x004c2030},
+        {sizeof(RpWorldGlobals), 0x507, 0x004bc090, 0x004bc020},
+        {0, 0x50b, 0x004c2c30, 0x004c2c40},
     };
     int32_t status = 0;
     for (size_t i = 0; i < sizeof(plugins) / sizeof(plugins[0]); i++) {
@@ -287,7 +302,8 @@ int RpWorldPluginAttach(void)
 BMX_ADDR(0x004ccac0)
 int RpPVSPluginAttach(void)
 {
-    rpPVSWorldOffset = RpWorldRegisterPlugin(4, 0x106, RW_CTOR(0x004cc6b0), RW_DTOR(0x004cc710), NULL);
+    rpPVSWorldOffset = RpWorldRegisterPlugin(sizeof(RpPVSWorldData *), 0x106, RW_CTOR(0x004cc6b0),
+                                             RW_DTOR(0x004cc710), NULL);
     if (rpPVSWorldOffset < 0) {
         return 0;
     }
@@ -295,7 +311,9 @@ int RpPVSPluginAttach(void)
                                     RW_GETSIZE(0x004cc7b0)) < 0) {
         return 0;
     }
-    rpPVSSectorOffset = RpWorldSectorRegisterPlugin(4, 0x106, RW_CTOR(0x004cc9b0), RW_DTOR(0x004cc9d0), NULL);
+    /* A sector's data is a pointer to its visibility bits. */
+    rpPVSSectorOffset =
+        RpWorldSectorRegisterPlugin(sizeof(uint8_t *), 0x106, RW_CTOR(0x004cc9b0), RW_DTOR(0x004cc9d0), NULL);
     if (rpPVSSectorOffset >= 0) {
         if (RpWorldSectorRegisterPluginStream(0x106, RW_READ(0x004cca30), RW_WRITE(0x004cca90),
                                               RW_GETSIZE(0x004cc9f0)) >= 0) {
@@ -309,16 +327,16 @@ int RpPVSPluginAttach(void)
 BMX_ADDR(0x00500250)
 int RpAnimPluginAttach(void)
 {
-    if (RwEngineRegisterPlugin(4, 0x108, RW_CTOR(0x004fcd50), RW_DTOR(0x004fcda0)) < 0) {
+    if (RwEngineRegisterPlugin(sizeof(RwFreeList *), 0x108, RW_CTOR(0x004fcd50), RW_DTOR(0x004fcda0)) < 0) {
         return 0;
     }
-    rpAnimClumpOffset =
-        RpClumpRegisterPlugin(0x14, 0x108, RW_CTOR(0x004fc740), RW_DTOR(0x004fc760), RW_COPY(0x004fc780));
+    rpAnimClumpOffset = RpClumpRegisterPlugin(sizeof(RpAnimClumpData), 0x108, RW_CTOR(0x004fc740),
+                                              RW_DTOR(0x004fc760), RW_COPY(0x004fc780));
     if (rpAnimClumpOffset < 0) {
         return 0;
     }
-    rpAnimFrameOffset =
-        RwFrameRegisterPlugin(0xc, 0x108, RW_CTOR(0x004fbce0), RW_DTOR(0x004fbd00), RW_COPY(0x004fbd50));
+    rpAnimFrameOffset = RwFrameRegisterPlugin(sizeof(RpAnimFramePlugin), 0x108, RW_CTOR(0x004fbce0),
+                                              RW_DTOR(0x004fbd00), RW_COPY(0x004fbd50));
     if (rpAnimFrameOffset < 0) {
         return 0;
     }
@@ -340,8 +358,8 @@ int RpBonePluginAttach(void)
     if (RwEngineRegisterPlugin(0, 0x10e, RW_CTOR(0x00505500), RW_DTOR(0x00505520)) < 0) {
         return 0;
     }
-    rpBoneGeometryOffset =
-        RpGeometryRegisterPlugin(4, 0x10e, RW_CTOR(0x00505530), RW_DTOR(0x00505550), RW_COPY(0x005055e0));
+    rpBoneGeometryOffset = RpGeometryRegisterPlugin(sizeof(RpSkinGeometry *), 0x10e, RW_CTOR(0x00505530),
+                                                    RW_DTOR(0x00505550), RW_COPY(0x005055e0));
     if (rpBoneGeometryOffset < 0) {
         return 0;
     }
@@ -350,8 +368,8 @@ int RpBonePluginAttach(void)
     if (rpBoneStreamResult < 0) {
         return 0;
     }
-    rpBoneFrameOffset =
-        RwFrameRegisterPlugin(4, 0x10e, RW_CTOR(0x005057f0), RW_DTOR(0x00505810), RW_COPY(0x00505830));
+    rpBoneFrameOffset = RwFrameRegisterPlugin(sizeof(RpSkinBone *), 0x10e, RW_CTOR(0x005057f0),
+                                              RW_DTOR(0x00505810), RW_COPY(0x00505830));
     return rpBoneFrameOffset >= 0;
 }
 
@@ -360,8 +378,8 @@ BMX_ADDR(0x005062b0)
 int RpLODAtomicPluginAttach(void)
 {
     rpLodEngineOffset = RwEngineRegisterPlugin(0, 0x112, RW_CTOR(0x00506240), RW_DTOR(0x00506280));
-    rpLodAtomicOffset =
-        RpAtomicRegisterPlugin(4, 0x112, RW_CTOR(0x00506190), RW_DTOR(0x00506200), RW_COPY(0x005061b0));
+    rpLodAtomicOffset = RpAtomicRegisterPlugin(sizeof(RpLodAtomicData *), 0x112, RW_CTOR(0x00506190),
+                                               RW_DTOR(0x00506200), RW_COPY(0x005061b0));
     RpAtomicRegisterPluginStream(0x112, RW_READ(0x00505e60), RW_WRITE(0x00506030), RW_GETSIZE(0x00506140));
     rpLodReserved = 0;
     rpLodCamera = NULL;
@@ -423,13 +441,13 @@ RwFrame *RwFrameForAllObjects(RwFrame *frame, RwObjectCallBack callback, void *d
 BMX_ADDR(0x00500220)
 uint32_t RwFrameGetUserData(const RwFrame *frame)
 {
-    return *(const uint32_t *)((const uint8_t *)frame + rpAnimFrameOffset + 8);
+    return ((const RpAnimFramePlugin *)((const uint8_t *)frame + rpAnimFrameOffset))->userData;
 }
 
 BMX_ADDR(0x00500230)
 void RwFrameSetUserData(RwFrame *frame, uint32_t data)
 {
-    *(uint32_t *)((uint8_t *)frame + rpAnimFrameOffset + 8) = data;
+    ((RpAnimFramePlugin *)((uint8_t *)frame + rpAnimFrameOffset))->userData = data;
 }
 
 /* Remembers the camera the LOD atomic plugin measures distances from. */
@@ -1027,7 +1045,8 @@ void *WorldObjectOpen(void *engine, int32_t offset)
     rpAnimModuleCount++;
     rpAnimEngineOffset = offset;
     if (rpAnimModuleCount == 1) {
-        *(RwFreeList **)((uint8_t *)RwEngineInstance + rpAnimEngineOffset) = RwFreeListCreate(8, 0x32, 0);
+        *(RwFreeList **)((uint8_t *)RwEngineInstance + rpAnimEngineOffset) =
+            RwFreeListCreate(sizeof(RpAnimFrameLink), 0x32, 0);
     }
     return engine;
 }
@@ -1084,15 +1103,15 @@ void *rpAnimFrameInit(void *frame)
 BMX_ADDR(0x004fbca0)
 struct RpAnimFrameData *rpAnimFrameDataCreate(void)
 {
-    uint32_t *words = RwEngineInstance->memoryFuncs.rwmalloc(0x10);
-    if (words == NULL) {
+    struct RpAnimFrameData *data = RwEngineInstance->memoryFuncs.rwmalloc(sizeof *data);
+    if (data == NULL) {
         return NULL;
     }
-    words[3] = 0;
-    words[2] = 0;
-    words[1] = 0;
-    words[0] = 0;
-    return (struct RpAnimFrameData *)words;
+    data->listB = NULL;
+    data->numB = 0;
+    data->listA = NULL;
+    data->numA = 0;
+    return data;
 }
 
 /* The name and the type (1: keys of 0xc bytes, 2: keys of 0x10 bytes) of a frame sequence. */
@@ -2680,7 +2699,7 @@ BMX_ADDR(0x00506240)
 void *LODAtomicCallBackOpen(void *engine, int32_t offset)
 {
     (void)offset;
-    rpLodFreeList = RwFreeListCreate(0x40, 0x40, 0);
+    rpLodFreeList = RwFreeListCreate(sizeof(RpLodAtomicData), 0x40, 0);
     if (rpLodFreeList == NULL) {
         return NULL;
     }

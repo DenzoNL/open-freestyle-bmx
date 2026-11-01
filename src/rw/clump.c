@@ -1919,10 +1919,10 @@ RpBuildMesh *_rpBuildMeshAddTriangle(RpBuildMesh *build, RpMaterial *material, u
                                      uint16_t v2)
 {
     if (build->capacity <= build->numTriangles) {
-        const int32_t size = (int32_t)(build->numTriangles * 0xc + 0xc);
+        const int32_t size = (int32_t)((build->numTriangles + 1) * sizeof(RpBuildMeshTriangle));
         RpBuildMeshTriangle *triangles;
         if (build->numTriangles == 0) {
-            triangles = engineAlloc(0xc);
+            triangles = engineAlloc(sizeof(RpBuildMeshTriangle));
         } else {
             triangles = RwEngineInstance->memoryFuncs.rwrealloc(build->triangles, (size_t)size);
         }
@@ -2750,19 +2750,20 @@ __attribute__((regparm(3))) RpPlaneSector *rpBspStreamRead(RwStream *stream, uin
     RwMemFloat32ToReal(&header[4], 4);
     RwMemFloat32ToReal(&header[5], 4);
     int failed;
-    RpPlaneSector *node = worldCursorTake(cursor, 0x18, &failed);
+    RpPlaneSector *node = worldCursorTake(cursor, sizeof(RpPlaneSector), &failed);
     if (failed) {
-        rpReportNoMem(0x18);
+        rpReportNoMem(sizeof(RpPlaneSector));
         return NULL;
     }
+    /* The values are the chunk's float bit patterns. */
     node->type = header[0];
-    ((int32_t *)node)[1] = header[1];
+    __builtin_memcpy(&node->value, &header[1], sizeof node->value);
     if ((flags & 0x40000000) == 0) {
-        ((int32_t *)node)[4] = header[1];
-        ((int32_t *)node)[5] = header[1];
+        __builtin_memcpy(&node->leftValue, &header[1], sizeof node->leftValue);
+        __builtin_memcpy(&node->rightValue, &header[1], sizeof node->rightValue);
     } else {
-        ((int32_t *)node)[4] = header[4];
-        ((int32_t *)node)[5] = header[5];
+        __builtin_memcpy(&node->leftValue, &header[4], sizeof node->leftValue);
+        __builtin_memcpy(&node->rightValue, &header[5], sizeof node->rightValue);
     }
     RpSector *child;
     if (header[2] == 0) {
@@ -2920,7 +2921,7 @@ RpWorld *RpWorldStreamRead(RwStream *stream)
     RwMemFloat32ToReal(&header[4], 0xc);
     const uint32_t format = (uint32_t)header[12];
     int32_t total = rpWorldSectorRegistry.sizeOfStruct * header[10] + rpWorldRegistry.sizeOfStruct +
-                    header[9] * 0x18 + header[8] * 0xc;
+                    header[9] * (int32_t)sizeof(RpPlaneSector) + header[8] * 0xc;
     if ((format & 0x10) != 0) {
         total += header[8] * 4;
     }

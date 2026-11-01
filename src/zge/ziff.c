@@ -1,8 +1,11 @@
 /* IFF chunk reader (C:\NgEngine\Zge\ziff.c). */
 #include "zge/ziff.h"
 
+#include <stddef.h>
+
 #include "compat/crt.h"
 #include "zge/com/zglrw/zrwmat.h"
+#include "zge/zanim.h"
 #include "zge/zdebug.h"
 #include "zge/zfile.h"
 #include "zge/zmem.h"
@@ -27,8 +30,8 @@ int ziffInitialize(void)
         zdebugFail("Already initialized", kZiffFile, 0x11a, 0);
     }
     zmemFill(&gZiff, 0, sizeof gZiff);
-    gZiff.callbacks = zmemFreeListCreate(0x10, 0x40, NULL);
-    gZiff.readers = zmemFreeListCreate(0x108, 0x10, NULL);
+    gZiff.callbacks = zmemFreeListCreate(sizeof(ZiffCallbackNode), 0x40, NULL);
+    gZiff.readers = zmemFreeListCreate(sizeof(Ziff), 0x10, NULL);
     gZiff.initialized = 1;
     return 1;
 }
@@ -387,8 +390,8 @@ BMX_ADDR(0x0049a4e0)
 void *ziffReadAnim(void *iff)
 {
     if (ziffBeginModel(iff) != 0) {
-        void *anim = zmemAlloc(0x14);
-        zmemFill(anim, 0, 0x14);
+        ZanimRecord *anim = zmemAlloc(sizeof *anim);
+        zmemFill(anim, 0, sizeof *anim);
         gZiffAnim = anim;
         ziffProcessChunks(iff, NULL);
         ziffEndModel(iff);
@@ -417,12 +420,12 @@ static void freeChain(uint8_t *node, unsigned dataOff, unsigned nextOff)
 BMX_ADDR(0x0049a630)
 void ziffFreeAnim(void *anim)
 {
-    uint8_t *a = anim;
+    ZanimRecord *a = anim;
 
-    freeChain(*(uint8_t **)(a + 0xc), 8, 0xc);
-    freeChain(*(uint8_t **)(a + 8), 8, 0xc);
-    freeChain(*(uint8_t **)(a + 0x10), 8, 0xc);
-    freeChain(*(uint8_t **)(a + 4), 4, 8);
+    freeChain((uint8_t *)a->translations, offsetof(ZanimChannel, keys), offsetof(ZanimChannel, next));
+    freeChain((uint8_t *)a->rotations, offsetof(ZanimChannel, keys), offsetof(ZanimChannel, next));
+    freeChain((uint8_t *)a->channels10, offsetof(ZanimChannel, keys), offsetof(ZanimChannel, next));
+    freeChain((uint8_t *)a->names, offsetof(ZanimNames, names), offsetof(ZanimNames, next));
     zmemFree(anim);
 }
 

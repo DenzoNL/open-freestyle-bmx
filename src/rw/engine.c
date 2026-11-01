@@ -603,7 +603,7 @@ void *_rwMatrixOpen(void *engine, int32_t offset)
 {
     rwMatrixOffset = offset;
     RwMatrixGlobals *globals = (RwMatrixGlobals *)((uint8_t *)RwEngineInstance + offset);
-    globals->freeList = RwFreeListCreate(0x40, 5, 4);
+    globals->freeList = RwFreeListCreate(sizeof(RwMatrix), 5, 4);
     if (globals->freeList == NULL) {
         return NULL;
     }

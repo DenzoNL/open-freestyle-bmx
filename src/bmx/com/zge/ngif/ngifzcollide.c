@@ -240,7 +240,7 @@ int zcollideRay(const ZVec3 *from, const ZVec3 *to, void *out)
             if (n->frame == frame) {
                 if (n->object != NULL) {
                     hit->kind = 2;
-                    hit->objectData = (PhysCollObject *)n->object;
+                    hit->objectData = (PhysPropObject *)n->object;
                     hit->object = n->object->index;
                 }
                 break;

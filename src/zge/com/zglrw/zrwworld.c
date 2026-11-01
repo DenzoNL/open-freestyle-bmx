@@ -102,7 +102,7 @@ void *zrwworldCreateObject(void)
     }
     zobjInit(object, 2);
     object->ops = (const ZObjOps *)&gZrwWorldEffectOps;
-    host = zmemAlloc(0x3c);
+    host = zmemAlloc(sizeof *host);
     *(ZrwEffectHost **)&object->pad30[0] = host;
     host->items = zlistCreate(4);
     effectHost(object)->updateNode = zrwRegisterUpdateFunction(

@@ -27,13 +27,15 @@ RwFreeList *RwFreeListCreate(int32_t entrySize, int32_t entriesPerBlock, int32_t
     freeList->entriesPerBlock = entriesPerBlock;
     freeList->entrySize =
         (int32_t)(((uint32_t)entrySize + (uint32_t)alignment - 1) & ~freeList->alignmentMask);
-    freeList->blockSize =
-        (int32_t)((uint32_t)entriesPerBlock * (uint32_t)freeList->entrySize + (uint32_t)alignment + 3);
-    freeList->freeBegin = (void **)RwEngineInstance->memoryFuncs.rwmalloc(4);
+    /* The entries sit at the block's end, aligned down; the header (the link to the next block) before them.
+     */
+    freeList->blockSize = (int32_t)((uint32_t)entriesPerBlock * (uint32_t)freeList->entrySize +
+                                    (uint32_t)alignment + (uint32_t)sizeof(RwFreeListBlock) - 1);
+    freeList->freeBegin = (void **)RwEngineInstance->memoryFuncs.rwmalloc(sizeof(void *));
     if (freeList->freeBegin == NULL) {
         RwError error;
         error.pluginID = 1;
-        error.errorCode = _rwerror(rwERR_NOMEM, 4);
+        error.errorCode = _rwerror(rwERR_NOMEM, (int32_t)sizeof(void *));
         RwErrorSet(&error);
         RwEngineInstance->memoryFuncs.rwfree(freeList);
         return NULL;
@@ -105,7 +107,8 @@ void *_rwFreeListAllocReal(RwFreeList *freeList)
             RwErrorSet(&error);
             return NULL;
         }
-        const uint32_t stackSize = ((uint32_t)freeList->entriesPerBlock + (uint32_t)freeList->numBlocks) * 4;
+        const uint32_t stackSize =
+            ((uint32_t)freeList->entriesPerBlock + (uint32_t)freeList->numBlocks) * (uint32_t)sizeof(void *);
         void **stack = (void **)RwEngineInstance->memoryFuncs.rwmalloc(stackSize);
         if (stack == NULL) {
             RwError error;
@@ -127,7 +130,8 @@ void *_rwFreeListAllocReal(RwFreeList *freeList)
             entry -= (uintptr_t)freeList->entrySize;
         }
         freeList->freeTop =
-            (void **)((uintptr_t)freeList->freeBegin + (uint32_t)freeList->entriesPerBlock * 4 - 4);
+            (void **)((uintptr_t)freeList->freeBegin +
+                      (uint32_t)freeList->entriesPerBlock * (uint32_t)sizeof(void *) - sizeof(void *));
     }
     void **top = freeList->freeTop;
     freeList->freeTop = top - 1;
@@ -238,7 +242,7 @@ void rwPluginRegEntryRelease(void *entry, void *freeList)
 BMX_ADDR(0x004e87c0)
 int _rwPluginRegistryOpen(void)
 {
-    rwPluginRegEntryFreeList = RwFreeListCreate(0x34, 0x14, 0);
+    rwPluginRegEntryFreeList = RwFreeListCreate(sizeof(RwPluginRegEntry), 0x14, 0);
     return rwPluginRegEntryFreeList != NULL;
 }
 

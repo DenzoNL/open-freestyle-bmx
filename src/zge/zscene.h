@@ -52,6 +52,15 @@ typedef struct ZsceneEntry {
 
 _Static_assert(sizeof(ZsceneEntry) == 0x10, "scene entry layout");
 
+/* An animation of an animation library (ZsceneEntry.object of a kZsceneEntryAnimLib entry), newest first. */
+typedef struct ZsceneAnim {
+    uint32_t name;           /* 0x00 ziffAnimName */
+    void *anim;              /* 0x04 ziffReadAnim */
+    struct ZsceneAnim *next; /* 0x08 */
+} ZsceneAnim;
+
+_Static_assert(sizeof(ZsceneAnim) == 0xc, "scene animation layout");
+
 /* The globals from 0x673f70 on (cleared as one block by zsceneInitialize). */
 typedef struct ZsceneState {
     int32_t initialized;   /* 0x673f70 */

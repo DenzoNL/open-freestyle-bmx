@@ -2,6 +2,7 @@
 #include "zge/zscene.h"
 
 #include "compat/crt.h"
+#include "zge/com/zglrw/zrwcam.h"
 #include "zge/com/zglrw/zrwmat.h"
 #include "zge/com/zglrw/zrwworld.h"
 #include "zge/zasset.h"
@@ -395,7 +396,7 @@ int zsceneLoadAnimFile(uint32_t *request)
     void *image = zfileLoad((const char *)(uintptr_t)request[0], (int *)&size);
     ZfileHandle *file;
     void *iff;
-    uint32_t *list = 0;
+    ZsceneAnim *list = 0;
 
     if (image == 0) {
         zdebugFail(zstrFormatTemp("AnimLib not found:%s", (const char *)(uintptr_t)request[0]), zsceneFile,
@@ -409,13 +410,13 @@ int zsceneLoadAnimFile(uint32_t *request)
 
         for (found = ziffFindChunk(iff, 0x4d494e41); found != 0; found = ziffNextChunk(iff, 0x4d494e41)) {
             void *anim = ziffReadAnim(iff);
-            uint32_t *entry = list;
+            ZsceneAnim *entry = list;
 
             if (anim != 0) {
-                entry = zmemAlloc(0xc);
-                entry[1] = (uint32_t)(uintptr_t)anim;
-                entry[0] = ziffAnimName(anim);
-                entry[2] = (uint32_t)(uintptr_t)list;
+                entry = zmemAlloc(sizeof *entry);
+                entry->anim = anim;
+                entry->name = ziffAnimName(anim);
+                entry->next = list;
             }
             list = entry;
         }
@@ -430,7 +431,7 @@ int zsceneLoadAnimFile(uint32_t *request)
 BMX_ADDR(0x00490e90)
 int zsceneLoadAnimLibrary(uint32_t *request)
 {
-    uint32_t *list = 0;
+    ZsceneAnim *list = 0;
     int lib = zassetOpenLibrary((const char *)(uintptr_t)request[0]);
     int count;
 
@@ -453,13 +454,13 @@ int zsceneLoadAnimLibrary(uint32_t *request)
                 for (found = ziffFindChunk(iff, 0x4d494e41); found != 0;
                      found = ziffNextChunk(iff, 0x4d494e41)) {
                     void *anim = ziffReadAnim(iff);
-                    uint32_t *entry = list;
+                    ZsceneAnim *entry = list;
 
                     if (anim != 0) {
-                        entry = zmemAlloc(0xc);
-                        entry[1] = (uint32_t)(uintptr_t)anim;
-                        entry[0] = ziffAnimName(anim);
-                        entry[2] = (uint32_t)(uintptr_t)list;
+                        entry = zmemAlloc(sizeof *entry);
+                        entry->anim = anim;
+                        entry->name = ziffAnimName(anim);
+                        entry->next = list;
                     }
                     list = entry;
                 }
@@ -482,8 +483,9 @@ int zsceneInitialize(const char *path)
         zdebugFail("Already initialized", zsceneFile, 1148, 0);
     }
     zmemFill(&gScene, 0, sizeof gScene);
-    gScene.entries = zmemFreeListCreate(0x10, 0x100, 0);
-    gScene.nodes = zmemFreeListCreate(0x78, 0x100, BMX_FNPTR(ZMemDestroyFn, 0x004901b0, zsceneFreeNode));
+    gScene.entries = zmemFreeListCreate(sizeof(ZsceneEntry), 0x100, 0);
+    gScene.nodes =
+        zmemFreeListCreate(sizeof(ZsceneNode), 0x100, BMX_FNPTR(ZMemDestroyFn, 0x004901b0, zsceneFreeNode));
     if (path == 0) {
         path = "Scene.Txt";
     }
@@ -792,11 +794,11 @@ void *zsceneFindAnim(int flags, const char *name)
 BMX_ADDR(0x00491a80)
 int zsceneAnimTable(void *library, uint32_t *table, int size)
 {
-    uint32_t *node = (uint32_t *)(uintptr_t)((uint32_t *)library)[3];
+    const ZsceneAnim *node = ((const ZsceneEntry *)library)->object;
     int count = 0;
-    uint32_t *p;
+    const ZsceneAnim *p;
 
-    for (p = node; p != 0; p = (uint32_t *)(uintptr_t)p[2]) {
+    for (p = node; p != 0; p = p->next) {
         count++;
     }
     if (count > size) {
@@ -809,8 +811,8 @@ int zsceneAnimTable(void *library, uint32_t *table, int size)
 
         do {
             dst--;
-            *dst = node[1];
-            node = (uint32_t *)(uintptr_t)node[2];
+            *dst = (uint32_t)(uintptr_t)node->anim;
+            node = node->next;
         } while (node != 0);
     }
     if (count < size) {
@@ -876,7 +878,8 @@ int zscnptsReset(void)
     gScnpts.count = 0;
     gScnpts.field14 = 0;
     if (points == 0) {
-        gScnpts.points = zmemFreeListCreate(0x50, 0, BMX_FNPTR(ZMemDestroyFn, 0x00491dc0, zscnptsFreeNode));
+        gScnpts.points =
+            zmemFreeListCreate(sizeof(ZrwMarker), 0, BMX_FNPTR(ZMemDestroyFn, 0x00491dc0, zscnptsFreeNode));
     }
     return 1;
 }
@@ -903,7 +906,8 @@ int zscnptsInitialize(void)
     gScnpts.points = 0;
     gScnpts.count = 0;
     gScnpts.field14 = 0;
-    gScnpts.points = zmemFreeListCreate(0x50, 0, BMX_FNPTR(ZMemDestroyFn, 0x00491dc0, zscnptsFreeNode));
+    gScnpts.points =
+        zmemFreeListCreate(sizeof(ZrwMarker), 0, BMX_FNPTR(ZMemDestroyFn, 0x00491dc0, zscnptsFreeNode));
     return 1;
 }
 

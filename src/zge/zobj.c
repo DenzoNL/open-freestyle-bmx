@@ -148,7 +148,7 @@ int zobjInitialize(int count)
         zdebugFail("Can't initialize with 0", kZobjFile, 0xaf, 0);
     }
     gZobjInitialized = 1;
-    gZobjPool = zmemFreeListCreate(0x3c, 0x100, BMX_FNPTR(ZMemDestroyFn, 0x00487400, zobjFree));
+    gZobjPool = zmemFreeListCreate(sizeof(ZObj), 0x100, BMX_FNPTR(ZMemDestroyFn, 0x00487400, zobjFree));
     gZobjLinkPool = zmemFreeListCreate(0x10, 4, NULL);
     gZobjUpdateNode =
         zrwRegisterUpdateFunction(8, BMX_FNPTR(ZrwUpdateFn, 0x00487020, zobjUpdateAll), NULL, 0);

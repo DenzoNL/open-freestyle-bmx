@@ -17,7 +17,7 @@ int zinputCreate(void)
     }
     gZinputReady = 1;
     gZpadDevices =
-        zmemFreeListCreate(kZpadDeviceBytes, 2, BMX_FNPTR(ZMemDestroyFn, 0x004803c0, zpadDestroyDevice));
+        zmemFreeListCreate(sizeof(ZpadDevice), 2, BMX_FNPTR(ZMemDestroyFn, 0x004803c0, zpadDestroyDevice));
     zpadDirectInputInitialize();
     return 1;
 }

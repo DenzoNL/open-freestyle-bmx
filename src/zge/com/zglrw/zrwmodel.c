@@ -516,7 +516,9 @@ BMX_ADDR(0x00488890)
 int zrwMdlRegisterPlugin(void)
 {
     gZrwMdlPluginOffset =
-        RpClumpRegisterPlugin(4, 0xff02, BMX_FNPTR(RwPluginObjectConstructor, 0x00487d90, zrwMdlConstructor),
+        /* The clump's model (zrwMdlSetUserData; X2e: still handed over as a 32-bit word). */
+        RpClumpRegisterPlugin(sizeof(ZrwModel *), 0xff02,
+                              BMX_FNPTR(RwPluginObjectConstructor, 0x00487d90, zrwMdlConstructor),
                               BMX_FNPTR(RwPluginObjectDestructor, 0x00487db0, zrwMdlDestructor), NULL);
     return gZrwMdlPluginOffset != -1;
 }

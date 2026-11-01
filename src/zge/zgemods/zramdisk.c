@@ -300,6 +300,6 @@ int zramdiskInitialize(void)
     if (gZramdiskFiles != NULL) {
         zdebugFail("File system has already been intialized.", kRamdiskFile, 0x2df, 0);
     }
-    gZramdiskFiles = zmemFreeListCreate(0x10, 0x10, NULL);
+    gZramdiskFiles = zmemFreeListCreate(sizeof(ZramdiskFile), 0x10, NULL);
     return gZramdiskFiles != NULL;
 }

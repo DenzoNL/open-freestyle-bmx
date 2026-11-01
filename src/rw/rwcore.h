@@ -12,6 +12,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "compat/layout.h"
 #include "compat/orig.h"
 #include "zge/zmath.h"
 

@@ -15,7 +15,7 @@ typedef struct DrvCameraExt {
     uint8_t pad04[0x1c];
 } DrvCameraExt;
 
-_Static_assert(sizeof(DrvCameraExt) == 0x20, "the original's camera plugin size");
+_Static_assert(sizeof(DrvCameraExt) == kDrvCameraExtBytes, "the original's camera plugin size");
 
 /* The matrix globals of engine plugin 0x401 (rw/engine.c): +8 is RwMatrixMultiply's routine. */
 #define rwMatrixGlobalsOffset ORIG_VAR(0x00676970, int32_t, rwMatrixGlobalsOffset)

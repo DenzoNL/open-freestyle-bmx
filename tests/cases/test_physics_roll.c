@@ -128,7 +128,7 @@ static int stubObjectValid(int object)
     return script.objectValid;
 }
 
-static void stubBspObjectHit(PhysCollObject *object, int a)
+static void stubBspObjectHit(PhysPropObject *object, int a)
 {
     logU32(0xb5930000u);
     logU32((uint32_t)(uintptr_t)object);
@@ -333,7 +333,7 @@ static void rand_hit(PhysRayHit *h, const ZMatrix *b, int wallBias, int faceBias
     }
     h->object = dt_range(1, 1000);
     h->objectData = alloc_contact();
-    h->objectData->propId = dt_u32() % 3 ? 0 : dt_range(1, 99);
+    h->objectData->prop = (const PhysPropInfo *)(uintptr_t)(dt_u32() % 3 ? 0 : dt_range(1, 99));
 }
 
 static void setup_roll(DtCtx *c, Scenario sc)

@@ -193,7 +193,7 @@ static int BMX_CDECL stubRaycast(const ZVec3 *from, const ZVec3 *to, PhysRayHit 
     if (hit->material != NULL) {
         *(uint32_t *)(uintptr_t)hit->material = pct(gWorld.deadlyPct) ? 6 : dt_u32();
     }
-    hit->objectData = (dt_u32() % 6) == 0 ? NULL : (PhysCollObject *)gWorld.object[dt_u32() % kObjects];
+    hit->objectData = (dt_u32() % 6) == 0 ? NULL : (PhysPropObject *)gWorld.object[dt_u32() % kObjects];
     if (hit->objectData == NULL) {
         hit->flags &= (uint8_t)~2u; /* both functions dereference the object of an object hit */
     }

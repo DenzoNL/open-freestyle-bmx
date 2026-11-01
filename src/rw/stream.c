@@ -468,7 +468,7 @@ BMX_ADDR(0x004e2350)
 void *_rwStreamModuleOpen(void *engine, int32_t offset)
 {
     rwStreamOffset = offset;
-    *(RwFreeList **)((uint8_t *)RwEngineInstance + offset) = RwFreeListCreate(0x20, 10, 0);
+    *(RwFreeList **)((uint8_t *)RwEngineInstance + offset) = RwFreeListCreate(sizeof(RwStream), 10, 0);
     if (rwStreamFreeList() == NULL) {
         return NULL;
     }

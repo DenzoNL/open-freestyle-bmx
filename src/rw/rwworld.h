@@ -177,6 +177,17 @@ typedef struct RpWorldCameraData {
 
 _Static_assert(sizeof(RpWorldCameraData) == 0x1c, "RpWorldCameraData layout");
 
+/*
+ * The world plugin's data of an atomic (at rpWorldAtomicOffset) or a light (at rpWorldLightOffset): the world
+ * it is in and its own sync callback, which the plugin's replaces.
+ */
+typedef struct RpWorldAtomicData {
+    RpWorld *world; /* 0x00 */
+    void *sync;     /* 0x04 saved RpAtomic.object.sync / RpLight.object.sync */
+} RpWorldAtomicData;
+
+typedef RpWorldAtomicData RpWorldLightData;
+
 /* The tie plugin's data in the engine instance (at rpTieOffset): free lists of the two kinds of ties. */
 typedef struct RpTieGlobals {
     RwFreeList *tieFreeList;      /* 0x00 */

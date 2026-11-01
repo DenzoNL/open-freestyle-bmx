@@ -13,14 +13,6 @@ enum { kZanimNameSize = 0x24, kZanimKeySize = 0x14 };
 
 #define gZanimInitialized ORIG_VAR(0x006746c0, int, gZanimInitialized)
 
-/* The animation being read (gZiffAnim): { name, names list, rotation channels, translation channels }. */
-typedef struct ZanimRecord {
-    uint32_t name;
-    ZanimNames *names;
-    ZanimChannel *rotations;
-    ZanimChannel *translations;
-} ZanimRecord;
-
 /* Bone hash of the bone at `index` in the newest name table (an unchecked index, like the original). */
 static uint32_t boneHash(const ZanimRecord *anim, uint32_t index)
 {

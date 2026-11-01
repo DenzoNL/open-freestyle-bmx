@@ -281,11 +281,27 @@ _Static_assert(sizeof(RwD3DStateCache) == 0x160, "RwD3DStateCache layout");
 #define rwD3DFogExp      ((const uint8_t *)BMX_ORIG(0x006769a4))
 #define rwD3DFogExp2     ((const uint8_t *)BMX_ORIG(0x00676aa4))
 
-/* The raster plugin data the texture state reads: +4 colour key on, +0xc texture handle, +0x10 this. */
+/* The pixel format record of a raster's plugin data (RwD3DRasterExt.info). */
 typedef struct RwD3DRasterInfo {
     uint8_t pad00[8];
     uint32_t flags; /* 0x08 bit 0: the texture has alpha */
 } RwD3DRasterInfo;
+
+/*
+ * The start of the driver's raster plugin data (at rwD3DRasterExtOffset), the fields the texture state reads.
+ * The original's Direct3D driver and ours (src/driver, DrvRasterExt) both lay it out this way.
+ */
+typedef struct RwD3DRasterExt {
+    void *texture;               /* 0x00 */
+    int32_t colorKey;            /* 0x04 colour key on */
+    void *cpu;                   /* 0x08 */
+    void *handle;                /* 0x0c the texture handle */
+    const RwD3DRasterInfo *info; /* 0x10 */
+} RwD3DRasterExt;
+
+BMX_LAYOUT32_ASSERT(offsetof(RwD3DRasterExt, colorKey) == 4 && offsetof(RwD3DRasterExt, handle) == 0xc &&
+                        offsetof(RwD3DRasterExt, info) == 0x10,
+                    "RwD3DRasterExt layout");
 
 /* ---- the deferred (alpha sorted) primitives (rw/d3dim2d.c) ---- */
 

@@ -195,7 +195,7 @@ int zpadPollDevices(void)
         uint32_t now = 0;
 
         zmemFill(&device->buttons, 0, 4);
-        zmemFill(device->input, 0, 0x58);
+        zmemFill(device->input, 0, sizeof device->input);
         zmemFill(&device->pad6c, 0, 4);
         if (record->di != NULL) {
             pollJoystick(record, device);
@@ -248,7 +248,8 @@ int zpadDirectInputInitialize(void)
         void *instance;
 
         gZpadDiActive = 1;
-        gZpadDiRecords = zmemFreeListCreate(0x14, 2, BMX_FNPTR(ZMemDestroyFn, 0x004803c0, zpadDestroyDevice));
+        gZpadDiRecords = zmemFreeListCreate(sizeof(ZpadDiRecord), 2,
+                                            BMX_FNPTR(ZMemDestroyFn, 0x004803c0, zpadDestroyDevice));
         gZpadQuery(0x15, (void **)&holder, 0);
         gZpadWindow = *holder;
         instance = (void *)gZpadGetWindowLong(gZpadWindow, -6);
