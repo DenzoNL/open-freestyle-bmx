@@ -4062,22 +4062,19 @@ struct BmxGroup_gRiderAirStepGroup gRiderAirStepGroup __attribute__((aligned(16)
         },
 };
 
-/* 0x005588f8 */
-RiderSingleTable gRiderGrindStep = {
-    riderGrindSub0,
-};
-
-/* 0x005588fc */
-RiderSingleTable gRiderLipStep = {
-    riderLipSub0,
-};
-
-/* 0x00558900 */
-RiderSingleTable gRiderManualStep = {
-    riderManualSub0,
-};
-
-struct BmxGroup_gRiderScoreWeightGroup gRiderScoreWeightGroup __attribute__((aligned(16))) = {
+struct BmxGroup_gRiderGrindStepGroup gRiderGrindStepGroup __attribute__((aligned(16))) = {
+    .gRiderGrindStep =
+        {
+            riderGrindSub0,
+        },
+    .gRiderLipStep =
+        {
+            riderLipSub0,
+        },
+    .gRiderManualStep =
+        {
+            riderManualSub0,
+        },
     .gRiderStickDir = {0x40300, 0x70501, 0x80602},
     .gRiderScoreWeight = {0.67f, 0.375f, 0.375f, 0.5f, 0.5f, 0.44f, 0.44f, 0.5f, 0.5f, 0.56f, 0.56f, 0.5f,
                           0.5f, 2.0f},
@@ -4650,10 +4647,7 @@ unsigned char d_0069621d[216];
 /* 0x006962f5 */
 uint8_t gDemoPlayer;
 
-/* 0x006962fc */
-PhysMotionTable gPhysMotions;
-
-struct BmxGroup_gActionMotionsGroup gActionMotionsGroup __attribute__((aligned(16)));
+struct BmxGroup_gPhysMotionsGroup gPhysMotionsGroup __attribute__((aligned(16)));
 
 /* 0x006966dc */
 uint32_t gOvlSaving;

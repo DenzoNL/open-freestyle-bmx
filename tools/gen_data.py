@@ -1156,6 +1156,18 @@ class Gen:
                 comps[-1][2] = comps[-1][2] or rng
             else:
                 comps.append([lo, hi, rng])
+        # A declaration of an array of one element (or none) is the start of a table whose length the code does not
+        # say (gPhysMotions[1] is read as a table that runs on through gActionMotions): it stays with the global
+        # after it.
+        for s in self.sites:
+            t = s.type.strip()
+            if s.addr in block and t.kind == "array" and t.count <= 1:
+                i = next(k for k, c in enumerate(comps) if c[0] <= s.addr < c[1])
+                if i + 1 < len(comps):
+                    self.log.append(f"{s}: an open-ended table, kept with what follows it at {comps[i + 1][0]:#x}")
+                    comps[i][1] = comps[i + 1][1]
+                    comps[i][2] = comps[i][2] or comps[i + 1][2]
+                    del comps[i + 1]
         for c in comps:
             if c[1] > hi_b:
                 sys.exit(f"{c[0]:#x}..{c[1]:#x} runs past the end of {block.name}")

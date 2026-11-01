@@ -10,18 +10,19 @@ bmxnative.exe reads nothing from NgBMX.exe: it needs only the game's data folder
 X2-A). The original's initialised data (the globals' values, tables, strings, the pointers between them and into
 the code) is C source in `src/data`, made once from the exe by `tools/gen_data.py` and maintained like the code.
 
-- **One definition per global** (X2a): 4232 definitions, each its own symbol with its own initialiser, in
+- **One definition per global** (X2a): 4042 definitions, each its own symbol with its own initialiser, in
   `src/data/<module>.c` by the module that declares the global (action, menu, bmxzge, pc, zge, zglrw, rw, native;
   imports and inputtables). Typed as the source declares it (`ORIG_VAR`'s type; 1446 of 1663 declarations have a type
   the data files see, the others, types local to a .c file, get a same-layout copy `BmxType_<name>`). Declarations
   inside another one (its fields, other names for it) are aliases, listed in its comment.
-- **Groups** (233): globals the code uses as one piece stay one struct whose members keep their original offsets
+- **Groups** (231): globals the code uses as one piece stay one struct whose members keep their original offsets
   (asserted): the views (declarations that span several globals without containing them: byte-array tables over
   rider and trick data, overlay tables, gGameRecords over the game state...), the ranges copied or cleared at once
   (SAVE.DAT's three ranges: `bmxSaveRecords` 0x551fd8+0x1680, `bmxSaveProfiles` 0x6952a0+0x98 (with the unreferenced bytes after it),
   `bmxSaveOptions` 0x6955e0+0xc3c; `bmxWinMainGlobals` cleared by initGlobals; `bmxZrwWorldState` cleared from
-  gZrwWorldReady, 0xac bytes), and a global with the bytes after it that nothing refers to (115: a table declared
-  shorter than it is reads on into them; gNgifPrimBuffer's buffer, gFxHandlerTable's three pointers). `EXTENTS` in
+  gZrwWorldReady, 0xac bytes), a global with the bytes after it that nothing refers to (109: a table declared
+  shorter than it is reads on into them; gFxHandlerTable's three pointers), and an array declared with one element
+  with the global after it (an open-ended table: `gPhysMotions[1]` is read on into gActionMotions). `EXTENTS` in
   the generator bounds views whose declared type is bigger than what the code uses (gComdataRecords: 0x1200 records
   declared, SAVE.DAT's 0x1680 bytes used; gPhysRiders: 4 riders declared, 2 used; gActionMapTable: 256 bytes
   declared, unused, gGameLevelInfoIndex's 12 at the same address). A group is laid out as if it

@@ -457,7 +457,7 @@ char sA104f104f104f[28] = "a:% 10.4f,% 10.4f,% 10.4f";
 char sZrwDbgOutOfBufferSpace[32] = "ZrwDbg: Out of buffer space\n";
 
 /* 0x00560270 */
-char sNotInitialized_00560270[16] = "Not initialized";
+char sNotInitialized[16] = "Not initialized";
 
 /* 0x00560280 */
 char sCNgEngineZgeZinputC[28] = "C:\\NgEngine\\Zge\\zinput.c";

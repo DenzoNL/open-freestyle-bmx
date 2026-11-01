@@ -129,10 +129,7 @@ extern struct BmxDataOpaque bmxAt_gRiderTrickSteer __asm__("_gRiderTrickSteer");
 extern struct BmxDataOpaque bmxAt_gRiderJumpFrames __asm__("_gRiderJumpFrames");
 extern struct BmxDataOpaque bmxAt_gRiderModeStep __asm__("_gRiderModeStep");
 extern struct BmxDataOpaque bmxAt_gRiderAirStepGroup __asm__("_gRiderAirStepGroup");
-extern struct BmxDataOpaque bmxAt_gRiderGrindStep __asm__("_gRiderGrindStep");
-extern struct BmxDataOpaque bmxAt_gRiderLipStep __asm__("_gRiderLipStep");
-extern struct BmxDataOpaque bmxAt_gRiderManualStep __asm__("_gRiderManualStep");
-extern struct BmxDataOpaque bmxAt_gRiderScoreWeightGroup __asm__("_gRiderScoreWeightGroup");
+extern struct BmxDataOpaque bmxAt_gRiderGrindStepGroup __asm__("_gRiderGrindStepGroup");
 extern struct BmxDataOpaque bmxAt_gRiderTrickComboGroup __asm__("_gRiderTrickComboGroup");
 extern struct BmxDataOpaque bmxAt_gGuiAssetFile __asm__("_gGuiAssetFile");
 extern struct BmxDataOpaque bmxAt_gGuiPulseStep __asm__("_gGuiPulseStep");
@@ -211,8 +208,6 @@ extern struct BmxDataOpaque bmxAt_gZcollideBarEdgeGroup __asm__("_gZcollideBarEd
 extern struct BmxDataOpaque bmxAt_sF_0055d8c8 __asm__("_sF_0055d8c8");
 extern struct BmxDataOpaque bmxAt_gZresOverlaySources __asm__("_gZresOverlaySources");
 extern struct BmxDataOpaque bmxAt_gZrollerRiderNamesGroup __asm__("_gZrollerRiderNamesGroup");
-extern struct BmxDataOpaque bmxAt_gZrollerBikeNamesGroup __asm__("_gZrollerBikeNamesGroup");
-extern struct BmxDataOpaque bmxAt_gSemitones __asm__("_gSemitones");
 extern struct BmxDataOpaque bmxAt_gCents __asm__("_gCents");
 extern struct BmxDataOpaque bmxAt_gGainCurve __asm__("_gGainCurve");
 extern struct BmxDataOpaque bmxAt_gDsVolumeGroup __asm__("_gDsVolumeGroup");
@@ -223,8 +218,6 @@ extern struct BmxDataOpaque bmxAt_gZactorMax __asm__("_gZactorMax");
 extern struct BmxDataOpaque bmxAt_gMotionMirrorMap __asm__("_gMotionMirrorMap");
 extern struct BmxDataOpaque bmxAt_gMotionLoadedBank __asm__("_gMotionLoadedBank");
 extern struct BmxDataOpaque bmxAt_gSkeletonChainGroup __asm__("_gSkeletonChainGroup");
-extern struct BmxDataOpaque bmxAt_gSkeletonOffsetsGroup __asm__("_gSkeletonOffsetsGroup");
-extern struct BmxDataOpaque bmxAt_gZsndTicksPerSec __asm__("_gZsndTicksPerSec");
 extern struct BmxDataOpaque bmxAt_gZdebugStart __asm__("_gZdebugStart");
 extern struct BmxDataOpaque bmxAt_gZProfilePrintAtGroup __asm__("_gZProfilePrintAtGroup");
 extern struct BmxDataOpaque bmxAt_gZrwDbgLineHook __asm__("_gZrwDbgLineHook");
@@ -590,7 +583,6 @@ extern struct BmxDataOpaque bmxAt_gFxSplashTexture __asm__("_gFxSplashTexture");
 extern struct BmxDataOpaque bmxAt_gNgifScript __asm__("_gNgifScript");
 extern struct BmxDataOpaque bmxAt_gFxCube __asm__("_gFxCube");
 extern struct BmxDataOpaque bmxAt_gNgifPrimBufferGroup __asm__("_gNgifPrimBufferGroup");
-extern struct BmxDataOpaque bmxAt_gNgifFlushPending __asm__("_gNgifFlushPending");
 extern struct BmxDataOpaque bmxAt_gNgifFlushNode __asm__("_gNgifFlushNode");
 extern struct BmxDataOpaque bmxAt_gNgifFlushPending2 __asm__("_gNgifFlushPending2");
 extern struct BmxDataOpaque bmxAt_gNgifFlushNode2 __asm__("_gNgifFlushNode2");
@@ -601,7 +593,6 @@ extern struct BmxDataOpaque bmxAt_gZactorArmHashesGroup __asm__("_gZactorArmHash
 extern struct BmxDataOpaque bmxAt_gZbspNearHits __asm__("_gZbspNearHits");
 extern struct BmxDataOpaque bmxAt_gZbspMatRefValue __asm__("_gZbspMatRefValue");
 extern struct BmxDataOpaque bmxAt_gZbspPropFacesGroup __asm__("_gZbspPropFacesGroup");
-extern struct BmxDataOpaque bmxAt_gZbspNearFaces __asm__("_gZbspNearFaces");
 extern struct BmxDataOpaque bmxAt_gZbspSphere __asm__("_gZbspSphere");
 extern struct BmxDataOpaque bmxAt_gZbspFaceQuery __asm__("_gZbspFaceQuery");
 extern struct BmxDataOpaque bmxAt_gZbspHits __asm__("_gZbspHits");
@@ -968,7 +959,6 @@ extern struct BmxDataOpaque bmxAt_gZresMaterialLib __asm__("_gZresMaterialLib");
 extern struct BmxDataOpaque bmxAt_gZresMiscLib __asm__("_gZresMiscLib");
 extern struct BmxDataOpaque bmxAt_gZrollerEdgesGroup __asm__("_gZrollerEdgesGroup");
 extern struct BmxDataOpaque bmxAt_gNgifPrim3DBufferGroup __asm__("_gNgifPrim3DBufferGroup");
-extern struct BmxDataOpaque bmxAt_gNgifOrderTable __asm__("_gNgifOrderTable");
 extern struct BmxDataOpaque bmxAt_gZrollerModels __asm__("_gZrollerModels");
 extern struct BmxDataOpaque bmxAt_gNgifPrim3D __asm__("_gNgifPrim3D");
 extern struct BmxDataOpaque bmxAt_gNgifColorGroup __asm__("_gNgifColorGroup");
@@ -1093,8 +1083,7 @@ extern struct BmxDataOpaque bmxAt_bmxSaveProfiles __asm__("_bmxSaveProfiles");
 extern struct BmxDataOpaque bmxAt_bmxSaveOptions __asm__("_bmxSaveOptions");
 extern struct BmxDataOpaque bmxAt_gPlayerCount __asm__("_gPlayerCount");
 extern struct BmxDataOpaque bmxAt_gDemoPlayer __asm__("_gDemoPlayer");
-extern struct BmxDataOpaque bmxAt_gPhysMotions __asm__("_gPhysMotions");
-extern struct BmxDataOpaque bmxAt_gActionMotionsGroup __asm__("_gActionMotionsGroup");
+extern struct BmxDataOpaque bmxAt_gPhysMotionsGroup __asm__("_gPhysMotionsGroup");
 extern struct BmxDataOpaque bmxAt_gOvlSaving __asm__("_gOvlSaving");
 extern struct BmxDataOpaque bmxAt_rpMeshOffset __asm__("_rpMeshOffset");
 extern struct BmxDataOpaque bmxAt_rpMeshModuleCount __asm__("_rpMeshModuleCount");
@@ -1387,11 +1376,11 @@ extern struct BmxDataOpaque bmxAt_rpAnimHeadNameGroup __asm__("_rpAnimHeadNameGr
 #define BMX_DATA_0x005588b8 ((char *)&bmxAt_gRiderModeStep)
 #define BMX_DATA_0x005588d4 ((char *)&bmxAt_gRiderAirStepGroup + 0x4)
 #define BMX_DATA_0x005588ec ((char *)&bmxAt_gRiderAirStepGroup + 0x1c)
-#define BMX_DATA_0x005588f8 ((char *)&bmxAt_gRiderGrindStep)
-#define BMX_DATA_0x005588fc ((char *)&bmxAt_gRiderLipStep)
-#define BMX_DATA_0x00558900 ((char *)&bmxAt_gRiderManualStep)
-#define BMX_DATA_0x00558904 ((char *)&bmxAt_gRiderScoreWeightGroup + 0x4)
-#define BMX_DATA_0x00558914 ((char *)&bmxAt_gRiderScoreWeightGroup + 0x14)
+#define BMX_DATA_0x005588f8 ((char *)&bmxAt_gRiderGrindStepGroup + 0x8)
+#define BMX_DATA_0x005588fc ((char *)&bmxAt_gRiderGrindStepGroup + 0xc)
+#define BMX_DATA_0x00558900 ((char *)&bmxAt_gRiderGrindStepGroup + 0x10)
+#define BMX_DATA_0x00558904 ((char *)&bmxAt_gRiderGrindStepGroup + 0x14)
+#define BMX_DATA_0x00558914 ((char *)&bmxAt_gRiderGrindStepGroup + 0x24)
 #define BMX_DATA_0x00558af7 ((char *)&bmxAt_gRiderTrickComboGroup + 0x7)
 #define BMX_DATA_0x00558b40 ((char *)&bmxAt_gRiderTrickComboGroup + 0x50)
 #define BMX_DATA_0x00558b8c ((char *)&bmxAt_gRiderTrickComboGroup + 0x9c)
@@ -1510,8 +1499,8 @@ extern struct BmxDataOpaque bmxAt_rpAnimHeadNameGroup __asm__("_rpAnimHeadNameGr
 #define BMX_DATA_0x0055d8c8 ((char *)&bmxAt_sF_0055d8c8)
 #define BMX_DATA_0x0055d978 ((char *)&bmxAt_gZresOverlaySources)
 #define BMX_DATA_0x0055dc50 ((char *)&bmxAt_gZrollerRiderNamesGroup)
-#define BMX_DATA_0x0055dc80 ((char *)&bmxAt_gZrollerBikeNamesGroup)
-#define BMX_DATA_0x0055e820 ((char *)&bmxAt_gSemitones)
+#define BMX_DATA_0x0055dc80 ((char *)&bmxAt_gZrollerRiderNamesGroup + 0x30)
+#define BMX_DATA_0x0055e820 ((char *)&bmxAt_gZrollerRiderNamesGroup + 0xbd0)
 #define BMX_DATA_0x0055e8b4 ((char *)&bmxAt_gCents)
 #define BMX_DATA_0x0055e97c ((char *)&bmxAt_gGainCurve)
 #define BMX_DATA_0x0055eb7c ((char *)&bmxAt_gDsVolumeGroup + 0xc)
@@ -1523,8 +1512,8 @@ extern struct BmxDataOpaque bmxAt_rpAnimHeadNameGroup __asm__("_rpAnimHeadNameGr
 #define BMX_DATA_0x0055f364 ((char *)&bmxAt_gMotionMirrorMap)
 #define BMX_DATA_0x0055f38c ((char *)&bmxAt_gMotionLoadedBank)
 #define BMX_DATA_0x0055f390 ((char *)&bmxAt_gSkeletonChainGroup)
-#define BMX_DATA_0x0055f4c0 ((char *)&bmxAt_gSkeletonOffsetsGroup)
-#define BMX_DATA_0x0055ffc0 ((char *)&bmxAt_gZsndTicksPerSec)
+#define BMX_DATA_0x0055f4c0 ((char *)&bmxAt_gSkeletonChainGroup + 0x130)
+#define BMX_DATA_0x0055ffc0 ((char *)&bmxAt_gSkeletonChainGroup + 0xc30)
 #define BMX_DATA_0x00560030 ((char *)&bmxAt_gZdebugStart)
 #define BMX_DATA_0x00560038 ((char *)&bmxAt_gZProfilePrintAtGroup + 0x8)
 #define BMX_DATA_0x00560064 ((char *)&bmxAt_gZrwDbgLineHook)
@@ -1983,7 +1972,7 @@ extern struct BmxDataOpaque bmxAt_rpAnimHeadNameGroup __asm__("_rpAnimHeadNameGr
 #define BMX_DATA_0x005ab4f0 ((char *)&bmxAt_gNgifScript)
 #define BMX_DATA_0x005ab4f4 ((char *)&bmxAt_gFxCube)
 #define BMX_DATA_0x005ab4fc ((char *)&bmxAt_gNgifPrimBufferGroup + 0xc)
-#define BMX_DATA_0x005d24fc ((char *)&bmxAt_gNgifFlushPending)
+#define BMX_DATA_0x005d24fc ((char *)&bmxAt_gNgifPrimBufferGroup + 0x2700c)
 #define BMX_DATA_0x005d2500 ((char *)&bmxAt_gNgifFlushNode)
 #define BMX_DATA_0x005d2504 ((char *)&bmxAt_gNgifFlushPending2)
 #define BMX_DATA_0x005d2508 ((char *)&bmxAt_gNgifFlushNode2)
@@ -1994,7 +1983,7 @@ extern struct BmxDataOpaque bmxAt_rpAnimHeadNameGroup __asm__("_rpAnimHeadNameGr
 #define BMX_DATA_0x005e63d8 ((char *)&bmxAt_gZbspNearHits)
 #define BMX_DATA_0x005e7fd8 ((char *)&bmxAt_gZbspMatRefValue)
 #define BMX_DATA_0x005e7fe0 ((char *)&bmxAt_gZbspPropFacesGroup)
-#define BMX_DATA_0x005e8420 ((char *)&bmxAt_gZbspNearFaces)
+#define BMX_DATA_0x005e8420 ((char *)&bmxAt_gZbspPropFacesGroup + 0x440)
 #define BMX_DATA_0x005f0c20 ((char *)&bmxAt_gZbspSphere)
 #define BMX_DATA_0x005f0c28 ((char *)&bmxAt_gZbspFaceQuery)
 #define BMX_DATA_0x005f0c68 ((char *)&bmxAt_gZbspHits)
@@ -2372,7 +2361,7 @@ extern struct BmxDataOpaque bmxAt_rpAnimHeadNameGroup __asm__("_rpAnimHeadNameGr
 #define BMX_DATA_0x00678490 ((char *)&bmxAt_gZresMiscLib)
 #define BMX_DATA_0x00678494 ((char *)&bmxAt_gZrollerEdgesGroup + 0x4)
 #define BMX_DATA_0x00678560 ((char *)&bmxAt_gNgifPrim3DBufferGroup)
-#define BMX_DATA_0x0068c3d0 ((char *)&bmxAt_gNgifOrderTable)
+#define BMX_DATA_0x0068c3d0 ((char *)&bmxAt_gNgifPrim3DBufferGroup + 0x13e70)
 #define BMX_DATA_0x0068c3e0 ((char *)&bmxAt_gZrollerModels)
 #define BMX_DATA_0x0068ebe0 ((char *)&bmxAt_gNgifPrim3D)
 #define BMX_DATA_0x0068fc00 ((char *)&bmxAt_gNgifColorGroup)
@@ -2509,8 +2498,8 @@ extern struct BmxDataOpaque bmxAt_rpAnimHeadNameGroup __asm__("_rpAnimHeadNameGr
 #define BMX_DATA_0x00696218 ((char *)&bmxAt_bmxSaveOptions + 0xc38)
 #define BMX_DATA_0x0069621c ((char *)&bmxAt_gPlayerCount)
 #define BMX_DATA_0x006962f5 ((char *)&bmxAt_gDemoPlayer)
-#define BMX_DATA_0x006962fc ((char *)&bmxAt_gPhysMotions)
-#define BMX_DATA_0x00696300 ((char *)&bmxAt_gActionMotionsGroup)
+#define BMX_DATA_0x006962fc ((char *)&bmxAt_gPhysMotionsGroup + 0xc)
+#define BMX_DATA_0x00696300 ((char *)&bmxAt_gPhysMotionsGroup + 0x10)
 #define BMX_DATA_0x006966dc ((char *)&bmxAt_gOvlSaving)
 #define BMX_DATA_0x006966e8 ((char *)&bmxAt_rpMeshOffset)
 #define BMX_DATA_0x006966ec ((char *)&bmxAt_rpMeshModuleCount)

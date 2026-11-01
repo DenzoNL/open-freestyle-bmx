@@ -4670,10 +4670,13 @@ _Static_assert(offsetof(struct BmxGroup_gRiderAirStepGroup, gRiderAirStep) +
                    0x28,
                "gRiderAirStepGroup");
 
-/* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00558904..0x00558a48.
+/* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005588f8..0x00558a48.
  */
-struct BmxGroup_gRiderScoreWeightGroup {
-    uint8_t lead_[4];                        /* nothing: the members' offsets keep their original alignment */
+struct BmxGroup_gRiderGrindStepGroup {
+    uint8_t lead_[8];                        /* nothing: the members' offsets keep their original alignment */
+    RiderSingleTable gRiderGrindStep;        /* 0x005588f8 */
+    RiderSingleTable gRiderLipStep;          /* 0x005588fc */
+    RiderSingleTable gRiderManualStep;       /* 0x00558900 */
     uint32_t gRiderStickDir[4];              /* 0x00558904 */
     float gRiderScoreWeight[16];             /* 0x00558914; the type is local to bmx/com/action/rider.c */
     unsigned char pad_00558954[36];          /* 0x00558954 */
@@ -4687,7 +4690,10 @@ struct BmxGroup_gRiderScoreWeightGroup {
     unsigned char pad_00558a3c[12];                    /* 0x00558a3c */
 };
 #define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gRiderScoreWeightGroup, member) == (addr) - 0x00558900, #member)
+    _Static_assert(offsetof(struct BmxGroup_gRiderGrindStepGroup, member) == (addr) - 0x005588f0, #member)
+AT(gRiderGrindStep, 0x005588f8);
+AT(gRiderLipStep, 0x005588fc);
+AT(gRiderManualStep, 0x00558900);
 AT(gRiderStickDir, 0x00558904);
 AT(gRiderScoreWeight, 0x00558914);
 AT(pad_00558954, 0x00558954);
@@ -4700,10 +4706,10 @@ AT(pad_005589f4, 0x005589f4);
 AT(sFailedToCreateBikeActorForRiderLdBikeLo, 0x005589fc);
 AT(pad_00558a3c, 0x00558a3c);
 #undef AT
-_Static_assert(offsetof(struct BmxGroup_gRiderScoreWeightGroup, pad_00558a3c) +
-                       sizeof(((struct BmxGroup_gRiderScoreWeightGroup *)0)->pad_00558a3c) ==
-                   0x148,
-               "gRiderScoreWeightGroup");
+_Static_assert(offsetof(struct BmxGroup_gRiderGrindStepGroup, pad_00558a3c) +
+                       sizeof(((struct BmxGroup_gRiderGrindStepGroup *)0)->pad_00558a3c) ==
+                   0x158,
+               "gRiderGrindStepGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00558af7..0x00559b94.
  */
@@ -5338,42 +5344,413 @@ _Static_assert(offsetof(struct BmxGroup_gZcollideBarEdgeGroup, pad_0055d507) +
                    0x1c,
                "gZcollideBarEdgeGroup");
 
-/* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0055dc50..0x0055dc80.
+/* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0055dc50..0x0055e8b2.
  */
 struct BmxGroup_gZrollerRiderNamesGroup {
-    ZrollerNameTable gZrollerRiderNames; /* 0x0055dc50 */
-    void *p_0055dc54[11];                /* 0x0055dc54 */
+    ZrollerNameTable gZrollerRiderNames;               /* 0x0055dc50 */
+    void *p_0055dc54[11];                              /* 0x0055dc54 */
+    ZrollerNameTable gZrollerBikeNames;                /* 0x0055dc80 */
+    void *p_0055dc84[48];                              /* 0x0055dc84 */
+    unsigned char pad_0055dd44[48];                    /* 0x0055dd44 */
+    char sXXbike01[12];                                /* 0x0055dd74 */
+    char sABbike04[12];                                /* 0x0055dd80 */
+    char sABbike03[12];                                /* 0x0055dd8c */
+    char sABbike02[12];                                /* 0x0055dd98 */
+    char sABbike01[12];                                /* 0x0055dda4 */
+    char sSJbike04[12];                                /* 0x0055ddb0 */
+    char sSJbike03[12];                                /* 0x0055ddbc */
+    char sSJbike02[12];                                /* 0x0055ddc8 */
+    char sSJbike01[12];                                /* 0x0055ddd4 */
+    char sJGbike04[12];                                /* 0x0055dde0 */
+    char sJGbike03[12];                                /* 0x0055ddec */
+    char sJGbike02[12];                                /* 0x0055ddf8 */
+    char sJGbike01[12];                                /* 0x0055de04 */
+    char sLRbike04[12];                                /* 0x0055de10 */
+    char sLRbike03[12];                                /* 0x0055de1c */
+    char sLRbike02[12];                                /* 0x0055de28 */
+    char sLRbike01[12];                                /* 0x0055de34 */
+    char sSBbike04[12];                                /* 0x0055de40 */
+    char sSBbike03[12];                                /* 0x0055de4c */
+    char sSBbike02[12];                                /* 0x0055de58 */
+    char sSBbike01[12];                                /* 0x0055de64 */
+    char sKHbike04[12];                                /* 0x0055de70 */
+    char sKHbike03[12];                                /* 0x0055de7c */
+    char sKHbike02[12];                                /* 0x0055de88 */
+    char sKHbike01[12];                                /* 0x0055de94 */
+    char sTMibike04[12];                               /* 0x0055dea0 */
+    char sTMibike03[12];                               /* 0x0055deac */
+    char sTMibike02[12];                               /* 0x0055deb8 */
+    char sTMibike01[12];                               /* 0x0055dec4 */
+    char sCKbike04[12];                                /* 0x0055ded0 */
+    char sCKbike03[12];                                /* 0x0055dedc */
+    char sCKbike02[12];                                /* 0x0055dee8 */
+    char sCKbike01[12];                                /* 0x0055def4 */
+    char sMLbike04[12];                                /* 0x0055df00 */
+    char sMLbike03[12];                                /* 0x0055df0c */
+    char sMLbike02[12];                                /* 0x0055df18 */
+    char sMLbike01[12];                                /* 0x0055df24 */
+    char sTMcbike04[12];                               /* 0x0055df30 */
+    char sTMcbike03[12];                               /* 0x0055df3c */
+    char sTMcbike02[12];                               /* 0x0055df48 */
+    char sTMcbike01[12];                               /* 0x0055df54 */
+    char sRNbike04[12];                                /* 0x0055df60 */
+    char sRNbike03[12];                                /* 0x0055df6c */
+    char sRNbike02[12];                                /* 0x0055df78 */
+    char sRNbike01[12];                                /* 0x0055df84 */
+    char sDMbike04[12];                                /* 0x0055df90 */
+    char sDMbike03[12];                                /* 0x0055df9c */
+    char sDMbike02[12];                                /* 0x0055dfa8 */
+    char sDMbike01[12];                                /* 0x0055dfb4 */
+    char sAmishBoy[12];                                /* 0x0055dfc0 */
+    unsigned char pad_0055dfcc[4];                     /* 0x0055dfcc */
+    char sSlimJimGuy[16];                              /* 0x0055dfd0 */
+    char sJoeyGarcia[16];                              /* 0x0055dfe0 */
+    char sLeighRamsdell[16];                           /* 0x0055dff0 */
+    unsigned char pad_0055e000[4];                     /* 0x0055e000 */
+    char sShaunButler[16];                             /* 0x0055e004 */
+    char sKenanHarkin[16];                             /* 0x0055e014 */
+    char sTimMirra[12];                                /* 0x0055e024 */
+    unsigned char pad_0055e030[4];                     /* 0x0055e030 */
+    char sChadKagy[12];                                /* 0x0055e034 */
+    unsigned char pad_0055e040[4];                     /* 0x0055e040 */
+    char sMikeLaird[12];                               /* 0x0055e044 */
+    unsigned char pad_0055e050[4];                     /* 0x0055e050 */
+    char sTroyMcMurray[16];                            /* 0x0055e054 */
+    unsigned char pad_0055e064[4];                     /* 0x0055e064 */
+    char sRyanNyquist[16];                             /* 0x0055e068 */
+    char sDaveMirra[12];                               /* 0x0055e078 */
+    unsigned char pad_0055e084[4];                     /* 0x0055e084 */
+    char sZROLLERFailedToIntializeZRES[36];            /* 0x0055e088 */
+    unsigned char pad_0055e0ac[8];                     /* 0x0055e0ac */
+    char sCZaxisBmxSrcComZgeNgIFNgIFzrollerC[44];      /* 0x0055e0b4 */
+    unsigned char pad_0055e0e0[8];                     /* 0x0055e0e0 */
+    char sZrollerUpdateZGL[20];                        /* 0x0055e0e8 */
+    char sZrollerCreateChaser[20];                     /* 0x0055e0fc */
+    unsigned char pad_0055e110[4];                     /* 0x0055e110 */
+    char sZrollerLoadAssets[20];                       /* 0x0055e114 */
+    unsigned char pad_0055e128[4];                     /* 0x0055e128 */
+    char sRiderShadow[16];                             /* 0x0055e12c */
+    char sOutOfPlayerDefs[20];                         /* 0x0055e13c */
+    unsigned char pad_0055e150[4];                     /* 0x0055e150 */
+    char sBikeShadow[12];                              /* 0x0055e154 */
+    unsigned char pad_0055e160[4];                     /* 0x0055e160 */
+    char sInvalidBikeSelected[24];                     /* 0x0055e164 */
+    unsigned char pad_0055e17c[4];                     /* 0x0055e17c */
+    char sZrollerCreateProp[20];                       /* 0x0055e180 */
+    unsigned char pad_0055e194[4];                     /* 0x0055e194 */
+    char sZrollerSetEngineState[24];                   /* 0x0055e198 */
+    unsigned char pad_0055e1b0[4];                     /* 0x0055e1b0 */
+    char sZrollerGetNumPlayerDefs[24];                 /* 0x0055e1b4 */
+    unsigned char pad_0055e1cc[4];                     /* 0x0055e1cc */
+    char sZrollerLoadMdlPlayerCB[24];                  /* 0x0055e1d0 */
+    unsigned char pad_0055e1e8[4];                     /* 0x0055e1e8 */
+    char sZrollerIsPlayerClose[24];                    /* 0x0055e1ec */
+    unsigned char pad_0055e204[4];                     /* 0x0055e204 */
+    char sChangePlayerModeLook[24];                    /* 0x0055e208 */
+    unsigned char pad_0055e220[4];                     /* 0x0055e220 */
+    char sZrollerAddPlayerMatsToLoadList[32];          /* 0x0055e224 */
+    unsigned char pad_0055e244[8];                     /* 0x0055e244 */
+    char sZrollerChangePlayerSponsor[28];              /* 0x0055e24c */
+    unsigned char pad_0055e268[4];                     /* 0x0055e268 */
+    char sZrollerchangeboardsponsor[28];               /* 0x0055e26c */
+    unsigned char pad_0055e288[4];                     /* 0x0055e288 */
+    char sZrollerLoadMdlGenericCB[24];                 /* 0x0055e28c */
+    unsigned char pad_0055e2a4[4];                     /* 0x0055e2a4 */
+    char sZrollerLoadMdlCommon[24];                    /* 0x0055e2a8 */
+    unsigned char pad_0055e2c0[4];                     /* 0x0055e2c0 */
+    char sLoadMdlCommonMat[20];                        /* 0x0055e2c4 */
+    char sZrollerProcessModelFlags[28];                /* 0x0055e2d8 */
+    unsigned char pad_0055e2f4[4];                     /* 0x0055e2f4 */
+    char sZrollerProcessActorDrawFlags[32];            /* 0x0055e2f8 */
+    unsigned char pad_0055e318[4];                     /* 0x0055e318 */
+    char sZrollerSetAnimMaterialPalette[32];           /* 0x0055e31c */
+    unsigned char pad_0055e33c[4];                     /* 0x0055e33c */
+    char sZrollerInitializeLoadingScreen[32];          /* 0x0055e340 */
+    unsigned char pad_0055e360[8];                     /* 0x0055e360 */
+    char sZrollerShutdownLoadingScreen[32];            /* 0x0055e368 */
+    unsigned char pad_0055e388[4];                     /* 0x0055e388 */
+    char sZrollerDisplayLoadingScreen[28];             /* 0x0055e38c */
+    unsigned char pad_0055e3a8[8];                     /* 0x0055e3a8 */
+    char sZrollerSetLocal[16];                         /* 0x0055e3b0 */
+    unsigned char pad_0055e3c0[4];                     /* 0x0055e3c0 */
+    char sZrollerLoadModule[20];                       /* 0x0055e3c4 */
+    unsigned char pad_0055e3d8[4];                     /* 0x0055e3d8 */
+    char sLoadCodeModule[16];                          /* 0x0055e3dc */
+    unsigned char pad_0055e3ec[4];                     /* 0x0055e3ec */
+    char sZrollerAllocMaterials[24];                   /* 0x0055e3f0 */
+    unsigned char pad_0055e408[4];                     /* 0x0055e408 */
+    char sZrollerAddGenericMaterialsToLoad[36];        /* 0x0055e40c */
+    unsigned char pad_0055e430[4];                     /* 0x0055e430 */
+    char sZrollerInitializeMaps[24];                   /* 0x0055e434 */
+    unsigned char pad_0055e44c[4];                     /* 0x0055e44c */
+    char sZrollerSetMap[16];                           /* 0x0055e450 */
+    char sZrollerLoadMaps[16];                         /* 0x0055e460 */
+    unsigned char pad_0055e470[4];                     /* 0x0055e470 */
+    char sZrollerLoadMatTerrainFirstCB[32];            /* 0x0055e474 */
+    unsigned char pad_0055e494[4];                     /* 0x0055e494 */
+    char sZrollerLoadMatTerrainLastCB[28];             /* 0x0055e498 */
+    unsigned char pad_0055e4b4[8];                     /* 0x0055e4b4 */
+    char sZrollerAssociateMapMaterials[32];            /* 0x0055e4bc */
+    unsigned char pad_0055e4dc[4];                     /* 0x0055e4dc */
+    char sZroolerAssociateMaterialLlljlkfsdjflsjd[44]; /* 0x0055e4e0 */
+    unsigned char pad_0055e50c[8];                     /* 0x0055e50c */
+    char sAssociateMaterialPalAnimation[36];           /* 0x0055e514 */
+    unsigned char pad_0055e538[4];                     /* 0x0055e538 */
+    char sZrollerGetPlayerStartPosHARDCODED[36];       /* 0x0055e53c */
+    unsigned char pad_0055e560[8];                     /* 0x0055e560 */
+    char sPlayerStartPointNotFoundUsingDefaultVal[52]; /* 0x0055e568 */
+    unsigned char pad_0055e59c[12];                    /* 0x0055e59c */
+    char sPlayerT[8];                                  /* 0x0055e5a8 */
+    unsigned char pad_0055e5b0[4];                     /* 0x0055e5b0 */
+    char sPlayer[8];                                   /* 0x0055e5b4 */
+    char sZrollerGetPlayerRestartPos[28];              /* 0x0055e5bc */
+    unsigned char pad_0055e5d8[4];                     /* 0x0055e5d8 */
+    char sZrollerInitPropLoadList[24];                 /* 0x0055e5dc */
+    unsigned char pad_0055e5f4[4];                     /* 0x0055e5f4 */
+    char sZrollerAddPropToLoadList[28];                /* 0x0055e5f8 */
+    unsigned char pad_0055e614[4];                     /* 0x0055e614 */
+    char sCreateProps[16];                             /* 0x0055e618 */
+    char sZrollerLoadPropMaterials[28];                /* 0x0055e628 */
+    unsigned char pad_0055e644[4];                     /* 0x0055e644 */
+    char sZrollerCreatePropActor[24];                  /* 0x0055e648 */
+    unsigned char pad_0055e660[4];                     /* 0x0055e660 */
+    char sZrollerDestroyActor[20];                     /* 0x0055e664 */
+    unsigned char pad_0055e678[4];                     /* 0x0055e678 */
+    char sZrollerGetAsyncKeyState[24];                 /* 0x0055e67c */
+    unsigned char pad_0055e694[4];                     /* 0x0055e694 */
+    char sZrollerSelectMap[20];                        /* 0x0055e698 */
+    char sZrollerSelectPlayer[20];                     /* 0x0055e6ac */
+    unsigned char pad_0055e6c0[4];                     /* 0x0055e6c0 */
+    char sZrollerSelectBikeNum[24];                    /* 0x0055e6c4 */
+    unsigned char pad_0055e6dc[4];                     /* 0x0055e6dc */
+    char sSetFogDistance[20];                          /* 0x0055e6e0 */
+    char sGetFogDistance[20];                          /* 0x0055e6f4 */
+    char sZrollerDisableFog[20];                       /* 0x0055e708 */
+    unsigned char pad_0055e71c[4];                     /* 0x0055e71c */
+    char sZrollerSetFogColor[20];                      /* 0x0055e720 */
+    unsigned char pad_0055e734[4];                     /* 0x0055e734 */
+    char sZrollerReplaceMaterial[24];                  /* 0x0055e738 */
+    unsigned char pad_0055e750[4];                     /* 0x0055e750 */
+    char sZrollerSetShadeMode[20];                     /* 0x0055e754 */
+    unsigned char pad_0055e768[4];                     /* 0x0055e768 */
+    char sZrollerStartCrossFade[24];                   /* 0x0055e76c */
+    unsigned char pad_0055e784[4];                     /* 0x0055e784 */
+    char sZrollerGetSceneStateNODATA[32];              /* 0x0055e788 */
+    unsigned char pad_0055e7a8[4];                     /* 0x0055e7a8 */
+    char sFreeSceneState[16];                          /* 0x0055e7ac */
+    unsigned char pad_0055e7bc[4];                     /* 0x0055e7bc */
+    char sSetSceneState[16];                           /* 0x0055e7c0 */
+    char sZrollerSelectLook[20];                       /* 0x0055e7d0 */
+    unsigned char pad_0055e7e4[4];                     /* 0x0055e7e4 */
+    char sRegisteredTooManyDrawCallbacksToZroller[48]; /* 0x0055e7e8 */
+    unsigned char pad_0055e818[8];                     /* 0x0055e818 */
+    uint16_t gSemitones[73]; /* 0x0055e820; the type is local to bmx/pc/zge/sound/winchan.c */
 };
 #define AT(member, addr)                                                                                     \
     _Static_assert(offsetof(struct BmxGroup_gZrollerRiderNamesGroup, member) == (addr) - 0x0055dc50, #member)
 AT(gZrollerRiderNames, 0x0055dc50);
 AT(p_0055dc54, 0x0055dc54);
-#undef AT
-_Static_assert(offsetof(struct BmxGroup_gZrollerRiderNamesGroup, p_0055dc54) +
-                       sizeof(((struct BmxGroup_gZrollerRiderNamesGroup *)0)->p_0055dc54) ==
-                   0x30,
-               "gZrollerRiderNamesGroup");
-
-/* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0055dc80..0x0055dd74.
- */
-struct BmxGroup_gZrollerBikeNamesGroup {
-    ZrollerNameTable gZrollerBikeNames; /* 0x0055dc80 */
-    void *p_0055dc84[48];               /* 0x0055dc84 */
-    unsigned char pad_0055dd44[48];     /* 0x0055dd44 */
-};
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZrollerBikeNamesGroup, member) == (addr) - 0x0055dc80, #member)
 AT(gZrollerBikeNames, 0x0055dc80);
 AT(p_0055dc84, 0x0055dc84);
 AT(pad_0055dd44, 0x0055dd44);
+AT(sXXbike01, 0x0055dd74);
+AT(sABbike04, 0x0055dd80);
+AT(sABbike03, 0x0055dd8c);
+AT(sABbike02, 0x0055dd98);
+AT(sABbike01, 0x0055dda4);
+AT(sSJbike04, 0x0055ddb0);
+AT(sSJbike03, 0x0055ddbc);
+AT(sSJbike02, 0x0055ddc8);
+AT(sSJbike01, 0x0055ddd4);
+AT(sJGbike04, 0x0055dde0);
+AT(sJGbike03, 0x0055ddec);
+AT(sJGbike02, 0x0055ddf8);
+AT(sJGbike01, 0x0055de04);
+AT(sLRbike04, 0x0055de10);
+AT(sLRbike03, 0x0055de1c);
+AT(sLRbike02, 0x0055de28);
+AT(sLRbike01, 0x0055de34);
+AT(sSBbike04, 0x0055de40);
+AT(sSBbike03, 0x0055de4c);
+AT(sSBbike02, 0x0055de58);
+AT(sSBbike01, 0x0055de64);
+AT(sKHbike04, 0x0055de70);
+AT(sKHbike03, 0x0055de7c);
+AT(sKHbike02, 0x0055de88);
+AT(sKHbike01, 0x0055de94);
+AT(sTMibike04, 0x0055dea0);
+AT(sTMibike03, 0x0055deac);
+AT(sTMibike02, 0x0055deb8);
+AT(sTMibike01, 0x0055dec4);
+AT(sCKbike04, 0x0055ded0);
+AT(sCKbike03, 0x0055dedc);
+AT(sCKbike02, 0x0055dee8);
+AT(sCKbike01, 0x0055def4);
+AT(sMLbike04, 0x0055df00);
+AT(sMLbike03, 0x0055df0c);
+AT(sMLbike02, 0x0055df18);
+AT(sMLbike01, 0x0055df24);
+AT(sTMcbike04, 0x0055df30);
+AT(sTMcbike03, 0x0055df3c);
+AT(sTMcbike02, 0x0055df48);
+AT(sTMcbike01, 0x0055df54);
+AT(sRNbike04, 0x0055df60);
+AT(sRNbike03, 0x0055df6c);
+AT(sRNbike02, 0x0055df78);
+AT(sRNbike01, 0x0055df84);
+AT(sDMbike04, 0x0055df90);
+AT(sDMbike03, 0x0055df9c);
+AT(sDMbike02, 0x0055dfa8);
+AT(sDMbike01, 0x0055dfb4);
+AT(sAmishBoy, 0x0055dfc0);
+AT(pad_0055dfcc, 0x0055dfcc);
+AT(sSlimJimGuy, 0x0055dfd0);
+AT(sJoeyGarcia, 0x0055dfe0);
+AT(sLeighRamsdell, 0x0055dff0);
+AT(pad_0055e000, 0x0055e000);
+AT(sShaunButler, 0x0055e004);
+AT(sKenanHarkin, 0x0055e014);
+AT(sTimMirra, 0x0055e024);
+AT(pad_0055e030, 0x0055e030);
+AT(sChadKagy, 0x0055e034);
+AT(pad_0055e040, 0x0055e040);
+AT(sMikeLaird, 0x0055e044);
+AT(pad_0055e050, 0x0055e050);
+AT(sTroyMcMurray, 0x0055e054);
+AT(pad_0055e064, 0x0055e064);
+AT(sRyanNyquist, 0x0055e068);
+AT(sDaveMirra, 0x0055e078);
+AT(pad_0055e084, 0x0055e084);
+AT(sZROLLERFailedToIntializeZRES, 0x0055e088);
+AT(pad_0055e0ac, 0x0055e0ac);
+AT(sCZaxisBmxSrcComZgeNgIFNgIFzrollerC, 0x0055e0b4);
+AT(pad_0055e0e0, 0x0055e0e0);
+AT(sZrollerUpdateZGL, 0x0055e0e8);
+AT(sZrollerCreateChaser, 0x0055e0fc);
+AT(pad_0055e110, 0x0055e110);
+AT(sZrollerLoadAssets, 0x0055e114);
+AT(pad_0055e128, 0x0055e128);
+AT(sRiderShadow, 0x0055e12c);
+AT(sOutOfPlayerDefs, 0x0055e13c);
+AT(pad_0055e150, 0x0055e150);
+AT(sBikeShadow, 0x0055e154);
+AT(pad_0055e160, 0x0055e160);
+AT(sInvalidBikeSelected, 0x0055e164);
+AT(pad_0055e17c, 0x0055e17c);
+AT(sZrollerCreateProp, 0x0055e180);
+AT(pad_0055e194, 0x0055e194);
+AT(sZrollerSetEngineState, 0x0055e198);
+AT(pad_0055e1b0, 0x0055e1b0);
+AT(sZrollerGetNumPlayerDefs, 0x0055e1b4);
+AT(pad_0055e1cc, 0x0055e1cc);
+AT(sZrollerLoadMdlPlayerCB, 0x0055e1d0);
+AT(pad_0055e1e8, 0x0055e1e8);
+AT(sZrollerIsPlayerClose, 0x0055e1ec);
+AT(pad_0055e204, 0x0055e204);
+AT(sChangePlayerModeLook, 0x0055e208);
+AT(pad_0055e220, 0x0055e220);
+AT(sZrollerAddPlayerMatsToLoadList, 0x0055e224);
+AT(pad_0055e244, 0x0055e244);
+AT(sZrollerChangePlayerSponsor, 0x0055e24c);
+AT(pad_0055e268, 0x0055e268);
+AT(sZrollerchangeboardsponsor, 0x0055e26c);
+AT(pad_0055e288, 0x0055e288);
+AT(sZrollerLoadMdlGenericCB, 0x0055e28c);
+AT(pad_0055e2a4, 0x0055e2a4);
+AT(sZrollerLoadMdlCommon, 0x0055e2a8);
+AT(pad_0055e2c0, 0x0055e2c0);
+AT(sLoadMdlCommonMat, 0x0055e2c4);
+AT(sZrollerProcessModelFlags, 0x0055e2d8);
+AT(pad_0055e2f4, 0x0055e2f4);
+AT(sZrollerProcessActorDrawFlags, 0x0055e2f8);
+AT(pad_0055e318, 0x0055e318);
+AT(sZrollerSetAnimMaterialPalette, 0x0055e31c);
+AT(pad_0055e33c, 0x0055e33c);
+AT(sZrollerInitializeLoadingScreen, 0x0055e340);
+AT(pad_0055e360, 0x0055e360);
+AT(sZrollerShutdownLoadingScreen, 0x0055e368);
+AT(pad_0055e388, 0x0055e388);
+AT(sZrollerDisplayLoadingScreen, 0x0055e38c);
+AT(pad_0055e3a8, 0x0055e3a8);
+AT(sZrollerSetLocal, 0x0055e3b0);
+AT(pad_0055e3c0, 0x0055e3c0);
+AT(sZrollerLoadModule, 0x0055e3c4);
+AT(pad_0055e3d8, 0x0055e3d8);
+AT(sLoadCodeModule, 0x0055e3dc);
+AT(pad_0055e3ec, 0x0055e3ec);
+AT(sZrollerAllocMaterials, 0x0055e3f0);
+AT(pad_0055e408, 0x0055e408);
+AT(sZrollerAddGenericMaterialsToLoad, 0x0055e40c);
+AT(pad_0055e430, 0x0055e430);
+AT(sZrollerInitializeMaps, 0x0055e434);
+AT(pad_0055e44c, 0x0055e44c);
+AT(sZrollerSetMap, 0x0055e450);
+AT(sZrollerLoadMaps, 0x0055e460);
+AT(pad_0055e470, 0x0055e470);
+AT(sZrollerLoadMatTerrainFirstCB, 0x0055e474);
+AT(pad_0055e494, 0x0055e494);
+AT(sZrollerLoadMatTerrainLastCB, 0x0055e498);
+AT(pad_0055e4b4, 0x0055e4b4);
+AT(sZrollerAssociateMapMaterials, 0x0055e4bc);
+AT(pad_0055e4dc, 0x0055e4dc);
+AT(sZroolerAssociateMaterialLlljlkfsdjflsjd, 0x0055e4e0);
+AT(pad_0055e50c, 0x0055e50c);
+AT(sAssociateMaterialPalAnimation, 0x0055e514);
+AT(pad_0055e538, 0x0055e538);
+AT(sZrollerGetPlayerStartPosHARDCODED, 0x0055e53c);
+AT(pad_0055e560, 0x0055e560);
+AT(sPlayerStartPointNotFoundUsingDefaultVal, 0x0055e568);
+AT(pad_0055e59c, 0x0055e59c);
+AT(sPlayerT, 0x0055e5a8);
+AT(pad_0055e5b0, 0x0055e5b0);
+AT(sPlayer, 0x0055e5b4);
+AT(sZrollerGetPlayerRestartPos, 0x0055e5bc);
+AT(pad_0055e5d8, 0x0055e5d8);
+AT(sZrollerInitPropLoadList, 0x0055e5dc);
+AT(pad_0055e5f4, 0x0055e5f4);
+AT(sZrollerAddPropToLoadList, 0x0055e5f8);
+AT(pad_0055e614, 0x0055e614);
+AT(sCreateProps, 0x0055e618);
+AT(sZrollerLoadPropMaterials, 0x0055e628);
+AT(pad_0055e644, 0x0055e644);
+AT(sZrollerCreatePropActor, 0x0055e648);
+AT(pad_0055e660, 0x0055e660);
+AT(sZrollerDestroyActor, 0x0055e664);
+AT(pad_0055e678, 0x0055e678);
+AT(sZrollerGetAsyncKeyState, 0x0055e67c);
+AT(pad_0055e694, 0x0055e694);
+AT(sZrollerSelectMap, 0x0055e698);
+AT(sZrollerSelectPlayer, 0x0055e6ac);
+AT(pad_0055e6c0, 0x0055e6c0);
+AT(sZrollerSelectBikeNum, 0x0055e6c4);
+AT(pad_0055e6dc, 0x0055e6dc);
+AT(sSetFogDistance, 0x0055e6e0);
+AT(sGetFogDistance, 0x0055e6f4);
+AT(sZrollerDisableFog, 0x0055e708);
+AT(pad_0055e71c, 0x0055e71c);
+AT(sZrollerSetFogColor, 0x0055e720);
+AT(pad_0055e734, 0x0055e734);
+AT(sZrollerReplaceMaterial, 0x0055e738);
+AT(pad_0055e750, 0x0055e750);
+AT(sZrollerSetShadeMode, 0x0055e754);
+AT(pad_0055e768, 0x0055e768);
+AT(sZrollerStartCrossFade, 0x0055e76c);
+AT(pad_0055e784, 0x0055e784);
+AT(sZrollerGetSceneStateNODATA, 0x0055e788);
+AT(pad_0055e7a8, 0x0055e7a8);
+AT(sFreeSceneState, 0x0055e7ac);
+AT(pad_0055e7bc, 0x0055e7bc);
+AT(sSetSceneState, 0x0055e7c0);
+AT(sZrollerSelectLook, 0x0055e7d0);
+AT(pad_0055e7e4, 0x0055e7e4);
+AT(sRegisteredTooManyDrawCallbacksToZroller, 0x0055e7e8);
+AT(pad_0055e818, 0x0055e818);
+AT(gSemitones, 0x0055e820);
 #undef AT
-_Static_assert(offsetof(struct BmxGroup_gZrollerBikeNamesGroup, pad_0055dd44) +
-                       sizeof(((struct BmxGroup_gZrollerBikeNamesGroup *)0)->pad_0055dd44) ==
-                   0xf4,
-               "gZrollerBikeNamesGroup");
-
-/* The type is local to bmx/pc/zge/sound/winchan.c. */
-typedef uint16_t BmxType_gSemitones[73];
+_Static_assert(offsetof(struct BmxGroup_gZrollerRiderNamesGroup, gSemitones) +
+                       sizeof(((struct BmxGroup_gZrollerRiderNamesGroup *)0)->gSemitones) ==
+                   0xc62,
+               "gZrollerRiderNamesGroup");
 
 /* The type is local to bmx/pc/zge/sound/winchan.c. */
 typedef uint16_t BmxType_gCents[100];
@@ -5421,41 +5798,229 @@ _Static_assert(offsetof(struct BmxGroup_gAdpcmStepGroup, pad_0055f29e) +
 /* The type is local to bmx/com/zge/zactor.c. */
 typedef uint16_t BmxType_gMotionMirrorMap[19];
 
-/* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0055f390..0x0055f4c0.
+/* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0055f390..0x0055ffc4.
  */
 struct BmxGroup_gSkeletonChainGroup {
     int8_t gSkeletonChain[1];      /* 0x0055f390; the type is local to bmx/com/zge/zactor.c */
     unsigned char d_0055f391[303]; /* 0x0055f391 */
+    struct {
+        float x;
+        float y;
+        float z;
+    } gSkeletonOffsets[1];                      /* 0x0055f4c0; the type is local to bmx/com/zge/zactor.c */
+    float d_0055f4cc[197];                      /* 0x0055f4cc */
+    char sOnlyCodedForPropTypes[28];            /* 0x0055f7e0 */
+    unsigned char pad_0055f7fc[4];              /* 0x0055f7fc */
+    char sCZaxisBmxSrcComZgeZactorC[36];        /* 0x0055f800 */
+    unsigned char pad_0055f824[4];              /* 0x0055f824 */
+    char sZACTORErrorFailedToAllocateActor[44]; /* 0x0055f828 */
+    unsigned char pad_0055f854[8];              /* 0x0055f854 */
+    char sMotionsAreTooLarge[24];               /* 0x0055f85c */
+    unsigned char pad_0055f874[4];              /* 0x0055f874 */
+    char sMotionLibraryAlreadyOpen[28];         /* 0x0055f878 */
+    unsigned char pad_0055f894[8];              /* 0x0055f894 */
+    char sMotionsNotOpened[20];                 /* 0x0055f89c */
+    unsigned char pad_0055f8b0[4];              /* 0x0055f8b0 */
+    char sTooBig[8];                            /* 0x0055f8b4 */
+    unsigned char pad_0055f8bc[4];              /* 0x0055f8bc */
+    char sCouldNotFindMotionBank[28];           /* 0x0055f8c0 */
+    unsigned char pad_0055f8dc[4];              /* 0x0055f8dc */
+    char sNotReloadingMotionLibrary[32];        /* 0x0055f8e0 */
+    unsigned char pad_0055f900[4];              /* 0x0055f900 */
+    char sMotionBankNotOpened[24];              /* 0x0055f904 */
+    unsigned char pad_0055f91c[4];              /* 0x0055f91c */
+    char sExeededMaximumLODsForActor[32];       /* 0x0055f920 */
+    unsigned char pad_0055f940[8];              /* 0x0055f940 */
+    char sZACTORUnknownTagIdentifier[36];       /* 0x0055f948 */
+    unsigned char pad_0055f96c[4];              /* 0x0055f96c */
+    char sNotAPersonType[20];                   /* 0x0055f970 */
+    unsigned char pad_0055f984[4];              /* 0x0055f984 */
+    char sZPRIMFailedToAllocateBuffer[36];      /* 0x0055f988 */
+    unsigned char pad_0055f9ac[4];              /* 0x0055f9ac */
+    char sErrorOptimizingDMMMemory[28];         /* 0x0055f9b0 */
+    unsigned char pad_0055f9cc[8];              /* 0x0055f9cc */
+    char sCZaxisBmxSrcComZgeZprimC[36];         /* 0x0055f9d4 */
+    unsigned char pad_0055f9f8[4];              /* 0x0055f9f8 */
+    char sZPRIMZprimGetColorNotImplemented[40]; /* 0x0055f9fc */
+    unsigned char pad_0055fa24[8];              /* 0x0055fa24 */
+    char sZPRIMFailedToAllocatePicture[36];     /* 0x0055fa2c */
+    unsigned char pad_0055fa50[8];              /* 0x0055fa50 */
+    char sZPRIMFailedToFindPictureX[36];        /* 0x0055fa58 */
+    unsigned char pad_0055fa7c[4];              /* 0x0055fa7c */
+    char sBufferOverflowInZprimReplaceVRAMGrey[44];    /* 0x0055fa80 */
+    unsigned char pad_0055faac[8];                     /* 0x0055faac */
+    char sZPRIMFailedToAllocateSprite[36];             /* 0x0055fab4 */
+    unsigned char pad_0055fad8[4];                     /* 0x0055fad8 */
+    char sZPRIMFailedToFindSpriteX[36];                /* 0x0055fadc */
+    unsigned char pad_0055fb00[4];                     /* 0x0055fb00 */
+    char sZPRIMFailedToAllocateAssetHandle[40];        /* 0x0055fb04 */
+    unsigned char pad_0055fb2c[8];                     /* 0x0055fb2c */
+    char sZPRIMFailedToAllocateBufferInCreateSpri[52]; /* 0x0055fb34 */
+    unsigned char pad_0055fb68[8];                     /* 0x0055fb68 */
+    char sZPRIMErrorCanOnlyDecompressFromCompress[88]; /* 0x0055fb70 */
+    unsigned char pad_0055fbc8[16];                    /* 0x0055fbc8 */
+    char sZPRIMErrorFrameOutOfBoundsDuringDecompr[56]; /* 0x0055fbd8 */
+    unsigned char pad_0055fc10[8];                     /* 0x0055fc10 */
+    char sPossibleMemoryLeakOfFntMemHdlHere[40];       /* 0x0055fc18 */
+    unsigned char pad_0055fc40[8];                     /* 0x0055fc40 */
+    char sZPRIMFailedToAllocateFont[32];               /* 0x0055fc48 */
+    unsigned char pad_0055fc68[8];                     /* 0x0055fc68 */
+    char sZPRIMFailedToFindFontX[32];                  /* 0x0055fc70 */
+    unsigned char pad_0055fc90[8];                     /* 0x0055fc90 */
+    char sZPRIMFailedToAllocateGroup[36];              /* 0x0055fc98 */
+    unsigned char pad_0055fcbc[4];                     /* 0x0055fcbc */
+    char sZPRIMFailedToFindGroup[32];                  /* 0x0055fcc0 */
+    unsigned char pad_0055fce0[4];                     /* 0x0055fce0 */
+    char sZPRIMLoadFailed[20];                         /* 0x0055fce4 */
+    unsigned char pad_0055fcf8[4];                     /* 0x0055fcf8 */
+    char sZPRIMErrorLoadingGroupIntoUsedSlot[48];      /* 0x0055fcfc */
+    unsigned char pad_0055fd2c[8];                     /* 0x0055fd2c */
+    char sZPRIMErrorBadSlotForGroup[36];               /* 0x0055fd34 */
+    unsigned char pad_0055fd58[8];                     /* 0x0055fd58 */
+    char sZPRIMFailedToLoadAsset[28];                  /* 0x0055fd60 */
+    unsigned char pad_0055fd7c[8];                     /* 0x0055fd7c */
+    char sZPRIMFailedToAllocateScreen[36];             /* 0x0055fd84 */
+    unsigned char pad_0055fda8[4];                     /* 0x0055fda8 */
+    char sZPRIMFailedToFindScreen[32];                 /* 0x0055fdac */
+    unsigned char pad_0055fdcc[4];                     /* 0x0055fdcc */
+    char sZPRIMErrorCanOnlyDrawtexttospriteFromFo[80]; /* 0x0055fdd0 */
+    unsigned char pad_0055fe20[16];                    /* 0x0055fe20 */
+    char sZPRIMErrorFrameOutOfBoundsDuringDrawtex[60]; /* 0x0055fe30 */
+    unsigned char pad_0055fe6c[12];                    /* 0x0055fe6c */
+    char sInvalidMaterialHandle[24];                   /* 0x0055fe78 */
+    unsigned char pad_0055fe90[4];                     /* 0x0055fe90 */
+    char sSpriteD[12];                                 /* 0x0055fe94 */
+    char sTrack[8];                                    /* 0x0055fea0 */
+    char sHTrackKzsndSeqMaxTracks[28];                 /* 0x0055fea8 */
+    unsigned char pad_0055fec4[4];                     /* 0x0055fec4 */
+    char sCZaxisBmxSrcComZgeZsndseqC[36];              /* 0x0055fec8 */
+    unsigned char pad_0055feec[8];                     /* 0x0055feec */
+    char sTrackHTrack[16];                             /* 0x0055fef4 */
+    char sNoteEventFlagsKzsndNoteEventFlagActive[44];  /* 0x0055ff04 */
+    unsigned char pad_0055ff30[8];                     /* 0x0055ff30 */
+    char sAlreadyInitialized[20];                      /* 0x0055ff38 */
+    unsigned char pad_0055ff4c[4];                     /* 0x0055ff4c */
+    char sCZaxisBmxSrcComZgeZsndsrcC[36];              /* 0x0055ff50 */
+    unsigned char pad_0055ff74[8];                     /* 0x0055ff74 */
+    char sNotInitialized[16];                          /* 0x0055ff7c */
+    unsigned char pad_0055ff8c[4];                     /* 0x0055ff8c */
+    char sSourceNotAllocated[24];                      /* 0x0055ff90 */
+    unsigned char pad_0055ffa8[4];                     /* 0x0055ffa8 */
+    char sInvalidHandle[16];                           /* 0x0055ffac */
+    unsigned char pad_0055ffbc[4];                     /* 0x0055ffbc */
+    uint32_t gZsndTicksPerSec; /* 0x0055ffc0, also gWinstrmTicksPerSec, gZsndTickRate */
 };
 #define AT(member, addr)                                                                                     \
     _Static_assert(offsetof(struct BmxGroup_gSkeletonChainGroup, member) == (addr) - 0x0055f390, #member)
 AT(gSkeletonChain, 0x0055f390);
 AT(d_0055f391, 0x0055f391);
-#undef AT
-_Static_assert(offsetof(struct BmxGroup_gSkeletonChainGroup, d_0055f391) +
-                       sizeof(((struct BmxGroup_gSkeletonChainGroup *)0)->d_0055f391) ==
-                   0x130,
-               "gSkeletonChainGroup");
-
-/* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0055f4c0..0x0055f7e0.
- */
-struct BmxGroup_gSkeletonOffsetsGroup {
-    struct {
-        float x;
-        float y;
-        float z;
-    } gSkeletonOffsets[1]; /* 0x0055f4c0; the type is local to bmx/com/zge/zactor.c */
-    float d_0055f4cc[197]; /* 0x0055f4cc */
-};
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gSkeletonOffsetsGroup, member) == (addr) - 0x0055f4c0, #member)
 AT(gSkeletonOffsets, 0x0055f4c0);
 AT(d_0055f4cc, 0x0055f4cc);
+AT(sOnlyCodedForPropTypes, 0x0055f7e0);
+AT(pad_0055f7fc, 0x0055f7fc);
+AT(sCZaxisBmxSrcComZgeZactorC, 0x0055f800);
+AT(pad_0055f824, 0x0055f824);
+AT(sZACTORErrorFailedToAllocateActor, 0x0055f828);
+AT(pad_0055f854, 0x0055f854);
+AT(sMotionsAreTooLarge, 0x0055f85c);
+AT(pad_0055f874, 0x0055f874);
+AT(sMotionLibraryAlreadyOpen, 0x0055f878);
+AT(pad_0055f894, 0x0055f894);
+AT(sMotionsNotOpened, 0x0055f89c);
+AT(pad_0055f8b0, 0x0055f8b0);
+AT(sTooBig, 0x0055f8b4);
+AT(pad_0055f8bc, 0x0055f8bc);
+AT(sCouldNotFindMotionBank, 0x0055f8c0);
+AT(pad_0055f8dc, 0x0055f8dc);
+AT(sNotReloadingMotionLibrary, 0x0055f8e0);
+AT(pad_0055f900, 0x0055f900);
+AT(sMotionBankNotOpened, 0x0055f904);
+AT(pad_0055f91c, 0x0055f91c);
+AT(sExeededMaximumLODsForActor, 0x0055f920);
+AT(pad_0055f940, 0x0055f940);
+AT(sZACTORUnknownTagIdentifier, 0x0055f948);
+AT(pad_0055f96c, 0x0055f96c);
+AT(sNotAPersonType, 0x0055f970);
+AT(pad_0055f984, 0x0055f984);
+AT(sZPRIMFailedToAllocateBuffer, 0x0055f988);
+AT(pad_0055f9ac, 0x0055f9ac);
+AT(sErrorOptimizingDMMMemory, 0x0055f9b0);
+AT(pad_0055f9cc, 0x0055f9cc);
+AT(sCZaxisBmxSrcComZgeZprimC, 0x0055f9d4);
+AT(pad_0055f9f8, 0x0055f9f8);
+AT(sZPRIMZprimGetColorNotImplemented, 0x0055f9fc);
+AT(pad_0055fa24, 0x0055fa24);
+AT(sZPRIMFailedToAllocatePicture, 0x0055fa2c);
+AT(pad_0055fa50, 0x0055fa50);
+AT(sZPRIMFailedToFindPictureX, 0x0055fa58);
+AT(pad_0055fa7c, 0x0055fa7c);
+AT(sBufferOverflowInZprimReplaceVRAMGrey, 0x0055fa80);
+AT(pad_0055faac, 0x0055faac);
+AT(sZPRIMFailedToAllocateSprite, 0x0055fab4);
+AT(pad_0055fad8, 0x0055fad8);
+AT(sZPRIMFailedToFindSpriteX, 0x0055fadc);
+AT(pad_0055fb00, 0x0055fb00);
+AT(sZPRIMFailedToAllocateAssetHandle, 0x0055fb04);
+AT(pad_0055fb2c, 0x0055fb2c);
+AT(sZPRIMFailedToAllocateBufferInCreateSpri, 0x0055fb34);
+AT(pad_0055fb68, 0x0055fb68);
+AT(sZPRIMErrorCanOnlyDecompressFromCompress, 0x0055fb70);
+AT(pad_0055fbc8, 0x0055fbc8);
+AT(sZPRIMErrorFrameOutOfBoundsDuringDecompr, 0x0055fbd8);
+AT(pad_0055fc10, 0x0055fc10);
+AT(sPossibleMemoryLeakOfFntMemHdlHere, 0x0055fc18);
+AT(pad_0055fc40, 0x0055fc40);
+AT(sZPRIMFailedToAllocateFont, 0x0055fc48);
+AT(pad_0055fc68, 0x0055fc68);
+AT(sZPRIMFailedToFindFontX, 0x0055fc70);
+AT(pad_0055fc90, 0x0055fc90);
+AT(sZPRIMFailedToAllocateGroup, 0x0055fc98);
+AT(pad_0055fcbc, 0x0055fcbc);
+AT(sZPRIMFailedToFindGroup, 0x0055fcc0);
+AT(pad_0055fce0, 0x0055fce0);
+AT(sZPRIMLoadFailed, 0x0055fce4);
+AT(pad_0055fcf8, 0x0055fcf8);
+AT(sZPRIMErrorLoadingGroupIntoUsedSlot, 0x0055fcfc);
+AT(pad_0055fd2c, 0x0055fd2c);
+AT(sZPRIMErrorBadSlotForGroup, 0x0055fd34);
+AT(pad_0055fd58, 0x0055fd58);
+AT(sZPRIMFailedToLoadAsset, 0x0055fd60);
+AT(pad_0055fd7c, 0x0055fd7c);
+AT(sZPRIMFailedToAllocateScreen, 0x0055fd84);
+AT(pad_0055fda8, 0x0055fda8);
+AT(sZPRIMFailedToFindScreen, 0x0055fdac);
+AT(pad_0055fdcc, 0x0055fdcc);
+AT(sZPRIMErrorCanOnlyDrawtexttospriteFromFo, 0x0055fdd0);
+AT(pad_0055fe20, 0x0055fe20);
+AT(sZPRIMErrorFrameOutOfBoundsDuringDrawtex, 0x0055fe30);
+AT(pad_0055fe6c, 0x0055fe6c);
+AT(sInvalidMaterialHandle, 0x0055fe78);
+AT(pad_0055fe90, 0x0055fe90);
+AT(sSpriteD, 0x0055fe94);
+AT(sTrack, 0x0055fea0);
+AT(sHTrackKzsndSeqMaxTracks, 0x0055fea8);
+AT(pad_0055fec4, 0x0055fec4);
+AT(sCZaxisBmxSrcComZgeZsndseqC, 0x0055fec8);
+AT(pad_0055feec, 0x0055feec);
+AT(sTrackHTrack, 0x0055fef4);
+AT(sNoteEventFlagsKzsndNoteEventFlagActive, 0x0055ff04);
+AT(pad_0055ff30, 0x0055ff30);
+AT(sAlreadyInitialized, 0x0055ff38);
+AT(pad_0055ff4c, 0x0055ff4c);
+AT(sCZaxisBmxSrcComZgeZsndsrcC, 0x0055ff50);
+AT(pad_0055ff74, 0x0055ff74);
+AT(sNotInitialized, 0x0055ff7c);
+AT(pad_0055ff8c, 0x0055ff8c);
+AT(sSourceNotAllocated, 0x0055ff90);
+AT(pad_0055ffa8, 0x0055ffa8);
+AT(sInvalidHandle, 0x0055ffac);
+AT(pad_0055ffbc, 0x0055ffbc);
+AT(gZsndTicksPerSec, 0x0055ffc0);
 #undef AT
-_Static_assert(offsetof(struct BmxGroup_gSkeletonOffsetsGroup, d_0055f4cc) +
-                       sizeof(((struct BmxGroup_gSkeletonOffsetsGroup *)0)->d_0055f4cc) ==
-                   0x320,
-               "gSkeletonOffsetsGroup");
+_Static_assert(offsetof(struct BmxGroup_gSkeletonChainGroup, gZsndTicksPerSec) +
+                       sizeof(((struct BmxGroup_gSkeletonChainGroup *)0)->gZsndTicksPerSec) ==
+                   0xc34,
+               "gSkeletonChainGroup");
 
 /* The type is local to zge/zdebug.c. */
 typedef void *BmxType_gZdebugStart;
@@ -7548,21 +8113,23 @@ _Static_assert(offsetof(struct BmxGroup_gFxQualityStepGroup, pad_005ab4ac) +
                    0x40,
                "gFxQualityStepGroup");
 
-/* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005ab4fc..0x005d24fc.
+/* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005ab4fc..0x005d2500.
  */
 struct BmxGroup_gNgifPrimBufferGroup {
     uint8_t lead_[12];                  /* nothing: the members' offsets keep their original alignment */
     NgifWords gNgifPrimBuffer;          /* 0x005ab4fc */
     unsigned char pad_005ab500[159740]; /* 0x005ab500 */
+    int gNgifFlushPending;              /* 0x005d24fc */
 };
 #define AT(member, addr)                                                                                     \
     _Static_assert(offsetof(struct BmxGroup_gNgifPrimBufferGroup, member) == (addr) - 0x005ab4f0, #member)
 AT(gNgifPrimBuffer, 0x005ab4fc);
 AT(pad_005ab500, 0x005ab500);
+AT(gNgifFlushPending, 0x005d24fc);
 #undef AT
-_Static_assert(offsetof(struct BmxGroup_gNgifPrimBufferGroup, pad_005ab500) +
-                       sizeof(((struct BmxGroup_gNgifPrimBufferGroup *)0)->pad_005ab500) ==
-                   0x2700c,
+_Static_assert(offsetof(struct BmxGroup_gNgifPrimBufferGroup, gNgifFlushPending) +
+                       sizeof(((struct BmxGroup_gNgifPrimBufferGroup *)0)->gNgifFlushPending) ==
+                   0x27010,
                "gNgifPrimBufferGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005d2510..0x005da1e8.
@@ -7598,20 +8165,22 @@ _Static_assert(offsetof(struct BmxGroup_gZactorArmHashesGroup, pad_005da2e0) +
                    0xc118,
                "gZactorArmHashesGroup");
 
-/* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005e7fe0..0x005e8420.
+/* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005e7fe0..0x005f0b98.
  */
 struct BmxGroup_gZbspPropFacesGroup {
     ZbspPropFaceTable gZbspPropFaces; /* 0x005e7fe0 */
     unsigned char pad_005e8068[952];  /* 0x005e8068 */
+    ZbspNearFaceTable gZbspNearFaces; /* 0x005e8420 */
 };
 #define AT(member, addr)                                                                                     \
     _Static_assert(offsetof(struct BmxGroup_gZbspPropFacesGroup, member) == (addr) - 0x005e7fe0, #member)
 AT(gZbspPropFaces, 0x005e7fe0);
 AT(pad_005e8068, 0x005e8068);
+AT(gZbspNearFaces, 0x005e8420);
 #undef AT
-_Static_assert(offsetof(struct BmxGroup_gZbspPropFacesGroup, pad_005e8068) +
-                       sizeof(((struct BmxGroup_gZbspPropFacesGroup *)0)->pad_005e8068) ==
-                   0x440,
+_Static_assert(offsetof(struct BmxGroup_gZbspPropFacesGroup, gZbspNearFaces) +
+                       sizeof(((struct BmxGroup_gZbspPropFacesGroup *)0)->gZbspNearFaces) ==
+                   0x8bb8,
                "gZbspPropFacesGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005f10a8..0x005f34ac.
@@ -8250,20 +8819,22 @@ _Static_assert(offsetof(struct BmxGroup_gZrollerEdgesGroup, pad_00678498) +
                    0xd0,
                "gZrollerEdgesGroup");
 
-/* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00678560..0x0068c3d0.
+/* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00678560..0x0068c3d4.
  */
 struct BmxGroup_gNgifPrim3DBufferGroup {
     NgifWords gNgifPrim3DBuffer;       /* 0x00678560 */
     unsigned char pad_00678564[81516]; /* 0x00678564 */
+    uint32_t *gNgifOrderTable;         /* 0x0068c3d0 */
 };
 #define AT(member, addr)                                                                                     \
     _Static_assert(offsetof(struct BmxGroup_gNgifPrim3DBufferGroup, member) == (addr) - 0x00678560, #member)
 AT(gNgifPrim3DBuffer, 0x00678560);
 AT(pad_00678564, 0x00678564);
+AT(gNgifOrderTable, 0x0068c3d0);
 #undef AT
-_Static_assert(offsetof(struct BmxGroup_gNgifPrim3DBufferGroup, pad_00678564) +
-                       sizeof(((struct BmxGroup_gNgifPrim3DBufferGroup *)0)->pad_00678564) ==
-                   0x13e70,
+_Static_assert(offsetof(struct BmxGroup_gNgifPrim3DBufferGroup, gNgifOrderTable) +
+                       sizeof(((struct BmxGroup_gNgifPrim3DBufferGroup *)0)->gNgifOrderTable) ==
+                   0x13e74,
                "gNgifPrim3DBufferGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0068fc00..0x0068fc20.
@@ -8623,21 +9194,24 @@ _Static_assert(offsetof(struct BmxGroup_bmxSaveOptions, pad_00696219) +
                    0xc3c,
                "bmxSaveOptions");
 
-/* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00696300..0x006966dc.
+/* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x006962fc..0x006966dc.
  */
-struct BmxGroup_gActionMotionsGroup {
+struct BmxGroup_gPhysMotionsGroup {
+    uint8_t lead_[12];              /* nothing: the members' offsets keep their original alignment */
+    PhysMotionTable gPhysMotions;   /* 0x006962fc */
     ActionMotions gActionMotions;   /* 0x00696300 */
     unsigned char pad_006966b8[36]; /* 0x006966b8 */
 };
 #define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gActionMotionsGroup, member) == (addr) - 0x00696300, #member)
+    _Static_assert(offsetof(struct BmxGroup_gPhysMotionsGroup, member) == (addr) - 0x006962f0, #member)
+AT(gPhysMotions, 0x006962fc);
 AT(gActionMotions, 0x00696300);
 AT(pad_006966b8, 0x006966b8);
 #undef AT
-_Static_assert(offsetof(struct BmxGroup_gActionMotionsGroup, pad_006966b8) +
-                       sizeof(((struct BmxGroup_gActionMotionsGroup *)0)->pad_006966b8) ==
-                   0x3dc,
-               "gActionMotionsGroup");
+_Static_assert(offsetof(struct BmxGroup_gPhysMotionsGroup, pad_006966b8) +
+                       sizeof(((struct BmxGroup_gPhysMotionsGroup *)0)->pad_006966b8) ==
+                   0x3ec,
+               "gPhysMotionsGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00696720..0x00696740.
  */
@@ -10347,10 +10921,7 @@ extern float gRiderTrickSteer;                                        /* 0x00558
 extern uint32_t gRiderJumpFrames;                                     /* 0x005588b4 */
 extern RiderModeTable gRiderModeStep;                                 /* 0x005588b8 */
 extern struct BmxGroup_gRiderAirStepGroup gRiderAirStepGroup;         /* 0x005588d4 */
-extern RiderSingleTable gRiderGrindStep;                              /* 0x005588f8 */
-extern RiderSingleTable gRiderLipStep;                                /* 0x005588fc */
-extern RiderSingleTable gRiderManualStep;                             /* 0x00558900 */
-extern struct BmxGroup_gRiderScoreWeightGroup gRiderScoreWeightGroup; /* 0x00558904 */
+extern struct BmxGroup_gRiderGrindStepGroup gRiderGrindStepGroup;     /* 0x005588f8 */
 extern char sFailedToCreateRiderActorForRiderLdLookN[72];             /* 0x00558a48 */
 extern char sStateLevelOutOfRange[32];                                /* 0x00558a90 */
 extern char sCouldnTAssociateRiderWithDynamicCollisi[71];             /* 0x00558ab0 */
@@ -10992,136 +11563,6 @@ extern char sERRORLoadingOverlayMaterial[40];                           /* 0x005
 extern char sOverlayD[12];                                              /* 0x0055dc14 */
 extern char sZresAddMaterialToLoadListNotFound[48];                     /* 0x0055dc20 */
 extern struct BmxGroup_gZrollerRiderNamesGroup gZrollerRiderNamesGroup; /* 0x0055dc50 */
-extern struct BmxGroup_gZrollerBikeNamesGroup gZrollerBikeNamesGroup;   /* 0x0055dc80 */
-extern char sXXbike01[12];                                              /* 0x0055dd74 */
-extern char sABbike04[12];                                              /* 0x0055dd80 */
-extern char sABbike03[12];                                              /* 0x0055dd8c */
-extern char sABbike02[12];                                              /* 0x0055dd98 */
-extern char sABbike01[12];                                              /* 0x0055dda4 */
-extern char sSJbike04[12];                                              /* 0x0055ddb0 */
-extern char sSJbike03[12];                                              /* 0x0055ddbc */
-extern char sSJbike02[12];                                              /* 0x0055ddc8 */
-extern char sSJbike01[12];                                              /* 0x0055ddd4 */
-extern char sJGbike04[12];                                              /* 0x0055dde0 */
-extern char sJGbike03[12];                                              /* 0x0055ddec */
-extern char sJGbike02[12];                                              /* 0x0055ddf8 */
-extern char sJGbike01[12];                                              /* 0x0055de04 */
-extern char sLRbike04[12];                                              /* 0x0055de10 */
-extern char sLRbike03[12];                                              /* 0x0055de1c */
-extern char sLRbike02[12];                                              /* 0x0055de28 */
-extern char sLRbike01[12];                                              /* 0x0055de34 */
-extern char sSBbike04[12];                                              /* 0x0055de40 */
-extern char sSBbike03[12];                                              /* 0x0055de4c */
-extern char sSBbike02[12];                                              /* 0x0055de58 */
-extern char sSBbike01[12];                                              /* 0x0055de64 */
-extern char sKHbike04[12];                                              /* 0x0055de70 */
-extern char sKHbike03[12];                                              /* 0x0055de7c */
-extern char sKHbike02[12];                                              /* 0x0055de88 */
-extern char sKHbike01[12];                                              /* 0x0055de94 */
-extern char sTMibike04[12];                                             /* 0x0055dea0 */
-extern char sTMibike03[12];                                             /* 0x0055deac */
-extern char sTMibike02[12];                                             /* 0x0055deb8 */
-extern char sTMibike01[12];                                             /* 0x0055dec4 */
-extern char sCKbike04[12];                                              /* 0x0055ded0 */
-extern char sCKbike03[12];                                              /* 0x0055dedc */
-extern char sCKbike02[12];                                              /* 0x0055dee8 */
-extern char sCKbike01[12];                                              /* 0x0055def4 */
-extern char sMLbike04[12];                                              /* 0x0055df00 */
-extern char sMLbike03[12];                                              /* 0x0055df0c */
-extern char sMLbike02[12];                                              /* 0x0055df18 */
-extern char sMLbike01[12];                                              /* 0x0055df24 */
-extern char sTMcbike04[12];                                             /* 0x0055df30 */
-extern char sTMcbike03[12];                                             /* 0x0055df3c */
-extern char sTMcbike02[12];                                             /* 0x0055df48 */
-extern char sTMcbike01[12];                                             /* 0x0055df54 */
-extern char sRNbike04[12];                                              /* 0x0055df60 */
-extern char sRNbike03[12];                                              /* 0x0055df6c */
-extern char sRNbike02[12];                                              /* 0x0055df78 */
-extern char sRNbike01[12];                                              /* 0x0055df84 */
-extern char sDMbike04[12];                                              /* 0x0055df90 */
-extern char sDMbike03[12];                                              /* 0x0055df9c */
-extern char sDMbike02[12];                                              /* 0x0055dfa8 */
-extern char sDMbike01[12];                                              /* 0x0055dfb4 */
-extern char sAmishBoy[16];                                              /* 0x0055dfc0 */
-extern char sSlimJimGuy[16];                                            /* 0x0055dfd0 */
-extern char sJoeyGarcia[16];                                            /* 0x0055dfe0 */
-extern char sLeighRamsdell[20];                                         /* 0x0055dff0 */
-extern char sShaunButler[16];                                           /* 0x0055e004 */
-extern char sKenanHarkin[16];                                           /* 0x0055e014 */
-extern char sTimMirra[16];                                              /* 0x0055e024 */
-extern char sChadKagy[16];                                              /* 0x0055e034 */
-extern char sMikeLaird[16];                                             /* 0x0055e044 */
-extern char sTroyMcMurray[20];                                          /* 0x0055e054 */
-extern char sRyanNyquist[16];                                           /* 0x0055e068 */
-extern char sDaveMirra[16];                                             /* 0x0055e078 */
-extern char sZROLLERFailedToIntializeZRES[44];                          /* 0x0055e088 */
-extern char sCZaxisBmxSrcComZgeNgIFNgIFzrollerC[52];                    /* 0x0055e0b4 */
-extern char sZrollerUpdateZGL[20];                                      /* 0x0055e0e8 */
-extern char sZrollerCreateChaser[24];                                   /* 0x0055e0fc */
-extern char sZrollerLoadAssets[24];                                     /* 0x0055e114 */
-extern char sRiderShadow[16];                                           /* 0x0055e12c */
-extern char sOutOfPlayerDefs[24];                                       /* 0x0055e13c */
-extern char sBikeShadow[16];                                            /* 0x0055e154 */
-extern char sInvalidBikeSelected[28];                                   /* 0x0055e164 */
-extern char sZrollerCreateProp[24];                                     /* 0x0055e180 */
-extern char sZrollerSetEngineState[28];                                 /* 0x0055e198 */
-extern char sZrollerGetNumPlayerDefs[28];                               /* 0x0055e1b4 */
-extern char sZrollerLoadMdlPlayerCB[28];                                /* 0x0055e1d0 */
-extern char sZrollerIsPlayerClose[28];                                  /* 0x0055e1ec */
-extern char sChangePlayerModeLook[28];                                  /* 0x0055e208 */
-extern char sZrollerAddPlayerMatsToLoadList[40];                        /* 0x0055e224 */
-extern char sZrollerChangePlayerSponsor[32];                            /* 0x0055e24c */
-extern char sZrollerchangeboardsponsor[32];                             /* 0x0055e26c */
-extern char sZrollerLoadMdlGenericCB[28];                               /* 0x0055e28c */
-extern char sZrollerLoadMdlCommon[28];                                  /* 0x0055e2a8 */
-extern char sLoadMdlCommonMat[20];                                      /* 0x0055e2c4 */
-extern char sZrollerProcessModelFlags[32];                              /* 0x0055e2d8 */
-extern char sZrollerProcessActorDrawFlags[36];                          /* 0x0055e2f8 */
-extern char sZrollerSetAnimMaterialPalette[36];                         /* 0x0055e31c */
-extern char sZrollerInitializeLoadingScreen[40];                        /* 0x0055e340 */
-extern char sZrollerShutdownLoadingScreen[36];                          /* 0x0055e368 */
-extern char sZrollerDisplayLoadingScreen[36];                           /* 0x0055e38c */
-extern char sZrollerSetLocal[20];                                       /* 0x0055e3b0 */
-extern char sZrollerLoadModule[24];                                     /* 0x0055e3c4 */
-extern char sLoadCodeModule[20];                                        /* 0x0055e3dc */
-extern char sZrollerAllocMaterials[28];                                 /* 0x0055e3f0 */
-extern char sZrollerAddGenericMaterialsToLoad[40];                      /* 0x0055e40c */
-extern char sZrollerInitializeMaps[28];                                 /* 0x0055e434 */
-extern char sZrollerSetMap[16];                                         /* 0x0055e450 */
-extern char sZrollerLoadMaps[20];                                       /* 0x0055e460 */
-extern char sZrollerLoadMatTerrainFirstCB[36];                          /* 0x0055e474 */
-extern char sZrollerLoadMatTerrainLastCB[36];                           /* 0x0055e498 */
-extern char sZrollerAssociateMapMaterials[36];                          /* 0x0055e4bc */
-extern char sZroolerAssociateMaterialLlljlkfsdjflsjd[52];               /* 0x0055e4e0 */
-extern char sAssociateMaterialPalAnimation[40];                         /* 0x0055e514 */
-extern char sZrollerGetPlayerStartPosHARDCODED[44];                     /* 0x0055e53c */
-extern char sPlayerStartPointNotFoundUsingDefaultVal[64];               /* 0x0055e568 */
-extern char sPlayerT[12];                                               /* 0x0055e5a8 */
-extern char sPlayer_0055e5b4[8];                                        /* 0x0055e5b4 */
-extern char sZrollerGetPlayerRestartPos[32];                            /* 0x0055e5bc */
-extern char sZrollerInitPropLoadList[28];                               /* 0x0055e5dc */
-extern char sZrollerAddPropToLoadList[32];                              /* 0x0055e5f8 */
-extern char sCreateProps[16];                                           /* 0x0055e618 */
-extern char sZrollerLoadPropMaterials[32];                              /* 0x0055e628 */
-extern char sZrollerCreatePropActor[28];                                /* 0x0055e648 */
-extern char sZrollerDestroyActor[24];                                   /* 0x0055e664 */
-extern char sZrollerGetAsyncKeyState[28];                               /* 0x0055e67c */
-extern char sZrollerSelectMap[20];                                      /* 0x0055e698 */
-extern char sZrollerSelectPlayer[24];                                   /* 0x0055e6ac */
-extern char sZrollerSelectBikeNum[28];                                  /* 0x0055e6c4 */
-extern char sSetFogDistance[20];                                        /* 0x0055e6e0 */
-extern char sGetFogDistance[20];                                        /* 0x0055e6f4 */
-extern char sZrollerDisableFog[24];                                     /* 0x0055e708 */
-extern char sZrollerSetFogColor[24];                                    /* 0x0055e720 */
-extern char sZrollerReplaceMaterial[28];                                /* 0x0055e738 */
-extern char sZrollerSetShadeMode[24];                                   /* 0x0055e754 */
-extern char sZrollerStartCrossFade[28];                                 /* 0x0055e76c */
-extern char sZrollerGetSceneStateNODATA[36];                            /* 0x0055e788 */
-extern char sFreeSceneState[20];                                        /* 0x0055e7ac */
-extern char sSetSceneState[16];                                         /* 0x0055e7c0 */
-extern char sZrollerSelectLook[24];                                     /* 0x0055e7d0 */
-extern char sRegisteredTooManyDrawCallbacksToZroller[56];               /* 0x0055e7e8 */
-extern BmxType_gSemitones gSemitones;                                   /* 0x0055e820 */
 extern BmxType_gCents gCents;                                           /* 0x0055e8b4 */
 extern BmxType_gGainCurve gGainCurve;                                   /* 0x0055e97c */
 extern struct BmxGroup_gDsVolumeGroup gDsVolumeGroup;                   /* 0x0055eb7c */
@@ -11164,65 +11605,12 @@ extern int32_t gZactorMax;                                              /* 0x005
 extern BmxType_gMotionMirrorMap gMotionMirrorMap;                       /* 0x0055f364 */
 extern uint32_t gMotionLoadedBank;                                      /* 0x0055f38c */
 extern struct BmxGroup_gSkeletonChainGroup gSkeletonChainGroup;         /* 0x0055f390 */
-extern struct BmxGroup_gSkeletonOffsetsGroup gSkeletonOffsetsGroup;     /* 0x0055f4c0 */
-extern char sOnlyCodedForPropTypes[32];                                 /* 0x0055f7e0 */
-extern char sCZaxisBmxSrcComZgeZactorC[40];                             /* 0x0055f800 */
-extern char sZACTORErrorFailedToAllocateActor[52];                      /* 0x0055f828 */
-extern char sMotionsAreTooLarge[28];                                    /* 0x0055f85c */
-extern char sMotionLibraryAlreadyOpen[36];                              /* 0x0055f878 */
-extern char sMotionsNotOpened[24];                                      /* 0x0055f89c */
-extern char sTooBig[12];                                                /* 0x0055f8b4 */
-extern char sCouldNotFindMotionBank[32];                                /* 0x0055f8c0 */
-extern char sNotReloadingMotionLibrary[36];                             /* 0x0055f8e0 */
-extern char sMotionBankNotOpened[28];                                   /* 0x0055f904 */
-extern char sExeededMaximumLODsForActor[40];                            /* 0x0055f920 */
-extern char sZACTORUnknownTagIdentifier[40];                            /* 0x0055f948 */
-extern char sNotAPersonType[24];                                        /* 0x0055f970 */
-extern char sZPRIMFailedToAllocateBuffer[40];                           /* 0x0055f988 */
-extern char sErrorOptimizingDMMMemory[36];                              /* 0x0055f9b0 */
-extern char sCZaxisBmxSrcComZgeZprimC[40];                              /* 0x0055f9d4 */
-extern char sZPRIMZprimGetColorNotImplemented[48];                      /* 0x0055f9fc */
-extern char sZPRIMFailedToAllocatePicture[44];                          /* 0x0055fa2c */
-extern char sZPRIMFailedToFindPictureX[40];                             /* 0x0055fa58 */
-extern char sBufferOverflowInZprimReplaceVRAMGrey[52];                  /* 0x0055fa80 */
-extern char sZPRIMFailedToAllocateSprite[40];                           /* 0x0055fab4 */
-extern char sZPRIMFailedToFindSpriteX[40];                              /* 0x0055fadc */
-extern char sZPRIMFailedToAllocateAssetHandle[48];                      /* 0x0055fb04 */
-extern char sZPRIMFailedToAllocateBufferInCreateSpri[60];               /* 0x0055fb34 */
-extern char sZPRIMErrorCanOnlyDecompressFromCompress[104];              /* 0x0055fb70 */
-extern char sZPRIMErrorFrameOutOfBoundsDuringDecompr[64];               /* 0x0055fbd8 */
-extern char sPossibleMemoryLeakOfFntMemHdlHere[48];                     /* 0x0055fc18 */
-extern char sZPRIMFailedToAllocateFont[40];                             /* 0x0055fc48 */
-extern char sZPRIMFailedToFindFontX[40];                                /* 0x0055fc70 */
-extern char sZPRIMFailedToAllocateGroup[40];                            /* 0x0055fc98 */
-extern char sZPRIMFailedToFindGroup[36];                                /* 0x0055fcc0 */
-extern char sZPRIMLoadFailed[24];                                       /* 0x0055fce4 */
-extern char sZPRIMErrorLoadingGroupIntoUsedSlot[56];                    /* 0x0055fcfc */
-extern char sZPRIMErrorBadSlotForGroup[44];                             /* 0x0055fd34 */
-extern char sZPRIMFailedToLoadAsset[36];                                /* 0x0055fd60 */
-extern char sZPRIMFailedToAllocateScreen[40];                           /* 0x0055fd84 */
-extern char sZPRIMFailedToFindScreen[36];                               /* 0x0055fdac */
-extern char sZPRIMErrorCanOnlyDrawtexttospriteFromFo[96];               /* 0x0055fdd0 */
-extern char sZPRIMErrorFrameOutOfBoundsDuringDrawtex[72];               /* 0x0055fe30 */
-extern char sInvalidMaterialHandle[28];                                 /* 0x0055fe78 */
-extern char sSpriteD[12];                                               /* 0x0055fe94 */
-extern char sTrack[8];                                                  /* 0x0055fea0 */
-extern char sHTrackKzsndSeqMaxTracks[32];                               /* 0x0055fea8 */
-extern char sCZaxisBmxSrcComZgeZsndseqC[44];                            /* 0x0055fec8 */
-extern char sTrackHTrack[16];                                           /* 0x0055fef4 */
-extern char sNoteEventFlagsKzsndNoteEventFlagActive[52];                /* 0x0055ff04 */
-extern char sAlreadyInitialized[24];                                    /* 0x0055ff38 */
-extern char sCZaxisBmxSrcComZgeZsndsrcC[44];                            /* 0x0055ff50 */
-extern char sNotInitialized[20];                                        /* 0x0055ff7c */
-extern char sSourceNotAllocated[28];                                    /* 0x0055ff90 */
-extern char sInvalidHandle[20];                                         /* 0x0055ffac */
-extern uint32_t gZsndTicksPerSec;             /* 0x0055ffc0, also gWinstrmTicksPerSec, gZsndTickRate */
-extern char sAlreadyInitialized_0055ffc4[20]; /* 0x0055ffc4 */
-extern char sCNgEngineZgeZdebugC[28];         /* 0x0055ffd8 */
-extern char s104f104f104f[28];                /* 0x0055fff4 */
-extern char sS104f104f104f[32];               /* 0x00560010 */
-extern BmxType_gZdebugStart gZdebugStart;     /* 0x00560030 */
-extern void *p_00560034;                      /* 0x00560034 */
+extern char sAlreadyInitialized[20];                                    /* 0x0055ffc4 */
+extern char sCNgEngineZgeZdebugC[28];                                   /* 0x0055ffd8 */
+extern char s104f104f104f[28];                                          /* 0x0055fff4 */
+extern char sS104f104f104f[32];                                         /* 0x00560010 */
+extern BmxType_gZdebugStart gZdebugStart;                               /* 0x00560030 */
+extern void *p_00560034;                                                /* 0x00560034 */
 extern struct BmxGroup_gZProfilePrintAtGroup gZProfilePrintAtGroup;     /* 0x00560038 */
 extern void *p_00560058;                                                /* 0x00560058 */
 extern void *p_0056005c;                                                /* 0x0056005c */
@@ -11253,7 +11641,7 @@ extern char s104f104f104f104f[32];                                      /* 0x005
 extern char sS104f104f104f104f[36];                                     /* 0x00560210 */
 extern char sA104f104f104f[28];                                         /* 0x00560234 */
 extern char sZrwDbgOutOfBufferSpace[32];                                /* 0x00560250 */
-extern char sNotInitialized_00560270[16];                               /* 0x00560270 */
+extern char sNotInitialized[16];                                        /* 0x00560270 */
 extern char sCNgEngineZgeZinputC[28];                                   /* 0x00560280 */
 extern char sAssetDSizeD[20];                                           /* 0x0056029c */
 extern char sNumGroupsDAssetsPerGroupD[36];                             /* 0x005602b0 */
@@ -12251,7 +12639,6 @@ extern uint32_t gFxSplashTexture;                               /* 0x005ab4ec */
 extern const int8_t *gNgifScript;                               /* 0x005ab4f0 */
 extern void *gFxCube;                                           /* 0x005ab4f4 */
 extern struct BmxGroup_gNgifPrimBufferGroup gNgifPrimBufferGroup;   /* 0x005ab4fc */
-extern int gNgifFlushPending;                                       /* 0x005d24fc */
 extern int gNgifFlushNode;                                          /* 0x005d2500 */
 extern int gNgifFlushPending2;                                      /* 0x005d2504, also gZprimFrameEnded */
 extern int gNgifFlushNode2;                                         /* 0x005d2508 */
@@ -12262,7 +12649,6 @@ extern struct BmxGroup_gZactorArmHashesGroup gZactorArmHashesGroup; /* 0x005da2c
 extern ZbspNearHitTable gZbspNearHits;                              /* 0x005e63d8 */
 extern uint32_t gZbspMatRefValue;                                   /* 0x005e7fd8 */
 extern struct BmxGroup_gZbspPropFacesGroup gZbspPropFacesGroup;     /* 0x005e7fe0 */
-extern ZbspNearFaceTable gZbspNearFaces;                            /* 0x005e8420 */
 extern unsigned char d_005f0b98[136];                               /* 0x005f0b98 */
 extern ZbspSphereResult gZbspSphere;                                /* 0x005f0c20 */
 extern ZbspFaceQuery gZbspFaceQuery;                                /* 0x005f0c28 */
@@ -12822,7 +13208,6 @@ extern int gZresMaterialLib;                                    /* 0x0067848c */
 extern int gZresMiscLib; /* 0x00678490, also gAssetLibrary, gOvlLibrary */
 extern struct BmxGroup_gZrollerEdgesGroup gZrollerEdgesGroup;         /* 0x00678494 */
 extern struct BmxGroup_gNgifPrim3DBufferGroup gNgifPrim3DBufferGroup; /* 0x00678560 */
-extern uint32_t *gNgifOrderTable;                                     /* 0x0068c3d0 */
 extern ZrollerModelTable
     gZrollerModels;                    /* 0x0068c3e0, also gNgifTextures, gZoverSprites, gZresOverlaySlots */
 extern uint32_t *gNgifPrim3D;          /* 0x0068ebe0 */
@@ -12957,152 +13342,151 @@ extern struct BmxGroup_bmxSaveOptions bmxSaveOptions;                 /* 0x00695
 extern uint8_t gPlayerCount;          /* 0x0069621c, also gNgPlayerCount, gPhysPlayerCount */
 extern unsigned char d_0069621d[216]; /* 0x0069621d */
 extern uint8_t gDemoPlayer;           /* 0x006962f5 */
-extern PhysMotionTable gPhysMotions;  /* 0x006962fc */
-extern struct BmxGroup_gActionMotionsGroup gActionMotionsGroup; /* 0x00696300 */
-extern uint32_t gOvlSaving;                                     /* 0x006966dc */
-extern int32_t rpMeshOffset;                                    /* 0x006966e8 */
-extern int32_t rpMeshModuleCount;                               /* 0x006966ec */
-extern int32_t rpPVSSectorOffset;                               /* 0x006966fc */
-extern int32_t rpPVSWorldOffset;                                /* 0x0069670c */
-extern uint32_t rwD3DOrClip;                                    /* 0x00696710 */
-extern struct BmxGroup_rwD3DAndClipGroup rwD3DAndClipGroup;     /* 0x00696720 */
-extern struct BmxGroup_rwD3DStateGroup rwD3DStateGroup;         /* 0x00696740 */
-extern const uint8_t *rwD3DCaps;                                /* 0x006968f0 */
-extern RwD3DTriFunc rwD3DClipTriCull;                           /* 0x00696900 */
-extern RwD3DTriFunc rwD3DTriCull;                               /* 0x00696904 */
-extern RwD3DTriVoidFunc rwD3DClipTri;                           /* 0x00696908 */
-extern RwD3DLineFunc rwD3DClipLine;                             /* 0x0069690c */
-extern RwD3DVoidFunc rwD3DIndexStart;                           /* 0x00696910 */
-extern RwD3DTriVoidFunc rwD3DIndexTri;                          /* 0x00696914 */
-extern RwD3DLineFunc rwD3DIndexLine;                            /* 0x00696918 */
-extern RwD3DVoidFunc rwD3DIndexFlush;                           /* 0x0069691c */
-extern RwD3DProjectionFunc rwD3DSetProjection;                  /* 0x00696920 */
-extern RwD3DUVSetFunc rwD3DSetUVStage;                          /* 0x00696924 */
-extern float rwD3DZScale;                                       /* 0x00696928 */
-extern float rwD3DZShift;                                       /* 0x0069692c */
-extern float rwD3DXScale;                                       /* 0x00696930 */
-extern float rwD3DYScale;                                       /* 0x00696934 */
-extern float rwD3DXOffset;                                      /* 0x00696938 */
-extern float rwD3DYOffset;                                      /* 0x0069693c */
-extern int32_t rwD3DNearZ;                                      /* 0x00696940 */
-extern int32_t rwD3DFarZ;                                       /* 0x00696944 */
-extern float rwD3DNearScreenZ;                                  /* 0x00696948 */
-extern float rwD3DFarScreenZ;                                   /* 0x0069694c */
-extern RwV2d rwD3DRecipWindow;                                  /* 0x00696950 */
-extern RwD3DTLVertex *rwD3DTLBase;                              /* 0x00696958 */
-extern RwD3DCamVertex *rwD3DCamBase;                            /* 0x0069695c */
-extern int32_t rwIm3DGouraud;                                   /* 0x00696960 */
-extern uint32_t rwD3DIm3DDepth;                                 /* 0x00696964 */
-extern RwD3DIm3DLevel *rwD3DIm3DLevel;                          /* 0x00696968 */
-extern unsigned char d_0069696c[12];                            /* 0x0069696c */
-extern unsigned char d_00696978[4];                             /* 0x00696978 */
-extern unsigned char d_0069697c[4];                             /* 0x0069697c */
-extern unsigned char d_00696980[220];                           /* 0x00696980 */
-extern uint32_t *rwD3DVertexBits;                               /* 0x00696a5c */
-extern uint32_t rwD3DVertexBitsSize;                            /* 0x00696a60 */
-extern RwD3DIndexList rwD3DTriIndices;                          /* 0x00696a64 */
-extern RwD3DIndexList rwD3DLineIndices;                         /* 0x00696a70 */
-extern RwD3DTLVertex *rwD3DTLBuffer;                            /* 0x00696a7c */
-extern RwD3DCamVertex *rwD3DCamBuffer;                          /* 0x00696a80 */
-extern uint32_t rwD3DBufferSize;                                /* 0x00696a84 */
-extern struct BmxGroup_rwD3DIm3DWorkGroup rwD3DIm3DWorkGroup;   /* 0x00696a88 */
-extern unsigned char d_00696b00[1024];                          /* 0x00696b00 */
-extern unsigned char d_00696f00[4];                             /* 0x00696f00 */
-extern unsigned char d_00696f04[380];                           /* 0x00696f04 */
-extern unsigned char d_00697080[8];                             /* 0x00697080 */
-extern unsigned char d_00697088[4];                             /* 0x00697088 */
-extern unsigned char d_0069708c[4];                             /* 0x0069708c */
-extern unsigned char d_00697090[56];                            /* 0x00697090 */
-extern unsigned char d_006970c8[4];                             /* 0x006970c8 */
-extern unsigned char d_006970cc[4];                             /* 0x006970cc */
-extern unsigned char d_006970d0[4];                             /* 0x006970d0 */
-extern unsigned char d_006970d4[4];                             /* 0x006970d4 */
-extern unsigned char d_006970d8[4];                             /* 0x006970d8 */
-extern unsigned char d_006970dc[4];                             /* 0x006970dc */
-extern unsigned char d_006970e0[4];                             /* 0x006970e0 */
-extern unsigned char d_006970e4[28];                            /* 0x006970e4 */
-extern unsigned char d_00697100[16];                            /* 0x00697100 */
-extern unsigned char d_00697110[56];                            /* 0x00697110 */
-extern unsigned char d_00697148[4];                             /* 0x00697148 */
-extern unsigned char d_0069714c[4];                             /* 0x0069714c */
-extern unsigned char d_00697150[4];                             /* 0x00697150 */
-extern unsigned char d_00697154[4];                             /* 0x00697154 */
-extern unsigned char d_00697158[4];                             /* 0x00697158 */
-extern unsigned char d_0069715c[4];                             /* 0x0069715c */
-extern unsigned char d_00697160[4];                             /* 0x00697160 */
-extern unsigned char d_00697164[28];                            /* 0x00697164 */
-extern unsigned char d_00697180[4];                             /* 0x00697180 */
-extern unsigned char d_00697184[4];                             /* 0x00697184 */
-extern unsigned char d_00697188[4];                             /* 0x00697188 */
-extern unsigned char d_0069718c[52];                            /* 0x0069718c */
-extern unsigned char d_006971c0[4];                             /* 0x006971c0 */
-extern unsigned char d_006971c4[4];                             /* 0x006971c4 */
-extern unsigned char d_006971c8[4];                             /* 0x006971c8 */
-extern unsigned char d_006971cc[4];                             /* 0x006971cc */
-extern unsigned char d_006971d0[4];                             /* 0x006971d0 */
-extern unsigned char d_006971d4[4];                             /* 0x006971d4 */
-extern unsigned char d_006971d8[4];                             /* 0x006971d8 */
-extern unsigned char d_006971dc[4];                             /* 0x006971dc */
-extern unsigned char d_006971e0[4];                             /* 0x006971e0 */
-extern unsigned char d_006971e4[4];                             /* 0x006971e4 */
-extern unsigned char d_006971e8[20];                            /* 0x006971e8 */
-extern unsigned char d_006971fc[4];                             /* 0x006971fc */
-extern unsigned char d_00697200[4];                             /* 0x00697200 */
-extern unsigned char d_00697204[4];                             /* 0x00697204 */
-extern unsigned char d_00697208[4];                             /* 0x00697208 */
-extern unsigned char d_0069720c[60];                            /* 0x0069720c */
-extern unsigned char d_00697248[4];                             /* 0x00697248 */
-extern unsigned char d_0069724c[4];                             /* 0x0069724c */
-extern unsigned char d_00697250[4];                             /* 0x00697250 */
-extern unsigned char d_00697254[4];                             /* 0x00697254 */
-extern unsigned char d_00697258[4];                             /* 0x00697258 */
-extern unsigned char d_0069725c[4];                             /* 0x0069725c */
-extern unsigned char d_00697260[4];                             /* 0x00697260 */
-extern unsigned char d_00697264[4];                             /* 0x00697264 */
-extern unsigned char d_00697268[24];                            /* 0x00697268 */
-extern unsigned char d_00697280[4];                             /* 0x00697280 */
-extern unsigned char d_00697284[4];                             /* 0x00697284 */
-extern unsigned char d_00697288[4];                             /* 0x00697288 */
-extern unsigned char d_0069728c[60];                            /* 0x0069728c */
-extern unsigned char d_006972c8[4];                             /* 0x006972c8 */
-extern unsigned char d_006972cc[4];                             /* 0x006972cc */
-extern unsigned char d_006972d0[4];                             /* 0x006972d0 */
-extern unsigned char d_006972d4[4];                             /* 0x006972d4 */
-extern unsigned char d_006972d8[4];                             /* 0x006972d8 */
-extern unsigned char d_006972dc[4];                             /* 0x006972dc */
-extern unsigned char d_006972e0[4];                             /* 0x006972e0 */
-extern unsigned char d_006972e4[4];                             /* 0x006972e4 */
-extern unsigned char d_006972e8[20];                            /* 0x006972e8 */
-extern unsigned char d_006972fc[4];                             /* 0x006972fc */
-extern unsigned char d_00697300[4];                             /* 0x00697300 */
-extern unsigned char d_00697304[4];                             /* 0x00697304 */
-extern unsigned char d_00697308[4];                             /* 0x00697308 */
-extern struct BmxGroup_gDirectDrawGroup gDirectDrawGroup;       /* 0x0069730c */
-extern unsigned char d_00697320[4];                             /* 0x00697320 */
-extern unsigned char d_00697324[4];                             /* 0x00697324 */
-extern unsigned char d_00697328[4];                             /* 0x00697328 */
-extern unsigned char d_0069732c[4];                             /* 0x0069732c */
-extern unsigned char d_00697330[4];                             /* 0x00697330 */
-extern unsigned char d_00697334[1];                             /* 0x00697334 */
-extern unsigned char d_00697335[1];                             /* 0x00697335 */
-extern unsigned char d_00697336[10];                            /* 0x00697336 */
-extern uint8_t *rwD3DContext;                                   /* 0x00697340 */
-extern RwCamera *rwD3DCurrentCamera;                            /* 0x00697348 */
-extern const RwMemoryFunctions *rwD3DMemory;                    /* 0x0069734c */
-extern unsigned char d_00697350[4];                             /* 0x00697350 */
-extern int32_t rwD3DFogStart;                                   /* 0x00697354 */
-extern float rwD3DFogEnd;                                       /* 0x00697358 */
-extern float rwD3DFogScale;                                     /* 0x0069735c */
-extern unsigned char d_00697360[4];                             /* 0x00697360 */
-extern int32_t rwD3DRasterExtOffset;                            /* 0x00697364 */
-extern int32_t rwD3DCameraExtOffset;                            /* 0x00697368 */
-extern int32_t rpLodEngineOffset;                               /* 0x00697370 */
-extern int32_t rpLodAtomicOffset;                               /* 0x00697374 */
-extern void *rpLodCamera;                                       /* 0x00697378 */
-extern struct BmxGroup_rpLodFreeListGroup rpLodFreeListGroup;   /* 0x0069737c */
-extern struct BmxGroup_gMovieGroup gMovieGroup;                 /* 0x006973a0 */
-extern void *gZrwRaster;                                        /* 0x006976c0, also gRaster, gZrwCamRaster */
-extern void *gZrwZRaster;                                       /* 0x006976c4 */
+extern struct BmxGroup_gPhysMotionsGroup gPhysMotionsGroup;   /* 0x006962fc */
+extern uint32_t gOvlSaving;                                   /* 0x006966dc */
+extern int32_t rpMeshOffset;                                  /* 0x006966e8 */
+extern int32_t rpMeshModuleCount;                             /* 0x006966ec */
+extern int32_t rpPVSSectorOffset;                             /* 0x006966fc */
+extern int32_t rpPVSWorldOffset;                              /* 0x0069670c */
+extern uint32_t rwD3DOrClip;                                  /* 0x00696710 */
+extern struct BmxGroup_rwD3DAndClipGroup rwD3DAndClipGroup;   /* 0x00696720 */
+extern struct BmxGroup_rwD3DStateGroup rwD3DStateGroup;       /* 0x00696740 */
+extern const uint8_t *rwD3DCaps;                              /* 0x006968f0 */
+extern RwD3DTriFunc rwD3DClipTriCull;                         /* 0x00696900 */
+extern RwD3DTriFunc rwD3DTriCull;                             /* 0x00696904 */
+extern RwD3DTriVoidFunc rwD3DClipTri;                         /* 0x00696908 */
+extern RwD3DLineFunc rwD3DClipLine;                           /* 0x0069690c */
+extern RwD3DVoidFunc rwD3DIndexStart;                         /* 0x00696910 */
+extern RwD3DTriVoidFunc rwD3DIndexTri;                        /* 0x00696914 */
+extern RwD3DLineFunc rwD3DIndexLine;                          /* 0x00696918 */
+extern RwD3DVoidFunc rwD3DIndexFlush;                         /* 0x0069691c */
+extern RwD3DProjectionFunc rwD3DSetProjection;                /* 0x00696920 */
+extern RwD3DUVSetFunc rwD3DSetUVStage;                        /* 0x00696924 */
+extern float rwD3DZScale;                                     /* 0x00696928 */
+extern float rwD3DZShift;                                     /* 0x0069692c */
+extern float rwD3DXScale;                                     /* 0x00696930 */
+extern float rwD3DYScale;                                     /* 0x00696934 */
+extern float rwD3DXOffset;                                    /* 0x00696938 */
+extern float rwD3DYOffset;                                    /* 0x0069693c */
+extern int32_t rwD3DNearZ;                                    /* 0x00696940 */
+extern int32_t rwD3DFarZ;                                     /* 0x00696944 */
+extern float rwD3DNearScreenZ;                                /* 0x00696948 */
+extern float rwD3DFarScreenZ;                                 /* 0x0069694c */
+extern RwV2d rwD3DRecipWindow;                                /* 0x00696950 */
+extern RwD3DTLVertex *rwD3DTLBase;                            /* 0x00696958 */
+extern RwD3DCamVertex *rwD3DCamBase;                          /* 0x0069695c */
+extern int32_t rwIm3DGouraud;                                 /* 0x00696960 */
+extern uint32_t rwD3DIm3DDepth;                               /* 0x00696964 */
+extern RwD3DIm3DLevel *rwD3DIm3DLevel;                        /* 0x00696968 */
+extern unsigned char d_0069696c[12];                          /* 0x0069696c */
+extern unsigned char d_00696978[4];                           /* 0x00696978 */
+extern unsigned char d_0069697c[4];                           /* 0x0069697c */
+extern unsigned char d_00696980[220];                         /* 0x00696980 */
+extern uint32_t *rwD3DVertexBits;                             /* 0x00696a5c */
+extern uint32_t rwD3DVertexBitsSize;                          /* 0x00696a60 */
+extern RwD3DIndexList rwD3DTriIndices;                        /* 0x00696a64 */
+extern RwD3DIndexList rwD3DLineIndices;                       /* 0x00696a70 */
+extern RwD3DTLVertex *rwD3DTLBuffer;                          /* 0x00696a7c */
+extern RwD3DCamVertex *rwD3DCamBuffer;                        /* 0x00696a80 */
+extern uint32_t rwD3DBufferSize;                              /* 0x00696a84 */
+extern struct BmxGroup_rwD3DIm3DWorkGroup rwD3DIm3DWorkGroup; /* 0x00696a88 */
+extern unsigned char d_00696b00[1024];                        /* 0x00696b00 */
+extern unsigned char d_00696f00[4];                           /* 0x00696f00 */
+extern unsigned char d_00696f04[380];                         /* 0x00696f04 */
+extern unsigned char d_00697080[8];                           /* 0x00697080 */
+extern unsigned char d_00697088[4];                           /* 0x00697088 */
+extern unsigned char d_0069708c[4];                           /* 0x0069708c */
+extern unsigned char d_00697090[56];                          /* 0x00697090 */
+extern unsigned char d_006970c8[4];                           /* 0x006970c8 */
+extern unsigned char d_006970cc[4];                           /* 0x006970cc */
+extern unsigned char d_006970d0[4];                           /* 0x006970d0 */
+extern unsigned char d_006970d4[4];                           /* 0x006970d4 */
+extern unsigned char d_006970d8[4];                           /* 0x006970d8 */
+extern unsigned char d_006970dc[4];                           /* 0x006970dc */
+extern unsigned char d_006970e0[4];                           /* 0x006970e0 */
+extern unsigned char d_006970e4[28];                          /* 0x006970e4 */
+extern unsigned char d_00697100[16];                          /* 0x00697100 */
+extern unsigned char d_00697110[56];                          /* 0x00697110 */
+extern unsigned char d_00697148[4];                           /* 0x00697148 */
+extern unsigned char d_0069714c[4];                           /* 0x0069714c */
+extern unsigned char d_00697150[4];                           /* 0x00697150 */
+extern unsigned char d_00697154[4];                           /* 0x00697154 */
+extern unsigned char d_00697158[4];                           /* 0x00697158 */
+extern unsigned char d_0069715c[4];                           /* 0x0069715c */
+extern unsigned char d_00697160[4];                           /* 0x00697160 */
+extern unsigned char d_00697164[28];                          /* 0x00697164 */
+extern unsigned char d_00697180[4];                           /* 0x00697180 */
+extern unsigned char d_00697184[4];                           /* 0x00697184 */
+extern unsigned char d_00697188[4];                           /* 0x00697188 */
+extern unsigned char d_0069718c[52];                          /* 0x0069718c */
+extern unsigned char d_006971c0[4];                           /* 0x006971c0 */
+extern unsigned char d_006971c4[4];                           /* 0x006971c4 */
+extern unsigned char d_006971c8[4];                           /* 0x006971c8 */
+extern unsigned char d_006971cc[4];                           /* 0x006971cc */
+extern unsigned char d_006971d0[4];                           /* 0x006971d0 */
+extern unsigned char d_006971d4[4];                           /* 0x006971d4 */
+extern unsigned char d_006971d8[4];                           /* 0x006971d8 */
+extern unsigned char d_006971dc[4];                           /* 0x006971dc */
+extern unsigned char d_006971e0[4];                           /* 0x006971e0 */
+extern unsigned char d_006971e4[4];                           /* 0x006971e4 */
+extern unsigned char d_006971e8[20];                          /* 0x006971e8 */
+extern unsigned char d_006971fc[4];                           /* 0x006971fc */
+extern unsigned char d_00697200[4];                           /* 0x00697200 */
+extern unsigned char d_00697204[4];                           /* 0x00697204 */
+extern unsigned char d_00697208[4];                           /* 0x00697208 */
+extern unsigned char d_0069720c[60];                          /* 0x0069720c */
+extern unsigned char d_00697248[4];                           /* 0x00697248 */
+extern unsigned char d_0069724c[4];                           /* 0x0069724c */
+extern unsigned char d_00697250[4];                           /* 0x00697250 */
+extern unsigned char d_00697254[4];                           /* 0x00697254 */
+extern unsigned char d_00697258[4];                           /* 0x00697258 */
+extern unsigned char d_0069725c[4];                           /* 0x0069725c */
+extern unsigned char d_00697260[4];                           /* 0x00697260 */
+extern unsigned char d_00697264[4];                           /* 0x00697264 */
+extern unsigned char d_00697268[24];                          /* 0x00697268 */
+extern unsigned char d_00697280[4];                           /* 0x00697280 */
+extern unsigned char d_00697284[4];                           /* 0x00697284 */
+extern unsigned char d_00697288[4];                           /* 0x00697288 */
+extern unsigned char d_0069728c[60];                          /* 0x0069728c */
+extern unsigned char d_006972c8[4];                           /* 0x006972c8 */
+extern unsigned char d_006972cc[4];                           /* 0x006972cc */
+extern unsigned char d_006972d0[4];                           /* 0x006972d0 */
+extern unsigned char d_006972d4[4];                           /* 0x006972d4 */
+extern unsigned char d_006972d8[4];                           /* 0x006972d8 */
+extern unsigned char d_006972dc[4];                           /* 0x006972dc */
+extern unsigned char d_006972e0[4];                           /* 0x006972e0 */
+extern unsigned char d_006972e4[4];                           /* 0x006972e4 */
+extern unsigned char d_006972e8[20];                          /* 0x006972e8 */
+extern unsigned char d_006972fc[4];                           /* 0x006972fc */
+extern unsigned char d_00697300[4];                           /* 0x00697300 */
+extern unsigned char d_00697304[4];                           /* 0x00697304 */
+extern unsigned char d_00697308[4];                           /* 0x00697308 */
+extern struct BmxGroup_gDirectDrawGroup gDirectDrawGroup;     /* 0x0069730c */
+extern unsigned char d_00697320[4];                           /* 0x00697320 */
+extern unsigned char d_00697324[4];                           /* 0x00697324 */
+extern unsigned char d_00697328[4];                           /* 0x00697328 */
+extern unsigned char d_0069732c[4];                           /* 0x0069732c */
+extern unsigned char d_00697330[4];                           /* 0x00697330 */
+extern unsigned char d_00697334[1];                           /* 0x00697334 */
+extern unsigned char d_00697335[1];                           /* 0x00697335 */
+extern unsigned char d_00697336[10];                          /* 0x00697336 */
+extern uint8_t *rwD3DContext;                                 /* 0x00697340 */
+extern RwCamera *rwD3DCurrentCamera;                          /* 0x00697348 */
+extern const RwMemoryFunctions *rwD3DMemory;                  /* 0x0069734c */
+extern unsigned char d_00697350[4];                           /* 0x00697350 */
+extern int32_t rwD3DFogStart;                                 /* 0x00697354 */
+extern float rwD3DFogEnd;                                     /* 0x00697358 */
+extern float rwD3DFogScale;                                   /* 0x0069735c */
+extern unsigned char d_00697360[4];                           /* 0x00697360 */
+extern int32_t rwD3DRasterExtOffset;                          /* 0x00697364 */
+extern int32_t rwD3DCameraExtOffset;                          /* 0x00697368 */
+extern int32_t rpLodEngineOffset;                             /* 0x00697370 */
+extern int32_t rpLodAtomicOffset;                             /* 0x00697374 */
+extern void *rpLodCamera;                                     /* 0x00697378 */
+extern struct BmxGroup_rpLodFreeListGroup rpLodFreeListGroup; /* 0x0069737c */
+extern struct BmxGroup_gMovieGroup gMovieGroup;               /* 0x006973a0 */
+extern void *gZrwRaster;                                      /* 0x006976c0, also gRaster, gZrwCamRaster */
+extern void *gZrwZRaster;                                     /* 0x006976c4 */
 extern void *gZrwWorld;             /* 0x006976c8, also gZrwDebugLight, gZrwSceneState */
 extern ZVec3 gZrwWorldCenter;       /* 0x006976cc, also gZrwOriginX, gZrwOriginY, gZrwOriginZ */
 extern ZVec3 gZrwWorldCenterScaled; /* 0x006976d8, also gZrwWorldOffset */

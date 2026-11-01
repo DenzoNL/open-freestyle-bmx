@@ -280,19 +280,20 @@ checking every function):
   stay a pointer.
 - Then **X3**: the x86_64 build links and runs.
 
-### X2a (done 2026-11-01, pending the game runs): globals out of the blocks
+### X2a (done 2026-11-01): globals out of the blocks
 
 Each original global is its own C definition with its own initialiser; details in docs/NATIVE.md "The original's
 data in the source".
-- **4232 definitions** (src/data/<module>.c by declaring module; declarations in src/data/globals.h): 1047 globals,
-  1651 strings, 837 float / word / byte runs, 425 zero objects, 39 pointers and pointer tables something refers to,
-  and 233 groups. The section blocks and src/data/layout.h are gone; 7439 bytes of padding nothing refers to are
+- **4042 definitions** (src/data/<module>.c by declaring module; declarations in src/data/globals.h): 1038 globals,
+  1472 strings, 837 float / word / byte runs, 425 zero objects, 39 pointers and pointer tables something refers to,
+  and 231 groups. The section blocks and src/data/layout.h are gone; 7439 bytes of padding nothing refers to are
   dropped.
 - **Groups** keep together what the code uses as one piece, as a struct with the original offsets (asserted): the
   views (the 61 of X1b, bounded where their declared type is bigger than what the code uses: gComdataRecords to
   SAVE.DAT's 0x1680 bytes, gPhysRiders to 2 riders, the unused gActionMapTable to gGameLevelInfoIndex's 12), the ranges copied or cleared at once (SAVE.DAT's three ranges,
-  initGlobals' memset, zrwworld.c's 0xac-byte memset from gZrwWorldReady, which X1b had missed), and 115 globals with
-  the bytes after them that nothing refers to (tables declared shorter than they are). SAVE.DAT's three ranges
+  initGlobals' memset, zrwworld.c's 0xac-byte memset from gZrwWorldReady, which X1b had missed), globals with the bytes
+  after them that nothing refers to (tables declared shorter than they are), and the 11 open-ended tables (arrays
+  declared with one element) together with the global after them. SAVE.DAT's three ranges
   are explicit groups: `bmxSaveRecords` (0x551fd8+0x1680) and `bmxSaveOptions` (0x6955e0+0xc3c) exactly,
   `bmxSaveProfiles` (0x6952a0+0x98) with the bytes after it that nothing refers to.
 - **`ORIG_VAR` / `BMX_ORIG`** natively name the definition: `BMX_DATA_<addr>` (src/data/addrs.h) is the symbol plus
@@ -304,12 +305,17 @@ data in the source".
   `&gZrollerSlots + n`: all inside their definitions or bounded), comparisons of pointers to different globals
   (none: all six compare within one array), constant out-of-bounds indices (the compiler's -Warray-bounds, clean).
   Not checkable statically: a loop that runs past a declared array into the next global something refers to; the
-  bytes after a global that nothing refers to stay with it for that reason. Alignment: groups keep their members'
+  bytes after a global that nothing refers to stay with it for that reason. **Found by the first replay**: the
+  rider's motion table is declared `gPhysMotions[1]` at 0x6962fc and read as `gPhysMotions[index]` on into
+  gActionMotions (0x696300, the same table shifted by one entry, filled by action.c); split apart, level tick 29
+  read a NULL motion and crashed. Since then every array declared with one element stays with the global after it
+  (11 such: gPhysMotions, the rider step tables, the PSX primitive buffers, gZbspPropFaces, the roller name tables,
+  the skeleton tables). Alignment: groups keep their members'
   original alignment; the page placement of X1b is gone (no code found that depends on it).
 - **Verified**: `tools/gen_data.py --check` (in the gate; each definition its own section): 1372840 bytes and every
   pointer (813 data, 739 code) equal to the exe's; the gate; bmxwidetest, bmxhftest; the hook build's code
-  unchanged. **Pending (no game runs while the user plays)**: xcheck of the user's recording against
-  rec-20261101-140610.native32-84da8fd.hash and of the scripted ride.
+  unchanged; tools/xcheck.py with the user's recording (5594 ticks, NgBMX.exe moved away) identical to
+  rec-20261101-140610.native32-84da8fd.hash. **Pending** (the user plays): the scripted ride.
 
 ## Not in scope
 
