@@ -253,6 +253,33 @@ What X2 gets from this, and what is left of X1 for it:
 X1 and X2 are the bulk of the work (thousands of lines touched, mechanical but wide). X3 and X4 should be small
 once X2 is done. X5 and X6 are moderate. The order puts the user's own desktop (X3) first.
 
+### X2 plan (2026-11-01)
+
+Inventory: the native build compiled for x86_64 with `-fsyntax-only` (scratchpad probe, to become tools/probe64.py):
+- **1750 distinct layout asserts fail.** 1311 are the section blocks' offset asserts in src/data/layout.h (they go
+  as globals leave the blocks); ~440 are in 73 hand-written headers, structs that hold pointers (physics_types.h
+  65, rwworld.h 30, zrwmodel.h 24, rwcore.h 21, rwplugins.h 19, zactor.h 15, rwtexture.h 15, ...).
+- **165 explicit `(uint32_t)(uintptr_t)` casts** (the compiler cannot see them): driver/raster.c 19, zscene.c 12,
+  driver/texture.c 12, winload.c 10, zrwzgl.c 8, fx.c 6, ...
+- **28-bit pointers** in the PSX-style ordering tables and packets (ngifpsx.c, zoverii.c, the front end; found in
+  X1b).
+- The rest is small: the trap handler's x86 context, a few data initialisers (`uintptr_t` into `uint32_t`).
+
+Slices, each checked with xcheck against the user's recordings and run in the 32-bit build (the oracle keeps
+checking every function):
+- **X2a, globals out of the blocks:** each global its own definition, the views (61, the generator's log) turned
+  into explicit structs or accessors; the blocks shrink to nothing; src/data/layout.h goes.
+- **X2b, which layouts matter:** classify every struct with a failing assert: (1) loaded from or saved to a file
+  (assets via zramdisk / ziff / zasset, RW streams, SAVE.DAT) -> an on-disk type with an explicit reader / writer;
+  (2) shared with the original only in the oracle -> the assert stays, 32-bit only; (3) in-memory only -> the
+  assert becomes 32-bit only, the layout is free.
+- **X2c, the on-disk types and readers** from X2b, one format at a time.
+- **X2d, the 28-bit pointers:** a packet / ordering-table representation that holds full pointers (or indices into
+  a packet arena).
+- **X2e, the casts:** each `(uint32_t)(uintptr_t)` reviewed: a real 32-bit value, an index, or a pointer that must
+  stay a pointer.
+- Then **X3**: the x86_64 build links and runs.
+
 ## Not in scope
 
 - Running without the user's game files: the assets, movies and music stay theirs.
