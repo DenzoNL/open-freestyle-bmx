@@ -20,17 +20,18 @@ typedef struct ZmemdmmBlock {
     uint32_t size; /* bytes, including this header */
 } ZmemdmmBlock;
 
-/* Handle record, found at `top - handle * 16`. */
+/* Handle record, found at `top - handle * sizeof(ZmemdmmHandle)`. */
 typedef struct ZmemdmmHandle {
     uint8_t used;
     uint8_t locks;
     uint8_t pad02[2];
     void *data;
-    uint32_t size; /* bytes of payload (rounded up to 4, at least 12) */
+    uint32_t size; /* bytes of payload (rounded up to a pointer's size, at least a ZmemdmmBlock) */
     uint8_t pad0c[4];
 } ZmemdmmHandle;
 
 BMX_LAYOUT32_ASSERT(sizeof(ZmemdmmHandle) == 0x10, "DMM handle record");
+BMX_LAYOUT32_ASSERT(sizeof(ZmemdmmBlock) == 0xc, "DMM free block header");
 
 typedef struct ZmemdmmState {
     uint8_t *tableLow;      /* 0x5f8f30 lowest handle record (the data area ends below it) */
@@ -40,7 +41,7 @@ typedef struct ZmemdmmState {
     uint32_t size;          /* 0x5f8f40 total bytes */
     uint8_t *highWater;     /* 0x5f8f44 end of the highest allocation, or the last free block */
     int lockCount;          /* 0x5f8f48 locks held over all handles */
-    uint8_t *top;           /* 0x5f8f4c end of the block; handle n lives at top - n * 16 */
+    uint8_t *top;           /* 0x5f8f4c end of the block; handle n lives at top - n * sizeof(ZmemdmmHandle) */
     uint8_t *base;          /* 0x5f8f50 */
     int initialized;        /* 0x5f8f54 */
 } ZmemdmmState;

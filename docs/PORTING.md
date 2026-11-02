@@ -380,8 +380,9 @@ mechanical commits leave bmxtest.dll, dinput.dll and bmxnative.exe .text/.data/.
     X2c), guiinput's 32-byte stride (pointer-free).
   - tools/xcheck.py --shots compares screenshots of the replay too (with `vanilla = 1`); the ride's frames 1000,
     1200, 1400 and 1800 are byte-identical to the exe before this batch.
-- **Left (X2c/X2e):** ngifzmemdmm (handle records and free-block headers laid out with 32-bit sizes in a byte
-  arena); crt.c rwFexist (original address); type pairs ZPropDef/ZbspTreeNode, ZPropInst/PhysPropNode,
+- **ngifzmemdmm:** the handle record size, the smallest payload (a free-block header) and the rounding come from
+  the types (0x10, 12 and 4 where pointers are 32 bits wide); "no free block" is UINTPTR_MAX, above every block.
+- **Left (X2c/X2e):** crt.c rwFexist (original address); type pairs ZPropDef/ZbspTreeNode, ZPropInst/PhysPropNode,
   ZrwRenderColTriangle = ZbspLevelFace (pointers read as u32 tags), ZObj views, OvlFont/ZOverFont, ZrwShadow*,
   ZrwColTriangle; the `(uint32_t)(uintptr_t)` casts (X2e: query / request arrays, zfileOpenRamDisk addresses, RW
   render state values). X2d: the 28-bit ordering tables.

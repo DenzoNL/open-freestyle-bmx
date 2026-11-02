@@ -8,13 +8,20 @@
 
 static const char kDmmFile[] = "C:\\zaxis\\Bmx\\src\\com\\zge\\NgIF\\NgIfzmemDMM.c";
 
-/* Value of freeHead when no block is free. */
-#define kNoFree ((ZmemdmmBlock *)(uintptr_t)0xffffffffu)
+/* Value of freeHead when no block is free: above every block (zmemdmmFree compares against it). */
+#define kNoFree ((ZmemdmmBlock *)UINTPTR_MAX)
+
+/* Size of a handle record (0x10 where pointers are 32 bits wide). The handle table grows down from the top.
+ */
+#define kRecord ((uint32_t)sizeof(ZmemdmmHandle))
+
+/* Sizes are rounded up to this (4 where pointers are 32 bits wide), so headers and records stay aligned. */
+#define kAlign ((uint32_t)sizeof(void *))
 
 /* Address of the record of a handle (no range check, like the original). */
 static ZmemdmmHandle *record(int handle)
 {
-    return (ZmemdmmHandle *)(uintptr_t)((uint32_t)(uintptr_t)gZmemdmm.top - (uint32_t)handle * 0x10u);
+    return (ZmemdmmHandle *)(void *)(gZmemdmm.top - (size_t)(uint32_t)handle * kRecord);
 }
 
 /* Last block of the free list. */
@@ -49,7 +56,7 @@ int zmemdmmInit(int a, uint32_t size, uint32_t b)
         return 1;
     }
     gZmemdmm.staticMark = zmemStaticMark();
-    gZmemdmm.size = (size + 3) & ~3u;
+    gZmemdmm.size = (size + kAlign - 1) & ~(kAlign - 1);
     gZmemdmm.base = zmemStaticAlloc(gZmemdmm.size);
     if (gZmemdmm.base == NULL) {
         failPrinted("ZMEMDMM: Failed to initialize DMM\n", 0xd4);
@@ -64,7 +71,7 @@ int zmemdmmInit(int a, uint32_t size, uint32_t b)
     gZmemdmm.freeHead = (ZmemdmmBlock *)gZmemdmm.base;
     gZmemdmm.freeHead->prev = NULL;
     gZmemdmm.freeHead->next = NULL;
-    gZmemdmm.freeHead->size = gZmemdmm.size - 0x10;
+    gZmemdmm.freeHead->size = gZmemdmm.size - kRecord; /* room for the first record */
     gZmemdmm.initialized = 1;
     return 0;
 }
@@ -118,14 +125,14 @@ int zmemdmmFindFreeHandle(void)
         handle++;
         rec = record(handle);
     }
-    if (gZmemdmm.tableLow - 0x10 <= gZmemdmm.highWater || gZmemdmm.freeHead == kNoFree) {
+    if (gZmemdmm.tableLow - kRecord <= gZmemdmm.highWater || gZmemdmm.freeHead == kNoFree) {
         return 0;
     }
     ZmemdmmBlock *last = lastFree(gZmemdmm.freeHead);
-    if (last->size > 0x10) {
-        last->size -= 0x10;
+    if (last->size > kRecord) {
+        last->size -= kRecord;
         gZmemdmm.tableGrew = 1;
-        gZmemdmm.tableLow -= 0x10;
+        gZmemdmm.tableLow -= kRecord;
         return handle;
     }
     return 0;
@@ -145,7 +152,7 @@ int zmemdmmCarveBlock(ZmemdmmBlock *blk, uint32_t size)
     }
     rec = record(handle);
     end = (uint8_t *)blk + size;
-    if (end + 0x10 <= gZmemdmm.tableLow) {
+    if (end + kRecord <= gZmemdmm.tableLow) {
         gZmemdmm.tableGrew = 0;
         rec->used = 1;
         rec->locks = 0;
@@ -201,8 +208,8 @@ int zmemdmmCarveBlock(ZmemdmmBlock *blk, uint32_t size)
         if (gZmemdmm.freeHead == kNoFree) {
             return 0;
         }
-        lastFree(gZmemdmm.freeHead)->size += 0x10;
-        gZmemdmm.tableLow += 0x10;
+        lastFree(gZmemdmm.freeHead)->size += kRecord;
+        gZmemdmm.tableLow += kRecord;
         gZmemdmm.tableGrew = 0;
     }
     return 0;
@@ -223,10 +230,11 @@ int zmemdmmAlloc(uint32_t size)
         zdebugFail("ZMEM: Out of RAM", kDmmFile, 0x204, 0);
         return 0;
     }
-    if (size < 0xc) {
-        size = 0xc;
+    /* A freed payload becomes a free block header. */
+    if (size < sizeof(ZmemdmmBlock)) {
+        size = (uint32_t)sizeof(ZmemdmmBlock);
     }
-    size = (size + 3) & ~3u;
+    size = (size + kAlign - 1) & ~(kAlign - 1);
     for (ZmemdmmBlock *blk = gZmemdmm.freeHead; blk != NULL; blk = blk->next) {
         if (size <= blk->size) {
             return zmemdmmCarveBlock(blk, size);
@@ -420,7 +428,7 @@ void zmemdmmComputeStats(void)
     if (gZmemdmm.tableLow != gZmemdmm.top) {
         do {
             records++;
-        } while (gZmemdmm.tableLow < gZmemdmm.top - (size_t)records * 0x10);
+        } while (gZmemdmm.tableLow < gZmemdmm.top - (size_t)records * kRecord);
     }
     (void)largest;
     (void)records;
