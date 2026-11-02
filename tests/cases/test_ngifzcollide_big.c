@@ -102,7 +102,7 @@ static ZrwRenderColHit *BMX_CDECL stubFindTriangle(const ZVec3 *point, float max
     if (pick == 0) {
         return NULL;
     }
-    gTri.tag = pick == 1 ? 0 : (uint32_t)(uintptr_t)gTriTag;
+    gTri.tag = pick == 1 ? NULL : (const void *)gTriTag;
     return &gTri;
 }
 
@@ -397,7 +397,7 @@ static void setup_edges_behind(DtCtx *c)
             list[i].v1 = list[i].v0;
             list[i].v1.y += (float)dt_range(-span, span);
         }
-        list[i].tag = (uint32_t)(uintptr_t)newEdgeTag();
+        list[i].tag = newEdgeTag();
     }
     gQuery.list = c->seed % 7 == 0 ? NULL : list;
     dt_stub(0x0048f320, NULL, (void *)stubModelQuery);

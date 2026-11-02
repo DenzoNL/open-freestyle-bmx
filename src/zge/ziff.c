@@ -9,6 +9,7 @@
 #include "zge/zdebug.h"
 #include "zge/zfile.h"
 #include "zge/zmem.h"
+#include "zge/zobj.h"
 #include "zge/zstring.h"
 
 static const char kZiffFile[] = "C:\\NgEngine\\Zge\\ziff.c";
@@ -498,7 +499,7 @@ void *zrwmatBuildSkeleton(void *object)
 BMX_ADDR(0x004994d0)
 void zrwmatFreeSkeleton(void *object)
 {
-    ZSkeleton *skel = ((ZSkeletonOwner *)object)->skeleton;
+    ZSkeleton *skel = ((const ZObj *)object)->data; /* a model object keeps its skeleton there */
 
     if (skel == NULL) {
         return;

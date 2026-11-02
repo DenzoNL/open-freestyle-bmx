@@ -20,7 +20,8 @@ typedef struct ZrwMatSlot {
 } ZrwMatSlot;
 
 /* Material record (0x74 bytes, from the free list in gZrwMat.pool). The last of the six texture slots (+0x68)
- * ends in the word of `rwMaterial` at +0x70, so only its handle is usable. */
+ * ends in the word of `rwMaterial` at +0x70, so only its handle is usable. The overlay is spelled in slots so
+ * that a 64-bit build keeps `rwMaterial` past that handle. */
 typedef struct ZrwMaterial {
     uint32_t flags; /* 0x00 low two bits set while in use */
     uint32_t pad04;
@@ -33,8 +34,10 @@ typedef struct ZrwMaterial {
     union {
         ZrwMatSlot slots[6]; /* 0x2c */
         struct {
-            uint8_t pad2c[0x44];
-            void *rwMaterial; /* 0x70 RpMaterial that follows the first texture */
+            ZrwMatSlot pad2c[5]; /* 0x2c slots 0 to 4 */
+            void *pad68;         /* 0x68 slot 5's handle */
+            uint32_t pad6c;      /* 0x6c */
+            void *rwMaterial;    /* 0x70 RpMaterial that follows the first texture */
         };
     };
 } ZrwMaterial;
@@ -46,6 +49,8 @@ BMX_LAYOUT32_ASSERT(offsetof(ZrwMaterial, slots) == 0x2c, "zrw material");
 
 BMX_LAYOUT32_ASSERT(sizeof(ZrwMaterial) == 0x74, "zrw material");
 BMX_LAYOUT32_ASSERT(offsetof(ZrwMaterial, rwMaterial) == 0x70, "zrw material");
+_Static_assert(offsetof(ZrwMaterial, rwMaterial) >= offsetof(ZrwMaterial, slots[5].texture) + sizeof(void *),
+               "zrw material: the RpMaterial is clear of every texture handle");
 
 /* Material definition chunk (MADF) as the loader keeps it: the chunk body starts at +8. */
 typedef struct ZrwMadf {

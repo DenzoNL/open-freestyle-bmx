@@ -11,30 +11,14 @@
 
 #include "compat/orig.h"
 #include "zge/com/zglrw/zrwmodel.h"
+#include "zge/zgemods/ztaginf.h"
 #include "zge/zmath.h"
 
-/* A collision triangle (0x5c bytes). */
-typedef struct ZrwRenderColTriangle {
-    ZVec3 v0; /* 0x00 */
-    uint32_t pad0c;
-    ZVec3 v1; /* 0x10 */
-    uint32_t pad1c;
-    ZVec3 v2; /* 0x20 */
-    uint32_t pad2c;
-    ZVec3 normal; /* 0x30 */
-    uint32_t pad3c;
-    uint32_t tag;          /* 0x40 zero: unused triangle */
-    uint32_t drawEdge[3];  /* 0x44 edges v0-v1, v1-v2, v2-v0 are drawn in debug */
-    uint32_t drawPoint[3]; /* 0x50 the corners (offset by the normal) are marked in debug */
-} ZrwRenderColTriangle;
-
-_Static_assert(offsetof(ZrwRenderColTriangle, v1) == 0x10, "collision triangle");
-_Static_assert(offsetof(ZrwRenderColTriangle, v2) == 0x20, "collision triangle");
-_Static_assert(offsetof(ZrwRenderColTriangle, normal) == 0x30, "collision triangle");
-_Static_assert(offsetof(ZrwRenderColTriangle, tag) == 0x40, "collision triangle");
-_Static_assert(offsetof(ZrwRenderColTriangle, drawEdge) == 0x44, "collision triangle");
-_Static_assert(offsetof(ZrwRenderColTriangle, drawPoint) == 0x50, "collision triangle");
-_Static_assert(sizeof(ZrwRenderColTriangle) == 0x5c, "collision triangle");
+/*
+ * A collision triangle: the level's triangle (ztaginf.h). Without a tag the triangle is unused; the edges and
+ * corners with a tag are drawn and collected by the debug code.
+ */
+typedef ZbspLevelFace ZrwRenderColTriangle;
 
 /* A node of the triangle tree (0x3c bytes): split nodes (types 2, 4, 8 split on x, y, z) and leaves (1). */
 typedef struct ZrwRenderColNode {
@@ -70,14 +54,14 @@ typedef struct ZrwRenderColHit {
     uint32_t pad20;
     ZVec3 v2; /* 0x24 */
     uint32_t pad30;
-    uint32_t tag; /* 0x34 */
+    const void *tag; /* 0x34 the triangle's tag, or the edge's for the edges of zrwModelQuery */
 } ZrwRenderColHit;
 
 _Static_assert(offsetof(ZrwRenderColHit, v0) == 0x04, "collision hit");
 _Static_assert(offsetof(ZrwRenderColHit, v1) == 0x14, "collision hit");
 _Static_assert(offsetof(ZrwRenderColHit, v2) == 0x24, "collision hit");
-_Static_assert(offsetof(ZrwRenderColHit, tag) == 0x34, "collision hit");
-_Static_assert(sizeof(ZrwRenderColHit) == 0x38, "collision hit");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwRenderColHit, tag) == 0x34, "collision hit");
+BMX_LAYOUT32_ASSERT(sizeof(ZrwRenderColHit) == 0x38, "collision hit");
 
 /* Result of zrwModelQuery (0x6737b0): a flag and a pointer to the hit list (0x672908). */
 typedef struct ZrwRenderColQuery {

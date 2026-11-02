@@ -66,7 +66,7 @@ PhysEdge ***zcollideFindEdgesBehind(const ZVec3 *p, const ZVec3 *dir, float radi
     if (q != NULL) {
         for (int i = 0; i < (int)q->found; i++) {
             const ZrwRenderColHit *r = &((const ZrwRenderColHit *)q->list)[i];
-            const ZbspEdgeTag *tag = (const ZbspEdgeTag *)(uintptr_t)r->tag;
+            const ZbspEdgeTag *tag = r->tag;
             ZVec3 s = *p;
             ZVec3 t = *p;
             PhysEdge *e;
@@ -201,7 +201,7 @@ int zcollideRay(const ZVec3 *from, const ZVec3 *to, void *out)
     f = &hit->faceRecord;
     if (best.hit.objectData == NULL) {
         const ZrwRenderColHit *tri = zrwModelFindTriangle(&hit->point, 2.0f);
-        const uint8_t *tag = tri != NULL ? (const uint8_t *)(uintptr_t)tri->tag : NULL;
+        const uint8_t *tag = tri != NULL ? (const uint8_t *)tri->tag : NULL;
         uint16_t id = 0;
 
         if (tag != NULL) {

@@ -3,7 +3,6 @@
 
 #include <stddef.h>
 
-#include "bmx/com/zge/ngif/ngifzbsp.h"
 #include "zge/zdebug.h"
 #include "zge/ziff.h"
 #include "zge/zmem.h"
@@ -244,9 +243,9 @@ int ztaginfLoad(void *iff)
                 face->edgeTag[0] = dataPointer(rec.w[13]);
                 face->edgeTag[1] = dataPointer(rec.w[14]);
                 face->edgeTag[2] = dataPointer(rec.w[15]);
-                face->data50[0] = dataPointer(rec.w[16]);
-                face->data50[1] = dataPointer(rec.w[17]);
-                face->data50[2] = dataPointer(rec.w[18]);
+                face->cornerTag[0] = dataPointer(rec.w[16]);
+                face->cornerTag[1] = dataPointer(rec.w[17]);
+                face->cornerTag[2] = dataPointer(rec.w[18]);
                 face->tag = dataPointer(rec.w[12]);
                 face->edge[0] = NULL; /* the caches are filled on demand by ngifzbsp */
                 face->edge[1] = NULL;

@@ -473,10 +473,10 @@ static ZrwRenderColTriangle *make_triangle(void)
     for (int i = 0; i < 16; i++) {
         ((float *)t)[i] = rf();
     }
-    t->tag = dt_u32() % 4 != 0 ? dt_u32() | 1 : 0;
+    t->tag = (const uint16_t *)(uintptr_t)(dt_u32() % 4 != 0 ? dt_u32() | 1 : 0);
     for (int i = 0; i < 3; i++) {
-        t->drawEdge[i] = dt_u32() % 3 == 0;
-        t->drawPoint[i] = dt_u32() % 3 == 0;
+        t->edgeTag[i] = (const ZbspEdgeTag *)(uintptr_t)(dt_u32() % 3 == 0);
+        t->cornerTag[i] = (const void *)(uintptr_t)(dt_u32() % 3 == 0);
     }
     return t;
 }
@@ -573,10 +573,10 @@ static void fill_leaves(ZrwRenderColNode *node, const ZVec3 *p, int withTriangle
         centroid = (ZVec3){p->x, p->y, h};
         DT_ORIG(0x004815b0, Cross3Fn)(&t->normal, &t->v0, &t->v1, &centroid);
         DT_ORIG(0x004811c0, NormalizeFn)(&t->normal, &t->normal);
-        t->tag = dt_u32() % 6 == 0 ? 0 : dt_u32() | 1;
+        t->tag = (const uint16_t *)(uintptr_t)(dt_u32() % 6 == 0 ? 0 : dt_u32() | 1);
         for (int k = 0; k < 3; k++) {
-            t->drawEdge[k] = dt_u32() % 3 == 0;
-            t->drawPoint[k] = dt_u32() % 3 == 0;
+            t->edgeTag[k] = (const ZbspEdgeTag *)(uintptr_t)(dt_u32() % 3 == 0);
+            t->cornerTag[k] = (const void *)(uintptr_t)(dt_u32() % 3 == 0);
         }
         if (dt_u32() % 8 == 0) {
             t->normal.x = dt_float_edgy(-1.0f, 1.0f); /* a normal that does not match the plane */
@@ -593,7 +593,7 @@ static void build_tree(const ZVec3 *p, int withTriangles)
     gZrwColRoot = *root;
     gZrwColDebug = (int)(dt_u32() & 1);
     gZrwColHit.valid = (uint8_t)dt_u32();
-    gZrwColHit.tag = dt_u32();
+    gZrwColHit.tag = (const void *)(uintptr_t)dt_u32();
 }
 
 static ZVec3 *make_point(void)
@@ -702,10 +702,10 @@ static ZrwRenderColTriangle *search_triangle(const ZVec3 *p, float radius)
         v->x = p->x + search_offset(radius);
         v->y = p->y + search_offset(radius);
         v->z = p->z + search_offset(radius);
-        t->drawEdge[k] = (dt_u32() % 3 == 0) ? 0 : dt_u32();
-        t->drawPoint[k] = (dt_u32() % 3 == 0) ? 0 : dt_u32();
+        t->edgeTag[k] = (const ZbspEdgeTag *)(uintptr_t)((dt_u32() % 3 == 0) ? 0 : dt_u32());
+        t->cornerTag[k] = (const void *)(uintptr_t)((dt_u32() % 3 == 0) ? 0 : dt_u32());
     }
-    t->tag = (dt_u32() % 4 == 0) ? 0 : dt_u32();
+    t->tag = (const uint16_t *)(uintptr_t)((dt_u32() % 4 == 0) ? 0 : dt_u32());
     return t;
 }
 

@@ -11,6 +11,7 @@
 #include "dt_realfile.h"
 #include "zge/com/zglrw/zrwmat.h"
 #include "zge/ziff.h"
+#include "zge/zobj.h"
 
 typedef Ziff *(BMX_CDECL *OpenFn)(void *, uint32_t, uint32_t);
 typedef void(BMX_CDECL *CloseFn)(void *);
@@ -743,12 +744,12 @@ static void BMX_CDECL stubSetSkeleton(void *object, void *skeleton)
 {
     ngLogPtr(object);
     ngLogPtr(skeleton);
-    ((ZSkeletonOwner *)object)->skeleton = skeleton;
+    ((ZObj *)object)->data = skeleton;
 }
 
 static void setup_build_skeleton(DtCtx *c)
 {
-    ZSkeletonOwner *object = dt_alloc(0x40);
+    ZObj *object = dt_alloc(0x40);
 
     dt_real_env(c, 0);
     dt_fill(object, 0x40);
@@ -761,7 +762,7 @@ static void setup_build_skeleton(DtCtx *c)
 
 static void setup_free_skeleton(DtCtx *c)
 {
-    ZSkeletonOwner *object;
+    ZObj *object;
     uint32_t count;
     ZSkeleton *skel;
 
@@ -783,7 +784,7 @@ static void setup_free_skeleton(DtCtx *c)
     }
     gZiffItemPool = (dt_u32() & 1) ? NULL : dt_alloc(sizeof(ZSkeletonItem));
     dt_fill(object, 0x40);
-    object->skeleton = (dt_u32() % 6 == 0) ? NULL : skel;
+    object->data = (dt_u32() % 6 == 0) ? NULL : skel;
     DT_ARG_PTR(c, 0, object);
 }
 

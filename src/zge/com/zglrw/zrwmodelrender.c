@@ -133,19 +133,19 @@ void zrwModelDrawTriangle(const ZrwRenderColTriangle *triangle, const uint32_t *
     c.y = (float)((double)roundedY + triangle->v2.y);
     c.z = (float)((double)roundedZ + triangle->v2.z);
     if (fillColor != NULL) {
-        if (triangle->tag != 0) {
+        if (triangle->tag != NULL) {
             gZrwDbgTriangleHook(&c, &b, &a, fillColor, 2);
         }
         gZrwDbgTriangleHook(&a, &b, &c, fillColor, 2);
     }
     if (edgeColor != NULL) {
-        if (triangle->drawEdge[0] != 0) {
+        if (triangle->edgeTag[0] != NULL) {
             gZrwDbgLineHook(&a, &b, edgeColor, 0);
         }
-        if (triangle->drawEdge[1] != 0) {
+        if (triangle->edgeTag[1] != NULL) {
             gZrwDbgLineHook(&b, &c, edgeColor, 0);
         }
-        if (triangle->drawEdge[2] != 0) {
+        if (triangle->edgeTag[2] != NULL) {
             gZrwDbgLineHook(&c, &a, edgeColor, 0);
         }
     }
@@ -153,7 +153,7 @@ void zrwModelDrawTriangle(const ZrwRenderColTriangle *triangle, const uint32_t *
         const ZVec3 *const corners[3] = {&triangle->v0, &triangle->v1, &triangle->v2};
 
         for (int i = 0; i < 3; i++) {
-            if (triangle->drawPoint[i] != 0) {
+            if (triangle->cornerTag[i] != NULL) {
                 ZVec3 point;
 
                 point.x = (float)((double)corners[i]->x - triangle->normal.x);
@@ -181,7 +181,7 @@ void zrwModelDrawTriangleEdge(const ZrwRenderColTriangle *triangle, uint8_t edge
     b.x = (float)((double)triangle->normal.x + to->x);
     b.y = (float)((double)to->y + triangle->normal.y);
     b.z = (float)((double)to->z + triangle->normal.z);
-    if (color != NULL && triangle->drawEdge[first] != 0) {
+    if (color != NULL && triangle->edgeTag[first] != NULL) {
         gZrwDbgLineHook(&a, &b, color, 2);
     }
 }
@@ -260,7 +260,7 @@ ZrwRenderColHit *zrwModelFindTriangle(const ZVec3 *point, float maxDistance)
     ZrwRenderColNode *node;
 
     gZrwColHit.valid = 0;
-    gZrwColHit.tag = 0;
+    gZrwColHit.tag = NULL;
     node = zrwModelFindNode(point);
     if (node == NULL) {
         return NULL;
@@ -275,7 +275,7 @@ ZrwRenderColHit *zrwModelFindTriangle(const ZVec3 *point, float maxDistance)
     for (uint32_t i = 0; i < node->triangleCount; i++) {
         ZrwRenderColTriangle *const triangle = node->triangles[i];
 
-        if (triangle->tag != 0) {
+        if (triangle->tag != NULL) {
             ZVec3 offset, scaled, projected;
             double dot;
             float distance;
@@ -316,7 +316,7 @@ ZrwRenderColHit *zrwModelFindTriangle(const ZVec3 *point, float maxDistance)
 
 /* Appends a hit of `kind` with the corners it has (NULL: left as is) to the list; the caller checks room. */
 static void colListAdd(uint16_t *found, uint8_t kind, const ZVec3 *v0, const ZVec3 *v1, const ZVec3 *v2,
-                       uint32_t tag)
+                       const void *tag)
 {
     gZrwColList[*found].valid = kind;
     gZrwColList[*found].v0 = *v0;
@@ -382,7 +382,7 @@ void zrwColSearch(int mode, const ZrwRenderColNode *node, uint16_t *found, const
         ZVec3 d;
 
         if (mode == 1) {
-            if (tri->tag != 0) {
+            if (tri->tag != NULL) {
                 const ZVec3 *corner = (const ZVec3 *)((uintptr_t)tri + (uint32_t)(key << 4));
                 float best = 9999.0f;
 
@@ -406,7 +406,7 @@ void zrwColSearch(int mode, const ZrwRenderColNode *node, uint16_t *found, const
                 ZVec3 edge;
                 float along;
 
-                if (tri->drawEdge[e] == 0) {
+                if (tri->edgeTag[e] == NULL) {
                     continue;
                 }
                 zvec3Sub(&d, point, from);
@@ -422,19 +422,19 @@ void zrwColSearch(int mode, const ZrwRenderColNode *node, uint16_t *found, const
                         __builtin_memcpy(&color, green, 4);
                         zrwModelDrawTriangleEdge(tri, (uint8_t)e, &color);
                     }
-                    colListAdd(found, 2, from, to, NULL, tri->drawEdge[e]);
+                    colListAdd(found, 2, from, to, NULL, tri->edgeTag[e]);
                 }
             }
         } else if (mode == 3) {
             for (int k = 0; k < 3; k++) {
                 const ZVec3 *corner = colCorner(tri, (uint32_t)k);
 
-                if (tri->drawPoint[k] == 0) {
+                if (tri->cornerTag[k] == NULL) {
                     continue;
                 }
                 zvec3Sub(&d, point, corner);
                 if (!(__builtin_fabs(zvec3Length(&d)) >= (double)radius) && *found < 0x40) {
-                    colListAdd(found, 3, corner, NULL, NULL, tri->drawPoint[k]);
+                    colListAdd(found, 3, corner, NULL, NULL, tri->cornerTag[k]);
                 }
             }
         }

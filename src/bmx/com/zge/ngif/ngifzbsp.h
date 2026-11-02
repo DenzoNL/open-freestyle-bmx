@@ -7,44 +7,13 @@
 #include "bmx/com/action/physics_hit.h"
 #include "compat/orig.h"
 #include "zge/zgemods/zprop.h"
+#include "zge/zgemods/ztaginf.h"
 #include "zge/zmath.h"
 #include "zge/zmem.h"
 
 /* ---- level data --------------------------------------------------------------------------------- */
 
-/* Tag of a level edge: `id` selects the kind of edge, `kind` (non-zero) is copied into the edge record. */
-typedef struct ZbspEdgeTag {
-    uint16_t id;
-    uint8_t kind;
-    uint8_t pad03;
-} ZbspEdgeTag;
-
-/*
- * Triangle of the level mesh (0x6c bytes, array at gZbspFaces). The three vertices are float points padded
- * to 16 bytes. Face and edge records (PhysFace / PhysEdge) are built from it on demand and cached.
- */
-typedef struct ZbspLevelFace {
-    ZVec3 v0;
-    float pad0c;
-    ZVec3 v1;
-    float pad1c;
-    ZVec3 v2;
-    float pad2c;
-    ZVec3 normal; /* 0x30 */
-    float pad3c;
-    const uint16_t *tag;           /* low 12 bits: tag id (0xfa1..0xfa4 respawn faces, ...) */
-    const ZbspEdgeTag *edgeTag[3]; /* tag of the edge from vertex k to vertex k + 1 */
-    const void *data50[3];         /* three more pointers into the tag data (nothing reads them) */
-    PhysEdge *edge[3];             /* cached by zbspFindTaggedEdges */
-    PhysFace *face;                /* cached by zbspFindTaggedFaces */
-} ZbspLevelFace;
-
-BMX_LAYOUT32_ASSERT(sizeof(ZbspLevelFace) == 0x6c, "ZbspLevelFace size");
-_Static_assert(offsetof(ZbspLevelFace, v1) == 0x10, "ZbspLevelFace.v1");
-_Static_assert(offsetof(ZbspLevelFace, tag) == 0x40, "ZbspLevelFace.tag");
-BMX_LAYOUT32_ASSERT(offsetof(ZbspLevelFace, edgeTag) == 0x44, "ZbspLevelFace.edgeTag");
-BMX_LAYOUT32_ASSERT(offsetof(ZbspLevelFace, edge) == 0x5c, "ZbspLevelFace.edge");
-BMX_LAYOUT32_ASSERT(offsetof(ZbspLevelFace, face) == 0x68, "ZbspLevelFace.face");
+/* ZbspEdgeTag and ZbspLevelFace, the level's triangles, are zge/zgemods/ztaginf.h's. */
 
 /* Source definition of a tree object; `kind` 1..4 maps to the shape kind (see zbspBuildShape). */
 typedef struct ZbspObjectDef {

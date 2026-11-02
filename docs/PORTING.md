@@ -397,11 +397,15 @@ mechanical commits leave bmxtest.dll, dinput.dll and bmxnative.exe .text/.data/.
   the world's effect object passes. The effect object is a ZObj whose data is ZobjPEmitState (the world's
   ZrwEffectHost). The particle steps are the gravity and floor modifiers' apply functions (ZfxModifier,
   ZfxParticle).
-- **Left (X2c/X2e):** type pairs ZrwRenderColTriangle = ZbspLevelFace (pointers read as u32 tags), ZrwMaterial's
-  slot[5] over rwMaterial, PhysRider vs gPlayerRecs byte offsets (kOvlPlayer*), ZSkeletonOwner as a ZObj
-  view, the emitter object's ops (gZrwWorldEffectOps, `void *` slots); the `(uint32_t)(uintptr_t)` casts
-  (X2e: query / request arrays, zfileOpenRamDisk addresses, RW render state values, the texture words of
-  zrwprim and ZfxParticle). X2d: the 28-bit ordering tables.
+- **Fifth batch:** the level's triangle (ZbspLevelFace, now in ztaginf.h) is the renderer's collision triangle,
+  so the debug and query code tests the tag pointers instead of reading them as words. The hit list carries
+  the tag as a pointer. ZrwMaterial spells the `rwMaterial` overlay in slots: on 64-bit, `pad2c[0x44]` would
+  have put the RpMaterial over slot 4's texture handle. ZSkeletonOwner is ZObj.data. PhysRider needed
+  nothing more: the overlay's byte offsets all lie before the first pointer, and an assert on every width
+  pins that.
+- **Left (X2c/X2e):** the emitter object's ops (gZrwWorldEffectOps, `void *` slots, a ZObjOps); the
+  `(uint32_t)(uintptr_t)` casts (X2e: query / request arrays, zfileOpenRamDisk addresses, RW render state
+  values, the texture words of zrwprim and ZfxParticle). X2d: the 28-bit ordering tables.
 
 ## Not in scope
 

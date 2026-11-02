@@ -125,12 +125,6 @@ typedef struct ZSkeleton {
     ZSkeletonNode data[];
 } ZSkeleton;
 
-/* The part of a renderer object the skeleton code touches. */
-typedef struct ZSkeletonOwner {
-    uint8_t pad00[0x30];
-    ZSkeleton *skeleton;
-} ZSkeletonOwner;
-
 BMX_LAYOUT32_ASSERT(sizeof(ZSkeletonNode) == 0x44, "skeleton node");
 
 /* Recycled ZSkeletonItems, and the animation being read by ziffReadAnim (its handlers fill it). */
