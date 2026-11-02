@@ -315,8 +315,8 @@ static void actorHooks(void)
     gZrollerRegister = stubRegister;
     gZrollerUnregister = stubUnregister;
     gZrollerUpdateHandle = (dt_u32() & 1) ? (int)dt_u32() : 0;
-    gZrollerShadow.slots = &gZrollerShadowSlots;
-    dt_fill(&gZrollerShadowSlots, 8);
+    gZrollerShadow.shadow.slots = gZrollerShadowSlots;
+    dt_fill(&gZrollerShadowSlots, sizeof gZrollerShadowSlots);
     dt_stub(0x004646f0, NULL, (void *)stubClearPose);
     dt_stub(0x00491410, NULL, (void *)stubFindModel);
     dt_stub(0x00487600, NULL, (void *)stubVisible);

@@ -27,6 +27,13 @@
 #include "zge/zmem.h"
 #include "zge/zstring.h"
 
+/* The fonts are written by the overlay as OvlFont and parsed by zoverii as ZOverFont: one layout. */
+_Static_assert(sizeof(OvlFont) == sizeof(ZOverFont) &&
+                   offsetof(OvlFont, height) == offsetof(ZOverFont, height) &&
+                   offsetof(OvlFont, charCount) == offsetof(ZOverFont, charCount) &&
+                   offsetof(OvlFont, glyphs) == offsetof(ZOverFont, glyphs),
+               "OvlFont = ZOverFont");
+
 static const char overlayFile[] = "C:\\zaxis\\Bmx\\Src\\com\\action\\overlay.c";
 
 /* Colours are 0xAARRGGBB-ish words of the overlay layer; these are the recurring ones. */

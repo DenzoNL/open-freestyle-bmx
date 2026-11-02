@@ -7,6 +7,7 @@
 
 #include "bmx/com/action/physics_types.h"
 #include "compat/orig.h"
+#include "zge/zgemods/zprop.h"
 #include "zge/zmath.h"
 
 /* Dynamic collision object (props). */
@@ -35,20 +36,7 @@ typedef struct PhysPropTag {
 
 struct ZbspTreeObject;
 
-/* Node of the prop list (head at 0x6722c4); its collision object is built on first use. */
-typedef struct PhysPropNode {
-    struct PhysPropNode *next;
-    uint8_t pad04[0x18];
-    PhysPropFrame *frame;
-    const struct ZbspTreeObject *source;
-    const PhysPropTag *tag;
-    uint8_t pad28[0x4];
-    struct PhysPropObject *object;
-    void(BMX_CDECL *destroy)(struct PhysPropObject *object); /* frees the object (0x468d20) */
-} PhysPropNode;
-
-BMX_LAYOUT32_ASSERT(offsetof(PhysPropNode, frame) == 0x1c, "PhysPropNode.frame");
-BMX_LAYOUT32_ASSERT(offsetof(PhysPropNode, destroy) == 0x30, "PhysPropNode.destroy");
+/* PhysPropNode, the node of the prop list, is zge/zgemods/zprop.h's placed prop. */
 
 /* The prop record of a collision object (a PhysPropObject); NULL when the object is not a prop. */
 static inline void *physObjectProp(const void *object)

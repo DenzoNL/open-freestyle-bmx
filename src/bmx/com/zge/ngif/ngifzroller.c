@@ -60,10 +60,10 @@ void zrollerFreeModelTable(void)
 BMX_ADDR(0x0046c220)
 int zrollerInit(void)
 {
-    gZrollerShadow.kind = 2;
-    gZrollerShadow.zero0c = 0;
-    gZrollerShadow.planeA = -500.0f;
-    gZrollerShadow.zero14 = 0;
+    gZrollerShadow.shadow.kind = 2;
+    gZrollerShadow.shadow.offset.x = 0.0f;
+    gZrollerShadow.shadow.offset.y = -500.0f;
+    gZrollerShadow.shadow.offset.z = 0.0f;
     gZrollerShadow.zero1c = 0;
     gZrollerShadow.planeB = -5.0f;
     gZrollerShadow.zero24 = 0;
@@ -73,7 +73,7 @@ int zrollerInit(void)
     if (gZbspFacePool == NULL) {
         gZbspFacePool = zmemFreeListCreate(sizeof(PhysFace), 0x200, NULL);
     }
-    gZrollerShadow.slots = &gZrollerShadowSlots;
+    gZrollerShadow.shadow.slots = gZrollerShadowSlots;
     if (gZrollerEdges == NULL) {
         gZrollerEdges = zlistCreate(0x80);
     }
@@ -197,7 +197,7 @@ ZActor *zrollerCreatePlayerActor(const uint16_t *def)
     }
     riderObject = zsceneFindModel(0, name);
     shadowObject = zsceneFindModel(0, "Rider Shadow");
-    gZrollerShadow.slots[0] = (int32_t)(uintptr_t)zobjGetModel(shadowObject);
+    gZrollerShadow.shadow.slots[0] = zobjGetModel(shadowObject);
     color[0] = color[1] = color[2] = color[3] = 0xff;
     gZobjSetColor(zobjGetModel(shadowObject), color);
     gZobjSetFlags(modelOf(riderObject), 8, 0);
@@ -235,8 +235,8 @@ ZActor *zrollerCreateBikeActor(const uint32_t *def)
     }
     bikeObject = zsceneFindModel(0, tableName(&gZrollerBikeNames, *def));
     shadowObject = zsceneFindModel(0, "Bike Shadow");
-    gZrollerShadow.bikeModel = (int32_t)(uintptr_t)zobjGetModel(bikeObject);
-    gZrollerShadow.slots[1] = (int32_t)(uintptr_t)zobjGetModel(shadowObject);
+    gZrollerShadow.shadow.model = zobjGetModel(bikeObject);
+    gZrollerShadow.shadow.slots[1] = zobjGetModel(shadowObject);
     color[0] = color[1] = color[2] = color[3] = 0xff;
     gZobjSetColor(zobjGetModel(shadowObject), color);
     gZobjSetFlags(modelOf(bikeObject), 8, 0);

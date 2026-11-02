@@ -151,18 +151,18 @@ static void setup_prop(DtCtx *c)
 
         dt_fill(d, sizeof *d);
         d->next = NULL;
-        d->id = 100 + (uint32_t)i;
+        d->object.id = 100 + (uint32_t)i;
         for (int k = 0; k < 8; k++) {
-            d->name[k] = (char)dt_range('a', 'z');
+            d->object.name[k] = (char)dt_range('a', 'z');
         }
-        d->name[dt_range(1, 8)] = 0;
+        d->object.name[dt_range(1, 8)] = 0;
         if (prev != NULL) {
             prev->next = d;
         } else {
             gPropDefs.head = (void *)d;
         }
         prev = d;
-        wanted = d->id;
+        wanted = d->object.id;
     }
     gPropDefs.tail = (void *)prev;
     gPropDefs.count = (uint32_t)defs;

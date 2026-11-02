@@ -75,28 +75,30 @@ int zpropLoadDef(void *iff)
         zdebugFail("zprop : Prop Def header size invalid", kZpropFile, 0x97, 0);
         return 0;
     }
-    def->id = header.id;
+    def->object.id = header.id;
     for (int i = 0; i < 7; i++) {
-        def->params[i] = header.params[i];
+        def->object.params[i] = header.params[i];
     }
-    zstrcpy(def->name, header.name);
+    zstrcpy(def->object.name, header.name);
     if (ziffFindChunk(iff, kChunkModl) == 0) {
         zdebugFail("zprop : Prop Def has no geometry!!!", kZpropFile, 0xa7, 0);
         return 0;
     }
-    def->model = zrwmatLoadChunk(iff);
-    gZobjSetFlags(def->model, 2, 0);
-    gZobjSetFlags(def->model, 8, 0);
+    def->object.model = zrwmatLoadChunk(iff);
+    gZobjSetFlags(def->object.model, 2, 0);
+    gZobjSetFlags(def->object.model, 8, 0);
     if (ziffFindChunk(iff, kChunkObji) != 0) {
         ziffRead(iff, &block, sizeof block);
-        def->extra = zmemAlloc(block.bytes);
-        ziffRead(iff, def->extra, block.bytes);
+        void *extra = zmemAlloc(block.bytes);
+
+        ziffRead(iff, extra, block.bytes);
+        def->object.def = extra;
     }
-    def->pad2c[2] = 0;
-    def->pad2c[0] = 0;
-    def->pad2c[1] = 0;
+    def->object.pad2c = 0;
+    def->object.pad24 = 0;
+    def->object.shape = NULL;
     zrwListAdd(&gZpropDefs, def);
-    zsceneAddEntry(NULL, header.id, 1, 1, def->model);
+    zsceneAddEntry(NULL, header.id, 1, 1, def->object.model);
     ziffEndModel(iff);
     return 1;
 }
@@ -124,7 +126,7 @@ int zpropLoad(void *iff)
         return 0;
     }
     for (def = (ZPropDef *)gZpropDefs.head; def != NULL; def = def->next) {
-        if (def->id == header.id) {
+        if (def->object.id == header.id) {
             break;
         }
     }
@@ -133,19 +135,19 @@ int zpropLoad(void *iff)
         return 0;
     }
     inst = memset(zmemAlloc(sizeof(ZPropInst)), 0, sizeof(ZPropInst));
-    zmemCopy(inst->tag, header.tag, sizeof inst->tag);
+    zmemCopy(inst->placement, header.tag, sizeof inst->placement);
     inst->id = header.id;
-    inst->pad28[1] = 0;
-    inst->extra = NULL;
+    inst->object = NULL;
+    inst->tag = NULL;
     zrwListAdd(&gZpropInsts, inst);
     zrwGetParameter(1, &scale, NULL);
     position = header.position;
     position[0] = (float)((double)position[0] * (double)scale);
     position[1] = (float)((double)position[1] * (double)scale);
     position[2] = (float)((double)position[2] * (double)scale);
-    inst->source = &def->id;
-    inst->object = zsceneFindModel(0, def->name);
-    if (inst->object == NULL) {
+    inst->source = &def->object;
+    inst->frame = zsceneFindModel(0, def->object.name);
+    if (inst->frame == NULL) {
         zdebugFail("zprop : Unable to create an obj based on the prop def model", kZpropFile, 0xf9, 0);
     } else {
         ZMatrix matrix;
@@ -157,7 +159,7 @@ int zpropLoad(void *iff)
         at.x = position[0];
         at.y = position[1];
         at.z = position[2];
-        zobjSetPosition(inst->object, &at);
+        zobjSetPosition(inst->frame, &at);
         matrix.right.x = header.right.x;
         matrix.right.y = header.right.y;
         matrix.right.z = header.right.z;
@@ -169,17 +171,19 @@ int zpropLoad(void *iff)
         matrix.at.z = header.at.z;
         zmatrixToEuler(&angles, &matrix, 0);
         zquatFromEuler(&rotation, &angles, 0);
-        zobjSetRotation(inst->object, &rotation);
+        zobjSetRotation(inst->frame, &rotation);
     }
     if (ziffFindChunk(iff, kChunkObji) == 0) {
-        inst->extra = NULL;
+        inst->tag = NULL;
     } else {
         ziffRead(iff, &block, sizeof block);
-        inst->extra = zmemAlloc(block.bytes);
-        ziffRead(iff, inst->extra, block.bytes);
+        void *extra = zmemAlloc(block.bytes);
+
+        ziffRead(iff, extra, block.bytes);
+        inst->tag = extra;
     }
-    inst->pad28[2] = 0;
-    inst->pad28[0] = 0;
+    inst->destroy = NULL;
+    *(uint32_t *)(void *)inst->pad28 = 0;
     ziffEndModel(iff);
     return 1;
 }

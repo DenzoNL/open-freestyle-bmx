@@ -384,7 +384,7 @@ static void makeProps(void)
         dt_fill(p, sizeof *p);
         dt_fill(object, sizeof *object);
         object->model = (void *)(uintptr_t)(0x46000000u + (uint32_t)i * 16u);
-        p->object = object;
+        p->frame = (struct PhysPropFrame *)(void *)object;
         p->next = NULL;
         p->id = dt_u32() % 2 == 0 ? (uint32_t)DT_ORIG(0x004828c0, int (*)(const char *))("light_") : dt_u32();
         if (dt_u32() % 2 == 0) {
@@ -394,9 +394,9 @@ static void makeProps(void)
             if (dt_u32() % 3 == 0) {
                 memset(color, 0, 4);
             }
-            p->extra = color;
+            p->tag = (const void *)color;
         } else {
-            p->extra = NULL;
+            p->tag = NULL;
         }
         if (prev != NULL) {
             prev->next = p;

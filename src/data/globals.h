@@ -9001,11 +9001,11 @@ struct BmxGroup_gZrollerShadowGroup {
                        BMX_DATA_OFF((addr) - 0x00678440, off64),                                             \
                    #member)
 AT(gZrollerShadow, 0x00678440, 0x0);
-AT(pad_00678468, 0x00678468, 0x30);
+AT(pad_00678468, 0x00678468, 0x38);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZrollerShadowGroup, pad_00678468) +
                        sizeof(((struct BmxGroup_gZrollerShadowGroup *)0)->pad_00678468) ==
-                   BMX_DATA_OFF(0x3c, 0x44),
+                   BMX_DATA_OFF(0x3c, 0x4c),
                "gZrollerShadowGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00678494..0x00678560.
@@ -12906,7 +12906,7 @@ extern struct BmxGroup_gZresGroup gZresGroup;                           /* 0x005
 extern ZrollerDrawTable gZrollerDrawCallbacks;                          /* 0x005fb6c8 */
 extern int gZrollerReserved;                                            /* 0x005fb6e8 */
 extern ZrollerSlotTable gZrollerSlots;                                  /* 0x005fb6f0 */
-extern int32_t gZrollerShadowSlots;                                     /* 0x005fb710 */
+extern ZrollerShadowSlots gZrollerShadowSlots;                          /* 0x005fb710 */
 extern ZrollerBounds gZrollerBounds;                                    /* 0x005fb718 */
 extern int gZrollerSlotCount;                                           /* 0x005fb738 */
 extern uint32_t gNgWord5fb73c;                                          /* 0x005fb73c */

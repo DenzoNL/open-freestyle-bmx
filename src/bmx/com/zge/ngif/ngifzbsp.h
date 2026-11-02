@@ -6,6 +6,7 @@
 
 #include "bmx/com/action/physics_hit.h"
 #include "compat/orig.h"
+#include "zge/zgemods/zprop.h"
 #include "zge/zmath.h"
 #include "zge/zmem.h"
 
@@ -71,30 +72,7 @@ _Static_assert(offsetof(ZbspShape, kind) == 0x24, "ZbspShape.kind");
 _Static_assert(offsetof(ZbspShape, box) == 0x28, "ZbspShape.box");
 
 /* Static object of the level file (list head at 0x6722b8); its payload starts at +8 of the list node. */
-typedef struct ZbspTreeObject {
-    uint8_t pad00[0x20];
-    const ZbspObjectDef *def;
-    uint8_t pad24[0x4];
-    ZbspShape *shape; /* built on first use */
-    uint8_t pad2c[0x4];
-    float size[3]; /* extents: width, height, depth */
-    uint8_t pad3c[0x4];
-    float lift;
-    uint8_t pad44[0x4];
-    float base;
-} ZbspTreeObject;
-
-typedef struct ZbspTreeNode {
-    struct ZbspTreeNode *next;
-    uint8_t pad04[0x4];
-    ZbspTreeObject object;
-} ZbspTreeNode;
-
-_Static_assert(offsetof(ZbspTreeObject, def) == 0x20, "ZbspTreeObject.def");
-BMX_LAYOUT32_ASSERT(offsetof(ZbspTreeObject, shape) == 0x28, "ZbspTreeObject.shape");
-BMX_LAYOUT32_ASSERT(offsetof(ZbspTreeObject, size) == 0x30, "ZbspTreeObject.size");
-BMX_LAYOUT32_ASSERT(offsetof(ZbspTreeObject, lift) == 0x40, "ZbspTreeObject.lift");
-BMX_LAYOUT32_ASSERT(offsetof(ZbspTreeObject, base) == 0x48, "ZbspTreeObject.base");
+/* ZbspTreeObject and ZbspTreeNode are the prop definitions of zge/zgemods/zprop.h. */
 
 /* Flags of a prop collision object (PhysPropObject.flags), set by zbspObjectSignal. */
 enum {

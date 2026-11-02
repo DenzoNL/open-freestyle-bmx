@@ -6,6 +6,7 @@
 
 #include "bmx/com/zge/zactor.h"
 #include "compat/orig.h"
+#include "zge/com/zglrw/zrwshadowstate.h"
 #include "zge/zlist.h"
 #include "zge/zmath.h"
 
@@ -31,20 +32,19 @@ typedef ZrollerSlot ZrollerSlotTable[2];
 
 /* State shared with the shadow update callback (0x49b520), at 0x678440. */
 typedef struct ZrollerShadow {
-    int32_t kind;   /* 2 */
-    int32_t *slots; /* model handles: [0] rider shadow, [1] bike shadow (0x5fb710) */
-    int32_t bikeModel;
-    uint32_t zero0c;
-    float planeA; /* -500 */
-    uint32_t zero14;
-    uint32_t pad18;
-    uint32_t zero1c;
-    float planeB; /* -5 */
-    uint32_t zero24;
+    ZrwShadow
+        shadow; /* 0x00 kind 2, the shadow models (0x5fb710), the bike's model, the eye offset (0, -500, 0) */
+    uint32_t pad18;  /* 0x18 */
+    uint32_t zero1c; /* 0x1c */
+    float planeB;    /* 0x20 -5 */
+    uint32_t zero24; /* 0x24 */
 } ZrollerShadow;
 
+BMX_LAYOUT32_ASSERT(sizeof(ZrollerShadow) == 0x28, "roller shadow");
+typedef void *ZrollerShadowSlots[2];
+
 #define gZrollerShadow       ORIG_VAR(0x00678440, ZrollerShadow, gZrollerShadow)
-#define gZrollerShadowSlots  ORIG_VAR(0x005fb710, int32_t, gZrollerShadowSlots)
+#define gZrollerShadowSlots  ORIG_VAR(0x005fb710, ZrollerShadowSlots, gZrollerShadowSlots)
 #define gZrollerUpdateHandle ORIG_VAR(0x005fb740, int, gZrollerUpdateHandle)
 
 /* Renderer hooks: free a model table handle, query world data, (un)register update callbacks. */

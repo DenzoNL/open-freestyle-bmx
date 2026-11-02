@@ -25,6 +25,7 @@
 
 #include "native/native.h"
 #include "platform/platform.h"
+#include "rw/rwcore.h"
 
 /* ------------------------------------------------------------------------------------------------ */
 /* Memory                                                                                            */
@@ -909,15 +910,13 @@ int crtFflush(FILE *f)
  */
 int rwFexist(const char *name)
 {
-    typedef void *(*OpenFn)(const char *, const char *);
-    typedef int (*CloseFn)(void *);
-    const uint8_t *engine = *(const uint8_t *const *)(uintptr_t)0x0067696c;
-    void *file = ((OpenFn) * (void *const *)(engine + 0xc4))(name, (const char *)(uintptr_t)0x0069bdb0);
+    const RwFileFunctions *files = &RwEngineInstance->fileFuncs;
+    void *file = files->rwfopen(name, "rb");
 
     if (!file) {
         return 0;
     }
-    ((CloseFn) * (void *const *)(engine + 0xc8))(file);
+    files->rwfclose(file);
     return 1;
 }
 

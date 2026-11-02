@@ -2166,7 +2166,7 @@ int gZrollerReserved;
 ZrollerSlotTable gZrollerSlots;
 
 /* 0x005fb710 */
-int32_t gZrollerShadowSlots;
+ZrollerShadowSlots gZrollerShadowSlots;
 
 /* 0x005fb718 */
 ZrollerBounds gZrollerBounds;

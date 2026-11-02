@@ -9,6 +9,7 @@
 #include "compat/orig.h"
 #include "zge/zmath.h"
 #include "zge/zmem.h"
+#include "zge/zobj.h"
 
 /* A zero vector; passed as the middle point of zvec3Cross3 to get a plain cross product. */
 #define gZmathOrigin ORIG_VAR(0x006702d8, ZVec3, gZmathOrigin)
@@ -109,14 +110,20 @@ typedef struct ZObjCamera {
     ZVec3 pos;                      /* 0x04 */
     uint8_t pad10[4];               /* 0x10 */
     ZQuat rot;                      /* 0x14 */
-    uint32_t field24;               /* 0x24 */
+    void *field24;                  /* 0x24 ZObj.links */
     const ZObjCameraVtable *vtable; /* 0x28 */
     void *camera;                   /* 0x2c renderer camera */
     ZCameraCache *cache;            /* 0x30 */
-    uint8_t pad34[0x3c - 0x34];
+    uint8_t pad34[4];               /* 0x34 */
+    void *events;                   /* 0x38 ZObj.events */
 } ZObjCamera;
 
 BMX_LAYOUT32_ASSERT(sizeof(ZObjCamera) == 0x3c, "object layout");
+/* A view of ZObj (zge/zobj.h): the same head on every width. */
+_Static_assert(offsetof(ZObjCamera, vtable) == offsetof(ZObj, ops) &&
+                   offsetof(ZObjCamera, camera) == offsetof(ZObj, model) &&
+                   offsetof(ZObjCamera, cache) == offsetof(ZObj, data) && sizeof(ZObjCamera) == sizeof(ZObj),
+               "ZObjCamera is a ZObj");
 
 #define gZobjCameraInitialized ORIG_VAR(0x006702f8, int, gZobjCameraInitialized)
 #define gZobjCameraCaches      ORIG_VAR(0x006702fc, ZMemFreeList *, gZobjCameraCaches)

@@ -2363,7 +2363,7 @@ const BmxDataUnit bmxDataUnits[] = {
     {0x005fb6c8, 0x005fb6e8, (const void *)&gZrollerDrawCallbacks},
     {0x005fb6e8, 0x005fb6ec, (const void *)&gZrollerReserved},
     {0x005fb6f0, 0x005fb710, (const void *)&gZrollerSlots},
-    {0x005fb710, 0x005fb714, (const void *)&gZrollerShadowSlots},
+    {0x005fb710, 0x005fb718, (const void *)&gZrollerShadowSlots},
     {0x005fb718, 0x005fb734, (const void *)&gZrollerBounds},
     {0x005fb738, 0x005fb73c, (const void *)&gZrollerSlotCount},
     {0x005fb73c, 0x005fb740, (const void *)&gNgWord5fb73c},

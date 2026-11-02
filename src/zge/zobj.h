@@ -9,7 +9,7 @@
 #include "zge/zlist.h"
 #include "zge/zmath.h"
 
-struct ZbspTreeNode;
+struct ZPropDef; /* the tree object list: prop definitions (ZbspTreeNode) */
 struct PhysPropNode;
 struct ZObj;
 
@@ -98,7 +98,7 @@ typedef void(BMX_CDECL *ZobjColorFn)(void *model, const uint8_t *rgba);
 #define gZobjSetColor ORIG_VAR(0x00560ef4, ZobjColorFn, gZobjSetColor)
 
 /* Heads of the two static object lists (globals 0x6722b8: tree objects, 0x6722c4: props). */
-struct ZbspTreeNode **zobjTreeObjectList(void);
+struct ZPropDef **zobjTreeObjectList(void);
 struct PhysPropNode **zobjPropList(void);
 /* Position of a scene object (a vector inside its frame). */
 const ZVec3 *zobjGetPosition(const void *object);

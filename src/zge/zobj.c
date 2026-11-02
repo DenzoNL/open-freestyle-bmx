@@ -21,9 +21,9 @@ static const char kZobjFile[] = "C:\\NgEngine\\Zge\\zobj.c";
 #define gZobjUpdateNode ORIG_VAR(0x006722e0, ZrwUpdateNode *, gZobjUpdateNode)
 
 BMX_ADDR(0x00486ec0)
-struct ZbspTreeNode **zobjTreeObjectList(void)
+struct ZPropDef **zobjTreeObjectList(void)
 {
-    return &ORIG_VAR(0x006722b8, struct ZbspTreeNode *, gZobjTreeObjects);
+    return &ORIG_VAR(0x006722b8, struct ZPropDef *, gZobjTreeObjects);
 }
 
 BMX_ADDR(0x00486ed0)

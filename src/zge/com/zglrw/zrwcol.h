@@ -32,6 +32,11 @@ typedef struct ZrwColTriangle {
 _Static_assert(offsetof(ZrwColTriangle, index) == 0x18, "collision triangle");
 BMX_LAYOUT32_ASSERT(offsetof(ZrwColTriangle, vertex) == 0x1c, "collision triangle");
 BMX_LAYOUT32_ASSERT(sizeof(ZrwColTriangle) == 0x28, "collision triangle");
+/* It is RenderWare's RpCollisionTriangle, in the game's own spelling: the two must agree on every width. */
+_Static_assert(sizeof(ZrwColTriangle) == sizeof(RpCollisionTriangle) &&
+                   offsetof(ZrwColTriangle, index) == offsetof(RpCollisionTriangle, index) &&
+                   offsetof(ZrwColTriangle, vertex) == offsetof(RpCollisionTriangle, vertices),
+               "ZrwColTriangle = RpCollisionTriangle");
 
 /* Colour of the last line hit (0x674158, r g b a). */
 typedef uint8_t ZrwColColor[4];

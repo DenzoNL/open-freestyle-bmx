@@ -11,19 +11,8 @@
 
 #include "compat/orig.h"
 #include "zge/com/zglrw/zrwmodel.h"
+#include "zge/com/zglrw/zrwshadowstate.h"
 #include "zge/zmath.h"
-
-/* The shadow state of the roller (ZrollerShadow in ngifzroller.h, the update callback's argument): the model
- * whose object casts the shadow and the offset of the ground probes' eye from that object. */
-typedef struct ZrwShadow {
-    int32_t kind;          /* 0x00 */
-    int32_t *slots;        /* 0x04 */
-    const ZrwModel *model; /* 0x08 its user value is the scene object whose position is sampled */
-    ZVec3 offset;          /* 0x0c */
-} ZrwShadow;
-
-BMX_LAYOUT32_ASSERT(offsetof(ZrwShadow, model) == 0x08, "shadow state");
-BMX_LAYOUT32_ASSERT(offsetof(ZrwShadow, offset) == 0x0c, "shadow state");
 
 /* Point of the 6x6 probe grid. */
 typedef struct ZrwShadowPoint {

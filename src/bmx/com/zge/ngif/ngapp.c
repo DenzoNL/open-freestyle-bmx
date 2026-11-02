@@ -354,7 +354,7 @@ void ngappAttachLightObjects(void)
 {
     for (ZPropInst *prop = (ZPropInst *)*zobjPropList(); prop != NULL; prop = prop->next) {
         if ((uint32_t)zstrHash("light_") == prop->id) {
-            zrwModelSetRenderCallback(((ZObj *)prop->object)->model,
+            zrwModelSetRenderCallback(((ZObj *)(void *)prop->frame)->model,
                                       BMX_FNPTR(NgObjectCallback, 0x0048f3e0, zrwModelRenderBillboard));
         }
     }
@@ -364,11 +364,11 @@ BMX_ADDR(0x0045ac90)
 void ngappResetPropColors(void)
 {
     for (ZPropInst *prop = (ZPropInst *)*zobjPropList(); prop != NULL; prop = prop->next) {
-        uint8_t *color = prop->extra;
+        uint8_t *color = (uint8_t *)(uintptr_t)prop->tag;
 
         if (color != NULL && *(uint32_t *)color != 0) {
             color[3] = 0xff;
-            gZobjSetColor(((ZObj *)prop->object)->model, color);
+            gZobjSetColor(((ZObj *)(void *)prop->frame)->model, color);
         }
     }
 }

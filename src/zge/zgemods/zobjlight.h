@@ -6,6 +6,7 @@
 
 #include "compat/orig.h"
 #include "zge/zmath.h"
+#include "zge/zobj.h"
 #include "zge/zquat.h"
 
 /* The renderer's light interface: function pointers in the exe's data (0x563420 table). */
@@ -24,13 +25,21 @@ typedef void(BMX_CDECL *ZrwLightParamFn)(void *light, uint32_t param);
 #define gZrwLightSetParam ORIG_VAR(0x00563438, ZrwLightParamFn, gZrwLightSetParam)
 
 /* Scene object of a light (the part used here): the ops table is at +0x28, the renderer handle at +0x2c. */
+/* A view of ZObj (zge/zobj.h) for lights. */
 typedef struct ZObjLight {
-    uint8_t pad00[0x28];
-    const void *ops;
-    void *handle;
+    uint32_t flags;   /* 0x00 */
+    ZVec3 pos;        /* 0x04 */
+    uint8_t pad10[4]; /* 0x10 */
+    ZQuat rot;        /* 0x14 */
+    void *links;      /* 0x24 */
+    const void *ops;  /* 0x28 */
+    void *handle;     /* 0x2c the renderer light */
 } ZObjLight;
 
 BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZObjLight, handle) == 0x2c, "light object layout");
+_Static_assert(__builtin_offsetof(ZObjLight, ops) == __builtin_offsetof(ZObj, ops) &&
+                   __builtin_offsetof(ZObjLight, handle) == __builtin_offsetof(ZObj, model),
+               "ZObjLight is a ZObj");
 
 /* Creates a light object of renderer type 0..3; NULL on failure. */
 void *zobjLightCreate(int type, int param);

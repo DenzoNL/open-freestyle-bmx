@@ -382,10 +382,18 @@ mechanical commits leave bmxtest.dll, dinput.dll and bmxnative.exe .text/.data/.
     1200, 1400 and 1800 are byte-identical to the exe before this batch.
 - **ngifzmemdmm:** the handle record size, the smallest payload (a free-block header) and the rounding come from
   the types (0x10, 12 and 4 where pointers are 32 bits wide); "no free block" is UINTPTR_MAX, above every block.
-- **Left (X2c/X2e):** crt.c rwFexist (original address); type pairs ZPropDef/ZbspTreeNode, ZPropInst/PhysPropNode,
-  ZrwRenderColTriangle = ZbspLevelFace (pointers read as u32 tags), ZObj views, OvlFont/ZOverFont, ZrwShadow*,
-  ZrwColTriangle; the `(uint32_t)(uintptr_t)` casts (X2e: query / request arrays, zfileOpenRamDisk addresses, RW
-  render state values). X2d: the 28-bit ordering tables.
+- **Third batch:** crt.c's rwFexist goes through the engine's file functions instead of an original address.
+  The placed prop and the prop list node are one type (PhysPropNode = ZPropInst, zprop.h), and so are the prop
+  definition and the tree node (ZPropDef = ZbspTreeNode, with ZbspTreeObject as its data from the id on). The
+  roller's shadow embeds ZrwShadow (zrwshadowstate.h), and its two model slots are pointers. The original
+  defined only 4 bytes at 0x5fb710 and the roller wrote slots[1] past them; src/data now defines both slots.
+  ZObjCamera and ZObjLight start with ZObj's head, and asserts tie ZrwColTriangle to RpCollisionTriangle and
+  OvlFont to ZOverFont.
+- **Left (X2c/X2e):** type pairs ZrwRenderColTriangle = ZbspLevelFace (pointers read as u32 tags), ZrwEffectItem
+  (the fx record at +0x2c), RwFileFunctions/ZrwFileOps (zrwfile.c copies one into the other), ZrwMaterial's
+  slot[5] over rwMaterial, PhysRider vs gPlayerRecs byte offsets (kOvlPlayer*), the ZObj effect host /
+  ZSkeletonOwner at pad30; the `(uint32_t)(uintptr_t)` casts (X2e: query / request arrays, zfileOpenRamDisk
+  addresses, RW render state values, zrwprim's texture word). X2d: the 28-bit ordering tables.
 
 ## Not in scope
 
