@@ -4,6 +4,7 @@
 #include "bmx/com/menu/gui/guilabel.h"
 #include "bmx/com/menu/gui/guimain.h"
 #include "bmx/com/zge/bmx/bmxsound.h"
+#include "bmx/com/zge/bmx/zoverii.h"
 #include "zge/zdebug.h"
 
 static const char guiinputFile[] = "C:\\zaxis\\Bmx\\src\\com\\menu\\gui\\guiinput.c";
@@ -245,14 +246,15 @@ int guiPadPressedMask20(uint32_t index)
 }
 
 BMX_ADDR(0x004364b0)
-void guiPlayVelocitySound(int unused, int kind, float speed, const uint8_t *emitter)
+void guiPlayVelocitySound(struct ZRig *rig, uint32_t kind, float speed, struct ZRigHit *hit)
 {
+    (void)rig;
     if (kind == 0 && speed > 10.0f) {
         int volume = (int)((double)speed * 6.0f);
         if (volume >= 0x7f) {
             volume = 0x7f;
         }
-        bmxSoundPlayAt(0xbbc, emitter + 8, 0, volume, 0);
+        bmxSoundPlayAt(0xbbc, &hit->point, 0, volume, 0);
     }
 }
 

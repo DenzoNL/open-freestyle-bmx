@@ -167,22 +167,24 @@ BMX_DATA_UNSERVED(0051ed8a)
 BMX_DATA_UNSERVED(0051eda2)
 
 /* 0x005667b0 */
-RwPluginRegistry rpClumpRegistry = {.sizeOfStruct = 32, .origSizeOfStruct = 32};
+RwPluginRegistry rpClumpRegistry = {.sizeOfStruct = sizeof(RpClump), .origSizeOfStruct = sizeof(RpClump)};
 
 /* 0x005667c4 */
-RwPluginRegistry rpAtomicRegistry = {.sizeOfStruct = 112, .origSizeOfStruct = 112};
+RwPluginRegistry rpAtomicRegistry = {.sizeOfStruct = sizeof(RpAtomic), .origSizeOfStruct = sizeof(RpAtomic)};
 
 /* 0x005667e0 */
-RwPluginRegistry rpGeometryRegistry = {.sizeOfStruct = 72, .origSizeOfStruct = 72};
+RwPluginRegistry rpGeometryRegistry = {.sizeOfStruct = sizeof(RpGeometry),
+                                       .origSizeOfStruct = sizeof(RpGeometry)};
 
 /* 0x00566800 */
-RwPluginRegistry rpMaterialRegistry = {.sizeOfStruct = 24, .origSizeOfStruct = 24};
+RwPluginRegistry rpMaterialRegistry = {.sizeOfStruct = sizeof(RpMaterial),
+                                       .origSizeOfStruct = sizeof(RpMaterial)};
 
 /* 0x00566814 */
 RwSurfaceProperties rpMaterialDefaultSurfaceProps = {.ambient = 1.0f, .specular = 1.0f, .diffuse = 1.0f};
 
 /* 0x00566820 */
-RwPluginRegistry rpWorldRegistry = {.sizeOfStruct = 116, .origSizeOfStruct = 116};
+RwPluginRegistry rpWorldRegistry = {.sizeOfStruct = sizeof(RpWorld), .origSizeOfStruct = sizeof(RpWorld)};
 
 /* 0x00566840 */
 float d_00566840 = 0.5f;
@@ -203,10 +205,11 @@ float d_00566850 = -0.5f;
 float d_00566854[3] = {-0.5f};
 
 /* 0x00566860 */
-RwPluginRegistry rpWorldSectorRegistry = {.sizeOfStruct = 92, .origSizeOfStruct = 92};
+RwPluginRegistry rpWorldSectorRegistry = {.sizeOfStruct = sizeof(RpWorldSector),
+                                          .origSizeOfStruct = sizeof(RpWorldSector)};
 
 /* 0x00566880 */
-RwPluginRegistry rpLightRegistry = {.sizeOfStruct = 68, .origSizeOfStruct = 68};
+RwPluginRegistry rpLightRegistry = {.sizeOfStruct = sizeof(RpLight), .origSizeOfStruct = sizeof(RpLight)};
 
 /* 0x005668a0 */
 uint32_t rwD3DAtomicDefaultColor = 0xff000000;
@@ -279,7 +282,7 @@ BmxType_rtCharsetGlyphs rtCharsetGlyphs = {
     0,   0,   0,   0,   0,   127, 51,  24,  12,  102, 127};
 
 struct BmxGroup_rwEngineRegistryGroup rwEngineRegistryGroup __attribute__((aligned(16))) = {
-    .rwEngineRegistry = {.sizeOfStruct = 328, .origSizeOfStruct = 328},
+    .rwEngineRegistry = {.sizeOfStruct = sizeof(RwGlobals), .origSizeOfStruct = sizeof(RwGlobals)},
     .d_00566dd4 = {0x2020100, 0x3030303, 0x4040404, 0x4040404, 0x5050505, 0x5050505, 0x5050505, 0x5050505,
                    0x6060606, 0x6060606, 0x6060606, 0x6060606, 0x6060606, 0x6060606, 0x6060606, 0x6060606,
                    0x7070707, 0x7070707, 0x7070707, 0x7070707, 0x7070707, 0x7070707, 0x7070707, 0x7070707,
@@ -291,7 +294,7 @@ struct BmxGroup_rwEngineRegistryGroup rwEngineRegistryGroup __attribute__((align
 };
 
 /* 0x00566ee0 */
-RwPluginRegistry rwFrameRegistry = {.sizeOfStruct = 168, .origSizeOfStruct = 168};
+RwPluginRegistry rwFrameRegistry = {.sizeOfStruct = sizeof(RwFrame), .origSizeOfStruct = sizeof(RwFrame)};
 
 /* 0x00566f00 */
 char sSoftwareCriterionRenderWare[32] = "Software\\Criterion\\RenderWare";
@@ -300,22 +303,24 @@ char sSoftwareCriterionRenderWare[32] = "Software\\Criterion\\RenderWare";
 int32_t rwD3DRenderOrder = 2;
 
 /* 0x00566f30 */
-RwPluginRegistry rwRasterRegistry = {.sizeOfStruct = 56, .origSizeOfStruct = 56};
+RwPluginRegistry rwRasterRegistry = {.sizeOfStruct = sizeof(RwRaster), .origSizeOfStruct = sizeof(RwRaster)};
 
 /* 0x00566f50 */
-RwPluginRegistry rwCameraRegistry = {.sizeOfStruct = 392, .origSizeOfStruct = 392};
+RwPluginRegistry rwCameraRegistry = {.sizeOfStruct = sizeof(RwCamera), .origSizeOfStruct = sizeof(RwCamera)};
 
 /* 0x00566f70 */
 char s0123456789abcdefghijklmnopqrstuvwxyz[40] = "0123456789abcdefghijklmnopqrstuvwxyz";
 
 /* 0x00566f98 */
-RwPluginRegistry rwTextureRegistry = {.sizeOfStruct = 40, .origSizeOfStruct = 40};
+RwPluginRegistry rwTextureRegistry = {.sizeOfStruct = sizeof(RwTexture),
+                                      .origSizeOfStruct = sizeof(RwTexture)};
 
 /* 0x00566fac */
-RwPluginRegistry rwTexDictionaryRegistry = {.sizeOfStruct = 28, .origSizeOfStruct = 28};
+RwPluginRegistry rwTexDictionaryRegistry = {.sizeOfStruct = sizeof(RwTexDictionary),
+                                            .origSizeOfStruct = sizeof(RwTexDictionary)};
 
 /* 0x00566fc0 */
-RwPluginRegistry rwImageRegistry = {.sizeOfStruct = 32, .origSizeOfStruct = 32};
+RwPluginRegistry rwImageRegistry = {.sizeOfStruct = sizeof(RwImage), .origSizeOfStruct = sizeof(RwImage)};
 
 /* 0x00566fe0 */
 uint32_t d_00566fe0 = 0xffffffff;

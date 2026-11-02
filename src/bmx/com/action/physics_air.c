@@ -42,7 +42,7 @@ static ZMatrix *riderBasis(PhysRider *r)
 
 static unsigned faceWord(const void *face)
 {
-    return *(const uint16_t *)((const uint8_t *)face + 0x16);
+    return ((const PhysContactData *)face)->face.tag;
 }
 
 /* Game object descriptor of a world object (its prop record). */

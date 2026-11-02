@@ -517,6 +517,7 @@
 #undef gPropDefs
 #undef gPropNodeStates
 #undef gPropRecords
+#undef gPropState
 #undef gRateB
 #undef gRateC
 #undef gReplays
@@ -7973,7 +7974,7 @@ struct BmxGroup_gGameRoundStatesGroup {
     PhysEdge **gPhysDebugEdges;       /* 0x0056c448 */
     uint32_t gPhysDebugFrame;         /* 0x0056c44c */
     unsigned char pad_0056c450[168];  /* 0x0056c450 */
-    PropState gPropDefaults;          /* 0x0056c4f8 */
+    PropStateBlock gPropDefaults;     /* 0x0056c4f8 */
     unsigned char pad_0056d038[576];  /* 0x0056d038 */
 };
 #define AT(member, addr, off64)                                                                              \
@@ -8115,12 +8116,12 @@ AT(gPhysDebugDraw, 0x0056c444, 0xffc);
 AT(gPhysDebugEdges, 0x0056c448, 0x1000);
 AT(gPhysDebugFrame, 0x0056c44c, 0x1008);
 AT(pad_0056c450, 0x0056c450, 0x100c);
-AT(gPropDefaults, 0x0056c4f8, 0x10b8);
-AT(pad_0056d038, 0x0056d038, 0x1c38);
+AT(gPropDefaults, 0x0056c4f8, 0x10b4);
+AT(pad_0056d038, 0x0056d038, 0x1f34);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gGameRoundStatesGroup, pad_0056d038) +
                        sizeof(((struct BmxGroup_gGameRoundStatesGroup *)0)->pad_0056d038) ==
-                   BMX_DATA_OFF(0x1b78, 0x1e78),
+                   BMX_DATA_OFF(0x1b78, 0x2174),
                "gGameRoundStatesGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00573260..0x00574584.
@@ -9300,32 +9301,24 @@ struct BmxGroup_gPlayerRecsGroup {
                        BMX_DATA_OFF((addr) - 0x00691f40, off64),                                             \
                    #member)
 AT(gPlayerRecs, 0x00691f40, 0x0);
-AT(pad_00693e20, 0x00693e20, 0x1f60);
+AT(pad_00693e20, 0x00693e20, 0x1fd0);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gPlayerRecsGroup, pad_00693e20) +
                        sizeof(((struct BmxGroup_gPlayerRecsGroup *)0)->pad_00693e20) ==
-                   BMX_DATA_OFF(0x1f48, 0x1fc8),
+                   BMX_DATA_OFF(0x1f48, 0x2038),
                "gPlayerRecsGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00694460..0x00694fa4.
  */
 struct BmxGroup_gPropRecordsGroup {
-    PropRecords gPropRecords;       /* 0x00694460, also gPropState, gReplayTable */
-    unsigned char d_00694ca0[1];    /* 0x00694ca0 */
-    unsigned char d_00694ca1[3];    /* 0x00694ca1 */
-    PropNodeStates gPropNodeStates; /* 0x00694ca4 */
+    PropState gPropState; /* 0x00694460, also gPropRecords, gReplayTable; gPropNodeStates at 0x00694ca4 */
 };
-#define AT(member, addr, off64)                                                                              \
-    _Static_assert(offsetof(struct BmxGroup_gPropRecordsGroup, member) ==                                    \
-                       BMX_DATA_OFF((addr) - 0x00694460, off64),                                             \
-                   #member)
-AT(gPropRecords, 0x00694460, 0x0);
-AT(d_00694ca0, 0x00694ca0, 0x880);
-AT(d_00694ca1, 0x00694ca1, 0x881);
-AT(gPropNodeStates, 0x00694ca4, 0x888);
+#define AT(member, addr)                                                                                     \
+    _Static_assert(offsetof(struct BmxGroup_gPropRecordsGroup, member) == (addr) - 0x00694460, #member)
+AT(gPropState, 0x00694460);
 #undef AT
-_Static_assert(offsetof(struct BmxGroup_gPropRecordsGroup, gPropNodeStates) +
-                       sizeof(((struct BmxGroup_gPropRecordsGroup *)0)->gPropNodeStates) ==
+_Static_assert(offsetof(struct BmxGroup_gPropRecordsGroup, gPropState) +
+                       sizeof(((struct BmxGroup_gPropRecordsGroup *)0)->gPropState) ==
                    BMX_DATA_OFF(0xb44, 0xe88),
                "gPropRecordsGroup");
 

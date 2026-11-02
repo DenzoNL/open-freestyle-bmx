@@ -39,15 +39,16 @@ typedef uint8_t ZrwColColor[4];
 
 /* Hit record in game space (0x4c bytes); the y and z axes are mirrored relative to RenderWare. */
 typedef struct ZrwColHit {
-    float normal[3];       /* 0x00 */
-    uint32_t pad0c;        /* 0x0c */
-    float vertex[3][4];    /* 0x10 corner xyz, one padding word each */
-    float distance;        /* 0x40 */
-    uint32_t objectData;   /* 0x44 user data of the object hit (0 for the static world) */
-    uint32_t materialData; /* 0x48 user data of the material */
+    float normal[3];    /* 0x00 */
+    uint32_t pad0c;     /* 0x0c */
+    float vertex[3][4]; /* 0x10 corner xyz, one padding word each */
+    float distance;     /* 0x40 */
+    void *objectData;   /* 0x44 user data of the object hit (its ZrwModel; NULL for the static world) */
+    void *materialData; /* 0x48 user data of the material */
 } ZrwColHit;
 
-_Static_assert(sizeof(ZrwColHit) == 0x4c, "collision hit");
+BMX_LAYOUT32_ASSERT(sizeof(ZrwColHit) == 0x4c, "collision hit");
+_Static_assert(offsetof(ZrwColHit, distance) == 0x40, "collision hit");
 
 /* Result of the line query (0x58 bytes): the nearest hit and the point where the line meets it. */
 typedef struct ZrwColLineHit {
@@ -55,7 +56,7 @@ typedef struct ZrwColLineHit {
     float point[3]; /* 0x4c */
 } ZrwColLineHit;
 
-_Static_assert(sizeof(ZrwColLineHit) == 0x58, "line hit");
+BMX_LAYOUT32_ASSERT(sizeof(ZrwColLineHit) == 0x58, "line hit");
 
 /* State of the collision system (0x674160, 0x50 bytes, cleared at initialisation). */
 typedef struct ZrwColState {

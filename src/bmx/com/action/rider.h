@@ -60,7 +60,9 @@ uint32_t riderGetTrickKind(const PhysRider *r);
 uint32_t riderStickDirection(const PhysRider *r);
 
 /* The collision callback of the rider's motion object. */
-void riderCollide(uint32_t motion, int index, float impact, const uint32_t *hit);
+struct ZRig;
+struct ZRigHit;
+void riderCollide(struct ZRig *rig, uint32_t index, float impact, struct ZRigHit *hit);
 
 /* Mode step functions. */
 int riderStepRoll(PhysRider *r);

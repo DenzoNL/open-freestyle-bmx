@@ -111,12 +111,12 @@ enum { kMaxNodes = 6 };
 static PhysPropFrame *gFrames[kMaxNodes];
 static int gNodeCount;
 
-static PhysPropFrame *BMX_CDECL stubObjectFrame(uint32_t objectData)
+static PhysPropFrame *BMX_CDECL stubObjectFrame(const void *objectData)
 {
     const uint32_t pick = dt_u32() % (uint32_t)(gNodeCount + 1);
 
     ngLog(0x560ee0);
-    ngLog(objectData);
+    ngLog((uint32_t)(uintptr_t)objectData);
     return pick < (uint32_t)gNodeCount ? gFrames[pick] : (PhysPropFrame *)(uintptr_t)0x1234;
 }
 
@@ -288,7 +288,7 @@ static void makeColHit(ZrwColHit *h, const ZVec3 *p, float span)
     h->normal[0] = (float)(n.x / len);
     h->normal[1] = (float)(n.y / len);
     h->normal[2] = (float)(n.z / len);
-    h->objectData = dt_u32() % 3 ? 0 : (dt_u32() | 1);
+    h->objectData = dt_u32() % 3 ? NULL : (void *)(uintptr_t)(dt_u32() | 1);
 }
 
 static void setup_face_near(DtCtx *c)
@@ -483,8 +483,8 @@ static void setup_ray(DtCtx *c)
         }
         around3(&h->point, 500.0f);
         h->hit.distance = dt_u32() % 8 ? dt_float(-0.0099f, 1.0099f) : dt_float_edgy(-2.0f, 2.0f);
-        h->hit.objectData = dt_u32() % 2 ? 0 : (dt_u32() | 1);
-        h->hit.materialData = dt_u32() % 3 ? (dt_u32() | 1) : 0;
+        h->hit.objectData = dt_u32() % 2 ? NULL : (void *)(uintptr_t)(dt_u32() | 1);
+        h->hit.materialData = dt_u32() % 3 ? (void *)(uintptr_t)(dt_u32() | 1) : NULL;
     }
     gLineCalls = 0;
     gMatWord = dt_u32();

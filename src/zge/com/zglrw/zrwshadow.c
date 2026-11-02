@@ -140,7 +140,7 @@ void zrollerUpdateShadow(void *state)
         gZrwShadowDouble = (float)extent;
     }
 
-    position = *zobjGetPosition((const void *)(uintptr_t)shadow->model->userValue);
+    position = *zobjGetPosition(shadow->model->userValue);
     zvec3Add(&eye, &position, &shadow->offset);
     zobjLookAtMatrix(&look, &eye, &position);
     zmatrixInvertRigid(&look, &look);

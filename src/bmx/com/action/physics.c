@@ -611,7 +611,7 @@ int physEnterGrindIn(PhysRider *r, int from, int to)
                 tmp.x = (float)((double)obj->pos[0] - probe.x);
                 tmp.y = (float)((double)obj->pos[1] - probe.y);
                 tmp.z = (float)((double)obj->pos[2] - probe.z);
-                if (obj->prop == NULL || zvec3Dot(&obj->prop->facing, &tmp) > 0.0f) {
+                if (obj->prop == NULL || zvec3Dot(&obj->prop->orient.up, &tmp) > 0.0f) {
                     continue;
                 }
                 tmp.x = (float)(int16_t)dx;
@@ -1063,7 +1063,7 @@ int physTakeContact(PhysRider *r, const PhysRayHit *hit)
     return 0;
 }
 
-/* Size of the contact record of a surface kind (0 for unknown kinds). */
+/* Size of the contact record of a surface kind (0 for unknown kinds): a face, an edge, a prop object. */
 static uint32_t contactSize(uint8_t surface)
 {
     switch (surface) {
@@ -1077,14 +1077,14 @@ static uint32_t contactSize(uint8_t surface)
     case 11:
     case 13:
     case 14:
-        return 0x88;
+        return sizeof(PhysFace);
     case 1:
     case 2:
     case 3:
     case 9:
-        return 0x38;
+        return sizeof(PhysEdge);
     case 12:
-        return 500;
+        return sizeof(PhysPropObject);
     default:
         return 0;
     }
@@ -1097,8 +1097,8 @@ void physContactSnapshotFix(PhysContactSnap *s)
     const uint32_t size = contactSize(s->surface);
 
     if (s->contact != NULL && size != 0) {
-        zmemCopy(s->data, s->contact, size);
-        s->contact = s->data;
+        zmemCopy(&s->data, s->contact, size);
+        s->contact = &s->data;
     }
 }
 
@@ -1109,8 +1109,8 @@ void physContactCopy(PhysRider *r)
     const uint32_t size = contactSize(r->surface);
 
     if (r->contact != NULL && size != 0) {
-        zmemCopy(r->contactData, r->contact, size);
-        r->contact = r->contactData;
+        zmemCopy(&r->contactData, r->contact, size);
+        r->contact = &r->contactData;
     }
 }
 /* Steering on the ground: leans into turns at moderate speed, then applies and damps the yaw. */

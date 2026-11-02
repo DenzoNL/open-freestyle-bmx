@@ -139,16 +139,16 @@ void zrwModelSetCollision(const ZrwModel *model, int on)
 }
 
 /* The model slot the plugin adds to every clump; its offset is only known once the plugin is registered. */
-static uint32_t *mdlSlot(void *clump)
+static void **mdlSlot(void *clump)
 {
-    return (uint32_t *)((uint8_t *)clump + gZrwMdlPluginOffset);
+    return (void **)(void *)((uint8_t *)clump + gZrwMdlPluginOffset);
 }
 
 BMX_ADDR(0x00487d90)
 void *zrwMdlConstructor(void *clump)
 {
     if (gZrwMdlPluginOffset > 0) {
-        *mdlSlot(clump) = 0;
+        *mdlSlot(clump) = NULL;
     }
     return clump; /* the plugin registry treats NULL as failure */
 }
@@ -160,7 +160,7 @@ void *zrwMdlDestructor(void *clump)
 }
 
 BMX_ADDR(0x00487dc0)
-int zrwMdlSetUserData(void *clump, uint32_t value)
+int zrwMdlSetUserData(void *clump, void *value)
 {
     if (gZrwMdlPluginOffset < 1) {
         return 0;
@@ -516,7 +516,7 @@ BMX_ADDR(0x00488890)
 int zrwMdlRegisterPlugin(void)
 {
     gZrwMdlPluginOffset =
-        /* The clump's model (zrwMdlSetUserData; X2e: still handed over as a 32-bit word). */
+        /* The clump's model (zrwMdlSetUserData). */
         RpClumpRegisterPlugin(sizeof(ZrwModel *), 0xff02,
                               BMX_FNPTR(RwPluginObjectConstructor, 0x00487d90, zrwMdlConstructor),
                               BMX_FNPTR(RwPluginObjectDestructor, 0x00487db0, zrwMdlDestructor), NULL);
@@ -588,22 +588,22 @@ int zrwModelSetFlags(const ZrwModel *model, uint8_t clear, uint8_t set)
 }
 
 BMX_ADDR(0x00488b80)
-uint32_t zrwMdlGetUserData(const void *atomic)
+void *zrwMdlGetUserData(const void *atomic)
 {
     if (gZrwMdlPluginOffset < 1) {
-        return 0;
+        return NULL;
     }
     return *mdlSlot(((const RpAtomic *)atomic)->clump);
 }
 
 BMX_ADDR(0x00488ba0)
-void zrwModelSetUserValue(ZrwModel *model, uint32_t value)
+void zrwModelSetUserValue(ZrwModel *model, void *value)
 {
     model->userValue = value;
 }
 
 BMX_ADDR(0x00488bb0)
-uint32_t zrwModelGetUserValue(const ZrwModel *model)
+void *zrwModelGetUserValue(const ZrwModel *model)
 {
     return model->userValue;
 }

@@ -76,7 +76,7 @@ void *zrwTextureAddRef(ZrwTexture *texture);
 /* Sets the name the texture reader is going to look for. */
 void zrwTextureSetLoadName(const char *name);
 /* Stores a user value in the texture's material plugin slot (when the plugin is registered). */
-void zrwTextureSetUserData(const ZrwTexture *texture, uint32_t value);
+void zrwTextureSetUserData(const ZrwTexture *texture, void *value);
 /* The `mipmapped` flag of the texture system, also handed to RenderWare's mipmapping / find callback. */
 void zrwSetMaterialParam(const void *value);
 void zrwSetMaterialValue(int value);
@@ -100,7 +100,7 @@ void zrwPaletteEncodeEntry(void *out, uint32_t format, int index, const uint8_t 
 #define gZrwMatPluginOffset ORIG_VAR(0x005623e8, int, gZrwMatPluginOffset)
 void *rwMatConstructor(void *material);
 void *rwMatDestructor(void *material);
-uint32_t zrwMatGetUserData(const void *material);
+void *zrwMatGetUserData(const void *material);
 /* Registers the material plugin on RenderWare textures; 0 on failure. */
 int zrwMatRegisterPlugin(void);
 

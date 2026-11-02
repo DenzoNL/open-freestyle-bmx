@@ -333,7 +333,7 @@ static void rand_hit(PhysRayHit *h, const ZMatrix *b, int wallBias, int faceBias
     }
     h->object = dt_range(1, 1000);
     h->objectData = alloc_contact();
-    h->objectData->prop = (const PhysPropInfo *)(uintptr_t)(dt_u32() % 3 ? 0 : dt_range(1, 99));
+    h->objectData->prop = (const PropRecord *)(uintptr_t)(dt_u32() % 3 ? 0 : dt_range(1, 99));
 }
 
 static void setup_roll(DtCtx *c, Scenario sc)

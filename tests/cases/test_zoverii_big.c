@@ -168,7 +168,7 @@ static void make_faces(const ZVec3 *from, const ZVec3 *to)
             rand_dir(&f->normal, kind == 2 ? rf(0.5f, 1.5f) : 1.0f);
         }
         f->d = rf(-500.0f, 500.0f);
-        f->owner = owner;
+        f->owner = (const struct ZrwColHit *)(const void *)owner;
         lerp(&s, from, to, rf(-0.2f, 1.2f));
         *onPlane = s;
         add_scaled(onPlane, &f->normal, kind == 3 ? rf(-400.0f, 400.0f) : rf(-30.0f, 30.0f));

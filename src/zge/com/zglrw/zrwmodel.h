@@ -109,7 +109,7 @@ struct ZrwModel {
     uint32_t flags;                 /* 0x08 bit 0: scale differs from 1, bit 1: parts matched */
     struct RpClump *clump;          /* 0x0c */
     struct RpClump *collisionClump; /* 0x10 the MCOL clump, NULL when the model collides with its own */
-    uint32_t userValue;             /* 0x14 */
+    void *userValue;                /* 0x14 the model's object (zrwshadow.c, gZbspObjectFrameFn) */
     ZVec3 position;                 /* 0x18 game coordinates */
     uint32_t pad24;
     ZVec3 scale; /* 0x28 */
@@ -231,10 +231,10 @@ void zrwModelSetCollision(const ZrwModel *model, int on);
 /* Plugin slot hooks of the clump (constructor clears the slot; the destructor does nothing). */
 void *zrwMdlConstructor(void *clump);
 void *zrwMdlDestructor(void *clump);
-int zrwMdlSetUserData(void *clump, uint32_t value);
+int zrwMdlSetUserData(void *clump, void *value);
 int zrwMdlRegisterPlugin(void);
 /* The value in the plugin slot of the atomic's clump (the model that owns it). */
-uint32_t zrwMdlGetUserData(const void *atomic);
+void *zrwMdlGetUserData(const void *atomic);
 
 /* Rotation matrix of a quaternion in RenderWare space (y, z negated); the second variant mirrors x. */
 void zrwQuatToMatrix(const ZQuat *quat, ZMatrix *out);
@@ -273,8 +273,8 @@ int zrwModelUpdate(ZrwModel *model);
  */
 int zrwModelSetFlags(const ZrwModel *model, uint8_t clear, uint8_t set);
 
-void zrwModelSetUserValue(ZrwModel *model, uint32_t value);
-uint32_t zrwModelGetUserValue(const ZrwModel *model);
+void zrwModelSetUserValue(ZrwModel *model, void *value);
+void *zrwModelGetUserValue(const ZrwModel *model);
 /* The clump collision queries test: the collision clump when there is one. */
 void *zrwModelCollisionClump(const ZrwModel *model);
 /* Material with the given texture name hash, or NULL. */

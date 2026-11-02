@@ -117,7 +117,7 @@ typedef PhysFace ZbspPropFaceTable[1];
 #define gZbspMatRefValue ORIG_VAR(0x005e7fd8, uint32_t, gZbspMatRefValue)
 #define gZbspNoShapeKind ORIG_VAR(0x005f8d68, uint8_t, gZbspNoShapeKind)
 /* Renderer entry that maps a world object's user data to its scene frame (0x560ee0). */
-typedef PhysPropFrame *(BMX_CDECL *ZbspObjectFrameFn)(uint32_t objectData);
+typedef PhysPropFrame *(BMX_CDECL *ZbspObjectFrameFn)(const void *objectData);
 #define gZbspObjectFrameFn ORIG_VAR(0x00560ee0, ZbspObjectFrameFn, gZbspObjectFrameFn)
 /* Renderer entry used by zbspGetMatRef (0x561038). */
 typedef const uint32_t *(BMX_CDECL *ZbspMaterialFn)(const void *material);

@@ -8,6 +8,11 @@ Each run gets the recording's starting SAVE.DAT in <game folder>/save (the folde
 afterwards), BMX_REPLAY, BMX_SIM_HASH, BMX_MUTE and BMX_NO_MOVIES; runs are sequential, in the background (the
 window never takes the focus). The first exe is the reference; the report names the first tick where another
 differs. Exit status 0 when all hash files are identical.
+
+--shots 300,900,1500 also saves those shown frames of every run (BMX_SHOT, <label>-f<frame>.bmp) and compares
+them byte for byte, so a renderer change that should not show is checked too. Use an ini with `vanilla = 1`:
+the frame interpolation blends by wall-clock time, so with it frames differ from run to run (even then a frame
+occasionally differs in a few pixels between two runs of one exe; compare such a frame against a second run).
 """
 import argparse
 import os
@@ -30,7 +35,7 @@ def recording_save(path):
         return f.read(size), pad, (vendor, product)
 
 
-def run(exe, game_dir, recording, save, ini, out_dir, label, timeout):
+def run(exe, game_dir, recording, save, ini, out_dir, label, timeout, shots):
     hash_path = os.path.join(out_dir, f'{label}.hash')
     save_path = os.path.join(game_dir, 'save', 'SAVE.DAT')
     env = dict(os.environ)
@@ -39,6 +44,8 @@ def run(exe, game_dir, recording, save, ini, out_dir, label, timeout):
         env.pop(k, None)
     if ini:
         env['BMX_CONFIG'] = os.path.abspath(ini)
+    if shots:
+        env.update(BMX_SHOT=os.path.join(os.path.abspath(out_dir), f'{label}-f%d.bmp'), BMX_SHOT_FRAME=shots)
     with open(save_path, 'wb') as f:
         f.write(save)
     subprocess.run([os.path.abspath(exe), 'Scene.Txt'], cwd=game_dir, env=env, timeout=timeout,
@@ -57,6 +64,7 @@ def main():
     ap.add_argument('--ini', help='bmxnative.ini for every run (default: each exe\'s own)')
     ap.add_argument('--out', help='folder for the hash files and logs (default: a temporary one)')
     ap.add_argument('--timeout', type=int, default=3600)
+    ap.add_argument('--shots', help='shown frames to save and compare, e.g. 300,900,1500')
     ap.add_argument('exes', nargs='+')
     args = ap.parse_args()
 
@@ -70,7 +78,8 @@ def main():
     results = []
     try:
         for i, exe in enumerate(args.exes):
-            hashes = run(exe, args.game_dir, args.recording, save, args.ini, out_dir, f'run{i}', args.timeout)
+            hashes = run(exe, args.game_dir, args.recording, save, args.ini, out_dir, f'run{i}', args.timeout,
+                         args.shots)
             print(f'  run{i}: {exe}: {len(hashes)} ticks')
             results.append(hashes)
     finally:
@@ -87,6 +96,20 @@ def main():
             ok = False
         else:
             print(f'  run{i} identical to run0')
+    for frame in (args.shots.split(',') if args.shots else []):
+        ref = os.path.join(out_dir, f'run0-f{frame}.bmp')
+        if not os.path.exists(ref):
+            print(f'  frame {frame}: run0 saved no screenshot')
+            ok = False
+            continue
+        with open(ref, 'rb') as f:
+            want = f.read()
+        for i in range(1, len(results)):
+            path = os.path.join(out_dir, f'run{i}-f{frame}.bmp')
+            same = os.path.exists(path) and open(path, 'rb').read() == want
+            if not same:
+                print(f'  frame {frame}: run{i} differs from run0')
+                ok = False
     print('identical' if ok else 'DIFFERENT')
     return 0 if ok else 1
 

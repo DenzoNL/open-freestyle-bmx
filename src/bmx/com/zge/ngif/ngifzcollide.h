@@ -30,7 +30,7 @@ typedef struct ZcollideLineHit {
     uint32_t pad58;
 } ZcollideLineHit;
 
-_Static_assert(sizeof(ZcollideLineHit) == 0x5c, "ZcollideLineHit size");
+BMX_LAYOUT32_ASSERT(sizeof(ZcollideLineHit) == 0x5c, "ZcollideLineHit size");
 
 /* End points of the prop box edges zcollideFillPropEdges builds (indices into its 8 corners). */
 typedef struct ZcollideBoxEdge {

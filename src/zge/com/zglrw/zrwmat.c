@@ -349,7 +349,7 @@ ZrwMaterial *zrwmatLoadSpriteTexture(void *data, uint32_t size, const char *name
     }
     material = newMaterial();
     appendTexture(material, texture);
-    zrwTextureSetUserData(texture, (uint32_t)(uintptr_t)material);
+    zrwTextureSetUserData(texture, material);
     gZrwMat.last = material;
     gZrwTextureDrop(texture);
     return gZrwMat.last;
@@ -472,6 +472,6 @@ void zrwmatTextureLoaded(void *texture)
     ZrwMaterial *material = newMaterial();
 
     appendTexture(material, texture);
-    zrwTextureSetUserData(texture, (uint32_t)(uintptr_t)material);
+    zrwTextureSetUserData(texture, material);
     gZrwMat.last = material;
 }

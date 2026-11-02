@@ -28,29 +28,6 @@ _Static_assert(sizeof(PropDef) == 10, "PropDef size");
 typedef PropDef PropDefs[12][16];
 #define gPropDefs ORIG_VAR(0x00557d28, PropDefs, gPropDefs)
 
-/* State of a prop of the current level (0x84 bytes, 16 at 0x694460). */
-typedef struct PropRecord {
-    uint8_t state;          /* 0x00 0 unused, 1 in place, 3 collected */
-    uint8_t flags;          /* 0x01 bit 1: set when the prop's object has the signalled flag */
-    uint8_t index;          /* 0x02 index into the level's PropDefs */
-    uint8_t player;         /* 0x03 who collected it */
-    uint32_t timer;         /* 0x04 */
-    PhysPropObject *object; /* 0x08 */
-    ZVec3 pos;              /* 0x0c */
-    uint8_t pad18[4];
-    ZVec3 vel; /* 0x1c */
-    uint8_t pad28[4];
-    ZMatrix orient; /* 0x2c */
-    ZAngle3 angles; /* 0x6c turn applied to the orientation by propOrient */
-    uint8_t pad72[2];
-    uint32_t sound;  /* 0x74 handle of the looping sound */
-    uint32_t mode;   /* 0x78 sub state of the movement / whether it is shown (kind 5) */
-    uint32_t paramA; /* 0x7c from PropDef.paramA */
-    uint32_t paramB; /* 0x80 */
-} PropRecord;
-
-BMX_LAYOUT32_ASSERT(sizeof(PropRecord) == 0x84, "PropRecord size");
-
 /* Visibility of a prop's node in the world: bit 0 set once the player hit its face. */
 typedef struct PropNodeState {
     uint32_t flags;
@@ -58,21 +35,25 @@ typedef struct PropNodeState {
     uint32_t pad08;
 } PropNodeState;
 
-/* The saved block: the records, a word, and the node states (the last 4 bytes of the last one are not saved).
- */
+/* The props' state: the records, a word, and the tagged nodes' states (0x694460..0x694fa4). */
 typedef struct PropState {
-    PropRecord record[16];
-    uint32_t pad840;
-    uint8_t nodes[0xb40 - 0x844];
+    PropRecord record[16];   /* 0x000 */
+    uint32_t pad840;         /* 0x840 */
+    PropNodeState nodes[64]; /* 0x844 */
 } PropState;
 
-BMX_LAYOUT32_ASSERT(sizeof(PropState) == 0xb40, "PropState size");
-typedef PropRecord PropRecords[16];
-typedef PropNodeState PropNodeStates[64];
+BMX_LAYOUT32_ASSERT(offsetof(PropState, nodes) == 0x844 && sizeof(PropState) == 0xb44, "PropState layout");
+
+/* What is saved, restored and kept as the level's defaults: the state up to the last node state's third word,
+ * which is left out (0xb40 bytes where pointers are 32 bits wide). */
+#define kPropStateSaved ((uint32_t)offsetof(PropState, nodes[63].pad08))
+typedef uint8_t PropStateBlock[offsetof(PropState, nodes[63].pad08)];
+
+BMX_LAYOUT32_ASSERT(sizeof(PropStateBlock) == 0xb40, "saved prop state size");
 #define gPropState      ORIG_VAR(0x00694460, PropState, gPropState)
-#define gPropRecords    ORIG_VAR(0x00694460, PropRecords, gPropRecords)
-#define gPropNodeStates ORIG_VAR(0x00694ca4, PropNodeStates, gPropNodeStates)
-#define gPropDefaults   ORIG_VAR(0x0056c4f8, PropState, gPropDefaults)
+#define gPropRecords    (gPropState.record)
+#define gPropNodeStates (gPropState.nodes) /* 0x00694ca4 */
+#define gPropDefaults   ORIG_VAR(0x0056c4f8, PropStateBlock, gPropDefaults)
 
 /* Starts a prop moving (collect: release == 0) or putting it back (release != 0). */
 void propSwitch(PropRecord *prop, uint32_t player, int release);

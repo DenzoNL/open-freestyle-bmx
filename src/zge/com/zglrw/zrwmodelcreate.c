@@ -369,9 +369,9 @@ void zrwModelSetRwInfo(ZrwModel *model)
 {
     RpGeometry *geometry;
 
-    zrwMdlSetUserData(model->clump, (uint32_t)(uintptr_t)model);
+    zrwMdlSetUserData(model->clump, model);
     if (model->collisionClump != NULL) {
-        zrwMdlSetUserData(model->collisionClump, (uint32_t)(uintptr_t)model);
+        zrwMdlSetUserData(model->collisionClump, model);
     }
     geometry = model->def->geometry;
     for (void *material = zlistFirst(model->materials); material != NULL;

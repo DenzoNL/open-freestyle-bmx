@@ -1433,9 +1433,9 @@ void *_rwRasterOpen(void *engine, int32_t offset)
 {
     rwRasterOffset = offset;
     RwRasterGlobals *globals = rasterGlobals();
-    RwRaster *root = (RwRaster *)globals->pad2c;
-    for (size_t i = 0; i < sizeof globals->pad2c; i++) {
-        globals->pad2c[i] = 0;
+    RwRaster *root = &globals->root;
+    for (size_t i = 0; i < sizeof globals->root; i++) {
+        ((uint8_t *)root)[i] = 0;
     }
     root->flags = 0x80;
     globals->depth = 0;

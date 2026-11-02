@@ -2016,7 +2016,7 @@ uint32_t riderGetTrickKind(const PhysRider *r)
  * throws sparks on hard hits and adds the impact to the score.
  */
 BMX_ADDR(0x00436020)
-void riderCollide(uint32_t motion, int index, float impact, const uint32_t *hit)
+void riderCollide(struct ZRig *rig, uint32_t index, float impact, struct ZRigHit *hit)
 {
     if (!(impact > 0.0f)) {
         return;
@@ -2024,7 +2024,7 @@ void riderCollide(uint32_t motion, int index, float impact, const uint32_t *hit)
     PhysRider *rider = NULL;
     const uint32_t count = gPlayerCount < 1 ? 1 : gPlayerCount;
     for (uint32_t i = 0; i < count; i++) {
-        if ((uint32_t)(uintptr_t)gPhysRiders[i].actor2 == motion) {
+        if (gPhysRiders[i].actor2 == (void *)rig) {
             rider = &gPhysRiders[i];
             break;
         }
@@ -2034,24 +2034,23 @@ void riderCollide(uint32_t motion, int index, float impact, const uint32_t *hit)
     }
     uint32_t kind = 0;
     int solid = 0;
-    if ((hit[0] & 1) != 0) {
-        if (hit[0xe] != 0) {
-            kind = *(const uint32_t *)(uintptr_t)hit[0xe] & 0xf;
+    if ((hit->kind & 1) != 0) {
+        if (hit->matRef != NULL) {
+            kind = *hit->matRef & 0xf;
         }
-    } else if ((hit[0] & 2) != 0) {
-        const uint16_t id = (uint16_t)hit[0xf];
+    } else if ((hit->kind & 2) != 0) {
+        const uint16_t id = hit->tag;
         const uint8_t *info = (const uint8_t *)zbspGetShape(id);
         if (ngifzCollideGetObject(id) != NULL) {
             kind = info[2];
         }
-        const uint8_t *node = physObjectProp((const void *)(uintptr_t)hit[0x10]);
-        if (node != NULL) {
-            const ZVec3 local = {readFloat((const uint8_t *)hit, 0x1c), readFloat((const uint8_t *)hit, 0x20),
-                                 readFloat((const uint8_t *)hit, 0x24)};
-            ZVec3 *slot = (ZVec3 *)((uint8_t *)(uintptr_t)motion + 0x88 + (uint32_t)index * 0xb4);
+        const PropRecord *prop = physObjectProp(hit->object);
+        if (prop != NULL) {
+            const ZVec3 local = hit->normal;
+            ZVec3 *slot = &rig->points[index].vel;
             (void)zvec3Dot(slot, &local);
-            (void)zvec3Dot((const ZVec3 *)(node + 0x1c), &local);
-            zvec3Add(slot, slot, (const ZVec3 *)(node + 0x1c));
+            (void)zvec3Dot(&prop->vel, &local);
+            zvec3Add(slot, slot, &prop->vel);
         }
     }
     switch (kind) {
@@ -2061,7 +2060,7 @@ void riderCollide(uint32_t motion, int index, float impact, const uint32_t *hit)
         solid = 1;
         break;
     case 6:
-        if ((*(const uint32_t *)(uintptr_t)hit[0xe] >> 0x13 & 3) == 2) {
+        if ((*hit->matRef >> 0x13 & 3) == 2) {
             if (index == 0) {
                 rider->surface = 0xe;
             }
@@ -2081,7 +2080,7 @@ void riderCollide(uint32_t motion, int index, float impact, const uint32_t *hit)
         } else {
             level = impact < 50.0f ? 2 : 3;
         }
-        const void *position = hit + 2;
+        const void *position = &hit->point;
         int source = -1;
         uint32_t minimum = 0;
         switch (index) {

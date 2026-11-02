@@ -458,7 +458,7 @@ ZrwRenderColQuery *zrwModelQuery(const ZVec3 *point, float radius)
 BMX_ADDR(0x0048f3e0)
 void *zrwModelRenderBillboard(void *object)
 {
-    ZrwModel *const model = (ZrwModel *)(uintptr_t)zrwMdlGetUserData(object);
+    ZrwModel *const model = zrwMdlGetUserData(object);
     const ZMatrix *cameraMatrix = RwFrameGetLTM(RwCameraGetFrame(gZrwCamera));
     ZMatrix *const frame = RwFrameGetLTM(RpAtomicGetFrame(object));
     uint32_t renderFlags;
@@ -504,7 +504,7 @@ void *zrwModelRenderBillboard(void *object)
 BMX_ADDR(0x0048f530)
 void *zrwModelRenderCallback(void *object)
 {
-    ZrwModel *const model = (ZrwModel *)(uintptr_t)zrwMdlGetUserData(object);
+    ZrwModel *const model = zrwMdlGetUserData(object);
 
     zrwModelSetColor(model, &model->color);
     model->def->atomicRender(object);
@@ -695,11 +695,11 @@ int zrwModelRenderInitialize(void)
     zmemFill(&gZrwModelRender, 0, sizeof gZrwModelRender);
     gZrwModelRender.initialized = 1;
     gZrwModelRender.vertexCapacity = 0x200;
-    gZrwModelRender.vertices = zmemAlloc(0x4010);
-    gZrwModelRender.buffer2 = zmemAlloc(0x1800);
-    gZrwModelRender.buffer3 = zmemAlloc(0x200);
+    gZrwModelRender.vertices = zmemAlloc((uint32_t)gZrwModelRender.vertexCapacity * 0x20 + 0x10);
+    gZrwModelRender.buffer2 = zmemAlloc((uint32_t)gZrwModelRender.vertexCapacity * 12);
+    gZrwModelRender.buffer3 = zmemAlloc((uint32_t)gZrwModelRender.vertexCapacity);
     gZrwModelRender.indexCapacity = 0x100;
-    gZrwModelRender.indices = zmemAlloc(0x600);
+    gZrwModelRender.indices = zmemAlloc((uint32_t)gZrwModelRender.indexCapacity * 6);
     gZrwModelRender.pad84 = 0;
     gZrwModelRender.atomicCallback = NULL;
     return 1;

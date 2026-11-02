@@ -57,17 +57,23 @@ typedef struct RwRaster {
     uint8_t privateFlags;    /* 0x22 */
     uint8_t format;          /* 0x23 */
     uint8_t stamp;           /* 0x24 incremented when the raster changes */
+    uint8_t pad25[3];        /* 0x25 */
+    void *pad28;             /* 0x28 */
+    int32_t originalWidth;   /* 0x2c level 0 size and stride, kept by the driver while a level is locked */
+    int32_t originalHeight;  /* 0x30 */
+    int32_t originalStride;  /* 0x34 */
 } RwRaster;
 
 BMX_LAYOUT32_ASSERT(offsetof(RwRaster, originX) == 0x1c, "RwRaster layout");
 BMX_LAYOUT32_ASSERT(offsetof(RwRaster, type) == 0x20, "RwRaster layout");
 BMX_LAYOUT32_ASSERT(offsetof(RwRaster, stamp) == 0x24, "RwRaster layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwRaster, originalWidth) == 0x2c && sizeof(RwRaster) == 0x38, "RwRaster layout");
 
 /* The raster module's data in the engine instance: the context stack and the raster free list. */
 typedef struct RwRasterGlobals {
     RwRaster *stack[10];  /* 0x00 pushed rasters; the entry for depth n is stack[n + 1] */
     int32_t depth;        /* 0x28 number of pushed contexts */
-    uint8_t pad2c[0x38];  /* 0x2c */
+    RwRaster root;        /* 0x2c the bottom of the context stack: a pseudo raster without a parent */
     RwFreeList *freeList; /* 0x64 */
 } RwRasterGlobals;
 

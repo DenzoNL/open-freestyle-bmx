@@ -1332,12 +1332,11 @@ static void drawObjectMarker(const void *marker, uint32_t color, int polygons)
     angles.x = (ZAngle)rdS16(marker, 4);
     angles.y = (ZAngle)-rdS16(marker, 6);
     angles.z = (ZAngle)rdS16(marker, 8);
-    const uint8_t *frame =
-        *(const uint8_t *const *)(*(const uint8_t *const *)((const uint8_t *)marker + 0x1f0) + 0x1c);
-    q.x = rdFloat(frame, 0x14);
-    q.y = -rdFloat(frame, 0x18);
-    q.z = rdFloat(frame, 0x1c);
-    q.w = rdFloat(frame, 0x20);
+    const PhysPropFrame *frame = ((const PhysPropObject *)marker)->node->frame;
+    q.x = frame->rot.x;
+    q.y = -frame->rot.y;
+    q.z = frame->rot.z;
+    q.w = frame->rot.w;
     zquatToMatrix(&m, &q);
     zmatrixRotateEuler(&m, &m, &angles);
     zmatrixRotateEuler(&m, &m, (const ZAngle3 *)((const uint8_t *)marker + 4));
@@ -1603,10 +1602,10 @@ static const RiderTrick *lastTrick(const RiderCombo *c)
     return (const RiderTrick *)(const void *)((const uint8_t *)c + c->count * sizeof(RiderTrick));
 }
 
-/* Tag word of the rider's current contact (face or edge record). */
+/* Tag word of the rider's current contact (face or edge record: both keep it at the same place). */
 static uint16_t contactTag(const void *contact)
 {
-    return *(const uint16_t *)(const void *)((const uint8_t *)contact + 0x16);
+    return ((const PhysContactData *)contact)->face.tag;
 }
 
 /* Tag group of a prop collision object (low 5 bits of the word at +2). */

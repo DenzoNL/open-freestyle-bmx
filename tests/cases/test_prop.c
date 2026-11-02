@@ -176,7 +176,7 @@ static void setupReset(DtCtx *c)
     dt_fill(&gPropState, sizeof gPropState);
     const int count = randomNodes(nodes);
     PropState *s = randomState(nodes, count);
-    gPropDefaults = *s;
+    __builtin_memcpy(&gPropDefaults, s, kPropStateSaved);
 }
 
 static void setupFind(DtCtx *c)

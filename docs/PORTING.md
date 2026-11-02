@@ -358,14 +358,33 @@ mechanical commits leave bmxtest.dll, dinput.dll and bmxnative.exe .text/.data/.
   - The import thunks of src/data/imports.c are i386 code: their slot offsets are asserted on 32-bit only.
   - Open for X3: bmxDataFind maps an original address linearly inside a unit (units.c's original ranges),
     which is wrong past a moved member on 64-bit.
-- **Left (X2c/X2e):** PropState
-  (0xb40 view, node states hold pointers; prop.c 0x300); contactSize / PhysContactSnap; d3dim2d deferred
-  records; zrwcol 0x13000, zrwprim, zrwmodelrender buffers; byte offsets in game.c, physics.c, physics_air.c,
-  rider.c, action.c, ngifzbsp.c, world.c (`object + 0xc`, pipeline + 0x10), driver/texture.c, zscene,
-  frontend_select, guiinput, ngifzmemdmm, crt.c rwFexist (original address); type pairs ZPropDef/ZbspTreeNode,
-  ZPropInst/PhysPropNode, ZrwRenderColTriangle = ZbspLevelFace (pointers read as u32 tags), ZObj views,
-  OvlFont/ZOverFont, ZrwShadow*, ZrwColTriangle; user-data words carrying pointers (zrwMdlSetUserData,
-  zrwTextureSetUserData; their plugin slots are already pointer-sized). X2d: the 28-bit ordering tables.
+- **Second batch (2026-11-02):**
+  - PropState is the whole 0x694460..0x694fa4 block (records, a word, 64 node states); what is saved, restored and
+    kept as the defaults is `kPropStateSaved` = up to the last state's third word (0xb40 on 32-bit);
+    gPropRecords / gPropNodeStates are its fields. replay.c's part B uses the same size (parts A-C never reach a
+    file: the demos are created with flags 7).
+  - The contact a rider or snapshot copies is a union of PhysFace, PhysEdge and PhysPropObject (500 bytes on
+    32-bit); contactSize is their sizeof. physics_types.h is maintained by hand (its spec is stale since X2c).
+  - PhysPropInfo was a stand-in for PropRecord (facing = orient.up); PropRecord moved next to PhysPropObject.
+  - d3dim2d's deferred records are RwD3DDeferVerts / RwD3DDeferPrim; the callback slot is pointer-sized.
+  - Pointers that travelled as u32: the model / texture user data (zrwMdlSetUserData, zrwTextureSetUserData,
+    zrwMatGetUserData), ZrwModel.userValue, ZrwColHit.objectData / materialData, PhysFace.owner (a ZrwColHit),
+    ZbspObjectFrameFn. The rig hit callbacks (riderCollide, guiPlayVelocitySound) take ZRig / ZRigHit (ZoverHitFn
+    = ZRigHitFn) instead of a u32 motion and a word array.
+  - RwRaster declared to its 0x38 bytes (the driver's saved level 0 size are its original* fields; the raster
+    module's root raster is RwRasterGlobals.root); src/data's 14 plugin registries start at sizeof(type).
+  - Byte offsets named: game.c (prop marker frame, contact tag), physics_air.c, rider.c (ray hit, rig point
+    velocity), ngifzbsp.c (material ref, hit corners), world.c (light hook = stage4, work owner). Checked and
+    left: game.c's trick grid offsets (PhysRider has no pointer before 0x488), zrwcol / zrwprim / model render
+    buffers (pointer-free; written as capacity times size), frontend_select (an asset number), zscene (done in
+    X2c), guiinput's 32-byte stride (pointer-free).
+  - tools/xcheck.py --shots compares screenshots of the replay too (with `vanilla = 1`); the ride's frames 1000,
+    1200, 1400 and 1800 are byte-identical to the exe before this batch.
+- **Left (X2c/X2e):** ngifzmemdmm (handle records and free-block headers laid out with 32-bit sizes in a byte
+  arena); crt.c rwFexist (original address); type pairs ZPropDef/ZbspTreeNode, ZPropInst/PhysPropNode,
+  ZrwRenderColTriangle = ZbspLevelFace (pointers read as u32 tags), ZObj views, OvlFont/ZOverFont, ZrwShadow*,
+  ZrwColTriangle; the `(uint32_t)(uintptr_t)` casts (X2e: query / request arrays, zfileOpenRamDisk addresses, RW
+  render state values). X2d: the 28-bit ordering tables.
 
 ## Not in scope
 

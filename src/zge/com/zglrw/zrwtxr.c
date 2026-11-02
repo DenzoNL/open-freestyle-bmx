@@ -198,12 +198,12 @@ void *rwMatDestructor(void *material)
 }
 
 BMX_ADDR(0x00497ae0)
-uint32_t zrwMatGetUserData(const void *material)
+void *zrwMatGetUserData(const void *material)
 {
     if (gZrwMatPluginOffset < 1) {
-        return 0;
+        return NULL;
     }
-    return *(const uint32_t *)((const uint8_t *)material + gZrwMatPluginOffset);
+    return *(void *const *)(const void *)((const uint8_t *)material + gZrwMatPluginOffset);
 }
 
 /*
@@ -627,7 +627,7 @@ BMX_ADDR(0x00498b10)
 int zrwMatRegisterPlugin(void)
 {
     gZrwMatPluginOffset =
-        /* The texture's material (zrwTextureSetUserData; X2e: still handed over as a 32-bit word). */
+        /* The texture's material (zrwTextureSetUserData). */
         RwTextureRegisterPlugin(sizeof(void *), 0xff01,
                                 BMX_FNPTR(RwPluginObjectConstructor, 0x00497a90, rwMatConstructor),
                                 BMX_FNPTR(RwPluginObjectDestructor, 0x00497ab0, rwMatDestructor), NULL);
@@ -641,10 +641,10 @@ void zrwTextureSetLoadName(const char *name)
 }
 
 BMX_ADDR(0x00498b50)
-void zrwTextureSetUserData(const ZrwTexture *texture, uint32_t value)
+void zrwTextureSetUserData(const ZrwTexture *texture, void *value)
 {
     if (gZrwMatPluginOffset > 0) {
-        *(uint32_t *)((uint8_t *)texture->texture + gZrwMatPluginOffset) = value;
+        *(void **)(void *)((uint8_t *)texture->texture + gZrwMatPluginOffset) = value;
     }
 }
 

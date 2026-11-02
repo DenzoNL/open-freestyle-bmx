@@ -199,7 +199,7 @@ int zcollideRay(const ZVec3 *from, const ZVec3 *to, void *out)
     hit->normal.z = best.hit.normal[2];
     hit->normalW = (float)-zvec3Dot((const ZVec3 *)best.hit.normal, (const ZVec3 *)best.hit.vertex[0]);
     f = &hit->faceRecord;
-    if (best.hit.objectData == 0) {
+    if (best.hit.objectData == NULL) {
         const ZrwRenderColHit *tri = zrwModelFindTriangle(&hit->point, 2.0f);
         const uint8_t *tag = tri != NULL ? (const uint8_t *)(uintptr_t)tri->tag : NULL;
         uint16_t id = 0;
@@ -222,8 +222,8 @@ int zcollideRay(const ZVec3 *from, const ZVec3 *to, void *out)
         f->p0 = *(const ZVec3 *)best.hit.vertex[0];
         f->p1 = *(const ZVec3 *)best.hit.vertex[1];
         f->p2 = *(const ZVec3 *)best.hit.vertex[2];
-        if (best.hit.materialData != 0) {
-            hit->materialWord = *gZbspMaterialFn((const void *)(uintptr_t)best.hit.materialData);
+        if (best.hit.materialData != NULL) {
+            hit->materialWord = *gZbspMaterialFn(best.hit.materialData);
         }
         hit->face = f;
         hit->material = &hit->materialWord;

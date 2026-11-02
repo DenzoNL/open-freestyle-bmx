@@ -292,7 +292,7 @@ static PhysFace *make_face(void)
 static PhysPropObject *make_prop(const ZVec3 *p, float spread)
 {
     PhysPropObject *o = dt_alloc(sizeof *o);
-    PhysPropInfo *info = dt_alloc(sizeof *info);
+    PropRecord *info = dt_alloc(sizeof *info);
     PhysPropNode *node = dt_alloc(sizeof *node);
     PhysPropFrame *frame = dt_alloc(sizeof *frame);
     ZQuat q;
@@ -305,7 +305,7 @@ static PhysPropObject *make_prop(const ZVec3 *p, float spread)
     o->pos[0] = (int16_t)(p->x + rf(-spread, spread));
     o->pos[1] = (int16_t)(p->y + rf(-spread, spread));
     o->pos[2] = (int16_t)(p->z + rf(-spread, spread));
-    rand_unit(&info->facing);
+    rand_unit(&info->orient.up);
     q.x = rf(-1, 1);
     q.y = rf(-1, 1);
     q.z = rf(-1, 1);
@@ -441,11 +441,11 @@ static void scene_props(const PhysRider *r, uint32_t steps)
         PhysPropObject *o = make_prop(path_point(steps), 60.0f);
         if (o->prop != NULL && (dt_u32() & 1)) {
             /* facing the rider */
-            PhysPropInfo *info = (PhysPropInfo *)o->prop;
-            info->facing.x = -r->vel.x;
-            info->facing.y = 0.0f;
-            info->facing.z = -r->vel.z;
-            normalize(&info->facing);
+            PropRecord *info = (PropRecord *)o->prop;
+            info->orient.up.x = -r->vel.x;
+            info->orient.up.y = 0.0f;
+            info->orient.up.z = -r->vel.z;
+            normalize(&info->orient.up);
         }
         list[i] = o;
     }

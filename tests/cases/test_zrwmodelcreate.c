@@ -132,7 +132,7 @@ static void shadow_update_impl(DtCtx *c)
     dt_fill(model, sizeof *model);
     dt_fill(object, sizeof *object);
     s5RandVec(&object->pos);
-    model->userValue = (uint32_t)(uintptr_t)object;
+    model->userValue = object;
     state->model = model;
     s5RandVec(&state->offset);
     if (dt_u32() % 3 == 0) {

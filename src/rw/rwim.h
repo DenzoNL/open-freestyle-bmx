@@ -17,12 +17,15 @@ typedef struct RwIm3DTransformInfo {
 } RwIm3DTransformInfo;
 
 /* An Im3D pipeline: seven entries called in this order on a transform (instance, then the stages). */
+/* Stage 4 of a pipeline: the light hook of the world and atomic pipelines (work, stageData). */
+typedef void(BMX_CDECL *RwIm3DStage4Fn)(void *work, void *data);
+
 typedef struct RwIm3DPipeline {
     void *(BMX_CDECL *instance)(RwIm3DTransformInfo *info); /* 0x00 returns the work object or NULL */
     void(BMX_CDECL *stage1)(void *work);                    /* 0x04 */
     void(BMX_CDECL *stage2)(void *work);                    /* 0x08 */
     void *stageData;                                        /* 0x0c second argument of stage4 */
-    void(BMX_CDECL *stage4)(void *work, void *data);        /* 0x10 */
+    RwIm3DStage4Fn stage4;                                  /* 0x10 */
     void(BMX_CDECL *stage5)(void *work);                    /* 0x14 */
     void(BMX_CDECL *stage6)(void *work);                    /* 0x18 */
 } RwIm3DPipeline;

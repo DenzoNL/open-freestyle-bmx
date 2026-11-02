@@ -46,15 +46,12 @@ enum {
 /* The parts: A two snapshots (at the start, and the live state while playing back), B two copies of the prop
  * state, C two copies of the goal info. */
 #define kReplayPartA (2 * sizeof(ReplaySnapshot))
-#define kReplayPartB (2 * sizeof(PropState))
+#define kReplayPartB (2 * kPropStateSaved)
 #define kReplayPartC (2 * kReplayGoalInfo)
 
 /* Sticks are stored as signed bytes: float * 127 when recording, byte / 127 (as 0x3c010204) when playing. */
 static const float kReplayStickScale = 127.0f;
 static const float kReplayStickUnit = 0x1.020408p-7f;
-
-/* Level goal table copied into recorders that keep part B. */
-#define gReplayTable ORIG_VAR(0x00694460, uint8_t, gReplayTable)
 
 BMX_ADDR(0x0042fce0)
 void replayInit(void)
@@ -252,9 +249,9 @@ uint8_t replayCreate(const ReplayParams *params)
                 }
                 if ((params->flags & 2) == 0) {
                     r->partB = at;
-                    r->partBEnd = at + (uint32_t)sizeof(PropState);
+                    r->partBEnd = at + kPropStateSaved;
                     at += (uint32_t)kReplayPartB;
-                    zmemCopy(replayAt(r, r->partB), &gReplayTable, sizeof(PropState));
+                    zmemCopy(replayAt(r, r->partB), &gPropState, kPropStateSaved);
                 }
                 if ((params->flags & 4) == 0) {
                     r->partC = at;
@@ -384,7 +381,7 @@ uint8_t replaySetMode(uint32_t handle, uint32_t mode)
     if (mode == 1) {
         rp->padIndex = r->padIndex;
         if ((rp->flags & 2) == 0) {
-            zmemCopy(replayAt(rp, rp->partB), &gPropState, sizeof gPropState);
+            zmemCopy(replayAt(rp, rp->partB), &gPropState, kPropStateSaved);
         }
         if (keepsGoalInfo(rp)) {
             zmemCopy(replayAt(rp, rp->partC), comdataGetGoalInfo(rp->rider, gCurrentLevel), kReplayGoalInfo);
@@ -410,7 +407,7 @@ uint8_t replaySetMode(uint32_t handle, uint32_t mode)
         r->padIndex = (uint8_t)rp->padIndex;
         if (rp->state <= 1) {
             if ((rp->flags & 2) == 0) {
-                zmemCopy(replayAt(rp, rp->partBEnd), &gPropState, sizeof gPropState);
+                zmemCopy(replayAt(rp, rp->partBEnd), &gPropState, kPropStateSaved);
             }
             if (keepsGoalInfo(rp)) {
                 zmemCopy(replayAt(rp, rp->partCEnd), comdataGetGoalInfo(rp->rider, gCurrentLevel),

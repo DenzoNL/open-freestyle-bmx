@@ -312,9 +312,9 @@ int zrwPrimSystemInitialize(void)
     gZrwPrim.initialized = 1;
     gZrwPrim.vertexSize = 0x24;
     gZrwPrim.im3dMax = 0x40;
-    gZrwPrim.im3d = zmemAlloc(0x90f);
+    gZrwPrim.im3d = zmemAlloc(gZrwPrim.im3dMax * (uint32_t)sizeof(ZrwIm3DVertex) + 0xf);
     gZrwPrim.im2dMax = 0x40;
-    gZrwPrim.im2d = zmemAlloc(0x80f);
+    gZrwPrim.im2d = zmemAlloc(gZrwPrim.im2dMax * (uint32_t)sizeof(ZrwIm2DVertex) + 0xf);
     return 1;
 }
 
@@ -348,7 +348,8 @@ void zrwprimDrawLines(uint32_t flags, const ZrwPrimLine *lines, int count, const
 
             if (gZrwPrim.im2dMax < 2) {
                 gZrwPrim.im2dMax = 0x20;
-                gZrwPrim.im2d = zmemResize(gZrwPrim.im2d, 0x40f);
+                gZrwPrim.im2d =
+                    zmemResize(gZrwPrim.im2d, gZrwPrim.im2dMax * (uint32_t)sizeof(ZrwIm2DVertex) + 0xf);
             }
             base = align16(gZrwPrim.im2d);
             for (int i = 0; i < 2; i++) {
@@ -369,7 +370,8 @@ void zrwprimDrawLines(uint32_t flags, const ZrwPrimLine *lines, int count, const
 
             if (gZrwPrim.im3dMax < 2) {
                 gZrwPrim.im3dMax = 0x20;
-                gZrwPrim.im3d = zmemResize(gZrwPrim.im3d, 0x48f);
+                gZrwPrim.im3d =
+                    zmemResize(gZrwPrim.im3d, gZrwPrim.im3dMax * (uint32_t)sizeof(ZrwIm3DVertex) + 0xf);
             }
             base = align16(gZrwPrim.im3d);
             for (int i = 0; i < 2; i++) {

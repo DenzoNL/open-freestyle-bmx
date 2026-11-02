@@ -494,7 +494,8 @@ int zoverParseFont(const void *data, void *font);
 ORIG_FN(0x00452e80, void *, zoverCreateRiderMotion, (void *actor, uint32_t flags));
 ORIG_FN(0x004526a0, void *, zoverCreateBikeMotion, (void));
 /* Registers the callback the motion object calls when a body part hits something. */
-typedef void(BMX_CDECL *ZoverHitFn)(uint32_t part, int index, float impact, const uint32_t *hit);
+/* What zoverSetHitCallback installs: the motion object's rig hit callback. */
+typedef ZRigHitFn ZoverHitFn;
 ORIG_FN(0x00451280, void, zoverSetHitCallback, (void *motion, ZoverHitFn fn));
 ORIG_FN(0x00454400, void, zoverMotionSetupA, (void *motion, void *actor));
 ORIG_FN(0x00454430, void, zoverMotionSetupB, (void *motion, void *actor));

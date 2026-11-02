@@ -10,11 +10,6 @@
 #include "zge/zmath.h"
 
 /* Dynamic collision object (props). */
-/* Prop record behind a collision object: facing direction at +0x3c. */
-typedef struct PhysPropInfo {
-    uint8_t pad00[0x3c];
-    ZVec3 facing;
-} PhysPropInfo;
 
 /* Scene frame of a prop: position at +4, rotation quaternion at +0x14 (y stored negated relative to the
  * world). */
@@ -54,26 +49,6 @@ typedef struct PhysPropNode {
 
 BMX_LAYOUT32_ASSERT(offsetof(PhysPropNode, frame) == 0x1c, "PhysPropNode.frame");
 BMX_LAYOUT32_ASSERT(offsetof(PhysPropNode, destroy) == 0x30, "PhysPropNode.destroy");
-
-/* Prop collision object (500 bytes), the contact of surface 12 (listed by zbspFindPropsNear). */
-typedef struct PhysPropObject {
-    uint16_t index; /* position of the source in the tree object list */
-    uint16_t flags; /* low 5 bits: tag group; see kZbspObj* */
-    ZAngle3 rot;
-    int16_t pos[3];
-    float scale[3];
-    uint8_t pad01c[0x8];
-    PhysEdge *edges; /* collision edges of the shape, allocated by zcollideBuildPropEdges */
-    uint8_t pad028[0x1c4];
-    const PhysPropInfo *prop; /* NULL when the object is not a prop */
-    PhysPropNode *node;
-} PhysPropObject;
-
-_Static_assert(offsetof(PhysPropObject, pos) == 0xa, "PhysPropObject.pos");
-_Static_assert(offsetof(PhysPropObject, scale) == 0x10, "PhysPropObject.scale");
-BMX_LAYOUT32_ASSERT(offsetof(PhysPropObject, edges) == 0x24, "PhysPropObject.edges");
-BMX_LAYOUT32_ASSERT(offsetof(PhysPropObject, prop) == 0x1ec, "PhysPropObject.prop");
-BMX_LAYOUT32_ASSERT(offsetof(PhysPropObject, node) == 0x1f0, "PhysPropObject.node");
 
 /* The prop record of a collision object (a PhysPropObject); NULL when the object is not a prop. */
 static inline void *physObjectProp(const void *object)

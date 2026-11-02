@@ -236,8 +236,7 @@ void zbspObjectSignal(PhysPropObject *object, int signal)
 BMX_ADDR(0x00466bb0)
 const uint32_t *zbspGetMatRef(const void *obj)
 {
-    const uint8_t *holder = *(const uint8_t *const *)((const uint8_t *)obj + 0x84);
-    const void *material = *(const void *const *)(holder + 0x48);
+    const void *material = ((const PhysFace *)obj)->owner->materialData;
 
     if (material == NULL) {
         return NULL;
@@ -763,10 +762,10 @@ void **zbspFindEdgesNear(const ZVec3 *p, float radius)
     return gZbspHits;
 }
 
-/* Corner i of a renderer hit (the corners are 0x10 bytes apart from +0x10). */
+/* Corner i of a renderer hit. */
 static const ZVec3 *hitCorner(const ZrwColHit *hit, int i)
 {
-    return (const ZVec3 *)((const uint8_t *)hit + 0x10 + (size_t)i * 0x10);
+    return (const ZVec3 *)(const void *)hit->vertex[i];
 }
 
 /* Face flag bits from byte 3 of a level tag: bit 0 -> 4, bit 1 -> 3, bits 2-3 -> 5-6. */
@@ -821,7 +820,7 @@ void *zbspFindFaceNear(const ZVec3 *p, float radius, float cosLimit)
         if (face >= &gZbspNearFaces[kZbspNearFaceMax]) {
             continue;
         }
-        if (src->objectData != 0) {
+        if (src->objectData != NULL) {
             const PhysPropFrame *frame = gZbspObjectFrameFn(src->objectData);
 
             for (PhysPropNode *n = *zobjPropList(); n != NULL; n = n->next) {
@@ -858,7 +857,7 @@ void *zbspFindFaceNear(const ZVec3 *p, float radius, float cosLimit)
         face->normal.y = src->normal[1];
         face->normal.z = src->normal[2];
         dist = zvec3Dot((const ZVec3 *)src->normal, hitCorner(src, 0));
-        face->owner = (void *)src;
+        face->owner = src;
         face->d = (float)-dist;
         face->vert[0] = corners->v[0];
         face->vert[1] = corners->v[1];

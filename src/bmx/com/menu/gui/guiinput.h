@@ -72,7 +72,9 @@ int guiPadPressedMask20(uint32_t index);
  * Plays sound 0xbbc at the emitter's position (emitter + 8) when kind is 0 and speed exceeds 10; the
  * volume is speed * 6, at most 127. Called through a pointer by the engine.
  */
-void guiPlayVelocitySound(int unused, int kind, float speed, const uint8_t *emitter);
+struct ZRig;
+struct ZRigHit;
+void guiPlayVelocitySound(struct ZRig *rig, uint32_t kind, float speed, struct ZRigHit *hit);
 
 /* Button element handler (type 2). */
 int BMX_CDECL guiButtonProc(int msg, GuiElement *el, int arg3, int arg4);

@@ -26,7 +26,6 @@
 
 enum {
     kPropMax = 16,
-    kPropStateSize = 0xb40,
     kPropStateRecord = 1,
     kPropStateCollected = 3,
     kPropTypeCollect = 0, /* PropDef.type values with their own handling */
@@ -71,7 +70,6 @@ static const char kPropFile[] = "C:\\zaxis\\Bmx\\Src\\com\\action\\prop.c";
 BMX_ADDR(0x0042deb0)
 void propInit(void)
 {
-    uint32_t *slot;
     uint32_t nodeCount = 0;
 
     for (uint32_t i = 0; i < kPropMax; i++) {
@@ -111,7 +109,7 @@ void propInit(void)
                 rec->paramA = def->paramA;
                 rec->paramB = def->paramB;
                 object->flags |= 0x400;
-                object->prop = (const PhysPropInfo *)(const void *)rec;
+                object->prop = rec;
                 rec->sound = 0xffffffffu;
                 if (def->soundStop != 0xff) {
                     rec->sound = (uint32_t)bmxSoundPlayAt(kSoundProp, &rec->pos, 0, def->soundStop, 0x7f);
@@ -140,17 +138,23 @@ void propInit(void)
             }
         }
     }
-    zmemFill(&gPropState.pad840, 0, 0x300);
-    /* The slot is the node field of a state record; the original also clears the word 8 bytes before it. */
-    slot = (uint32_t *)(uintptr_t)&gPropNodeStates[0].node;
+    /* The original clears 0x300 bytes from the word after the records: everything up to the saved block's
+     * end. */
+    zmemFill(&gPropState.pad840, 0, kPropStateSaved - (uint32_t)offsetof(PropState, pad840));
     for (PhysPropNode *node = *zobjPropList(); node != NULL; node = node->next) {
         if (node->tag != NULL && node->tag->range != 0) {
             if (nodeCount >= 64) {
+                /* The original reports it and goes on writing past the block. */
                 zdebugFail("state info overflow", kPropFile, 0x1eb, 0);
+                break;
             }
-            slot[-2] = 0;
-            slot[0] = (uint32_t)(uintptr_t)node;
-            slot += 3;
+            /* The original also clears the word before the state (the previous state's third word). */
+            if (nodeCount == 0) {
+                gPropState.pad840 = 0;
+            } else {
+                gPropNodeStates[nodeCount - 1].pad08 = 0;
+            }
+            gPropNodeStates[nodeCount].node = node;
             nodeCount++;
         }
     }
@@ -168,7 +172,7 @@ void propInit(void)
             }
         }
     }
-    zmemCopy(&gPropDefaults, &gPropState, kPropStateSize);
+    zmemCopy(&gPropDefaults, &gPropState, kPropStateSaved);
     zrollerAddDrawCallback(BMX_FNPTR(ZrollerDrawFn, 0x00402527, propReturnZero));
 }
 
@@ -417,7 +421,7 @@ uint32_t propReturnZero(void)
 BMX_ADDR(0x0042eb70)
 void propLoadState(const void *state)
 {
-    zmemCopy(&gPropState, state, kPropStateSize);
+    zmemCopy(&gPropState, state, kPropStateSaved);
     for (uint32_t i = 0; i < kPropMax; i++) {
         PropRecord *const rec = &gPropRecords[i];
         const PropDef *const def = &gPropDefs[0][0] + (uint32_t)gCurrentLevel * 16 + i;

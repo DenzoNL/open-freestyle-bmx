@@ -500,7 +500,7 @@ static int rigFaceContact(const ZbspFaceHit *h, const ZVec3 *move, const ZVec3 *
     *n = f->normal;
     zvec3NormalizeScaled(n, n);
     /* The owner is the renderer hit the face was built from; its first corner lies on the plane. */
-    f->d = (float)-zvec3Dot(n, (const ZVec3 *)((const ZrwColHit *)f->owner)->vertex[0]);
+    f->d = (float)-zvec3Dot(n, (const ZVec3 *)(const void *)f->owner->vertex[0]);
     if (!(zvec3Dot(move, move) >= 0x1.99999ap-4f)) {
         target->x = (float)((double)f->normal.x * CONTACT_GAP + h->point.x);
         target->y = (float)((double)f->normal.y * CONTACT_GAP + h->point.y);

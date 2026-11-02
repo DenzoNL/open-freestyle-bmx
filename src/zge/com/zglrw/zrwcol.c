@@ -31,7 +31,7 @@ int zrwColSystemInitialize(void)
     zmemFill(&gZrwCol, 0, sizeof gZrwCol);
     gZrwCol.initialized = 1;
     gZrwCol.capacity = 0x400;
-    gZrwCol.hits = zmemAlloc(0x13000);
+    gZrwCol.hits = zmemAlloc(gZrwCol.capacity * (uint32_t)sizeof(ZrwColHit));
     return 1;
 }
 
@@ -139,12 +139,12 @@ static void gameCorner(float *out, float x, float y, float z)
     out[2] = -(float)(((double)z - gZrwWorldCenter.z) * inv);
 }
 
-/* User data of the texture of a material (what zrwMatGetUserData reads), 0 without a texture. */
-static uint32_t materialData(RpMaterial *material)
+/* User data of the texture of a material (what zrwMatGetUserData reads), NULL without a texture. */
+static void *materialData(RpMaterial *material)
 {
     void *data = RpMaterialGetTexture(material);
 
-    return (data == NULL) ? 0 : zrwMatGetUserData(data);
+    return (data == NULL) ? NULL : zrwMatGetUserData(data);
 }
 
 /* Material of a world polygon: its material index is relative to the sector's window into the world list. */
@@ -192,7 +192,7 @@ ZrwColTriangle *zrwcolRecordHit(void *arg, const RpWorldSector *sector, ZrwColTr
             gameCorner(hit->vertex[i], p[0], p[1], p[2]);
         }
         hit->distance = distance;
-        hit->objectData = 0;
+        hit->objectData = NULL;
         hit->materialData = materialData(polygonMaterial(sector, triangle->index));
         return triangle;
     }
@@ -291,7 +291,7 @@ int zrwcolQueryLine(float *from, float *to, uint32_t flags, const int *excluded,
 
             gameCorner(out->hit.vertex[i], p[0], p[1], p[2]);
         }
-        out->hit.objectData = 0;
+        out->hit.objectData = NULL;
         out->hit.materialData = materialData(polygonMaterial(sector, best->index));
     } else {
         zdebugFail("Error", kColFile, 0x25b, 0);

@@ -6,18 +6,6 @@
 
 #include "driver/driver.h"
 
-/* RwRaster is 0x38 bytes in RW 3.1; the lock saves the level 0 size and stride behind the public fields. */
-typedef struct DrvRasterSaved {
-    int32_t width;  /* 0x2c */
-    int32_t height; /* 0x30 */
-    int32_t stride; /* 0x34 */
-} DrvRasterSaved;
-
-static DrvRasterSaved *rasterSaved(RwRaster *raster)
-{
-    return (DrvRasterSaved *)((uint8_t *)raster + 0x2c);
-}
-
 /* Row size of the CPU copy: whole bytes, DWORD aligned like a DirectDraw surface's pitch. */
 static int32_t cpuStride(const RwRaster *raster)
 {
@@ -74,9 +62,9 @@ int drvRasterLock(void *out, void *raster, int32_t in)
         return 0;
     }
     stride = cpuStride(drvTopRaster(r));
-    rasterSaved(r)->stride = r->stride;
-    rasterSaved(r)->height = r->height;
-    rasterSaved(r)->width = r->width;
+    r->originalStride = r->stride;
+    r->originalHeight = r->height;
+    r->originalWidth = r->width;
     r->pixels = cpu + (r->depth + 7) / 8 * r->originX + r->originY * stride;
     r->stride = stride;
     *(uint8_t **)out = r->pixels;
@@ -103,9 +91,9 @@ int drvRasterUnlock(void *out, void *raster, int32_t in)
     if ((r->privateFlags & 4) != 0) {
         drvDrawTextureChanged(r);
     }
-    r->width = rasterSaved(r)->width;
-    r->stride = rasterSaved(r)->stride;
-    r->height = rasterSaved(r)->height;
+    r->width = r->originalWidth;
+    r->stride = r->originalStride;
+    r->height = r->originalHeight;
     r->pixels = NULL;
     r->privateFlags &= 0xf9;
     return 1;

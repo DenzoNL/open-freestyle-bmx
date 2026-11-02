@@ -23,6 +23,9 @@ enum {
 
 typedef void(BMX_CDECL *RwD3DDeferFunc)(uint8_t *record);
 
+/* The size of a deferred record's callback slot (4 bytes where pointers are 32 bits wide). */
+#define kDeferSlot ((uint32_t)sizeof(void *))
+
 /* Set when a flip waits for the blitter (cleared by the next camera begin update). */
 #define rwD3DFlipPending ORIG_VAR(0x00676ba4, int32_t, rwD3DFlipPending)
 
@@ -62,7 +65,8 @@ RwD3DDeferList *rwD3DDeferCreate(void)
 BMX_ADDR(0x004ee7e0)
 void *rwD3DDeferAlloc(RwD3DDeferList *list, uint32_t size, void *callback)
 {
-    const uint32_t need = (size + 7) & ~3u;
+    /* The callback in a pointer-sized slot, the record after it; both kept pointer-aligned. */
+    const uint32_t need = (size + kDeferSlot + kDeferSlot - 1) & ~(kDeferSlot - 1);
     const uint32_t total = need + list->used;
     uint32_t used;
 
@@ -92,7 +96,7 @@ void *rwD3DDeferAlloc(RwD3DDeferList *list, uint32_t size, void *callback)
     *(void **)(list->arena + used) = callback;
     list->count++;
     list->used += need;
-    return list->arena + used + 4;
+    return list->arena + used + kDeferSlot;
 }
 
 /* 0x4ee940: calls every record's callback, in order (1) or backwards. */
@@ -102,12 +106,12 @@ RwD3DDeferList *rwD3DDeferRun(RwD3DDeferList *list, int32_t order)
     if (order == 1) {
         const uint32_t *offset = list->offsets;
         for (uint32_t n = list->count; n != 0; n--, offset++) {
-            (*(RwD3DDeferFunc *)(list->arena + *offset))(list->arena + 4 + *offset);
+            (*(RwD3DDeferFunc *)(list->arena + *offset))(list->arena + kDeferSlot + *offset);
         }
     } else {
         const uint32_t *offset = list->offsets + list->count - 1;
         for (uint32_t n = list->count; n != 0; n--, offset--) {
-            (*(RwD3DDeferFunc *)(list->arena + *offset))(list->arena + 4 + *offset);
+            (*(RwD3DDeferFunc *)(list->arena + *offset))(list->arena + kDeferSlot + *offset);
         }
     }
     return list;
@@ -337,15 +341,15 @@ void rwD3DSortDraw(void)
             i++;
             indices = first->indices;
         }
-        rwD3DDevDrawIndexedPrimitive(first->type, kFvfTL, record + 0x50, *(uint32_t *)(record + 0x48),
-                                     indices, count, kDrawFlags);
+        rwD3DDevDrawIndexedPrimitive(first->type, kFvfTL, ((RwD3DDeferPrim *)record)->v,
+                                     ((RwD3DDeferPrim *)record)->numVertices, indices, count, kDrawFlags);
     }
 }
 
 /* The screen z of vertex `index` of a deferred record. */
 static float recordZ(const uint8_t *record, uint16_t index)
 {
-    return ((const RwD3DTLVertex *)(record + 0x50))[index].sz;
+    return ((const RwD3DDeferPrim *)record)->v[index].sz;
 }
 
 static void addItem(uint8_t *record, uint16_t *indices, uint16_t count, uint16_t type, float key)
@@ -365,15 +369,16 @@ static void addItem(uint8_t *record, uint16_t *indices, uint16_t count, uint16_t
 BMX_ADDR(0x004d9680)
 void rwD3DDeferSplit(uint8_t *record)
 {
-    const int32_t type = *(int32_t *)(record + 0x44);
-    const uint32_t numVertices = *(uint32_t *)(record + 0x48);
-    int32_t n = *(int32_t *)(record + 0x4c);
-    uint16_t *p = (uint16_t *)(record + 0x50 + numVertices * sizeof(RwD3DTLVertex));
+    RwD3DDeferPrim *const prim = (RwD3DDeferPrim *)record;
+    const int32_t type = (int32_t)prim->type;
+    const uint32_t numVertices = prim->numVertices;
+    int32_t n = prim->count;
+    uint16_t *p = rwD3DDeferIndices(prim);
     uint32_t mxcsr;
 
     if (type == kPtTriangleFan) {
-        rwD3DRestoreState((const RwD3DSavedState *)record);
-        rwD3DDevDrawIndexedPrimitive(kPtTriangleFan, kFvfTL, record + 0x50, numVertices, p, (uint32_t)n,
+        rwD3DRestoreState(&prim->state);
+        rwD3DDevDrawIndexedPrimitive(kPtTriangleFan, kFvfTL, prim->v, numVertices, p, (uint32_t)n,
                                      kDrawFlags);
         return;
     }
@@ -407,20 +412,24 @@ void rwD3DDeferSplit(uint8_t *record)
     rwD3DRoundEnd(mxcsr);
 }
 
-/* 0x4db740: callback of a deferred line (its two vertices at +0x44). */
+/* 0x4db740: callback of a deferred line. */
 BMX_ADDR(0x004db740)
 void rwD3DDeferLine(uint8_t *record)
 {
-    rwD3DRestoreState((const RwD3DSavedState *)record);
-    rwD3DDevDrawPrimitive(kPtLineList, kFvfTL, record + 0x44, 2, kDrawFlags);
+    RwD3DDeferVerts *const line = (RwD3DDeferVerts *)record;
+
+    rwD3DRestoreState(&line->state);
+    rwD3DDevDrawPrimitive(kPtLineList, kFvfTL, line->v, 2, kDrawFlags);
 }
 
 /* 0x4db7a0: callback of a deferred triangle. */
 BMX_ADDR(0x004db7a0)
 void rwD3DDeferTriangle(uint8_t *record)
 {
-    rwD3DRestoreState((const RwD3DSavedState *)record);
-    rwD3DDevDrawPrimitive(kPtTriangleList, kFvfTL, record + 0x44, 3, kDrawFlags);
+    RwD3DDeferVerts *const triangle = (RwD3DDeferVerts *)record;
+
+    rwD3DRestoreState(&triangle->state);
+    rwD3DDevDrawPrimitive(kPtTriangleList, kFvfTL, triangle->v, 3, kDrawFlags);
 }
 
 /*
@@ -480,7 +489,8 @@ int rwD3DIm2DLine(RwD3DTLVertex *vertices, int32_t numVertices, int32_t a, int32
                                      kDrawFlags);
         return 1;
     }
-    record = rwD3DDeferAlloc(rwD3DDefer, 0x84, BMX_FNPTR(void *, 0x004db740, rwD3DDeferLine));
+    record = rwD3DDeferAlloc(rwD3DDefer, (uint32_t)(sizeof(RwD3DDeferVerts) + 2 * sizeof(RwD3DTLVertex)),
+                             BMX_FNPTR(void *, 0x004db740, rwD3DDeferLine));
     if (record == NULL) {
         /* Three indices, as in the original: the third is the vertex count's low half. */
         const uint16_t indices[3] = {(uint16_t)a, (uint16_t)b, (uint16_t)numVertices};
@@ -488,9 +498,9 @@ int rwD3DIm2DLine(RwD3DTLVertex *vertices, int32_t numVertices, int32_t a, int32
                                      kDrawFlags);
         return 1;
     }
-    rwD3DSaveState((RwD3DSavedState *)record);
-    __builtin_memcpy(record + 0x44, &vertices[a], sizeof *vertices);
-    __builtin_memcpy(record + 0x64, &vertices[b], sizeof *vertices);
+    rwD3DSaveState(&((RwD3DDeferVerts *)record)->state);
+    __builtin_memcpy(&((RwD3DDeferVerts *)record)->v[0], &vertices[a], sizeof *vertices);
+    __builtin_memcpy(&((RwD3DDeferVerts *)record)->v[1], &vertices[b], sizeof *vertices);
     return 1;
 }
 
@@ -506,16 +516,17 @@ int rwD3DIm2DTriangle(RwD3DTLVertex *vertices, int32_t numVertices, int32_t a, i
                                      kDrawFlags);
         return 1;
     }
-    record = rwD3DDeferAlloc(rwD3DDefer, 0xa4, BMX_FNPTR(void *, 0x004db7a0, rwD3DDeferTriangle));
+    record = rwD3DDeferAlloc(rwD3DDefer, (uint32_t)(sizeof(RwD3DDeferVerts) + 3 * sizeof(RwD3DTLVertex)),
+                             BMX_FNPTR(void *, 0x004db7a0, rwD3DDeferTriangle));
     if (record == NULL) {
         rwD3DDevDrawIndexedPrimitive(kPtTriangleList, kFvfTL, vertices, (uint32_t)numVertices, indices, 3,
                                      kDrawFlags);
         return 1;
     }
-    rwD3DSaveState((RwD3DSavedState *)record);
-    __builtin_memcpy(record + 0x44, &vertices[a], sizeof *vertices);
-    __builtin_memcpy(record + 0x64, &vertices[b], sizeof *vertices);
-    __builtin_memcpy(record + 0x84, &vertices[c], sizeof *vertices);
+    rwD3DSaveState(&((RwD3DDeferVerts *)record)->state);
+    __builtin_memcpy(&((RwD3DDeferVerts *)record)->v[0], &vertices[a], sizeof *vertices);
+    __builtin_memcpy(&((RwD3DDeferVerts *)record)->v[1], &vertices[b], sizeof *vertices);
+    __builtin_memcpy(&((RwD3DDeferVerts *)record)->v[2], &vertices[c], sizeof *vertices);
     return 1;
 }
 
@@ -550,6 +561,7 @@ int rwD3DIm2DPrimitive(int32_t type, RwD3DTLVertex *vertices, int32_t numVertice
     int32_t prims;
     const uint32_t d3dType = primType(type, numVertices, &prims);
     uint8_t *record;
+    RwD3DDeferPrim *prim;
     uint16_t *indices;
 
     if (d3dType == 0) {
@@ -559,19 +571,22 @@ int rwD3DIm2DPrimitive(int32_t type, RwD3DTLVertex *vertices, int32_t numVertice
         rwD3DDevDrawPrimitive(d3dType, kFvfTL, vertices, (uint32_t)numVertices, kDrawFlags);
         return 1;
     }
-    record = rwD3DDeferAlloc(rwD3DDefer, (uint32_t)numVertices * 0x22 + 0x50,
+    record = rwD3DDeferAlloc(rwD3DDefer,
+                             (uint32_t)(sizeof(RwD3DDeferPrim) +
+                                        (uint32_t)numVertices * (sizeof(RwD3DTLVertex) + sizeof(uint16_t))),
                              BMX_FNPTR(void *, 0x004d9680, rwD3DDeferSplit));
     if (record == NULL) {
         rwD3DDevDrawPrimitive(d3dType, kFvfTL, vertices, (uint32_t)numVertices, kDrawFlags);
         return 1;
     }
     rwD3DSortNeed += (uint32_t)prims;
-    rwD3DSaveState((RwD3DSavedState *)record);
-    *(int32_t *)(record + 0x4c) = numVertices;
-    *(int32_t *)(record + 0x48) = numVertices;
-    *(uint32_t *)(record + 0x44) = d3dType;
-    __builtin_memcpy(record + 0x50, vertices, (uint32_t)numVertices * sizeof *vertices);
-    indices = (uint16_t *)(record + 0x50 + (uint32_t)numVertices * sizeof *vertices);
+    prim = (RwD3DDeferPrim *)record;
+    rwD3DSaveState(&prim->state);
+    prim->count = numVertices;
+    prim->numVertices = (uint32_t)numVertices;
+    prim->type = d3dType;
+    __builtin_memcpy(prim->v, vertices, (uint32_t)numVertices * sizeof *vertices);
+    indices = rwD3DDeferIndices(prim);
     for (int32_t i = 0; i < numVertices; i++) {
         indices[i] = (uint16_t)i;
     }
@@ -589,6 +604,7 @@ int rwD3DIm2DIndexedPrimitive(int32_t type, RwD3DTLVertex *vertices, int32_t num
     int32_t prims, used = 0;
     const uint32_t d3dType = primType(type, numIndices, &prims);
     uint8_t *record;
+    RwD3DDeferPrim *prim;
     uint16_t *out;
 
     if (d3dType == 0) {
@@ -626,7 +642,9 @@ int rwD3DIm2DIndexedPrimitive(int32_t type, RwD3DTLVertex *vertices, int32_t num
             used++;
         }
     }
-    record = rwD3DDeferAlloc(rwD3DDefer, (uint32_t)numIndices * 2 + 0x50 + (uint32_t)used * 0x20,
+    record = rwD3DDeferAlloc(rwD3DDefer,
+                             (uint32_t)(sizeof(RwD3DDeferPrim) + (uint32_t)numIndices * sizeof(uint16_t) +
+                                        (uint32_t)used * sizeof(RwD3DTLVertex)),
                              BMX_FNPTR(void *, 0x004d9680, rwD3DDeferSplit));
     if (record == NULL) {
         rwD3DDevDrawIndexedPrimitive(d3dType, kFvfTL, vertices, (uint32_t)numVertices, indices,
@@ -634,14 +652,15 @@ int rwD3DIm2DIndexedPrimitive(int32_t type, RwD3DTLVertex *vertices, int32_t num
         return 1;
     }
     rwD3DSortNeed += (uint32_t)prims;
-    rwD3DSaveState((RwD3DSavedState *)record);
-    *(int32_t *)(record + 0x4c) = numIndices;
-    *(int32_t *)(record + 0x48) = used;
-    *(uint32_t *)(record + 0x44) = d3dType;
+    prim = (RwD3DDeferPrim *)record;
+    rwD3DSaveState(&prim->state);
+    prim->count = numIndices;
+    prim->numVertices = (uint32_t)used;
+    prim->type = d3dType;
     for (int32_t i = 0; i < used; i++) {
-        __builtin_memcpy(record + 0x50 + i * 0x20, &vertices[rwD3DRemapUsed[i]], sizeof *vertices);
+        __builtin_memcpy(&prim->v[i], &vertices[rwD3DRemapUsed[i]], sizeof *vertices);
     }
-    out = (uint16_t *)(record + 0x50 + (uint32_t)used * 0x20);
+    out = rwD3DDeferIndices(prim);
     for (int32_t i = 0; i < numIndices; i++) {
         out[i] = rwD3DRemap[indices[i]];
     }

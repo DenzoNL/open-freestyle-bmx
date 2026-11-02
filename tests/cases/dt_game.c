@@ -895,7 +895,7 @@ void dtGameRandomRider(PhysRider *r)
     r->bikeObj2 = (void *)(0x00300400u + pick(4) * 0x100);
     r->impactTotal = dt_float_edgy(0.0f, 100.0f);
     r->snapB.surface = (dt_u32() & 3) ? 0xc : (uint8_t)pick(16);
-    r->snapB.contact = dtGame.object != NULL ? dtGame.object : (void *)r->snapB.data;
+    r->snapB.contact = dtGame.object != NULL ? dtGame.object : (void *)&r->snapB.data;
 }
 
 static void randomGoals(void)

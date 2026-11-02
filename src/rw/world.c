@@ -1725,8 +1725,8 @@ void *WorldOpen(void *engine, int32_t offset)
     worldGlobals()->worlds.next = &worldGlobals()->worlds;
     worldGlobals()->worlds.prev = &worldGlobals()->worlds;
     rpWorldExtCallSlot2(worldGlobals()->pipeline);
-    *(void **)((uint8_t *)worldGlobals()->pipeline + 0x10) =
-        BMX_FNPTR(void *, 0x004bae70, rpWorldLightObject);
+    ((RwIm3DPipeline *)worldGlobals()->pipeline)->stage4 =
+        BMX_FNPTR(RwIm3DStage4Fn, 0x004bae70, rpWorldLightObject);
     rpWorldModuleCount++;
     return engine;
 }
@@ -1994,12 +1994,12 @@ RpWorldSector *RpWorldSectorForAllLights(RpWorldSector *sector, RwObjectCallBack
     return rpSectorForAllLights(sector, callback, data);
 }
 
-/* The pipeline's light hook (stored at +0x10 of the world pipeline): lights the object with the world's
+/* The pipeline's light hook (stage 4 of the world pipeline): lights the object with the world's
  * lights and those tied to its sector. Returns the sector, or the object when the sector is not lit. */
 BMX_ADDR(0x004bae70)
 void *rpWorldLightObject(void *object, RpLightApplyFn apply)
 {
-    RpWorldSector *sector = *(RpWorldSector **)((uint8_t *)object + 0xc);
+    RpWorldSector *sector = ((RwResEntry *)object)->owner;
     if ((*((uint8_t *)sector + 2) & 0x20) == 0) {
         return object;
     }

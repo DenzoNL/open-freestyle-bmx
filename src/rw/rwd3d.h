@@ -305,7 +305,7 @@ BMX_LAYOUT32_ASSERT(offsetof(RwD3DRasterExt, colorKey) == 4 && offsetof(RwD3DRas
 
 /* ---- the deferred (alpha sorted) primitives (rw/d3dim2d.c) ---- */
 
-/* A growing arena of records, each a callback word followed by the record (rwD3DDeferAlloc). */
+/* A growing arena of records, each a callback slot followed by the record (rwD3DDeferAlloc). */
 typedef struct RwD3DDeferList {
     uint8_t *arena;     /* 0x00 */
     uint32_t arenaSize; /* 0x04 */
@@ -340,11 +340,30 @@ typedef struct RwD3DSavedState {
 
 BMX_LAYOUT32_ASSERT(sizeof(RwD3DSavedState) == 0x44, "RwD3DSavedState layout");
 
-/*
- * A deferred Im2D primitive record (after the callback word): its RwD3DSavedState, then D3D primitive type
- * 0x44, vertex count 0x48, index count 0x4c, the vertices at 0x50 and the indices after them. Deferred lines
- * and triangles keep their two or three vertices at 0x44 instead.
- */
+/* A deferred Im2D line or triangle (after the callback slot): its state and its two or three vertices. */
+typedef struct RwD3DDeferVerts {
+    RwD3DSavedState state; /* 0x00 */
+    RwD3DTLVertex v[];     /* 0x44 */
+} RwD3DDeferVerts;
+
+/* A deferred Im2D primitive (after the callback slot): its state, the D3D primitive type, the vertices and
+ * then `count` uint16_t indices into them. */
+typedef struct RwD3DDeferPrim {
+    RwD3DSavedState state; /* 0x00 */
+    uint32_t type;         /* 0x44 */
+    uint32_t numVertices;  /* 0x48 */
+    int32_t count;         /* 0x4c */
+    RwD3DTLVertex v[];     /* 0x50 */
+} RwD3DDeferPrim;
+
+BMX_LAYOUT32_ASSERT(offsetof(RwD3DDeferVerts, v) == 0x44 && offsetof(RwD3DDeferPrim, v) == 0x50,
+                    "deferred record layout");
+
+/* The indices of a deferred primitive, after its vertices. */
+static inline uint16_t *rwD3DDeferIndices(RwD3DDeferPrim *p)
+{
+    return (uint16_t *)&p->v[p->numVertices];
+}
 
 /* An element to sort: one primitive (triangle or line) of a deferred record. */
 typedef struct RwD3DSortItem {

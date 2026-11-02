@@ -47,7 +47,7 @@ def rel(path):
     return os.path.relpath(path, ROOT).replace(chr(92), '/')
 
 
-with concurrent.futures.ThreadPoolExecutor(16) as ex:
+with concurrent.futures.ThreadPoolExecutor(int(os.environ.get("BMX_JOBS", "16"))) as ex:
     for err in ex.map(run, E):
         for line in err.splitlines():
             m = re.match(r'^(.*?):(\d+):\d+: error: (.*)', line)
