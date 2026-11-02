@@ -27,7 +27,7 @@ int zmemInitialize(void)
         zdebugFail("Already initialized", zmemFile, 0x202, 0);
     }
     zmemInstallHooks();
-    zmemFill(&gZmem, 0, 0x24);
+    zmemFill(&gZmem, 0, sizeof gZmem);
     gZmem.initialized = 1;
     return 1;
 }

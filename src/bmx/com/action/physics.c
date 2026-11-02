@@ -1420,8 +1420,8 @@ int physEnterGrind(PhysRider *r, int from, int to)
     }
     kind = edgeSoundKind(r->contact);
     prop = contact->prop;
-    if (prop != NULL && *(void *const *)(prop + 0x1ec) != NULL) {
-        propTouch(r->player, *(void *const *)(prop + 0x1ec));
+    if (prop != NULL && physObjectProp(prop) != NULL) {
+        propTouch(r->player, physObjectProp(prop));
     }
     r->groundGap = 0.0f;
     bmxSoundPlayAt(0xbba, &r->pos, (int)((uint32_t)r->player << 28 | kind | 0x200), 0x7f, 0);
@@ -1872,12 +1872,12 @@ int physEnterStall(PhysRider *r, int from, int to)
             zvec3Negate(&dir, &dir);
         }
         if (e->prop != NULL) {
-            prop = *(void *const *)((const uint8_t *)e->prop + 0x1ec);
+            prop = physObjectProp(e->prop);
         }
         break;
     }
     case 12:
-        prop = *(void *const *)((const uint8_t *)r->contact + 0x1ec);
+        prop = physObjectProp(r->contact);
         break;
     default:
         break;

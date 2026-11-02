@@ -7,19 +7,10 @@
 #include "rw/rwstream.h"
 #include "rw/rwtexture.h"
 
-/* The engine plugin 0x401 data: the flag bit marking an identity matrix and the multiply routine. */
-typedef struct RwMatrixGlobals {
-    RwFreeList *freeList;          /* 0x00 */
-    uint32_t identityBit;          /* 0x04 */
-    RwMatrixMultiplyFunc multiply; /* 0x08 */
-    uint32_t pad0c;                /* 0x0c */
-} RwMatrixGlobals;
-
-_Static_assert(sizeof(RwMatrixGlobals) == 0x10, "RwMatrixGlobals layout");
-
-static RwMatrixGlobals *rwMatrixGlobals(void)
+/* The matrix module's data (RwMatrixModule, rwmath.h). */
+static RwMatrixModule *rwMatrixGlobals(void)
 {
-    return (RwMatrixGlobals *)((uint8_t *)RwEngineInstance + rwMatrixOffset);
+    return (RwMatrixModule *)((uint8_t *)RwEngineInstance + rwMatrixOffset);
 }
 
 static RwResourcesGlobals *rwResources(void)
@@ -511,7 +502,7 @@ RwMatrix *RwMatrixUpdate(RwMatrix *matrix)
 BMX_ADDR(0x004d04f0)
 RwMatrix *RwMatrixMultiply(RwMatrix *out, const RwMatrix *a, const RwMatrix *b)
 {
-    const uint32_t identity = rwMatrixGlobals()->identityBit & 0x20000;
+    const uint32_t identity = rwMatrixGlobals()->flagMask & 0x20000;
     if ((a->flags & identity) != 0) {
         *out = *b;
     } else if ((b->flags & identity) != 0) {
@@ -602,12 +593,12 @@ BMX_ADDR(0x004d2080)
 void *_rwMatrixOpen(void *engine, int32_t offset)
 {
     rwMatrixOffset = offset;
-    RwMatrixGlobals *globals = (RwMatrixGlobals *)((uint8_t *)RwEngineInstance + offset);
-    globals->freeList = RwFreeListCreate(0x40, 5, 4);
+    RwMatrixModule *globals = (RwMatrixModule *)((uint8_t *)RwEngineInstance + offset);
+    globals->freeList = RwFreeListCreate(sizeof(RwMatrix), 5, 4);
     if (globals->freeList == NULL) {
         return NULL;
     }
-    globals->identityBit = 0x20000;
+    globals->flagMask = 0x20000;
     rwMatrixModuleCount++;
     globals->multiply = BMX_FNPTR(RwMatrixMultiplyFunc, 0x004d02c0, rwMatrixMultiplyDefault);
     return engine;

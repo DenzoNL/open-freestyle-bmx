@@ -288,7 +288,8 @@ int zprofileInitialize(void)
     s->y = 32.0f;
     s->scale20 = 2.0f;
     s->initialized = 1;
-    s->entries = zmemFreeListCreate(0x24, 0, BMX_FNPTR(ZMemDestroyFn, 0x004a4080, pcProfileDestroyEntry));
+    s->entries = zmemFreeListCreate(sizeof(ZProfileEntry), 0,
+                                    BMX_FNPTR(ZMemDestroyFn, 0x004a4080, pcProfileDestroyEntry));
     if (s->updateNode == NULL) {
         s->updateNode =
             zrwRegisterUpdateFunction(4, BMX_FNPTR(ZrwUpdateFn, 0x004a35f0, zprofileUpdate), NULL, 0);

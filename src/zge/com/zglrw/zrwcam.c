@@ -66,7 +66,8 @@ int zrwCameraInitialize(void)
     if (gZrwCamReady != 0) {
         zdebugFail("Already initialized", kZrwCamFile, 0x10a, 0);
     }
-    gZrwCamPool = zmemFreeListCreate(200, 2, BMX_FNPTR(ZMemDestroyFn, 0x00492970, zrwCameraDestroy));
+    gZrwCamPool =
+        zmemFreeListCreate(sizeof(ZrwCamera), 2, BMX_FNPTR(ZMemDestroyFn, 0x00492970, zrwCameraDestroy));
     height = gZrwCamHeight;
     width = gZrwCamWidth;
     if (camerasExist()) {
@@ -187,7 +188,7 @@ ZrwCamera *zrwCameraCreate(uint32_t flags, void *owner)
     ZrwCamera *camera = zmemFreeListAlloc(gZrwCamPool);
     void *rw;
 
-    memset(camera, 0, 200);
+    memset(camera, 0, sizeof *camera);
     camera->owner = owner;
     camera->flags = (camera->flags & 0xffffff01u) | 1;
     rw = RwCameraCreate();

@@ -2044,7 +2044,7 @@ void riderCollide(uint32_t motion, int index, float impact, const uint32_t *hit)
         if (ngifzCollideGetObject(id) != NULL) {
             kind = info[2];
         }
-        const uint8_t *node = *(const uint8_t *const *)(uintptr_t)(hit[0x10] + 0x1ec);
+        const uint8_t *node = physObjectProp((const void *)(uintptr_t)hit[0x10]);
         if (node != NULL) {
             const ZVec3 local = {readFloat((const uint8_t *)hit, 0x1c), readFloat((const uint8_t *)hit, 0x20),
                                  readFloat((const uint8_t *)hit, 0x24)};

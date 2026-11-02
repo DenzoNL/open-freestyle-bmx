@@ -64,7 +64,7 @@ typedef struct ZrwEffectItem {
     ZrwEffectType *type; /* 0x2c */
 } ZrwEffectItem;
 
-_Static_assert(offsetof(ZrwEffectItem, type) == 0x2c, "effect item");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwEffectItem, type) == 0x2c, "effect item");
 
 /* Per-object record of the effect object (0x3c bytes, at +0x30 of it). */
 typedef struct ZrwEffectHost {
@@ -81,7 +81,7 @@ typedef struct ZrwEffectHost {
     uint32_t active;     /* 0x38 */
 } ZrwEffectHost;
 
-_Static_assert(sizeof(ZrwEffectHost) == 0x3c, "effect host");
+BMX_LAYOUT32_ASSERT(sizeof(ZrwEffectHost) == 0x3c, "effect host");
 
 /* Creates the effect object (type 2); NULL on failure. */
 void *zrwworldCreateObject(void);
@@ -154,7 +154,7 @@ typedef struct ZrwParticleSystem {
     uint32_t lastStep; /* 0x28 time (zrwTimeGetTime) of the last acceleration step */
 } ZrwParticleSystem;
 
-_Static_assert(offsetof(ZrwParticleSystem, lastStep) == 0x28, "particle system");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwParticleSystem, lastStep) == 0x28, "particle system");
 
 /* Particle steps: the system pointer is a ZrwParticleSystem (typed as words for the original's signature). */
 void zrwParticleAccelerate(int enabled, uint32_t *system, const ZVec3 *acceleration);

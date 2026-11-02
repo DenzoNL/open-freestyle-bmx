@@ -122,7 +122,7 @@ static RwIm3DGlobals *imEnv(DtCtx *c, int maxDepth, int minDepth)
     g->dOpenDevice.fpIm3DRenderPrimitive = stPrimitive;
     g->dOpenDevice.fpIm3DRenderLine = stLine;
     g->dOpenDevice.fpIm3DRenderIndexedPrimitive = stIndexed;
-    RwIm3DGlobals *im = dt_alloc(sizeof *im + 8 * sizeof(void *));
+    RwIm3DGlobals *im = dt_alloc(sizeof *im - sizeof(void *));
     im->begin = stBegin;
     im->end = stEnd;
     im->depth = dt_range(minDepth, maxDepth);

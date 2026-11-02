@@ -30,7 +30,7 @@ _Static_assert(sizeof(PhysDebugVertex) == 0x14, "PhysDebugVertex size");
 ORIG_FN(0x00469b00, int, ngifzCollideLine, (const ZVec3 *from, const ZVec3 *to, PhysRayHit *hit));
 ORIG_FN(0x004665c0, const uint8_t *, ngifzBspGetInfo, (int object));
 ORIG_FN(0x00469530, int, ngifzCollideObjectValid, (int object));
-ORIG_FN(0x00466610, void, ngifzBspObjectHit, (PhysCollObject * object, int a));
+ORIG_FN(0x00466610, void, ngifzBspObjectHit, (PhysPropObject * object, int a));
 ORIG_FN(0x00463710, void, ngifDrawLine3D, (int mode, const PhysDebugVertex *a, const PhysDebugVertex *b));
 
 /* TODO(file): zge/zgemods/zobjcamera.h (vector helpers). */

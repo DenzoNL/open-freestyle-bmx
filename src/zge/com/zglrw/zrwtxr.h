@@ -29,7 +29,7 @@ typedef struct ZrwTexture {
     void *texture; /* 0x24 RwTexture */
 } ZrwTexture;
 
-_Static_assert(sizeof(ZrwTexture) == 0x28, "zrw texture");
+BMX_LAYOUT32_ASSERT(sizeof(ZrwTexture) == 0x28, "zrw texture");
 
 /* The texture system's state (memset to 0 at initialisation). */
 typedef struct ZrwTextureState {
@@ -48,7 +48,7 @@ typedef struct ZrwTextureState {
     uint32_t loadBufferSize; /* 0x42c */
 } ZrwTextureState;
 
-_Static_assert(sizeof(ZrwTextureState) == 0x430, "zrw texture state");
+BMX_LAYOUT32_ASSERT(sizeof(ZrwTextureState) == 0x430, "zrw texture state");
 
 #define gZrwTxr ORIG_VAR(0x00674290, ZrwTextureState, gZrwTxr)
 

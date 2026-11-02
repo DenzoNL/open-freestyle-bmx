@@ -116,7 +116,7 @@ typedef struct ZObjCamera {
     uint8_t pad34[0x3c - 0x34];
 } ZObjCamera;
 
-_Static_assert(sizeof(ZObjCamera) == 0x3c, "object layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZObjCamera) == 0x3c, "object layout");
 
 #define gZobjCameraInitialized ORIG_VAR(0x006702f8, int, gZobjCameraInitialized)
 #define gZobjCameraCaches      ORIG_VAR(0x006702fc, ZMemFreeList *, gZobjCameraCaches)

@@ -39,13 +39,13 @@ typedef struct ZrwMaterial {
     };
 } ZrwMaterial;
 
-_Static_assert(sizeof(ZrwMatSlot) == 12, "zrw material slot");
+BMX_LAYOUT32_ASSERT(sizeof(ZrwMatSlot) == 12, "zrw material slot");
 _Static_assert(offsetof(ZrwMaterial, textureCount) == 0x24, "zrw material");
 _Static_assert(offsetof(ZrwMaterial, refCount) == 0x26, "zrw material");
-_Static_assert(offsetof(ZrwMaterial, slots) == 0x2c, "zrw material");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwMaterial, slots) == 0x2c, "zrw material");
 
-_Static_assert(sizeof(ZrwMaterial) == 0x74, "zrw material");
-_Static_assert(offsetof(ZrwMaterial, rwMaterial) == 0x70, "zrw material");
+BMX_LAYOUT32_ASSERT(sizeof(ZrwMaterial) == 0x74, "zrw material");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwMaterial, rwMaterial) == 0x70, "zrw material");
 
 /* Material definition chunk (MADF) as the loader keeps it: the chunk body starts at +8. */
 typedef struct ZrwMadf {
@@ -83,12 +83,12 @@ typedef struct ZrwMatState {
 } ZrwMatState;
 
 _Static_assert(offsetof(ZrwMatState, pool) == 0x08, "zrw material state");
-_Static_assert(offsetof(ZrwMatState, madf) == 0x0c, "zrw material state");
-_Static_assert(offsetof(ZrwMatState, last) == 0x10, "zrw material state");
-_Static_assert(offsetof(ZrwMatState, hook) == 0x14, "zrw material state");
-_Static_assert(offsetof(ZrwMatState, find) == 0x18, "zrw material state");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwMatState, madf) == 0x0c, "zrw material state");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwMatState, last) == 0x10, "zrw material state");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwMatState, hook) == 0x14, "zrw material state");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwMatState, find) == 0x18, "zrw material state");
 
-_Static_assert(sizeof(ZrwMatState) == 0x24, "zrw material state");
+BMX_LAYOUT32_ASSERT(sizeof(ZrwMatState) == 0x24, "zrw material state");
 
 #define gZrwMat     ORIG_VAR(0x006723a8, ZrwMatState, gZrwMat)
 #define gZrwMadfRec ORIG_VAR(0x00672318, ZrwMadf, gZrwMadfRec)

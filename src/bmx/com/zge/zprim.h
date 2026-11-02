@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "compat/orig.h"
+#include "compat/slot32.h"
 
 /* Property ids of zprimSet / zprimGet. */
 enum {
@@ -65,12 +66,12 @@ typedef struct ZPrimState {
     int32_t spacing; /* 0x50 */
 } ZPrimState;
 
-_Static_assert(sizeof(ZPrimState) == 0x54, "state size");
-_Static_assert(__builtin_offsetof(ZPrimState, picture) == 0x14, "state layout");
-_Static_assert(__builtin_offsetof(ZPrimState, scaleX) == 0x28, "state layout");
-_Static_assert(__builtin_offsetof(ZPrimState, font) == 0x3c, "state layout");
-_Static_assert(__builtin_offsetof(ZPrimState, flagsC) == 0x44, "state layout");
-_Static_assert(__builtin_offsetof(ZPrimState, spacing) == 0x50, "state layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZPrimState) == 0x54, "state size");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZPrimState, picture) == 0x14, "state layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZPrimState, scaleX) == 0x28, "state layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZPrimState, font) == 0x3c, "state layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZPrimState, flagsC) == 0x44, "state layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZPrimState, spacing) == 0x50, "state layout");
 
 /*
  * A loaded asset (picture, sprite set, font, screen). The data lives in a DMM block; `offset` is where this
@@ -84,7 +85,7 @@ typedef struct ZPrimAsset {
     int32_t offset;          /* 0x0c */
 } ZPrimAsset;
 
-_Static_assert(sizeof(ZPrimAsset) == 0x10, "asset size");
+BMX_LAYOUT32_ASSERT(sizeof(ZPrimAsset) == 0x10, "asset size");
 
 /*
  * Data of a picture or a sprite set (the block zprimAssetData returns). A picture is a set with one frame,
@@ -145,7 +146,10 @@ typedef struct ZPrimFont {
     int32_t pixelOffset; /* 0x04 */
     uint16_t pitch;      /* 0x08 bytes per row of the pixel sheet */
     uint8_t pad0a[2];
-    int32_t *pages; /* 0x0c 32 texture handles, created when glyphs are drawn; NULL before */
+    /* 0x0c the glyph page table (32 texture handles, a block of gNgifGlyphPages), created when glyphs are
+     * drawn; 0 before. The font is used in place, so this is a 32-bit slot in the file data
+     * (compat/slot32.h). */
+    uint32_t pages;
     uint8_t pad10[4];
     uint16_t field14; /* 0x14 low half of the `c` argument zprimDrawText hands to ngifDrawGlyph */
     uint8_t pad16[2];

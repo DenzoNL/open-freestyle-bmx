@@ -30,7 +30,7 @@ typedef struct ZtaginfNode {
     struct ZbspLevelFace **faces; /* 0x30 array of faceCount pointers into the triangle array */
 } ZtaginfNode;
 
-_Static_assert(sizeof(ZtaginfNode) == 0x34, "tag node size");
+BMX_LAYOUT32_ASSERT(sizeof(ZtaginfNode) == 0x34, "tag node size");
 
 /* The level's triangle array and its length (globals 0x6728c0 / 0x6728bc). */
 #define gZtaginfFaces     ORIG_VAR(0x006728c0, struct ZbspLevelFace *, gZtaginfFaces)

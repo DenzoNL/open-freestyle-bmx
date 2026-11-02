@@ -46,8 +46,7 @@ RpLight *RpLightCreate(uint32_t type)
     light->object.object.flags = 0;
     light->object.object.subType = (uint8_t)type;
     light->object.object.type = 3;
-    const uint16_t lightFrame =
-        *(const uint16_t *)((const uint8_t *)RwEngineInstance + offsetof(RwGlobals, pad0c));
+    const uint16_t lightFrame = RwEngineInstance->lightVisit;
     light->stamp = 1;
     light->object.object.flags = rpLIGHTLIGHTATOMICS | rpLIGHTLIGHTWORLD;
     light->lightFrame = (uint16_t)(lightFrame - 1);
@@ -203,7 +202,7 @@ void *_rpLightClose(void *engine)
 BMX_ADDR(0x004b1800)
 RpLight *rpLightVisitOnce(RpLight *light, RpLightVisit *visit)
 {
-    const uint16_t frame = *(uint16_t *)((uint8_t *)RwEngineInstance + 0x0c);
+    const uint16_t frame = RwEngineInstance->lightVisit;
     if (light->lightFrame != frame) {
         if ((light->object.object.flags & 1) != 0) {
             visit->callback(visit->context, light, visit->block, visit->tail, visit->extra);
@@ -249,7 +248,7 @@ void rpAtomicLightStage(RwResEntry *work, RpLightVisitFn apply)
     visit.callback = apply;
     visit.extra = &atomic->geometry->surfaceProps;
     __builtin_memcpy((void *)&visit.tail, &len, sizeof len);
-    (*(uint16_t *)((uint8_t *)RwEngineInstance + 0x0c))++;
+    RwEngineInstance->lightVisit++;
     RpWorldForAllDirectionalLights(BMX_FNPTR(RwObjectCallBack, 0x004b17c0, rpLightVisitEnabled), &visit);
     RwLLLink *head = &atomic->llWorldSectorsInAtomic;
     for (RwLLLink *link = head->next; link != head; link = link->next) {

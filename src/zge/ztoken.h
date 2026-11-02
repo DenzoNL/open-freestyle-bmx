@@ -25,7 +25,7 @@ typedef struct ZtokenFrame {
     char includeDir[0x100]; /* 0x20c prefix for #INCLUDE file names */
 } ZtokenFrame;
 
-_Static_assert(sizeof(ZtokenFrame) == 0x30c, "token frame layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZtokenFrame) == 0x30c, "token frame layout");
 
 /* Globals from 0x675380: the frames, then the settings and the symbol table. */
 typedef struct ZtokenState {

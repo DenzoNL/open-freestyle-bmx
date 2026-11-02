@@ -18,7 +18,7 @@ typedef struct ZrwLight {
     void *light; /* 0x08 RpLight */
 } ZrwLight;
 
-_Static_assert(sizeof(ZrwLight) == 12, "light record");
+BMX_LAYOUT32_ASSERT(sizeof(ZrwLight) == 12, "light record");
 
 #define gZrwLightPool        ORIG_VAR(0x00675374, ZMemFreeList *, gZrwLightPool)
 #define gZrwLightInitialized ORIG_VAR(0x00675370, int, gZrwLightInitialized)

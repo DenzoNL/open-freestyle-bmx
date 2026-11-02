@@ -49,7 +49,7 @@ typedef struct PropRecord {
     uint32_t paramB; /* 0x80 */
 } PropRecord;
 
-_Static_assert(sizeof(PropRecord) == 0x84, "PropRecord size");
+BMX_LAYOUT32_ASSERT(sizeof(PropRecord) == 0x84, "PropRecord size");
 
 /* Visibility of a prop's node in the world: bit 0 set once the player hit its face. */
 typedef struct PropNodeState {
@@ -66,7 +66,7 @@ typedef struct PropState {
     uint8_t nodes[0xb40 - 0x844];
 } PropState;
 
-_Static_assert(sizeof(PropState) == 0xb40, "PropState size");
+BMX_LAYOUT32_ASSERT(sizeof(PropState) == 0xb40, "PropState size");
 typedef PropRecord PropRecords[16];
 typedef PropNodeState PropNodeStates[64];
 #define gPropState      ORIG_VAR(0x00694460, PropState, gPropState)

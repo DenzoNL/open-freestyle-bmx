@@ -121,9 +121,9 @@ typedef struct RwD3DIm3DWork {
     RwMatrix combined;         /* 0x48 ltm x view */
 } RwD3DIm3DWork;
 
-_Static_assert(sizeof(RwD3DIm3DWork) == 0x88, "RwD3DIm3DWork layout");
-_Static_assert(offsetof(RwD3DIm3DWork, numVertices) == 0x20, "RwD3DIm3DWork layout");
-_Static_assert(offsetof(RwD3DIm3DWork, mesh) == 0x40, "RwD3DIm3DWork layout");
+BMX_LAYOUT32_ASSERT(sizeof(RwD3DIm3DWork) == 0x88, "RwD3DIm3DWork layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwD3DIm3DWork, numVertices) == 0x20, "RwD3DIm3DWork layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwD3DIm3DWork, mesh) == 0x40, "RwD3DIm3DWork layout");
 
 typedef int(BMX_CDECL *RwD3DTriFunc)(int32_t a, int32_t b, int32_t c);
 typedef void(BMX_CDECL *RwD3DTriVoidFunc)(int32_t a, int32_t b, int32_t c);
@@ -143,7 +143,7 @@ typedef struct RwD3DIm3DLevel {
     int32_t numTL;            /* 0x14 TL vertices including those clipping adds */
 } RwD3DIm3DLevel;
 
-_Static_assert(sizeof(RwD3DIm3DLevel) == 0x18, "RwD3DIm3DLevel layout");
+BMX_LAYOUT32_ASSERT(sizeof(RwD3DIm3DLevel) == 0x18, "RwD3DIm3DLevel layout");
 
 /* A growable index list of the Im3D draw calls: triangles (0x696a64) and lines (0x696a70). */
 typedef struct RwD3DIndexList {
@@ -270,7 +270,7 @@ typedef struct RwD3DStateCache {
     int32_t alphaSort;       /* 0x69689c rwRENDERSTATEALPHAPRIMITIVEBUFFER: translucent primitives deferred */
 } RwD3DStateCache;
 
-_Static_assert(sizeof(RwD3DStateCache) == 0x160, "RwD3DStateCache layout");
+BMX_LAYOUT32_ASSERT(sizeof(RwD3DStateCache) == 0x160, "RwD3DStateCache layout");
 
 #define rwD3DState ORIG_VAR(0x00696740, RwD3DStateCache, rwD3DState)
 /* 1 when the device can alpha test (greater or not equal). */
@@ -281,11 +281,27 @@ _Static_assert(sizeof(RwD3DStateCache) == 0x160, "RwD3DStateCache layout");
 #define rwD3DFogExp      ((const uint8_t *)BMX_ORIG(0x006769a4))
 #define rwD3DFogExp2     ((const uint8_t *)BMX_ORIG(0x00676aa4))
 
-/* The raster plugin data the texture state reads: +4 colour key on, +0xc texture handle, +0x10 this. */
+/* The pixel format record of a raster's plugin data (RwD3DRasterExt.info). */
 typedef struct RwD3DRasterInfo {
     uint8_t pad00[8];
     uint32_t flags; /* 0x08 bit 0: the texture has alpha */
 } RwD3DRasterInfo;
+
+/*
+ * The start of the driver's raster plugin data (at rwD3DRasterExtOffset), the fields the texture state reads.
+ * The original's Direct3D driver and ours (src/driver, DrvRasterExt) both lay it out this way.
+ */
+typedef struct RwD3DRasterExt {
+    void *texture;               /* 0x00 */
+    int32_t colorKey;            /* 0x04 colour key on */
+    void *cpu;                   /* 0x08 */
+    void *handle;                /* 0x0c the texture handle */
+    const RwD3DRasterInfo *info; /* 0x10 */
+} RwD3DRasterExt;
+
+BMX_LAYOUT32_ASSERT(offsetof(RwD3DRasterExt, colorKey) == 4 && offsetof(RwD3DRasterExt, handle) == 0xc &&
+                        offsetof(RwD3DRasterExt, info) == 0x10,
+                    "RwD3DRasterExt layout");
 
 /* ---- the deferred (alpha sorted) primitives (rw/d3dim2d.c) ---- */
 
@@ -322,7 +338,7 @@ typedef struct RwD3DSavedState {
     RwRaster *textureRaster; /* 0x40 */
 } RwD3DSavedState;
 
-_Static_assert(sizeof(RwD3DSavedState) == 0x44, "RwD3DSavedState layout");
+BMX_LAYOUT32_ASSERT(sizeof(RwD3DSavedState) == 0x44, "RwD3DSavedState layout");
 
 /*
  * A deferred Im2D primitive record (after the callback word): its RwD3DSavedState, then D3D primitive type

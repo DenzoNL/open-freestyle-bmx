@@ -73,7 +73,7 @@ ORIG_FN(0x004cd510, int, rwWorldPvsDefaultCallback, (int stage, float progress))
 
 static ZrwEffectHost *effectHost(void *object)
 {
-    return *(ZrwEffectHost **)&((ZObj *)object)->pad30[0];
+    return ((ZObj *)object)->data;
 }
 
 BMX_ADDR(0x00495bd0)
@@ -102,8 +102,8 @@ void *zrwworldCreateObject(void)
     }
     zobjInit(object, 2);
     object->ops = (const ZObjOps *)&gZrwWorldEffectOps;
-    host = zmemAlloc(0x3c);
-    *(ZrwEffectHost **)&object->pad30[0] = host;
+    host = zmemAlloc(sizeof *host);
+    object->data = host;
     host->items = zlistCreate(4);
     effectHost(object)->updateNode = zrwRegisterUpdateFunction(
         2, BMX_FNPTR(ZrwUpdateFn, 0x00495bd0, (ZrwUpdateFn)zrwworldUpdateEffects), object, 1);

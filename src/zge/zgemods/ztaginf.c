@@ -15,14 +15,11 @@ static const char kZtaginfFile[] = "C:\\NgEngine\\Zge\\ZgeMods\\ztaginf.c";
 #define gZtaginfUnused2 ORIG_VAR(0x00672900, uint32_t, gZtaginfUnused2)
 
 enum {
-    kFaceStride = 0x6c,
     kTagChunkD = 0x44474154, /* 'TAGD' */
     kTagChunkI = 0x49474154, /* 'TAGI' */
     kTagChunkF = 0x46474154, /* 'TAGF' */
     kTagChunkN = 0x4e474154, /* 'TAGN' */
 };
-
-_Static_assert(kFaceStride == sizeof(ZbspLevelFace), "face stride");
 
 /* Tree node's record in the file: 0x28 bytes. */
 typedef struct TagNodeRecord {
@@ -162,13 +159,14 @@ int ztaginfReadNode(ZtaginfNode *node, void *iff)
     if (node->faceCount == 0) {
         node->faces = NULL;
     } else {
-        const uint32_t bytes = (uint32_t)node->faceCount << 2;
+        /* The file lists the triangles as 32-bit indices. */
+        const uint32_t bytes = (uint32_t)node->faceCount * sizeof(uint32_t);
         uint32_t *indices = zmemAlloc(bytes);
 
         ziffRead(iff, indices, bytes);
-        node->faces = (struct ZbspLevelFace **)zmemAlloc((uint32_t)node->faceCount << 2);
+        node->faces = zmemAlloc((uint32_t)(node->faceCount * sizeof *node->faces));
         for (uint32_t i = 0; i < node->faceCount; i++) {
-            node->faces[i] = (struct ZbspLevelFace *)((uint8_t *)gZtaginfFaces + indices[i] * kFaceStride);
+            node->faces[i] = &gZtaginfFaces[indices[i]];
         }
         zmemFree(indices);
     }
@@ -186,10 +184,10 @@ int ztaginfReadNode(ZtaginfNode *node, void *iff)
     return 1;
 }
 
-/* An offset into the file's data block, or 0 for "none" (-1). */
-static uint32_t dataPointer(uint32_t offset)
+/* An offset into the file's data block (the record's 32-bit field), or NULL for "none" (-1). */
+static const void *dataPointer(uint32_t offset)
 {
-    return offset == 0xffffffffu ? 0 : offset + (uint32_t)(uintptr_t)gZtaginfData;
+    return offset == 0xffffffffu ? NULL : (const uint8_t *)gZtaginfData + offset;
 }
 
 BMX_ADDR(0x0048dae0)
@@ -221,16 +219,16 @@ int ztaginfLoad(void *iff)
                 ziffRead(iff, gZtaginfData, size);
             }
         }
-        gZtaginfFaces = zmemAlloc(gZtaginfFaceCount * kFaceStride);
+        gZtaginfFaces = zmemAlloc((uint32_t)(gZtaginfFaceCount * sizeof(ZbspLevelFace)));
         if (ziffFindChunk(iff, kTagChunkF) != 0) {
-            uint32_t offset = 0;
+            uint32_t index = 0;
             do {
                 ziffRead(iff, &rec, sizeof rec);
                 if (rec.size != 0x50) {
                     zdebugFail("ztaginf : Tagging info face structure mismatch", kZtaginfFile, 0x17a, 0);
                 }
                 /* The index is not checked against the face count, like the original's offset. */
-                ZbspLevelFace *face = (ZbspLevelFace *)((uint8_t *)gZtaginfFaces + offset);
+                ZbspLevelFace *face = &gZtaginfFaces[index];
                 storeBits(&face->normal.x, fpuCopy(rec.w[9]));
                 storeBits(&face->normal.y, fpuCopy(rec.w[10]));
                 storeBits(&face->normal.z, fpuCopy(rec.w[11]));
@@ -243,18 +241,18 @@ int ztaginfLoad(void *iff)
                 storeBits(&face->v2.x, fpuCopy(rec.w[6]));
                 storeBits(&face->v2.y, fpuCopy(rec.w[7]));
                 storeBits(&face->v2.z, fpuCopy(rec.w[8]));
-                face->edgeTag[0] = (const ZbspEdgeTag *)(uintptr_t)dataPointer(rec.w[13]);
-                face->edgeTag[1] = (const ZbspEdgeTag *)(uintptr_t)dataPointer(rec.w[14]);
-                face->edgeTag[2] = (const ZbspEdgeTag *)(uintptr_t)dataPointer(rec.w[15]);
-                storeBits(&face->pad50[0], dataPointer(rec.w[16]));
-                storeBits(&face->pad50[4], dataPointer(rec.w[17]));
-                storeBits(&face->pad50[8], dataPointer(rec.w[18]));
-                face->tag = (const uint16_t *)(uintptr_t)dataPointer(rec.w[12]);
+                face->edgeTag[0] = dataPointer(rec.w[13]);
+                face->edgeTag[1] = dataPointer(rec.w[14]);
+                face->edgeTag[2] = dataPointer(rec.w[15]);
+                face->data50[0] = dataPointer(rec.w[16]);
+                face->data50[1] = dataPointer(rec.w[17]);
+                face->data50[2] = dataPointer(rec.w[18]);
+                face->tag = dataPointer(rec.w[12]);
                 face->edge[0] = NULL; /* the caches are filled on demand by ngifzbsp */
                 face->edge[1] = NULL;
                 face->edge[2] = NULL;
                 face->face = NULL;
-                offset += kFaceStride;
+                index++;
             } while (ziffNextChunk(iff, kTagChunkF) != 0);
         }
     }

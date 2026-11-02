@@ -192,9 +192,9 @@ static int systemRegister(RwDevice *device, const RwMemoryFunctions *memory)
     *device = rwOrigDevice;
     rwD3DEngineDevice = device;
     rwD3DMemory = memory;
-    drvRasterOffset = drvRasterRegisterPlugin(0x20, kDrvPluginId, NULL, NULL, NULL);
-    drvCameraOffset =
-        RwCameraRegisterPlugin(0x20, kDrvPluginId, RW_CTOR(0x004d4ea0), RW_DTOR(0x004d4f80), NULL);
+    drvRasterOffset = drvRasterRegisterPlugin(sizeof(DrvRasterExt), kDrvPluginId, NULL, NULL, NULL);
+    drvCameraOffset = RwCameraRegisterPlugin(kDrvCameraExtBytes, kDrvPluginId, RW_CTOR(0x004d4ea0),
+                                             RW_DTOR(0x004d4f80), NULL);
     rwD3DRasterExtOffset = drvRasterOffset;
     rwD3DCameraExtOffset = drvCameraOffset;
     return 1;

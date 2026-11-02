@@ -8,6 +8,7 @@
 
 #include <stdint.h>
 
+#include "bmx/pc/zge/sound/winload.h"
 #include "compat/orig.h"
 
 enum {
@@ -48,17 +49,8 @@ enum {
     kzsndNoteEventFlagSilent = 0x2, /* has no mixer channel (track muted) */
 };
 
-/* Sequence description in the sound file. */
-typedef struct ZsndSeqHeader {
-    uint8_t volume; /* 0x00 */
-    uint8_t pan;    /* 0x01 */
-    uint8_t voice;  /* 0x02 voice number, 0xff none */
-    uint8_t keymap; /* 0x03 key map number, 0xff none */
-    uint8_t pad04[4];
-    const uint8_t *data; /* 0x08 the event stream starts 4 bytes in */
-    uint8_t pad0c[2];
-    uint16_t bank; /* 0x0e sound file the voices come from */
-} ZsndSeqHeader;
+/* Sequence description: a track definition of the sound file (winload.h). */
+typedef ZsdTrackDef ZsndSeqHeader;
 
 struct ZsndNote;
 struct ZsndSeqTrack;
@@ -101,9 +93,8 @@ typedef struct ZsndSeqTrack {
     uint8_t pad46[2];
 } ZsndSeqTrack;
 
-_Static_assert(sizeof(ZsndNote) == 0x14, "note layout");
-_Static_assert(sizeof(ZsndSeqTrack) == 0x48, "track layout");
-_Static_assert(sizeof(ZsndSeqHeader) == 0x10, "header layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZsndNote) == 0x14, "note layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZsndSeqTrack) == 0x48, "track layout");
 
 struct ZsndSeqEvent;
 typedef int(BMX_CDECL *ZsndSeqHandler)(struct ZsndSeqEvent *event);
@@ -121,7 +112,7 @@ typedef struct ZsndSeqEvent {
     ZsndSeqHandler handler; /* 0x0c */
 } ZsndSeqEvent;
 
-_Static_assert(sizeof(ZsndSeqEvent) == 0x10, "event layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZsndSeqEvent) == 0x10, "event layout");
 
 typedef ZsndNote ZsndNotePool[kzsndSeqMaxNotes];
 typedef ZsndSeqTrack ZsndTrackPool[kzsndSeqMaxTracks];

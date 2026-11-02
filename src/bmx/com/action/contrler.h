@@ -41,7 +41,7 @@ typedef struct ContrlerPad {
     ContrlerState state; /* 0x10 */
 } ContrlerPad;
 
-_Static_assert(sizeof(ContrlerPad) == 0x3c, "ContrlerPad size");
+BMX_LAYOUT32_ASSERT(sizeof(ContrlerPad) == 0x3c, "ContrlerPad size");
 
 typedef ContrlerPad ContrlerPads[2];
 #define gContrlerPads ORIG_VAR(0x0056b628, ContrlerPads, gContrlerPads)

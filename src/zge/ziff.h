@@ -34,7 +34,7 @@ typedef struct Ziff {
 } Ziff;
 
 _Static_assert(sizeof(ZiffFrame) == 0x20, "ziff frame");
-_Static_assert(sizeof(Ziff) == 0x108, "ziff reader");
+BMX_LAYOUT32_ASSERT(sizeof(Ziff) == 0x108, "ziff reader");
 
 /* Chunk handler: returns 0 to stop processing. The original passes a user argument as second parameter. */
 typedef int(BMX_CDECL *ZiffChunkFn)(void *iff, void *arg);
@@ -56,7 +56,7 @@ typedef struct ZiffState {
     int32_t headOffset;             /* 0x6746e8 */
 } ZiffState;
 
-_Static_assert(sizeof(ZiffState) == 0x1c, "ziff state");
+BMX_LAYOUT32_ASSERT(sizeof(ZiffState) == 0x1c, "ziff state");
 
 #define gZiff ORIG_VAR(0x006746d0, ZiffState, gZiff)
 
@@ -131,7 +131,7 @@ typedef struct ZSkeletonOwner {
     ZSkeleton *skeleton;
 } ZSkeletonOwner;
 
-_Static_assert(sizeof(ZSkeletonNode) == 0x44, "skeleton node");
+BMX_LAYOUT32_ASSERT(sizeof(ZSkeletonNode) == 0x44, "skeleton node");
 
 /* Recycled ZSkeletonItems, and the animation being read by ziffReadAnim (its handlers fill it). */
 #define gZiffItemPool ORIG_VAR(0x006746c4, ZSkeletonItem *, gZiffItemPool)

@@ -49,7 +49,7 @@ typedef struct ZMovieWaveHeader {
     uint32_t reserved; /* 0x1c */
 } ZMovieWaveHeader;
 
-_Static_assert(sizeof(ZMovieWaveHeader) == 0x20, "WAVEHDR size");
+BMX_LAYOUT32_ASSERT(sizeof(ZMovieWaveHeader) == 0x20, "WAVEHDR size");
 
 typedef struct ZMovie {
     int32_t videoStream;                      /* 0x000 index, -1 none */
@@ -87,12 +87,12 @@ typedef struct ZMovie {
     int32_t audioEnabled;                         /* 0x288 audio may be played at all */
 } ZMovie;
 
-_Static_assert(sizeof(ZMovieStream) == 0x2c, "stream info layout");
-_Static_assert(__builtin_offsetof(ZMovie, info) == 0x3c, "movie layout");
-_Static_assert(__builtin_offsetof(ZMovie, drawDib) == 0x1dc, "movie layout");
-_Static_assert(__builtin_offsetof(ZMovie, playing) == 0x1fc, "movie layout");
-_Static_assert(__builtin_offsetof(ZMovie, buffers) == 0x238, "movie layout");
-_Static_assert(sizeof(ZMovie) == 0x28c, "movie layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZMovieStream) == 0x2c, "stream info layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZMovie, info) == 0x3c, "movie layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZMovie, drawDib) == 0x1dc, "movie layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZMovie, playing) == 0x1fc, "movie layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZMovie, buffers) == 0x238, "movie layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZMovie) == 0x28c, "movie layout");
 
 /* Clears the movie and starts the AVI library. */
 void zmovieInit(ZMovie *movie);

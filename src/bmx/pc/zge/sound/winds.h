@@ -134,6 +134,6 @@ typedef struct DsDevice {
     const DsDeviceVtbl *vtbl;
 } DsDevice;
 
-_Static_assert(sizeof(DsBufferDesc) == 0x24, "DSBUFFERDESC");
+BMX_LAYOUT32_ASSERT(sizeof(DsBufferDesc) == 0x24, "DSBUFFERDESC");
 
 #endif

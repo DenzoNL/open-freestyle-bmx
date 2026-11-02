@@ -47,7 +47,7 @@ typedef struct ZrwPrimState {
     uint32_t im2dMax;    /* 0x14 0x40 */
 } ZrwPrimState;
 
-_Static_assert(sizeof(ZrwPrimState) == 0x18, "prim state");
+BMX_LAYOUT32_ASSERT(sizeof(ZrwPrimState) == 0x18, "prim state");
 
 #define gZrwPrim ORIG_VAR(0x00672898, ZrwPrimState, gZrwPrim)
 /* Frame counter seen by the last draw call (0x672890) and the 2D depth nudge (0x6728b0, reset per call). */

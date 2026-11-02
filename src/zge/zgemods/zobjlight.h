@@ -30,7 +30,7 @@ typedef struct ZObjLight {
     void *handle;
 } ZObjLight;
 
-_Static_assert(__builtin_offsetof(ZObjLight, handle) == 0x2c, "light object layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZObjLight, handle) == 0x2c, "light object layout");
 
 /* Creates a light object of renderer type 0..3; NULL on failure. */
 void *zobjLightCreate(int type, int param);

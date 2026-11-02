@@ -22,8 +22,8 @@ typedef struct ZrwShadow {
     ZVec3 offset;          /* 0x0c */
 } ZrwShadow;
 
-_Static_assert(offsetof(ZrwShadow, model) == 0x08, "shadow state");
-_Static_assert(offsetof(ZrwShadow, offset) == 0x0c, "shadow state");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwShadow, model) == 0x08, "shadow state");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwShadow, offset) == 0x0c, "shadow state");
 
 /* Point of the 6x6 probe grid. */
 typedef struct ZrwShadowPoint {
@@ -50,7 +50,7 @@ _Static_assert(sizeof(ZrwShadowPoint) == 0x10, "shadow point");
 _Static_assert(offsetof(ZrwShadowVertex, u) == 0x10, "shadow vertex");
 _Static_assert(offsetof(ZrwShadowVertex, color) == 0x18, "shadow vertex");
 _Static_assert(sizeof(ZrwShadowVertex) == 0x1c, "shadow vertex");
-_Static_assert(sizeof(ZrwShadowQuad) == 0x14, "shadow quad");
+BMX_LAYOUT32_ASSERT(sizeof(ZrwShadowQuad) == 0x14, "shadow quad");
 
 /* The probe grid is 6x6 points; the mesh has 5x5 quads. */
 #define kZrwShadowGrid  6

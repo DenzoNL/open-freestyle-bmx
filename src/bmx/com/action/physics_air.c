@@ -45,10 +45,10 @@ static unsigned faceWord(const void *face)
     return *(const uint16_t *)((const uint8_t *)face + 0x16);
 }
 
-/* Game object descriptor of a world object (pointer at +0x1ec). */
+/* Game object descriptor of a world object (its prop record). */
 static void *objectInfo(const void *object)
 {
-    return *(void *const *)((const uint8_t *)object + 0x1ec);
+    return physObjectProp(object);
 }
 
 /* Aims IK limb(s) `limbs` at `target`; the pole runs from part `part` of the rider actor to its unit x

@@ -243,10 +243,10 @@ void zactorSetupBike(void *actor)
 static const ZAngle3 kTwistPlus = {0, 0, 0x4000};
 static const ZAngle3 kTwistMinus = {0, 0, (ZAngle)0xc000};
 
-/* The skeleton of a model object (the object stores it at +0x30, in ZObj's pad30). */
+/* The skeleton of a model object (ZObj.data). */
 static void *objectSkeleton(int32_t object)
 {
-    return *(void **)((uint8_t *)(uintptr_t)object + 0x30);
+    return ((ZObj *)(uintptr_t)object)->data;
 }
 
 /*
@@ -322,7 +322,7 @@ void zactorSyncPose(void *actor)
 /* Index of the rider the player controls (byte at 0x56b408); read directly, not through comdata. */
 #define gCurrentPlayer ORIG_VAR(0x0056b408, uint8_t, gCurrentPlayer)
 
-/* Rider records at 0x691f40 are 0xf70 bytes; the index is not range checked. */
+/* The rider records at 0x691f40; the index is not range checked. */
 static PhysRider *currentRider(void)
 {
     return (PhysRider *)((uintptr_t)&gPhysRiders + (size_t)gCurrentPlayer * sizeof(PhysRider));

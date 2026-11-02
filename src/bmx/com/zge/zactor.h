@@ -66,18 +66,18 @@ typedef struct ZActor {
     int32_t partCount; /* 0x274 */
 } ZActor;
 
-_Static_assert(sizeof(ZActor) == 0x278, "actor size");
+BMX_LAYOUT32_ASSERT(sizeof(ZActor) == 0x278, "actor size");
 _Static_assert(__builtin_offsetof(ZActor, pos) == 0xc, "actor layout");
 _Static_assert(__builtin_offsetof(ZActor, rot) == 0x1e, "actor layout");
 _Static_assert(__builtin_offsetof(ZActor, scale) == 0x28, "actor layout");
 _Static_assert(__builtin_offsetof(ZActor, player) == 0x48, "actor layout");
-_Static_assert(__builtin_offsetof(ZActor, lod) == 0x194, "actor layout");
-_Static_assert(__builtin_offsetof(ZActor, radius) == 0x1d0, "actor layout");
-_Static_assert(__builtin_offsetof(ZActor, object) == 0x1d4, "actor layout");
-_Static_assert(__builtin_offsetof(ZActor, shadow) == 0x1d8, "actor layout");
-_Static_assert(__builtin_offsetof(ZActor, partHash) == 0x1dc, "actor layout");
-_Static_assert(__builtin_offsetof(ZActor, partOrder) == 0x228, "actor layout");
-_Static_assert(__builtin_offsetof(ZActor, partCount) == 0x274, "actor layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZActor, lod) == 0x194, "actor layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZActor, radius) == 0x1d0, "actor layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZActor, object) == 0x1d4, "actor layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZActor, shadow) == 0x1d8, "actor layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZActor, partHash) == 0x1dc, "actor layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZActor, partOrder) == 0x228, "actor layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZActor, partCount) == 0x274, "actor layout");
 
 /* Header of a motion (keyframe animation), as stored in a motion bank. */
 typedef struct ZMotionBone {
@@ -163,10 +163,10 @@ typedef struct ZMotionChannel {
     uint8_t pad17b;           /* 0x17b */
 } ZMotionChannel;
 
-_Static_assert(sizeof(ZMotionChannel) == 0x17c, "channel size");
-_Static_assert(__builtin_offsetof(ZMotionChannel, motion) == 0xc0, "channel layout");
-_Static_assert(__builtin_offsetof(ZMotionChannel, rootAcc) == 0xe4, "channel layout");
-_Static_assert(__builtin_offsetof(ZMotionChannel, joints) == 0x104, "channel layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZMotionChannel) == 0x17c, "channel size");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZMotionChannel, motion) == 0xc0, "channel layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZMotionChannel, rootAcc) == 0xe4, "channel layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZMotionChannel, joints) == 0x104, "channel layout");
 
 enum { kZmotionChannels = 9, kZmotionMaxJoints = 19 };
 
@@ -181,10 +181,10 @@ typedef struct ZMotionPlayer {
     uint8_t pad_d5e[0xd60 - 0xd5e];
 } ZMotionPlayer;
 
-_Static_assert(sizeof(ZMotionPlayer) == 0xd60, "player size");
+BMX_LAYOUT32_ASSERT(sizeof(ZMotionPlayer) == 0xd60, "player size");
 /* zactorCopySecondaryJoints copies from +0x9f2 to +0x10a. */
-_Static_assert(__builtin_offsetof(ZMotionPlayer, ch[6].joints[1]) == 0x9f2, "player layout");
-_Static_assert(__builtin_offsetof(ZMotionPlayer, ch[0].joints[1]) == 0x10a, "player layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZMotionPlayer, ch[6].joints[1]) == 0x9f2, "player layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZMotionPlayer, ch[0].joints[1]) == 0x10a, "player layout");
 
 /* Entry of a motion bank (a loaded motion library). */
 typedef struct ZMotionBank {

@@ -118,7 +118,7 @@ enum { kFadeMinMs = 8 };
 
 /* ZrwCamera (zrwcam.h): the RwCamera frame's matrix copy and the view (rotation, eye) zrwCameraSetView
  * keeps. */
-enum { kZrwCameraWorld = 0x14, kZrwCameraView = 0x54 };
+enum { kZrwCameraWorld = offsetof(ZrwCamera, world), kZrwCameraView = offsetof(ZrwCamera, view) };
 
 enum { kMaxModels = 0x100, kMaxParts = 0x1000, kMaxDirty = 512, kMaxParticles = 0x800 };
 static const uint64_t kMarginNs = 1500000; /* kept free before a tick on top of the worst draw */
@@ -415,7 +415,7 @@ static void walkParticles(HfCapture *c)
         if (object->ops != kEffectOps) {
             continue;
         }
-        host = *(ZrwEffectHost *const *)&object->pad30[0];
+        host = object->data;
         if (host == NULL || host->items == NULL) {
             continue;
         }
@@ -861,7 +861,7 @@ static void restoreHash(uint64_t out[kRestoreParts])
         {
             /* the RwCamera frame: floats only (the sync after the restore normalises its flags, as the
              * draw's sync does in vanilla) */
-            const RwMatrix *const m = RwFrameGetMatrix(RwCameraGetFrame(*(void *const *)(zrw + 0x0c)));
+            const RwMatrix *const m = RwFrameGetMatrix(RwCameraGetFrame(((const ZrwCamera *)zrw)->rwCamera));
 
             out[6] = fnv(out[6], &m->right, sizeof m->right);
             out[6] = fnv(out[6], &m->up, sizeof m->up);
@@ -967,7 +967,7 @@ static int hfDrawFrame(void)
     }
     if (gClearOn != 0) {
         for (void *camera = zrwcamFirst(); camera != NULL; camera = zrwcamNext(camera)) {
-            if ((((const uint8_t *)camera)[8] & 4) != 0) {
+            if ((((const ZrwCamera *)camera)->state & 4) != 0) {
                 RwCameraClear(zrwcamHandle(camera), &gClearColor, 3);
             }
         }
@@ -978,7 +978,7 @@ static int hfDrawFrame(void)
     for (void *camera = zrwcamFirst(); camera != NULL; camera = zrwcamNext(camera)) {
         RwError error;
 
-        if ((((const uint8_t *)camera)[8] & 4) == 0) {
+        if ((((const ZrwCamera *)camera)->state & 4) == 0) {
             continue;
         }
         RwErrorGet(&error);

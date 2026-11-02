@@ -64,7 +64,7 @@ static void setup_create(DtCtx *c)
     texEnv(c);
     lightStubs();
     gTexAllocFailAt = dt_u32() % 5 == 0 ? 1 : 0;
-    *(uint16_t *)((uint8_t *)RwEngineInstance + offsetof(RwGlobals, pad0c)) = (uint16_t)dt_u32();
+    RwEngineInstance->lightVisit = (uint16_t)dt_u32();
     DT_ARG_INT(c, 0, dt_u32() % 3 == 0 ? dt_u32() : (uint32_t)dt_range(0, 6));
     rwtEnd();
 }

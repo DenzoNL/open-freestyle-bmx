@@ -36,10 +36,10 @@ typedef struct ZrwModelCreateState {
     ZrwModel *last;                              /* 0x20 the model the last MODL chunk produced */
 } ZrwModelCreateState;
 
-_Static_assert(offsetof(ZrwModelCreateState, cursor) == 0x0c, "model create state");
-_Static_assert(offsetof(ZrwModelCreateState, lodClumps) == 0x10, "model create state");
-_Static_assert(offsetof(ZrwModelCreateState, last) == 0x20, "model create state");
-_Static_assert(sizeof(ZrwModelCreateState) == 0x24, "model create state");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwModelCreateState, cursor) == 0x0c, "model create state");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwModelCreateState, lodClumps) == 0x10, "model create state");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwModelCreateState, last) == 0x20, "model create state");
+BMX_LAYOUT32_ASSERT(sizeof(ZrwModelCreateState) == 0x24, "model create state");
 
 #define gZrwModelCreate ORIG_VAR(0x00675218, ZrwModelCreateState, gZrwModelCreate)
 

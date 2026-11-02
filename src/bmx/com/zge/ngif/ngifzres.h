@@ -41,11 +41,11 @@ typedef struct ZresState {
 } ZresState;
 
 _Static_assert(__builtin_offsetof(ZresState, libs) == 0x1064, "zres layout");
-_Static_assert(__builtin_offsetof(ZresState, playerCount) == 0x1088, "zres layout");
-_Static_assert(__builtin_offsetof(ZresState, bufferB) == 0x1098, "zres layout");
-_Static_assert(__builtin_offsetof(ZresState, riderRecord) == 0x20a0, "zres layout");
-_Static_assert(__builtin_offsetof(ZresState, levelCount) == 0x20c8, "zres layout");
-_Static_assert(sizeof(ZresState) == 0x20d4, "zres size");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZresState, playerCount) == 0x1088, "zres layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZresState, bufferB) == 0x1098, "zres layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZresState, riderRecord) == 0x20a0, "zres layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZresState, levelCount) == 0x20c8, "zres layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZresState) == 0x20d4, "zres size");
 
 #define gZres ORIG_VAR(0x005f8f60, ZresState, gZres)
 
@@ -78,7 +78,7 @@ typedef struct ZresOverlaySlot {
     void *texture; /* 0x10 renderer handle, 0 when the slot is free */
 } ZresOverlaySlot;
 
-_Static_assert(sizeof(ZresOverlaySlot) == 0x14, "overlay slot");
+BMX_LAYOUT32_ASSERT(sizeof(ZresOverlaySlot) == 0x14, "overlay slot");
 
 typedef ZresOverlaySource ZresOverlaySourceTable[kZresOverlaySources];
 typedef ZresOverlaySlot ZresOverlaySlotTable[kZresOverlaySlots];

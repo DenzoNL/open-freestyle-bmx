@@ -25,6 +25,21 @@ typedef struct ZanimChannel {
     struct ZanimChannel *next;
 } ZanimChannel;
 
+/*
+ * The animation record ziffReadAnim allocates (gZiffAnim): its name, the bone name tables, the rotation and
+ * translation channels, newest first, and a fifth list nothing fills (ziffFreeAnim frees it like a channel
+ * list).
+ */
+typedef struct ZanimRecord {
+    uint32_t name;
+    ZanimNames *names;
+    ZanimChannel *rotations;
+    ZanimChannel *translations;
+    ZanimChannel *channels10;
+} ZanimRecord;
+
+BMX_LAYOUT32_ASSERT(sizeof(ZanimRecord) == 0x14, "animation record layout");
+
 /* Chunk handler of the animation container (ANIM): nothing to read. */
 int zanimReadAnim(void *iff);
 /* DEFI: the bone names. */

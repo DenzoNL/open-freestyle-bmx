@@ -108,21 +108,21 @@ static RpWorld **lightWorldSlot(const RpLight *light)
     return (RpWorld **)((uint8_t *)light + rpWorldLightOffset);
 }
 
-/* RpClump fields this module uses (the clump type itself is in rw/clump.c): its link in the world's list. */
+/* RpClump fields this module uses: its link in the world's list. */
 static RwLLLink *clumpInWorldLink(RpClump *clump)
 {
-    return (RwLLLink *)((uint8_t *)clump + 0x14);
+    return &clump->inWorldLink;
 }
 
 static uint8_t *clumpStamp(RpClump *clump)
 {
-    return (uint8_t *)clump + 0x12;
+    return &clump->stamp;
 }
 
 /* The list of sector ties of an atomic (RpTie.lWorldSectorInAtomic links). */
 static RwLLLink *atomicSectorList(const RpAtomic *atomic)
 {
-    return (RwLLLink *)((uint8_t *)atomic + 0x68);
+    return (RwLLLink *)&atomic->llWorldSectorsInAtomic;
 }
 
 static RpTieGlobals *tieGlobals(void)
@@ -1343,7 +1343,7 @@ void *pvsViewSector(RpIntersection *intersection, RpWorldSector *sector, RpPVSWo
 BMX_ADDR(0x004cc6b0)
 void *pvsWorldConstruct(void *world)
 {
-    RpPVSWorldData *pvs = RwEngineInstance->memoryFuncs.rwmalloc(0x58);
+    RpPVSWorldData *pvs = RwEngineInstance->memoryFuncs.rwmalloc(sizeof *pvs);
     void *result = NULL;
     if (pvs != NULL) {
         pvs->cursor = NULL;
@@ -1670,11 +1670,12 @@ void *_rpTieOpen(void *engine, int32_t offset)
 {
     rpTieOffset = offset;
     RwFreeList **lists = (RwFreeList **)((uint8_t *)RwEngineInstance + offset);
-    lists[0] = RwFreeListCreate(0x18, 100, 0);
+    lists[0] = RwFreeListCreate(sizeof(RpTie), 100, 0);
     if (lists[0] == NULL) {
         return NULL;
     }
-    ((RwFreeList **)((uint8_t *)RwEngineInstance + rpTieOffset))[1] = RwFreeListCreate(0x18, 0x14, 0);
+    ((RwFreeList **)((uint8_t *)RwEngineInstance + rpTieOffset))[1] =
+        RwFreeListCreate(sizeof(RpLightTie), 0x14, 0);
     if (((RwFreeList **)((uint8_t *)RwEngineInstance + rpTieOffset))[1] == NULL) {
         RwFreeListDestroy(((RwFreeList **)((uint8_t *)RwEngineInstance + rpTieOffset))[0]);
         ((RwFreeList **)((uint8_t *)RwEngineInstance + rpTieOffset))[0] = NULL;
@@ -1715,7 +1716,7 @@ void *WorldOpen(void *engine, int32_t offset)
     if (worldGlobals()->pipeline == NULL) {
         return NULL;
     }
-    worldGlobals()->entryFreeList = RwFreeListCreate(0x10, 3, 0);
+    worldGlobals()->entryFreeList = RwFreeListCreate(sizeof(RpWorldListEntry), 3, 0);
     if (worldGlobals()->entryFreeList == NULL) {
         rwIm3DPipelineRelease(worldGlobals()->pipeline);
         worldGlobals()->pipeline = NULL;
@@ -1768,7 +1769,7 @@ void *WorldDeInitClumpExt(void *clump)
 BMX_ADDR(0x004b8ff0)
 void *WorldInitClumpExt(void *clump)
 {
-    *(uint32_t *)((uint8_t *)clump + rpWorldClumpOffset) = 0;
+    *clumpWorldSlot(clump) = NULL;
     return clump;
 }
 
@@ -2008,13 +2009,6 @@ void *rpWorldLightObject(void *object, RpLightApplyFn apply)
 }
 
 /* ---- atomics and the world ---------------------------------------------------------------------------- */
-
-/* The world plugin's data of an atomic (at rpWorldAtomicOffset): the world it is in and its own sync
- * callback. */
-typedef struct RpWorldAtomicData {
-    RpWorld *world; /* 0x00 */
-    void *sync;     /* 0x04 saved RpAtomic.object.sync */
-} RpWorldAtomicData;
 
 static RpWorldAtomicData *atomicData(const RpAtomic *atomic)
 {
@@ -2337,7 +2331,8 @@ RpLight *WorldLightSync(RpLight *light)
 {
     const int32_t offset = rpWorldLightOffset;
     light->stamp++;
-    if (((void *(BMX_CDECL *)(RpLight *))((void **)((uint8_t *)light + offset))[1])(light) == NULL) {
+    if (((void *(BMX_CDECL *)(RpLight *))((RpWorldLightData *)((uint8_t *)light + offset))->sync)(light) ==
+        NULL) {
         RwError error;
         error.pluginID = kWorldPluginId;
         error.errorCode = _rwerror(rwERR_NULLP);
@@ -2470,9 +2465,9 @@ BMX_ADDR(0x004b8fc0)
 void *WorldInitLightExt(void *light)
 {
     RpLight *l = light;
-    uint32_t *data = (uint32_t *)((uint8_t *)l + rpWorldLightOffset);
-    data[0] = 0;
-    data[1] = (uint32_t)(uintptr_t)l->object.sync;
+    RpWorldLightData *data = (RpWorldLightData *)((uint8_t *)l + rpWorldLightOffset);
+    data->world = NULL;
+    data->sync = l->object.sync;
     l->object.sync = RW_CB(void *, 0x004b7bb0);
     return light;
 }
@@ -2702,7 +2697,9 @@ RpMeshHeader *_rpMeshRead(RwStream *stream, void *owner, const RpMaterialList *m
     if (RwStreamReadInt32(stream, header, 0xc) == NULL) {
         return NULL;
     }
-    RpMeshHeader *mesh = RwEngineInstance->memoryFuncs.rwmalloc(header[2] * 2 + 0x10 + header[1] * 0x10);
+    /* The header, the meshes (4 bytes more each than an RpMesh, as in the original), the 16-bit indices. */
+    RpMeshHeader *mesh = RwEngineInstance->memoryFuncs.rwmalloc(header[2] * 2 + sizeof(RpMeshHeader) +
+                                                                header[1] * (sizeof(RpMesh) + 4));
     if (mesh == NULL) {
         return NULL;
     }

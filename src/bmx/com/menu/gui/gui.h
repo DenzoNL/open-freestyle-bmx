@@ -142,10 +142,10 @@ struct GuiElement {
     int dataHandle;        /* 0xec: type specific data (toggle choices) */
 };
 
-_Static_assert(sizeof(GuiElement) == 0xf0, "GuiElement layout");
-_Static_assert(offsetof(GuiElement, animFrames) == 0x50, "GuiElement layout");
-_Static_assert(offsetof(GuiElement, textFlags) == 0xc8, "GuiElement layout");
-_Static_assert(offsetof(GuiElement, dataHandle) == 0xec, "GuiElement layout");
+BMX_LAYOUT32_ASSERT(sizeof(GuiElement) == 0xf0, "GuiElement layout");
+BMX_LAYOUT32_ASSERT(offsetof(GuiElement, animFrames) == 0x50, "GuiElement layout");
+BMX_LAYOUT32_ASSERT(offsetof(GuiElement, textFlags) == 0xc8, "GuiElement layout");
+BMX_LAYOUT32_ASSERT(offsetof(GuiElement, dataHandle) == 0xec, "GuiElement layout");
 
 /* Screen hook: gets every broadcast first and may consume it. */
 typedef int(BMX_CDECL *GuiHookFn)(int msg, GuiElement *element, int arg3, int arg4);
@@ -163,7 +163,7 @@ typedef struct GuiScreenState {
     GuiHookFn hook; /* 0x14 */
 } GuiScreenState;
 
-_Static_assert(sizeof(GuiScreenState) == 0x18, "GuiScreenState layout");
+BMX_LAYOUT32_ASSERT(sizeof(GuiScreenState) == 0x18, "GuiScreenState layout");
 
 typedef GuiElement GuiElementArray[kGuiMaxElements];
 typedef GuiElement *GuiElementPtrArray[kGuiMaxElements];

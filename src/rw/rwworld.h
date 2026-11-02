@@ -81,15 +81,15 @@ typedef struct RpWorldSector {
     struct RpMeshHeader *mesh;           /* 0x58 render mesh built from the polygons */
 } RpWorldSector;
 
-_Static_assert(offsetof(RpWorldSector, polygons) == 0x0c, "RpWorldSector layout");
-_Static_assert(offsetof(RpWorldSector, texCoords) == 0x18, "RpWorldSector layout");
-_Static_assert(offsetof(RpWorldSector, preLitLum) == 0x1c, "RpWorldSector layout");
-_Static_assert(offsetof(RpWorldSector, repEntry) == 0x20, "RpWorldSector layout");
-_Static_assert(offsetof(RpWorldSector, boundingBox) == 0x3c, "RpWorldSector layout");
-_Static_assert(offsetof(RpWorldSector, collAtomicsInWorldSector) == 0x24, "RpWorldSector layout");
-_Static_assert(offsetof(RpWorldSector, lightsInWorldSector) == 0x34, "RpWorldSector layout");
-_Static_assert(offsetof(RpWorldSector, colSectorRoot) == 0x54, "RpWorldSector layout");
-_Static_assert(offsetof(RpWorldSector, mesh) == 0x58, "RpWorldSector layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpWorldSector, polygons) == 0x0c, "RpWorldSector layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpWorldSector, texCoords) == 0x18, "RpWorldSector layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpWorldSector, preLitLum) == 0x1c, "RpWorldSector layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpWorldSector, repEntry) == 0x20, "RpWorldSector layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpWorldSector, boundingBox) == 0x3c, "RpWorldSector layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpWorldSector, collAtomicsInWorldSector) == 0x24, "RpWorldSector layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpWorldSector, lightsInWorldSector) == 0x34, "RpWorldSector layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpWorldSector, colSectorRoot) == 0x54, "RpWorldSector layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpWorldSector, mesh) == 0x58, "RpWorldSector layout");
 
 /* Links an atomic and a world sector it touches (in both of their lists). */
 typedef struct RpTie {
@@ -107,8 +107,8 @@ typedef struct RpLightTie {
     RpWorldSector *worldSector;  /* 0x14 */
 } RpLightTie;
 
-_Static_assert(sizeof(RpTie) == 0x18, "RpTie layout");
-_Static_assert(sizeof(RpLightTie) == 0x18, "RpLightTie layout");
+BMX_LAYOUT32_ASSERT(sizeof(RpTie) == 0x18, "RpTie layout");
+BMX_LAYOUT32_ASSERT(sizeof(RpLightTie) == 0x18, "RpLightTie layout");
 
 /* RpMaterial: texture, colour, reference count, a change stamp and the surface properties. */
 typedef struct RpMaterial {
@@ -120,9 +120,9 @@ typedef struct RpMaterial {
     RwSurfaceProperties surfaceProps; /* 0x0c */
 } RpMaterial;
 
-_Static_assert(offsetof(RpMaterial, refCount) == 0x08, "RpMaterial layout");
-_Static_assert(offsetof(RpMaterial, stamp) == 0x0a, "RpMaterial layout");
-_Static_assert(sizeof(RpMaterial) == 0x18, "RpMaterial layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpMaterial, refCount) == 0x08, "RpMaterial layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpMaterial, stamp) == 0x0a, "RpMaterial layout");
+BMX_LAYOUT32_ASSERT(sizeof(RpMaterial) == 0x18, "RpMaterial layout");
 
 /* The materials of a geometry or world: a growable array (space 5 at a time). */
 typedef struct RpMaterialList {
@@ -151,15 +151,15 @@ typedef struct RpWorld {
     uint8_t stamp;                              /* 0x70 incremented when the world is destroyed */
 } RpWorld;
 
-_Static_assert(offsetof(RpWorld, matList) == 0x0c, "RpWorld layout");
-_Static_assert(offsetof(RpWorld, rootSector) == 0x18, "RpWorld layout");
-_Static_assert(offsetof(RpWorld, clumpList) == 0x24, "RpWorld layout");
-_Static_assert(offsetof(RpWorld, directionalLightList) == 0x34, "RpWorld layout");
-_Static_assert(offsetof(RpWorld, worldOrigin) == 0x3c, "RpWorld layout");
-_Static_assert(offsetof(RpWorld, boundingBox) == 0x48, "RpWorld layout");
-_Static_assert(offsetof(RpWorld, surfaceProps) == 0x60, "RpWorld layout");
-_Static_assert(offsetof(RpWorld, renderCallBack) == 0x6c, "RpWorld layout");
-_Static_assert(offsetof(RpWorld, stamp) == 0x70, "RpWorld layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpWorld, matList) == 0x0c, "RpWorld layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpWorld, rootSector) == 0x18, "RpWorld layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpWorld, clumpList) == 0x24, "RpWorld layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpWorld, directionalLightList) == 0x34, "RpWorld layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpWorld, worldOrigin) == 0x3c, "RpWorld layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpWorld, boundingBox) == 0x48, "RpWorld layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpWorld, surfaceProps) == 0x60, "RpWorld layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpWorld, renderCallBack) == 0x6c, "RpWorld layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpWorld, stamp) == 0x70, "RpWorld layout");
 
 /*
  * The world plugin's data of a camera (at RwCamera + rpWorldCameraOffset): the sectors in view, the world and
@@ -175,7 +175,18 @@ typedef struct RpWorldCameraData {
     void *sync;                     /* 0x18 saved RwCamera.object.sync */
 } RpWorldCameraData;
 
-_Static_assert(sizeof(RpWorldCameraData) == 0x1c, "RpWorldCameraData layout");
+BMX_LAYOUT32_ASSERT(sizeof(RpWorldCameraData) == 0x1c, "RpWorldCameraData layout");
+
+/*
+ * The world plugin's data of an atomic (at rpWorldAtomicOffset) or a light (at rpWorldLightOffset): the world
+ * it is in and its own sync callback, which the plugin's replaces.
+ */
+typedef struct RpWorldAtomicData {
+    RpWorld *world; /* 0x00 */
+    void *sync;     /* 0x04 saved RpAtomic.object.sync / RpLight.object.sync */
+} RpWorldAtomicData;
+
+typedef RpWorldAtomicData RpWorldLightData;
 
 /* The tie plugin's data in the engine instance (at rpTieOffset): free lists of the two kinds of ties. */
 typedef struct RpTieGlobals {
@@ -244,7 +255,7 @@ typedef struct RpIntersection {
     int32_t type; /* 0x18 RpIntersectType */
 } RpIntersection;
 
-_Static_assert(sizeof(RpIntersection) == 0x1c, "RpIntersection layout");
+BMX_LAYOUT32_ASSERT(sizeof(RpIntersection) == 0x1c, "RpIntersection layout");
 _Static_assert(offsetof(RpIntersection, type) == 0x18, "RpIntersection layout");
 
 typedef void *(BMX_CDECL *RpIntersectionCallBackWorldSector)(RpIntersection *intersection,
@@ -283,11 +294,11 @@ typedef struct RpPVSWorldData {
     uint32_t statsB;                                 /* 0x54 */
 } RpPVSWorldData;
 
-_Static_assert(offsetof(RpPVSWorldData, visibility) == 0x14, "RpPVSWorldData layout");
-_Static_assert(offsetof(RpPVSWorldData, rowBuffer) == 0x20, "RpPVSWorldData layout");
-_Static_assert(offsetof(RpPVSWorldData, progressCallBack) == 0x34, "RpPVSWorldData layout");
-_Static_assert(offsetof(RpPVSWorldData, numEntries) == 0x44, "RpPVSWorldData layout");
-_Static_assert(offsetof(RpPVSWorldData, statsA) == 0x50, "RpPVSWorldData layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpPVSWorldData, visibility) == 0x14, "RpPVSWorldData layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpPVSWorldData, rowBuffer) == 0x20, "RpPVSWorldData layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpPVSWorldData, progressCallBack) == 0x34, "RpPVSWorldData layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpPVSWorldData, numEntries) == 0x44, "RpPVSWorldData layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpPVSWorldData, statsA) == 0x50, "RpPVSWorldData layout");
 
 /* State of a PVS generation in progress: the world, and the camera and image it renders with. */
 #define rpPVSWorld  ORIG_VAR(0x00676810, RpWorld *, rpPVSWorld)

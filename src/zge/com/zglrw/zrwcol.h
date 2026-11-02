@@ -30,8 +30,8 @@ typedef struct ZrwColTriangle {
 } ZrwColTriangle;
 
 _Static_assert(offsetof(ZrwColTriangle, index) == 0x18, "collision triangle");
-_Static_assert(offsetof(ZrwColTriangle, vertex) == 0x1c, "collision triangle");
-_Static_assert(sizeof(ZrwColTriangle) == 0x28, "collision triangle");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwColTriangle, vertex) == 0x1c, "collision triangle");
+BMX_LAYOUT32_ASSERT(sizeof(ZrwColTriangle) == 0x28, "collision triangle");
 
 /* Colour of the last line hit (0x674158, r g b a). */
 typedef uint8_t ZrwColColor[4];
@@ -72,10 +72,10 @@ typedef struct ZrwColState {
     uint32_t bestSub;    /* 0x4c the RpWorldSector it belongs to, 0 for an atomic */
 } ZrwColState;
 
-_Static_assert(offsetof(ZrwColState, best) == 0x20, "collision state");
-_Static_assert(offsetof(ZrwColState, bestUser) == 0x48, "collision state");
-_Static_assert(offsetof(ZrwColState, bestSub) == 0x4c, "collision state");
-_Static_assert(sizeof(ZrwColState) == 0x50, "collision state");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwColState, best) == 0x20, "collision state");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwColState, bestUser) == 0x48, "collision state");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwColState, bestSub) == 0x4c, "collision state");
+BMX_LAYOUT32_ASSERT(sizeof(ZrwColState) == 0x50, "collision state");
 
 #define gZrwCol ORIG_VAR(0x00674160, ZrwColState, gZrwCol)
 /* Set by zrwcolEnableIfTagInfo (0x6741b0). */

@@ -33,8 +33,8 @@ typedef struct ZfileDevice {
     uint32_t(BMX_CDECL *getSize)(ZfileHandle *file, int *size, uint32_t flags);         /* 0x38 */
 } ZfileDevice;
 
-_Static_assert(__builtin_offsetof(ZfileDevice, open) == 0x20, "device layout");
-_Static_assert(__builtin_offsetof(ZfileDevice, getSize) == 0x38, "device layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZfileDevice, open) == 0x20, "device layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZfileDevice, getSize) == 0x38, "device layout");
 
 enum { kZfileMaxDevices = 16, kZfileErrorBytes = 0x40, kZfileNameBytes = 0x80 };
 

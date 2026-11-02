@@ -90,7 +90,7 @@ static void releaseBuffers(ZMovie *m)
 {
     while (m->bufferCount != 0) {
         m->bufferCount--;
-        gWaveOutUnprepare(m->waveOut, m->buffers[m->bufferCount], 0x20);
+        gWaveOutUnprepare(m->waveOut, m->buffers[m->bufferCount], sizeof(ZMovieWaveHeader));
         zmemFree(m->buffers[m->bufferCount]);
     }
 }
@@ -256,7 +256,7 @@ int zmovieFillAudio(ZMovie *m)
                     return 0;
                 }
                 m->audioPos += readSamples;
-                if (gWaveOutWrite(m->waveOut, m->buffers[m->head], 0x20) != 0) {
+                if (gWaveOutWrite(m->waveOut, m->buffers[m->head], sizeof(ZMovieWaveHeader)) != 0) {
                     return 0;
                 }
                 m->queued++;

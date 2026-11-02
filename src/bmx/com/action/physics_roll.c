@@ -250,8 +250,8 @@ static int rollProbeWalls(PhysRider *r, RollState *s, unsigned w)
             propHitFace(r->player, hit->face);
             lands = 0;
         }
-        if ((hit->kind & 2) && hit->objectData->propId != 0 &&
-            !propTouch(r->player, (void *)(uintptr_t)hit->objectData->propId)) {
+        if ((hit->kind & 2) && physObjectProp(hit->objectData) != NULL &&
+            !propTouch(r->player, physObjectProp(hit->objectData))) {
             continue;
         }
         if (!lands) {
@@ -515,8 +515,8 @@ static int rollContact(PhysRider *r, RollState *s, unsigned w, double dz)
         }
     } else if (hit->kind & 2) {
         const uint8_t *info;
-        if (hit->objectData->propId != 0) {
-            propTouch(r->player, (void *)(uintptr_t)hit->objectData->propId);
+        if (physObjectProp(hit->objectData) != NULL) {
+            propTouch(r->player, physObjectProp(hit->objectData));
         }
         info = ngifzBspGetInfo(hit->object);
         if (ngifzCollideObjectValid(hit->object)) {

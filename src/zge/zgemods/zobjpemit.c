@@ -1,6 +1,8 @@
 /* Particle emitters and look-at (C:\NgEngine\Zge\ZgeMods\zobjPEmit.c). */
 #include "zge/zgemods/zobjpemit.h"
 
+#include <stddef.h>
+
 #include "zge/com/zglrw/zrwzgl.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zobjcamera.h"
@@ -24,13 +26,14 @@ void zobjPEmitEffectDestroy(ZfxEffect *effect)
 BMX_ADDR(0x00495390)
 ZfxEmitter *zobjPEmitCreate(uint32_t effect, uint16_t capacity)
 {
-    ZfxEmitter *emitter = zmemAlloc(0x30);
+    ZfxEmitter *emitter = zmemAlloc(sizeof *emitter);
 
     if (emitter == NULL) {
         return NULL;
     }
     emitter->particles = zlistCreate(capacity);
-    emitter->pool = zmemFreeListCreate(0x60, capacity, NULL);
+    /* The engine's particles stop before the corners the game's effects add (ngiffx.c). */
+    emitter->pool = zmemFreeListCreate(offsetof(ZfxParticle, corner), capacity, NULL);
     emitter->effect = effect;
     emitter->lastUpdate = gTimeGetTime();
     return emitter;
@@ -50,7 +53,7 @@ void zobjPEmitDestroy(ZfxEffect *effect, ZfxEmitter *emitter)
 BMX_ADDR(0x00495410)
 void zobjPEmitAddModifier(ZfxEffect *effect, ZfxModifier *modifier, void *arg)
 {
-    ZfxModifierNode *node = zmemAlloc(0x10);
+    ZfxModifierNode *node = zmemAlloc(sizeof *node);
 
     node->modifier = modifier;
     node->arg = arg;
@@ -75,7 +78,7 @@ void zobjPEmitAddModifierByName(ZfxEffect *effect, const char *name, void *arg)
     ZfxModifier *modifier = zstrNameTable1Find(name);
 
     if (modifier != NULL) {
-        ZfxModifierNode *node = zmemAlloc(0x10);
+        ZfxModifierNode *node = zmemAlloc(sizeof *node);
 
         node->modifier = modifier;
         node->arg = arg;

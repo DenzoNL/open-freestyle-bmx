@@ -40,7 +40,7 @@ typedef struct ZrwFileOps {
     void *pad24;                                                                               /* 0x24 */
 } ZrwFileOps;
 
-_Static_assert(sizeof(ZrwFileOps) == 0x28, "file ops");
+BMX_LAYOUT32_ASSERT(sizeof(ZrwFileOps) == 0x28, "file ops");
 
 #define gZrwFileOps         ORIG_VAR(0x006752c0, ZrwFileOps, gZrwFileOps)
 #define gZrwFileInitialized ORIG_VAR(0x006752e8, int, gZrwFileInitialized)

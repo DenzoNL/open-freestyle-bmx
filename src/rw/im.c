@@ -150,7 +150,7 @@ BMX_ADDR(0x004e83e0)
 void *_rwRenderPipelineOpen(void *engine, int32_t offset)
 {
     rwIm3DOffset = offset;
-    rwIm3DGlobals()->pipelineFreeList = RwFreeListCreate(0x1c, 5, 0);
+    rwIm3DGlobals()->pipelineFreeList = RwFreeListCreate(sizeof(RwIm3DPipeline), 5, 0);
     if (rwIm3DGlobals()->pipelineFreeList == NULL) {
         return NULL;
     }

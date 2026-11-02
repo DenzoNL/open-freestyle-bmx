@@ -575,7 +575,7 @@ typedef struct ExtrasTitle {
     MovieDesc movie;
 } ExtrasTitle;
 
-_Static_assert(sizeof(ExtrasTitle) == 0x7c, "ExtrasTitle layout");
+BMX_LAYOUT32_ASSERT(sizeof(ExtrasTitle) == 0x7c, "ExtrasTitle layout");
 /* Plays the movie(s) of the descriptor; the exe's own name for it is not known. */
 void moviePlay(MovieDesc *const *list);
 

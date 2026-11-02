@@ -75,6 +75,10 @@ ORIG_FN(0x004b4720, int, RpGeometryGetNumTrianglesWithArg, (void *geometry, int 
 static const uint8_t kHashDummy[] = "123456789012345678";
 #endif
 
+/* The scratch holds a table of 0x1000 match pointers, aligned (plus slack for the alignment). */
+enum { kHashTableEntries = 0x1000 };
+#define kHashScratchBytes (kHashTableEntries * sizeof(const uint8_t *) + 0x10)
+
 static inline uint32_t hashBucket(uint32_t a, uint32_t b, uint32_t c)
 {
     return (uint32_t)((int32_t)((((a << 4) ^ b) << 4 ^ c) * (uint32_t)-0x1a1) >> 4) & 0x1ff;
@@ -84,7 +88,8 @@ BMX_ADDR(0x0049bd10)
 void zassetDecompressHashed(void *work, const uint8_t *src, int srcLength, uint8_t *dst, int *outLength)
 {
     const uint8_t *const end = src + srcLength;
-    const uint8_t **table = (const uint8_t **)(((uintptr_t)work + 3) & ~(uintptr_t)3);
+    const uintptr_t align = _Alignof(const uint8_t *) - 1;
+    const uint8_t **table = (const uint8_t **)(((uintptr_t)work + align) & ~align);
     const uint8_t *ip = src + 4;
     uint32_t ring = 0;
     uint32_t flags = 1;
@@ -99,7 +104,7 @@ void zassetDecompressHashed(void *work, const uint8_t *src, int srcLength, uint8
         *outLength = length;
         return;
     }
-    for (int i = 0; i < 0x1000; i++) {
+    for (int i = 0; i < kHashTableEntries; i++) {
         table[i] = kHashDummy;
     }
     while (ip != end) {
@@ -175,7 +180,7 @@ int zassetDecompress(int kind, const void *packed, uint32_t size, void *dest, ui
     int afterLiteral = 0;
 
     if (method == 1) {
-        void *work = zmemAlloc(0x4010);
+        void *work = zmemAlloc(kHashScratchBytes);
         zassetDecompressHashed(work, src, srcLength, dst, outLength);
         zmemFree(work);
         return 0;

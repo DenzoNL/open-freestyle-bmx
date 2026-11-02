@@ -57,15 +57,16 @@ typedef struct ZObj {
     ZObjLinks *links;   /* 0x24 */
     const ZObjOps *ops; /* 0x28 */
     void *model;        /* 0x2c renderer handle of the type (model, light, camera) */
-    uint8_t pad30[8];   /* 0x30 */
+    void *data;         /* 0x30 by type: the skeleton (models), the effect host (effects), the transform */
+    uint8_t pad34[4];   /* 0x34 */
     ZObjEvents *events; /* 0x38 */
 } ZObj;
 
-_Static_assert(sizeof(ZObj) == 0x3c, "object layout");
-_Static_assert(__builtin_offsetof(ZObj, links) == 0x24, "object layout");
-_Static_assert(__builtin_offsetof(ZObj, ops) == 0x28, "object layout");
-_Static_assert(__builtin_offsetof(ZObj, model) == 0x2c, "object layout");
-_Static_assert(__builtin_offsetof(ZObj, events) == 0x38, "object layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZObj) == 0x3c, "object layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZObj, links) == 0x24, "object layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZObj, ops) == 0x28, "object layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZObj, model) == 0x2c, "object layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZObj, events) == 0x38, "object layout");
 
 enum {
     kZobjActive = 0x08,

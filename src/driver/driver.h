@@ -14,9 +14,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "compat/layout.h"
 #include "hook/hook.h"
 #include "rw/rwcamera.h"
 #include "rw/rwcore.h"
+#include "rw/rwd3d.h"
 #include "rw/rwtexture.h"
 
 /* (original address, our function) pairs: these override a port of the same address (tools/gen_origmap.py).
@@ -91,11 +93,14 @@ typedef struct DrvRasterExt {
     uint8_t pad1a[6];
 } DrvRasterExt;
 
-_Static_assert(sizeof(DrvRasterExt) == 0x20, "the original's raster plugin size");
-_Static_assert(offsetof(DrvRasterExt, handle) == 0x0c && offsetof(DrvRasterExt, info) == 0x10,
-               "the raster plugin fields rw/d3dstate.c reads");
+BMX_LAYOUT32_ASSERT(sizeof(DrvRasterExt) == 0x20, "the original's raster plugin size");
+_Static_assert(offsetof(DrvRasterExt, colorKey) == offsetof(RwD3DRasterExt, colorKey) &&
+                   offsetof(DrvRasterExt, handle) == offsetof(RwD3DRasterExt, handle) &&
+                   offsetof(DrvRasterExt, info) == offsetof(RwD3DRasterExt, info),
+               "the raster plugin fields rw/d3dstate.c reads (RwD3DRasterExt)");
 
-extern int32_t drvCameraOffset; /* the driver's camera plugin data (DrvCameraExt) */
+extern int32_t drvCameraOffset; /* the driver's camera plugin data (DrvCameraExt, no pointers) */
+enum { kDrvCameraExtBytes = 0x20 };
 DrvRasterExt *drvRasterExt(const RwRaster *raster);
 /* Dev aid: BMX_DRIVER_TRACE=1 logs every driver entry with its first three arguments. */
 void drvTrace(const char *name, uint32_t a, uint32_t b, uint32_t c);

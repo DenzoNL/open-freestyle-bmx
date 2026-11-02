@@ -67,7 +67,7 @@ typedef struct ZfxEmitter {
     uint32_t effect;     /* 0x2c argument of ngiffxPosterCreate */
 } ZfxEmitter;
 
-_Static_assert(sizeof(ZfxEmitter) == 0x30, "emitter layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZfxEmitter) == 0x30, "emitter layout");
 
 /* Handler table of an effect, in the exe's data (0x55c278 + 0x38 * n). */
 struct ZfxEffect {
@@ -79,7 +79,7 @@ struct ZfxEffect {
     uint8_t pad28[0x10];
 };
 
-_Static_assert(sizeof(ZfxEffect) == 0x38, "effect table layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZfxEffect) == 0x38, "effect table layout");
 
 /* Vertex of the renderer's immediate mode primitives. */
 typedef struct ZfxVertex {
@@ -115,7 +115,7 @@ struct ZfxSkid {
     uint32_t texture[16]; /* 0x0c one per frame */
     uint32_t lastTime;    /* 0x4c */
 };
-_Static_assert(sizeof(ZfxSkid) == 0x50, "skid layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZfxSkid) == 0x50, "skid layout");
 enum { kFxSkidEntries = 8 };
 typedef ZfxSkid ZfxSkidTable[kFxSkidEntries];
 #define gFxSkids ORIG_VAR(0x0068fd00, ZfxSkidTable, gFxSkids)

@@ -198,10 +198,10 @@ static int16_t randomSigned(void)
     return (int16_t)bmxFtol((double)(zmathRandom() & 0xff) - 128.0);
 }
 
-/* The object's transform (+0x30), whose position sits at +8. */
+/* The object's transform (ZObj.data), whose position sits at +8. */
 static const float *objectTransform(const void *object)
 {
-    return *(const float *const *)((const uint8_t *)object + 0x30);
+    return ((const ZObj *)object)->data;
 }
 
 /* Spark spawner: moving particles with a random velocity around the base velocity. */

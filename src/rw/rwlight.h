@@ -22,10 +22,10 @@ typedef struct RpLight {
     uint8_t stamp;           /* 0x42 */
 } RpLight;
 
-_Static_assert(offsetof(RpLight, radius) == 0x18, "RpLight layout");
-_Static_assert(offsetof(RpLight, coneAngle) == 0x2c, "RpLight layout");
-_Static_assert(offsetof(RpLight, lightFrame) == 0x40, "RpLight layout");
-_Static_assert(offsetof(RpLight, stamp) == 0x42, "RpLight layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpLight, radius) == 0x18, "RpLight layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpLight, coneAngle) == 0x2c, "RpLight layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpLight, lightFrame) == 0x40, "RpLight layout");
+BMX_LAYOUT32_ASSERT(offsetof(RpLight, stamp) == 0x42, "RpLight layout");
 
 /* The light plugin's data in the engine instance: the free list of lights. */
 #define rpLightOffset ORIG_VAR(0x006767a0, int32_t, rpLightOffset)
@@ -42,7 +42,7 @@ typedef struct RpLightVisit {
     void *tail;              /* 0x4c */
 } RpLightVisit;
 
-_Static_assert(sizeof(RpLightVisit) == 0x50, "RpLightVisit layout");
+BMX_LAYOUT32_ASSERT(sizeof(RpLightVisit) == 0x50, "RpLightVisit layout");
 
 void rpWorldExtLightSelectCallback(RpLight *light);
 RpLight *rpLightVisitOnce(RpLight *light, RpLightVisit *visit);

@@ -102,7 +102,7 @@ typedef struct CameraView {
     ZVec3 target; /* 0x18 */
 } CameraView;
 
-_Static_assert(sizeof(CameraView) == 0x24, "CameraView size");
+BMX_LAYOUT32_ASSERT(sizeof(CameraView) == 0x24, "CameraView size");
 
 /* Non-zero while a replay or other playback runs (timers and goal markers stand still). */
 uint32_t cameraPlaybackActive(void);

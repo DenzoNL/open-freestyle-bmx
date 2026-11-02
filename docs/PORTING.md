@@ -317,6 +317,36 @@ data in the source".
   unchanged; tools/xcheck.py with the user's recording (5594 ticks, NgBMX.exe moved away) identical to
   rec-20261101-140610.native32-84da8fd.hash. **Pending** (the user plays): the scripted ride.
 
+### X2c (partly done 2026-11-01): on-disk types, sizes, offsets, 32-bit-only layout asserts
+
+Work list: docs/notes/layouts64.md. Rule kept throughout: value-identical in the 32-bit builds (the
+mechanical commits leave bmxtest.dll, dinput.dll and bmxnative.exe .text/.data/.rdata byte-identical).
+- **Done:** zassetDecompressHashed's scratch sized from its pointer table; on-disk types + readers for the
+  FILE structs (.zsd banks: ZsdFile*, the in-memory tables built over the file's on 32-bit, beside it on
+  64-bit; Replay: ReplayFileHeader, offsets via replayAt; zprim font pages through compat/slot32.h; RW
+  chunks 0x10e / 0x112: RpSkinBoneBlockFile, RpLodAtomicFile; tag faces: typed fixups). SAVE.DAT confirmed
+  pointer-free (no 64-bit failures in its groups). ~45 literal allocation sizes -> sizeof (zge free lists,
+  all RW plugin registrations, RwFreeList's stack, plane sectors, meshes, replay parts as ReplaySnapshot,
+  WAVEHDR, DirectInput vtable slots). Byte offsets -> fields (RwGlobals.lightVisit, RpClump.inWorldLink,
+  ZObj.data, ZrwCamera fields, Im3D work record, PhysRider stride, physObjectProp). Type pairs merged:
+  PhysCollObject = PhysPropObject, ZsndSeqHeader = ZsdTrackDef, RwMatrixGlobals = RwMatrixModule;
+  ZtaginfNode / ZrwRenderColNode asserted to agree. compat/layout.h: BMX_LAYOUT32_ASSERT; the 409
+  failing in-memory asserts converted. tools/probe64.py (--list, other errors): **418 -> 0 failing asserts
+  outside src/data** (src/data: 1780, generator).
+- **Verified:** xcheck rec-20261101-140610 (5594 ticks) = native32-84da8fd hash, scripted ride (1014) equal
+  (after the FILE, sizes and offsets commits); attract mode demo (Replay.ZAL, 2130 ticks) equal to the X2a
+  exe; oracle subsets (winload with real assets, zsndseq, zprim, replay, RW plugins, light, clump).
+  Pending: full gate after the last commits.
+- **Left (X2c/X2e):** src/data generator: group offset asserts, 12 data initialisers storing pointers in u32,
+  memsets over groups by literal size (zrwworld 0xac, zrwzgl 0x10/0x88/0xa8, main.c 0x34); PropState
+  (0xb40 view, node states hold pointers; prop.c 0x300); contactSize / PhysContactSnap; d3dim2d deferred
+  records; zrwcol 0x13000, zrwprim, zrwmodelrender buffers; byte offsets in game.c, physics.c, physics_air.c,
+  rider.c, action.c, ngifzbsp.c, world.c (`object + 0xc`, pipeline + 0x10), driver/texture.c, zscene,
+  frontend_select, guiinput, ngifzmemdmm, crt.c rwFexist (original address); type pairs ZPropDef/ZbspTreeNode,
+  ZPropInst/PhysPropNode, ZrwRenderColTriangle = ZbspLevelFace (pointers read as u32 tags), ZObj views,
+  OvlFont/ZOverFont, ZrwShadow*, ZrwColTriangle; user-data words carrying pointers (zrwMdlSetUserData,
+  zrwTextureSetUserData; their plugin slots are already pointer-sized). X2d: the 28-bit ordering tables.
+
 ## Not in scope
 
 - Running without the user's game files: the assets, movies and music stay theirs.

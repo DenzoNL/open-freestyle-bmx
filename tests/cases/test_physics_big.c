@@ -553,7 +553,7 @@ static void make_ray(PhysRayHit *h, const PhysRider *r)
         break;
     case 2:
         h->kind = 2;
-        h->objectData = (dt_u32() & 3) ? (PhysCollObject *)(void *)make_prop(&r->pos, 50.0f) : NULL;
+        h->objectData = (dt_u32() & 3) ? (PhysPropObject *)(void *)make_prop(&r->pos, 50.0f) : NULL;
         break;
     default: {
         PhysFace *f = make_face();

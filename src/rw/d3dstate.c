@@ -77,7 +77,7 @@ static void updateAlpha(void)
 BMX_ADDR(0x004ef3d0)
 void *rwD3DRasterHandle(const RwRaster *raster)
 {
-    return *(void *const *)((const uint8_t *)raster + rwD3DRasterExtOffset + 0xc);
+    return ((const RwD3DRasterExt *)((const uint8_t *)raster + rwD3DRasterExtOffset))->handle;
 }
 
 /* 0x4d6840 (raster in EAX): rwRENDERSTATETEXTURERASTER. NULL draws with the vertex colours only. */
@@ -96,14 +96,14 @@ __attribute__((regparm(1))) int rwD3DSetTextureRaster(RwRaster *raster)
             s->colorKey = 0;
         }
     } else {
-        const uint8_t *ext = (const uint8_t *)raster + offset;
-        const RwD3DRasterInfo *info = *(RwD3DRasterInfo *const *)(ext + 0x10);
+        const RwD3DRasterExt *ext = (const RwD3DRasterExt *)((const uint8_t *)raster + offset);
+        const RwD3DRasterInfo *info = ext->info;
         int32_t key;
 
         rwD3DDevSetTexture(0, rwD3DRasterHandle(raster));
         setStage(&s->colorOp, kTssColorOp, kTopModulate);
         s->textureAlpha = (int32_t)(info->flags & 1);
-        key = *(const int32_t *)(ext + 4) != 0;
+        key = ext->colorKey != 0;
         if (key != s->colorKey) {
             rwD3DDevSetRenderState(kRsColorKeyEnable, (uint32_t)key);
             s->colorKey = *(const int32_t *)((const uint8_t *)raster + offset + 4) != 0;

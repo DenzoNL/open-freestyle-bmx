@@ -10,13 +10,6 @@
 #include "zge/zmath.h"
 
 /* Dynamic collision object (props). */
-typedef struct PhysCollObject {
-    uint8_t pad000[0x1ec];
-    int32_t propId; /* 0 when the object is not a prop */
-} PhysCollObject;
-
-_Static_assert(sizeof(PhysCollObject) == 0x1f0, "PhysCollObject size");
-
 /* Prop record behind a collision object: facing direction at +0x3c. */
 typedef struct PhysPropInfo {
     uint8_t pad00[0x3c];
@@ -35,7 +28,7 @@ typedef struct PhysPropFrame {
 } PhysPropFrame;
 
 _Static_assert(offsetof(PhysPropFrame, rot) == 0x14, "PhysPropFrame.rot");
-_Static_assert(offsetof(PhysPropFrame, model) == 0x2c, "PhysPropFrame.model");
+BMX_LAYOUT32_ASSERT(offsetof(PhysPropFrame, model) == 0x2c, "PhysPropFrame.model");
 
 /* Placement record of a prop in the level file (bytes 4-7 and the word at 8 feed the collision object). */
 typedef struct PhysPropTag {
@@ -59,8 +52,8 @@ typedef struct PhysPropNode {
     void(BMX_CDECL *destroy)(struct PhysPropObject *object); /* frees the object (0x468d20) */
 } PhysPropNode;
 
-_Static_assert(offsetof(PhysPropNode, frame) == 0x1c, "PhysPropNode.frame");
-_Static_assert(offsetof(PhysPropNode, destroy) == 0x30, "PhysPropNode.destroy");
+BMX_LAYOUT32_ASSERT(offsetof(PhysPropNode, frame) == 0x1c, "PhysPropNode.frame");
+BMX_LAYOUT32_ASSERT(offsetof(PhysPropNode, destroy) == 0x30, "PhysPropNode.destroy");
 
 /* Prop collision object (500 bytes), the contact of surface 12 (listed by zbspFindPropsNear). */
 typedef struct PhysPropObject {
@@ -78,9 +71,15 @@ typedef struct PhysPropObject {
 
 _Static_assert(offsetof(PhysPropObject, pos) == 0xa, "PhysPropObject.pos");
 _Static_assert(offsetof(PhysPropObject, scale) == 0x10, "PhysPropObject.scale");
-_Static_assert(offsetof(PhysPropObject, edges) == 0x24, "PhysPropObject.edges");
-_Static_assert(offsetof(PhysPropObject, prop) == 0x1ec, "PhysPropObject.prop");
-_Static_assert(offsetof(PhysPropObject, node) == 0x1f0, "PhysPropObject.node");
+BMX_LAYOUT32_ASSERT(offsetof(PhysPropObject, edges) == 0x24, "PhysPropObject.edges");
+BMX_LAYOUT32_ASSERT(offsetof(PhysPropObject, prop) == 0x1ec, "PhysPropObject.prop");
+BMX_LAYOUT32_ASSERT(offsetof(PhysPropObject, node) == 0x1f0, "PhysPropObject.node");
+
+/* The prop record of a collision object (a PhysPropObject); NULL when the object is not a prop. */
+static inline void *physObjectProp(const void *object)
+{
+    return (void *)((const PhysPropObject *)object)->prop;
+}
 
 /*
  * Line test / ray result (cleared to 0xd8 bytes by zcollideRay; the global copy at 0x56c128 uses the
@@ -110,7 +109,7 @@ typedef struct PhysRayHit {
     const uint32_t *material; /* bits 0-3 surface material, bits 19-20 hazard kind */
     int32_t object;           /* collision object handle */
     union {
-        PhysCollObject *objectData;
+        PhysPropObject *objectData;
         PhysEdge *edge;
     };
     uint8_t pad44[0x4];
@@ -119,12 +118,12 @@ typedef struct PhysRayHit {
     uint32_t padd4;
 } PhysRayHit;
 
-_Static_assert(sizeof(PhysRayHit) == 0xd8, "PhysRayHit size");
-_Static_assert(offsetof(PhysRayHit, faceRecord) == 0x48, "PhysRayHit.faceRecord");
-_Static_assert(offsetof(PhysRayHit, materialWord) == 0xd0, "PhysRayHit.materialWord");
+BMX_LAYOUT32_ASSERT(sizeof(PhysRayHit) == 0xd8, "PhysRayHit size");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRayHit, faceRecord) == 0x48, "PhysRayHit.faceRecord");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRayHit, materialWord) == 0xd0, "PhysRayHit.materialWord");
 _Static_assert(offsetof(PhysRayHit, normal) == 0x1c, "PhysRayHit.normal");
 _Static_assert(offsetof(PhysRayHit, face) == 0x30, "PhysRayHit.face");
-_Static_assert(offsetof(PhysRayHit, material) == 0x38, "PhysRayHit.material");
-_Static_assert(offsetof(PhysRayHit, objectData) == 0x40, "PhysRayHit.objectData");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRayHit, material) == 0x38, "PhysRayHit.material");
+BMX_LAYOUT32_ASSERT(offsetof(PhysRayHit, objectData) == 0x40, "PhysRayHit.objectData");
 
 #endif

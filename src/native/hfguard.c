@@ -37,6 +37,7 @@
 #include "rw/rwplugins.h"
 #include "rw/rwtexture.h"
 #include "rw/rwworld.h"
+#include "zge/com/zglrw/zrwcam.h"
 #include "zge/com/zglrw/zrwcol.h"
 #include "zge/com/zglrw/zrwmodel.h"
 #include "zge/com/zglrw/zrwshadow.h"
@@ -289,7 +290,7 @@ static void hashAll(Hashes *out)
                                model->collisionClump ? RpClumpGetFrame(model->collisionClump) : NULL, part);
             }
         } else if (object->ops == kEffectOps) {
-            const ZList *items = (*(ZrwEffectHost *const *)&object->pad30[0])->items;
+            const ZList *items = ((const ZrwEffectHost *)object->data)->items;
 
             gEmitters = (uint32_t)items->count > gEmitters ? (uint32_t)items->count : gEmitters;
             for (int i = 0; i < items->count; i++) {
@@ -393,7 +394,7 @@ static int guardDraw(int second)
     }
     if (gClearOn != 0) {
         for (void *camera = zrwcamFirst(); camera != NULL; camera = zrwcamNext(camera)) {
-            if ((((const uint8_t *)camera)[8] & 4) != 0) {
+            if ((((const ZrwCamera *)camera)->state & 4) != 0) {
                 RwCameraClear(zrwcamHandle(camera), &gClearColor, 3);
             }
         }
@@ -403,7 +404,7 @@ static int guardDraw(int second)
     for (void *camera = zrwcamFirst(); camera != NULL; camera = zrwcamNext(camera)) {
         RwError error;
 
-        if ((((const uint8_t *)camera)[8] & 4) == 0) {
+        if ((((const ZrwCamera *)camera)->state & 4) == 0) {
             continue;
         }
         RwErrorGet(&error);

@@ -54,8 +54,8 @@ typedef struct ZrwDbgScratch {
     ZrwDbgPoly2 axesPolys[3]; /* 0x650448 */
 } ZrwDbgScratch;
 
-_Static_assert(offsetof(ZrwDbgScratch, linePoly) == 0x2b8, "scratch layout");
-_Static_assert(sizeof(ZrwDbgScratch) == 0x2ec, "scratch layout");
+BMX_LAYOUT32_ASSERT(offsetof(ZrwDbgScratch, linePoly) == 0x2b8, "scratch layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZrwDbgScratch) == 0x2ec, "scratch layout");
 
 #define gScratch ORIG_VAR(0x00650180, ZrwDbgScratch, gScratch)
 

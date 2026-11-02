@@ -45,7 +45,7 @@ typedef struct ZFont {
     ZFontSet *sets; /* 0x10 points 4 bytes into an array that starts with the set count */
 } ZFont;
 
-_Static_assert(sizeof(ZFont) == 0x14, "font layout");
+BMX_LAYOUT32_ASSERT(sizeof(ZFont) == 0x14, "font layout");
 _Static_assert(sizeof(ZFontGlyph) == 0x1c, "glyph layout");
 
 typedef struct ZFontState {

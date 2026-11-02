@@ -63,16 +63,16 @@ struct RwCamera {
     ZVec3 frustumCorners[8];  /* 0x128 near corners 0..3, far corners 4..7 */
 };
 
-_Static_assert(offsetof(RwCamera, projection) == 0x14, "RwCamera layout");
-_Static_assert(offsetof(RwCamera, viewMatrix) == 0x20, "RwCamera layout");
-_Static_assert(offsetof(RwCamera, frameBuffer) == 0x60, "RwCamera layout");
-_Static_assert(offsetof(RwCamera, viewWindow) == 0x68, "RwCamera layout");
-_Static_assert(offsetof(RwCamera, nearPlane) == 0x80, "RwCamera layout");
-_Static_assert(offsetof(RwCamera, zShift) == 0x90, "RwCamera layout");
-_Static_assert(offsetof(RwCamera, version) == 0x96, "RwCamera layout");
-_Static_assert(offsetof(RwCamera, frustumPlanes) == 0x98, "RwCamera layout");
-_Static_assert(offsetof(RwCamera, frustumCorners) == 0x128, "RwCamera layout");
-_Static_assert(sizeof(RwCamera) == 0x188, "RwCamera layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwCamera, projection) == 0x14, "RwCamera layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwCamera, viewMatrix) == 0x20, "RwCamera layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwCamera, frameBuffer) == 0x60, "RwCamera layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwCamera, viewWindow) == 0x68, "RwCamera layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwCamera, nearPlane) == 0x80, "RwCamera layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwCamera, zShift) == 0x90, "RwCamera layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwCamera, version) == 0x96, "RwCamera layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwCamera, frustumPlanes) == 0x98, "RwCamera layout");
+BMX_LAYOUT32_ASSERT(offsetof(RwCamera, frustumCorners) == 0x128, "RwCamera layout");
+BMX_LAYOUT32_ASSERT(sizeof(RwCamera) == 0x188, "RwCamera layout");
 
 #define rwCameraOffset ORIG_VAR(0x00676d10, int32_t, rwCameraOffset)
 
