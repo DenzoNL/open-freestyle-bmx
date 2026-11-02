@@ -217,6 +217,9 @@ round floats (so the hook build uses SSE2, not x87). Rules are in CONTRIBUTING.m
   - **Legal:** converted levels derive from the user's install and can't be redistributed (CC0
     materials can).
 - Dev: 64-bit build, ASan/UBSan builds.
+- HUD / UI rework (the user, 2026-11-03): if the HUD or menus are ever rebuilt, give them a proper draw list
+  (full pointers or a real renderer-side list) instead of the PSX-style packet chains with 28-bit links;
+  X2d only made those links work on 64-bit (docs/PORTING.md "X2d").
 - Not planned by us, PRs welcome if the repo goes public: online multiplayer (rollback is feasible:
   deterministic sim, input-based replays), speedrun timer/practice mode.
 

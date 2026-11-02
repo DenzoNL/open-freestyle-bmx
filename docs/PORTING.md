@@ -274,8 +274,7 @@ checking every function):
   (2) shared with the original only in the oracle -> the assert stays, 32-bit only; (3) in-memory only -> the
   assert becomes 32-bit only, the layout is free.
 - **X2c, the on-disk types and readers** from X2b, one format at a time.
-- **X2d, the 28-bit pointers:** a packet / ordering-table representation that holds full pointers (or indices into
-  a packet arena).
+- **X2d, the 28-bit pointers:** done; the packet links are offsets from an anchor on 64-bit (below).
 - **X2e, the casts:** each `(uint32_t)(uintptr_t)` reviewed: a real 32-bit value, an index, or a pointer that must
   stay a pointer.
 - Then **X3**: the x86_64 build links and runs.
@@ -405,7 +404,36 @@ mechanical commits leave bmxtest.dll, dinput.dll and bmxnative.exe .text/.data/.
   pins that.
 - **Left (X2c/X2e):** the emitter object's ops (gZrwWorldEffectOps, `void *` slots, a ZObjOps); the
   `(uint32_t)(uintptr_t)` casts (X2e: query / request arrays, zfileOpenRamDisk addresses, RW render state
-  values, the texture words of zrwprim and ZfxParticle). X2d: the 28-bit ordering tables.
+  values, the texture words of zrwprim and ZfxParticle).
+
+### X2d (done 2026-11-03): the 28-bit packet links
+
+The PSX-style display lists (ngifpsx.c, the overlay pools of zoverii.c, the menu frame polygons of frontend.c /
+frontend_options.c, and wide.c's walker) chain packets through the low 28 bits of each packet's first word; the
+top nibble is the packet's tag. Encoded with `(uint32_t)(uintptr_t)p & 0x0fffffff` (about 12 sites) and decoded
+with `(uint32_t *)(uintptr_t)(word & 0x0fffffff)` (3 sites); 0x0fffffff ends a chain. Every packet and ordering
+table is static data (src/data: the ordering table, the primitive buffers, the overlay pools, the menu polygons),
+which on 32-bit sits well below 256 MB. On 64-bit the address does not fit.
+
+Options:
+1. **Widen the link** to a pointer. Every packet layout (byte offsets read with get32 / put8) shifts, the packets
+   stop matching the original's, and the hook tests of those functions lose their reference. Rejected.
+2. **Links as offsets from an anchor** in the program's data: encode `p - anchor` in 28 bits (signed, so the
+   packets may lie on either side of it), decode `anchor + offset`. 32-bit builds keep the anchor at 0, so the link is
+   the address as now: the hook build, the tests and the replay hashes are unchanged. On 64-bit the anchor is a
+   src/data symbol; the image's data spans a few MB, far inside the ±128 MB a signed 28-bit offset reaches.
+   An assert in the encoder catches a packet outside that range (heap memory, say).
+3. **An index into a packet arena**: one allocation that holds every packet, links as indices. Moving the
+   buffers out of src/data changes the hook build's view of the original's data. Rejected for that reason.
+
+Recommendation: 2, in one header (compat/pktlink.h: `bmxPacketLink(const void *)` / `bmxPacketAt(uint32_t)`) used by
+all the sites, so the representation is decided in one place.
+
+Decision (2026-11-03, the user agreed): option 2, done. compat/pktlink.h holds both encodings, and the five
+files that link or walk packets use it (ngifpsx.c, zoverii.c, frontend.c, frontend_options.c, wide.c). The
+32-bit builds are unchanged: the hook cases pass and the replays stay identical. Should the HUD / UI ever be
+reworked, give it a proper draw list instead of building on the PSX packet chains (PLAN.md, backlog).
+
 
 ## Not in scope
 

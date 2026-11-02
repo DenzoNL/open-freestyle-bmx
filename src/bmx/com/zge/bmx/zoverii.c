@@ -5,6 +5,7 @@
 #include "bmx/com/zge/ngif/ngifzactor.h"
 #include "bmx/com/zge/ngif/ngifzbsp.h"
 #include "compat/crt.h"
+#include "compat/pktlink.h"
 #include "zge/com/zglrw/zrwcol.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zobjcamera.h"
@@ -2194,7 +2195,7 @@ static void setLink(uint32_t *word, uint32_t target)
 static void linkPool(ZOverItem *items, uint32_t count)
 {
     for (uint32_t i = 0; i + 1 < count; i++) {
-        setLink(&items[i].w[0], (uint32_t)(uintptr_t)&items[i + 1]);
+        setLink(&items[i].w[0], bmxPacketLink(&items[i + 1]));
     }
 }
 
@@ -2232,7 +2233,7 @@ int zoverInit(void)
 static void chainPool(ZOverItem *pool, ZOverItem *last)
 {
     setLink(&last->w[0], *gZoverOt);
-    setLink(gZoverOt, (uint32_t)(uintptr_t)pool);
+    setLink(gZoverOt, bmxPacketLink(pool));
 }
 
 /*
@@ -2262,7 +2263,7 @@ int zoverFlush(void)
     term->link = (term->link & LINK_MASK) | 0x10000000;
     term->command = 0xe1000200;
     setLink(&term->link, *gZoverOt);
-    setLink(gZoverOt, (uint32_t)(uintptr_t)term);
+    setLink(gZoverOt, bmxPacketLink(term));
     gZoverFrame ^= 1;
     if (gZoverFreeCount > 0x23b) {
         zdebugFail("free list overflow", zoverFile, 0x10c, 0);
@@ -2291,7 +2292,7 @@ int zoverFlush(void)
         other[index].b[kZoverItemFlags] &= 0x7f;
         zmemCopy(&base[index], &other[index], sizeof(ZOverItem));
         if (index != count - 1) {
-            setLink(&base[index].w[0], (uint32_t)(uintptr_t)&base[index + 1]);
+            setLink(&base[index].w[0], bmxPacketLink(&base[index + 1]));
         }
     }
     return 0;

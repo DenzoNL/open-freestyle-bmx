@@ -21,6 +21,7 @@
 
 #include "bmx/com/zge/bmx/zoverii.h"
 #include "bmx/com/zge/ngif/ngifpsx.h"
+#include "compat/pktlink.h"
 #include "driver/driver.h"
 #include "driver/wide.h"
 #include "hook/hook.h"
@@ -249,7 +250,7 @@ static const uint8_t *nextPacket(const uint8_t *p)
 {
     const uint32_t word = *(const uint32_t *)p;
 
-    return (word & 0x0fffffffu) == 0x0fffffffu ? NULL : (const uint8_t *)(uintptr_t)(word & 0x0fffffffu);
+    return (word & kBmxPacketLinkMask) == kBmxPacketEnd ? NULL : (const uint8_t *)bmxPacketAt(word);
 }
 
 /* The anchor of the run of 3D list packets that starts at p (one zoverDrawText, or a single packet). */
@@ -317,8 +318,8 @@ static void wideDrawList(uint32_t *entry)
         }
         gRunLeft = 0;
     }
-    while ((word & 0x0fffffffu) != 0x0fffffffu) {
-        entry = (uint32_t *)(uintptr_t)(*entry & 0x0fffffffu);
+    while ((word & kBmxPacketLinkMask) != kBmxPacketEnd) {
+        entry = bmxPacketAt(*entry);
         gHudAnchor = anchored ? packetAnchor((const uint8_t *)entry) : kDrvWideAnchorNone;
         if ((*entry & 0xf0000000u) != 0) {
             ngifDrawPrimitive((const uint8_t *)entry);

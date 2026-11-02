@@ -3,6 +3,7 @@
 
 #include "bmx/com/zge/zprim.h"
 #include "compat/crt.h"
+#include "compat/pktlink.h"
 #include "zge/com/zglrw/zrwdbg.h"
 #include "zge/com/zglrw/zrwmat.h"
 #include "zge/zdebug.h"
@@ -43,7 +44,7 @@ static void linkPrim(uint8_t *p, uint32_t tag, unsigned words)
 {
     uint32_t *prim = (uint32_t *)p;
     *prim = withLink(tag, *gNgifOrderTable);
-    *gNgifOrderTable = withLink(*gNgifOrderTable, (uint32_t)(uintptr_t)prim);
+    *gNgifOrderTable = withLink(*gNgifOrderTable, bmxPacketLink(prim));
     gNgifOrderTable = gNgifOrderTable - 1;
     gNgifPrim = prim + words;
 }
@@ -342,11 +343,11 @@ void ngifInitOrderTable(uint32_t *ot, int n)
 
     if (last > 0) {
         for (int32_t i = last; i != 0; i--) {
-            ot[i] = (uint32_t)(uintptr_t)(ot + i - 1) & 0x0fffffffu;
+            ot[i] = bmxPacketLink(ot + i - 1);
         }
         last = 0;
     }
-    ot[last] |= 0x0fffffffu;
+    ot[last] |= kBmxPacketEnd;
 }
 
 /* ---- polygons and lines through the renderer ------------------------------------------------------ */
@@ -708,8 +709,8 @@ void ngifDrawList(uint32_t *entry)
 {
     uint32_t word = *entry;
 
-    while ((word & 0x0fffffffu) != 0x0fffffffu) {
-        entry = (uint32_t *)(uintptr_t)(*entry & 0x0fffffffu);
+    while ((word & kBmxPacketLinkMask) != kBmxPacketEnd) {
+        entry = bmxPacketAt(*entry);
         if ((*entry & 0xf0000000u) != 0) {
             ngifDrawPrimitive((const uint8_t *)entry);
         }
@@ -730,7 +731,7 @@ static void linkPrim3D(uint8_t *p, uint32_t tag, uint32_t index)
     uint32_t *const ot = gNgifOtBase;
 
     put32(p, 0, withLink(tag, ot[index]));
-    ot[index] = withLink(ot[index], (uint32_t)(uintptr_t)p);
+    ot[index] = withLink(ot[index], bmxPacketLink(p));
 }
 
 /*
@@ -1256,7 +1257,7 @@ void ngifDrawLine3D(int flags, const NgifVert3 *a, const NgifVert3 *b)
         put8(p, 7, 0x52);
     }
     put32(p, 0, withLink(tag, *ot));
-    *ot = withLink(*ot, (uint32_t)(uintptr_t)p);
+    *ot = withLink(*ot, bmxPacketLink(p));
     gNgifPrim3D += 0x20;
 }
 

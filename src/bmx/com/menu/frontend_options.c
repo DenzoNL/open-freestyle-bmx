@@ -10,6 +10,7 @@
 #include "bmx/com/menu/gui/guimain.h"
 #include "bmx/com/zge/zprim.h"
 #include "compat/crt.h"
+#include "compat/pktlink.h"
 #include "zge/zstring.h"
 
 enum {
@@ -202,7 +203,7 @@ static void stripLink(StripPoly *poly)
     uint32_t *table = ngifGetOrderTable();
     poly->tag = (poly->tag & 0xf0000000u) | (table[0] & 0x0fffffffu);
     table = ngifGetOrderTable();
-    table[0] = (table[0] & 0xf0000000u) | ((uint32_t)(uintptr_t)poly & 0x0fffffffu);
+    table[0] = (table[0] & 0xf0000000u) | bmxPacketLink(poly);
 }
 
 static void stripBegin(StripPoly *poly)

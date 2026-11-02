@@ -5,6 +5,7 @@
 #include "bmx/com/zge/ngif/ngifzmemdmm.h"
 #include "bmx/com/zge/zprim.h"
 #include "compat/crt.h"
+#include "compat/pktlink.h"
 
 /* Wraps value into 0..count-1 by repeated adding/subtracting (count must be positive). */
 BMX_ADDR(0x0043be90)
@@ -40,7 +41,7 @@ void menuFrameFree(void)
 static void menuPolyLink(uint32_t *table, FramePoly *poly)
 {
     poly->tag = (poly->tag & 0xf0000000u) | (table[0] & 0x0fffffffu);
-    table[0] = (table[0] & 0xf0000000u) | ((uint32_t)(uintptr_t)poly & 0x0fffffffu);
+    table[0] = (table[0] & 0xf0000000u) | bmxPacketLink(poly);
 }
 
 typedef struct FrameCorner {
