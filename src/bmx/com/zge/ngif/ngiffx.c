@@ -30,8 +30,8 @@ typedef ZfxEffect ZfxEffectTable[7];
 #define gFxPoster    ORIG_VAR(0x0055c358, ZfxEffect, gFxPoster)
 #define gFxRipple    ORIG_VAR(0x0055c390, ZfxEffect, gFxRipple)
 #define gFxLightning ORIG_VAR(0x0055c3c8, ZfxEffect, gFxLightning)
-#define gFxGravity   ORIG_VAR(0x005623d8, uint8_t, gFxGravity)
-#define gFxFloorColl ORIG_VAR(0x005623e0, uint8_t, gFxFloorColl)
+#define gFxGravity   ORIG_VAR(0x005623d8, ZfxModifier, gFxGravity)
+#define gFxFloorColl ORIG_VAR(0x005623e0, ZfxModifier, gFxFloorColl)
 
 typedef float ZfxParams[16];
 #define gFxSparkDefault        ORIG_VAR(0x0055c128, ZfxParams, gFxSparkDefault)
@@ -206,8 +206,8 @@ static const float *objectTransform(const void *object)
 
 /* Spark spawner: moving particles with a random velocity around the base velocity. */
 BMX_ADDR(0x0045c950)
-void ngiffxSparkSpawn(int enabled, const void *object, ZfxEmitter *emitter, uint32_t count, int unused,
-                      const float *params)
+void ngiffxSparkSpawn(const ZfxEffect *effect, const void *object, ZfxEmitter *emitter, uint32_t count,
+                      void *unused, const float *params)
 {
     const uint32_t now = gTimeGetTime();
     const float *const xf = objectTransform(object);
@@ -216,7 +216,7 @@ void ngiffxSparkSpawn(int enabled, const void *object, ZfxEmitter *emitter, uint
     if (!given) {
         params = gFxSparkDefault;
     }
-    if (enabled == 0 || emitter == NULL) {
+    if (effect == NULL || emitter == NULL) {
         return;
     }
     for (uint32_t n = count & 0xff; n > 0; n--) {
@@ -273,7 +273,7 @@ static void cameraMatrices(ZMatrix *camera, ZMatrix *toCamera)
  * ramps down over the last 0x200 ms.
  */
 BMX_ADDR(0x0045cc50)
-int ngiffxSparkRender(const void *effect, ZfxEmitter *emitter)
+int ngiffxSparkRender(const ZfxEffect *effect, ZfxEmitter *emitter, int unused)
 {
     const uint32_t now = gTimeGetTime();
     int drawn = 0;
@@ -337,8 +337,8 @@ int ngiffxSparkRender(const void *effect, ZfxEmitter *emitter)
 
 /* Shard spawner: a particle with a velocity, and an axis perpendicular-ish to it that spins. */
 BMX_ADDR(0x0045d260)
-void ngiffxShardSpawn(int enabled, const void *object, ZfxEmitter *emitter, uint32_t count, int unused,
-                      const float *params)
+void ngiffxShardSpawn(const ZfxEffect *effect, const void *object, ZfxEmitter *emitter, uint32_t count,
+                      void *unused, const float *params)
 {
     const uint32_t now = gTimeGetTime();
     const float *const xf = objectTransform(object);
@@ -346,7 +346,7 @@ void ngiffxShardSpawn(int enabled, const void *object, ZfxEmitter *emitter, uint
     if (params == NULL) {
         params = gFxShardDefault;
     }
-    if (enabled == 0 || emitter == NULL) {
+    if (effect == NULL || emitter == NULL) {
         return;
     }
     for (uint32_t n = count & 0xff; n > 0; n--) {
@@ -398,7 +398,7 @@ static uint8_t fadeAlpha(uint32_t rem, uint32_t far, uint32_t knee, int shift, u
 
 /* Draws the shard particles as two sided triangles (flat, UVs zero). */
 BMX_ADDR(0x0045d420)
-int ngiffxShardRender(const void *effect, ZfxEmitter *emitter)
+int ngiffxShardRender(const ZfxEffect *effect, ZfxEmitter *emitter, int unused)
 {
     const uint32_t now = gTimeGetTime();
     int drawn = 0;
@@ -452,7 +452,7 @@ int ngiffxShardRender(const void *effect, ZfxEmitter *emitter)
 
 /* Draws the splash particles as camera facing quads that fade out. */
 BMX_ADDR(0x0045d730)
-int ngiffxSplashRender(const void *effect, ZfxEmitter *emitter)
+int ngiffxSplashRender(const ZfxEffect *effect, ZfxEmitter *emitter, int unused)
 {
     const uint32_t now = gTimeGetTime();
     int drawn = 0;
@@ -491,8 +491,8 @@ int ngiffxSplashRender(const void *effect, ZfxEmitter *emitter)
 
 /* Dust spawner: one slow particle with the fixed DUST01 texture. */
 BMX_ADDR(0x0045da40)
-void ngiffxDustSpawn(int enabled, const void *object, ZfxEmitter *emitter, uint32_t count, int unused,
-                     const float *params)
+void ngiffxDustSpawn(const ZfxEffect *effect, const void *object, ZfxEmitter *emitter, uint32_t count,
+                     void *unused, const float *params)
 {
     const uint32_t now = gTimeGetTime();
     const float *const xf = objectTransform(object);
@@ -501,7 +501,7 @@ void ngiffxDustSpawn(int enabled, const void *object, ZfxEmitter *emitter, uint3
     if (params == NULL) {
         params = gFxDustDefault;
     }
-    if (enabled == 0 || emitter == NULL) {
+    if (effect == NULL || emitter == NULL) {
         return;
     }
     p = zmemFreeListAlloc(emitter->pool);
@@ -525,7 +525,7 @@ void ngiffxDustSpawn(int enabled, const void *object, ZfxEmitter *emitter, uint3
 
 /* Draws the dust particles as camera facing quads; the texture steps through DUST01..16 as they age. */
 BMX_ADDR(0x0045db20)
-int ngiffxDustRender(const void *effect, ZfxEmitter *emitter)
+int ngiffxDustRender(const ZfxEffect *effect, ZfxEmitter *emitter, int unused)
 {
     const uint32_t now = gTimeGetTime();
     int drawn = 0;
@@ -569,7 +569,7 @@ int ngiffxDustRender(const void *effect, ZfxEmitter *emitter)
 
 /* Creates an emitter: the particle list, a free list of `capacity` particles and its owner effect. */
 BMX_ADDR(0x0045de30)
-ZfxEmitter *ngiffxPosterCreate(uint32_t effect, uint16_t capacity)
+ZfxEmitter *ngiffxPosterCreate(ZfxEffect *effect, uint16_t capacity)
 {
     ZfxEmitter *emitter = zmemAlloc(sizeof *emitter);
 
@@ -585,8 +585,8 @@ ZfxEmitter *ngiffxPosterCreate(uint32_t effect, uint16_t capacity)
 
 /* Poster spawner: a static quad whose four corners are given relative to the object. */
 BMX_ADDR(0x0045dea0)
-void ngiffxPosterSpawn(int enabled, const void *object, ZfxEmitter *emitter, uint32_t count, int unused,
-                       const float *params)
+void ngiffxPosterSpawn(const ZfxEffect *effect, const void *object, ZfxEmitter *emitter, uint32_t count,
+                       void *unused, const float *params)
 {
     const uint32_t now = gTimeGetTime();
     const float *const xf = objectTransform(object);
@@ -595,7 +595,7 @@ void ngiffxPosterSpawn(int enabled, const void *object, ZfxEmitter *emitter, uin
     if (params == NULL) {
         params = gFxPosterDefault;
     }
-    if (enabled == 0 || emitter == NULL) {
+    if (effect == NULL || emitter == NULL) {
         return;
     }
     p = zmemFreeListAlloc(emitter->pool);
@@ -621,7 +621,7 @@ void ngiffxPosterSpawn(int enabled, const void *object, ZfxEmitter *emitter, uin
 
 /* Draws the posters as quads from their stored corners, fading in the last second. */
 BMX_ADDR(0x0045e010)
-int ngiffxPosterRender(const void *effect, ZfxEmitter *emitter)
+int ngiffxPosterRender(const ZfxEffect *effect, ZfxEmitter *emitter, int unused)
 {
     const uint32_t now = gTimeGetTime();
     int drawn = 0;
@@ -656,8 +656,8 @@ int ngiffxPosterRender(const void *effect, ZfxEmitter *emitter)
 
 /* Ripple spawner: a static particle that only grows (see the updater). */
 BMX_ADDR(0x0045e210)
-void ngiffxRippleSpawn(int enabled, const void *object, ZfxEmitter *emitter, uint32_t count, int unused,
-                       const float *params)
+void ngiffxRippleSpawn(const ZfxEffect *effect, const void *object, ZfxEmitter *emitter, uint32_t count,
+                       void *unused, const float *params)
 {
     const uint32_t now = gTimeGetTime();
     const float *const xf = objectTransform(object);
@@ -666,7 +666,7 @@ void ngiffxRippleSpawn(int enabled, const void *object, ZfxEmitter *emitter, uin
     if (params == NULL) {
         params = gFxRippleDefault;
     }
-    if (enabled == 0 || emitter == NULL) {
+    if (effect == NULL || emitter == NULL) {
         return;
     }
     p = zmemFreeListAlloc(emitter->pool);
@@ -687,7 +687,7 @@ void ngiffxRippleSpawn(int enabled, const void *object, ZfxEmitter *emitter, uin
 
 /* Draws the ripples as flat squares on the ground plane. */
 BMX_ADDR(0x0045e2d0)
-int ngiffxRippleRender(const void *effect, ZfxEmitter *emitter)
+int ngiffxRippleRender(const ZfxEffect *effect, ZfxEmitter *emitter, int unused)
 {
     const uint32_t now = gTimeGetTime();
     int drawn = 0;
@@ -803,8 +803,8 @@ int ngiffxUpdateEmitter(ZfxEffect *effect, ZfxEmitter *emitter)
 
 /* Lightning spawner: a chain of particles along a jittered line from the first to the second point. */
 BMX_ADDR(0x0045e750)
-void ngiffxLightningSpawn(int enabled, const void *object, ZfxEmitter *emitter, uint32_t count, int unused,
-                          const float *params)
+void ngiffxLightningSpawn(const ZfxEffect *effect, const void *object, ZfxEmitter *emitter, uint32_t count,
+                          void *unused, const float *params)
 {
     const uint32_t now = gTimeGetTime();
     const float *const xf = objectTransform(object);
@@ -812,7 +812,7 @@ void ngiffxLightningSpawn(int enabled, const void *object, ZfxEmitter *emitter, 
     if (params == NULL) {
         params = gFxLightningDefault;
     }
-    if (enabled == 0 || emitter == NULL) {
+    if (effect == NULL || emitter == NULL) {
         return;
     }
     for (uint32_t n = count & 0xff; n > 0; n--) {
@@ -872,7 +872,7 @@ void ngiffxLightningSpawn(int enabled, const void *object, ZfxEmitter *emitter, 
  * runs leftwards (camera x not positive). The alpha is the remaining life below 0x100 ms, else 0.
  */
 BMX_ADDR(0x0045eaa0)
-int ngiffxLightningRender(const void *effect, ZfxEmitter *emitter)
+int ngiffxLightningRender(const ZfxEffect *effect, ZfxEmitter *emitter, int unused)
 {
     const uint32_t now = gTimeGetTime();
     int drawn = 0;

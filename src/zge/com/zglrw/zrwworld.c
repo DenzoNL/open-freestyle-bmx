@@ -71,7 +71,7 @@ typedef float ZrwBounceParams[2];
 /* Address only: the PVS progress callbacks RenderWare is given. */
 ORIG_FN(0x004cd510, int, rwWorldPvsDefaultCallback, (int stage, float progress));
 
-static ZrwEffectHost *effectHost(void *object)
+static ZobjPEmitState *effectHost(void *object)
 {
     return ((ZObj *)object)->data;
 }
@@ -80,12 +80,12 @@ BMX_ADDR(0x00495bd0)
 int zrwworldUpdateEffects(void *object)
 {
     ZList *items = effectHost(object)->items;
-    ZrwEffectItem *item = zlistFirst(items);
+    ZfxEmitter *item = zlistFirst(items);
 
     while (item != NULL) {
-        ZrwEffectType *type = item->type;
+        ZfxEffect *type = item->effect;
 
-        type->update(type, item, 0);
+        type->render(type, item, 0);
         item = zlistNext(effectHost(object)->items);
     }
     return 1;
@@ -95,7 +95,7 @@ BMX_ADDR(0x00495c10)
 void *zrwworldCreateObject(void)
 {
     ZObj *object = zobjAlloc();
-    ZrwEffectHost *host;
+    ZobjPEmitState *host;
 
     if (object == NULL) {
         return NULL;
@@ -107,26 +107,26 @@ void *zrwworldCreateObject(void)
     host->items = zlistCreate(4);
     effectHost(object)->updateNode = zrwRegisterUpdateFunction(
         2, BMX_FNPTR(ZrwUpdateFn, 0x00495bd0, (ZrwUpdateFn)zrwworldUpdateEffects), object, 1);
-    effectHost(object)->pad18[0] = 0;
-    effectHost(object)->pad18[1] = 0;
-    effectHost(object)->pad18[2] = 0;
-    effectHost(object)->one24 = 1.0f;
-    effectHost(object)->pad08[0] = 0;
-    effectHost(object)->pad08[1] = 0;
-    effectHost(object)->pad08[2] = 0;
-    effectHost(object)->one28 = 1.0f;
-    effectHost(object)->one2c = 1.0f;
-    effectHost(object)->one30 = 1.0f;
-    effectHost(object)->active = 1;
+    effectHost(object)->rect[0] = 0.0f;
+    effectHost(object)->rect[1] = 0.0f;
+    effectHost(object)->rect[2] = 0.0f;
+    effectHost(object)->rect[3] = 1.0f;
+    effectHost(object)->position[0] = 0.0f;
+    effectHost(object)->position[1] = 0.0f;
+    effectHost(object)->position[2] = 0.0f;
+    effectHost(object)->direction[0] = 1.0f;
+    effectHost(object)->direction[1] = 1.0f;
+    effectHost(object)->direction[2] = 1.0f;
+    effectHost(object)->value = 1;
     return object;
 }
 
 BMX_ADDR(0x00495d50)
 uint32_t zrwworldApplyEffect(void *object, const char *name, uint32_t flags, void *a, void *b)
 {
-    ZrwEffectType *type = zstrNameTable0Find(name);
+    ZfxEffect *type = zstrNameTable0Find(name);
     ZList *items;
-    ZrwEffectItem *item;
+    ZfxEmitter *item;
 
     if (type == NULL) {
         return 0;
@@ -134,7 +134,7 @@ uint32_t zrwworldApplyEffect(void *object, const char *name, uint32_t flags, voi
     items = effectHost(object)->items;
     item = zlistFirst(items);
     while (item != NULL) {
-        if (item->type == type) {
+        if (item->effect == type) {
             break;
         }
         item = zlistNext(items);
@@ -146,7 +146,7 @@ uint32_t zrwworldApplyEffect(void *object, const char *name, uint32_t flags, voi
             return 0;
         }
     }
-    type->apply(type, object, (void *)item, flags, a, b);
+    type->spawn(type, object, item, flags, a, b);
     return flags & 0xff;
 }
 
@@ -687,26 +687,25 @@ int zrwWorldRender(void)
 BMX_ADDR(0x00497640)
 void zrwWorldNop(void) {}
 
-/* The particle steps keep the original signatures: `system` is not const although they only read it. */
-// NOLINTBEGIN(readability-non-const-parameter)
 /* Moves every particle's velocity by the acceleration times the time since the last step (which is not
  * updated here). The timestamp is read before `system` is checked. */
 BMX_ADDR(0x00497650)
-void zrwParticleAccelerate(int enabled, uint32_t *system, const ZVec3 *acceleration)
+void zrwParticleAccelerate(ZfxModifier *self, ZfxEmitter *emitter, void *arg)
 {
+    const ZVec3 *const acceleration = arg;
     const uint32_t now = gZrwTimeGetTime();
-    const double elapsed = (double)(uint32_t)(now - ((const ZrwParticleSystem *)system)->lastStep);
+    const double elapsed = (double)(uint32_t)(now - emitter->lastUpdate);
     ZVec3 delta;
     const ZVec3 *accel = acceleration != NULL ? acceleration : &gZrwDefaultGravity;
 
     delta.x = (float)(elapsed * accel->x * 0x1.0624dep-10f);
     delta.y = (float)(elapsed * accel->y * 0x1.0624dep-10f);
     delta.z = (float)(elapsed * accel->z * 0x1.0624dep-10f);
-    if (enabled != 0 && system != NULL) {
-        ZList *list = ((ZrwParticleSystem *)system)->particles;
+    if (self != NULL && emitter != NULL) {
+        ZList *list = emitter->particles;
 
-        for (ZrwParticle *particle = zlistFirst(list); particle != NULL; particle = zlistNext(list)) {
-            zvec3Add(&particle->velocity, &particle->velocity, &delta);
+        for (ZfxParticle *particle = zlistFirst(list); particle != NULL; particle = zlistNext(list)) {
+            zvec3Add(&particle->vel, &particle->vel, &delta);
         }
     }
 }
@@ -716,20 +715,21 @@ void zrwParticleNop(void) {}
 
 /* Particles whose y reaches the floor value are set onto it and have their y velocity reflected. */
 BMX_ADDR(0x00497700)
-void zrwParticleFloorBounce(int enabled, uint32_t *system, const float *params)
+void zrwParticleFloorBounce(ZfxModifier *self, ZfxEmitter *emitter, void *arg)
 {
+    const float *const params = arg;
     const float *p = params != NULL ? params : gZrwDefaultBounce;
     const float floor = p[0];
     const float bounce = p[1];
 
-    if (enabled != 0 && system != NULL) {
-        ZList *list = ((ZrwParticleSystem *)system)->particles;
+    if (self != NULL && emitter != NULL) {
+        ZList *list = emitter->particles;
 
-        for (ZrwParticle *particle = zlistFirst(list); particle != NULL; particle = zlistNext(list)) {
-            float *y = &particle->position.y;
+        for (ZfxParticle *particle = zlistFirst(list); particle != NULL; particle = zlistNext(list)) {
+            float *y = &particle->pos.y;
 
             if ((double)*y >= (double)floor) {
-                float *velocity = &particle->velocity.y;
+                float *velocity = &particle->vel.y;
 
                 *y = floor;
                 *velocity = (float)-((double)bounce * *velocity);
@@ -737,4 +737,3 @@ void zrwParticleFloorBounce(int enabled, uint32_t *system, const float *params)
         }
     }
 }
-// NOLINTEND(readability-non-const-parameter)

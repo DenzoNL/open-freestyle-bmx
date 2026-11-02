@@ -389,11 +389,19 @@ mechanical commits leave bmxtest.dll, dinput.dll and bmxnative.exe .text/.data/.
   defined only 4 bytes at 0x5fb710 and the roller wrote slots[1] past them; src/data now defines both slots.
   ZObjCamera and ZObjLight start with ZObj's head, and asserts tie ZrwColTriangle to RpCollisionTriangle and
   OvlFont to ZOverFont.
-- **Left (X2c/X2e):** type pairs ZrwRenderColTriangle = ZbspLevelFace (pointers read as u32 tags), ZrwEffectItem
-  (the fx record at +0x2c), RwFileFunctions/ZrwFileOps (zrwfile.c copies one into the other), ZrwMaterial's
-  slot[5] over rwMaterial, PhysRider vs gPlayerRecs byte offsets (kOvlPlayer*), the ZObj effect host /
-  ZSkeletonOwner at pad30; the `(uint32_t)(uintptr_t)` casts (X2e: query / request arrays, zfileOpenRamDisk
-  addresses, RW render state values, zrwprim's texture word). X2d: the 28-bit ordering tables.
+- **Fourth batch:** the file function table is RenderWare's RwFileFunctions everywhere (zrwfile.c's copy,
+  zprofile.c's saved one). The RAM disk callbacks zprofile.c installs have the table's signatures (`void *`
+  handle slot, `size_t` counts); before, they were stored through a `void **`. The effect tables are typed:
+  ZfxEffect is the effect type of zrwworld.c and the item class of zobjpemit.c, and ZfxEmitter is their
+  record. The spawners' first argument, called `enabled`, is the effect, and the renderers take the 0 that
+  the world's effect object passes. The effect object is a ZObj whose data is ZobjPEmitState (the world's
+  ZrwEffectHost). The particle steps are the gravity and floor modifiers' apply functions (ZfxModifier,
+  ZfxParticle).
+- **Left (X2c/X2e):** type pairs ZrwRenderColTriangle = ZbspLevelFace (pointers read as u32 tags), ZrwMaterial's
+  slot[5] over rwMaterial, PhysRider vs gPlayerRecs byte offsets (kOvlPlayer*), ZSkeletonOwner as a ZObj
+  view, the emitter object's ops (gZrwWorldEffectOps, `void *` slots); the `(uint32_t)(uintptr_t)` casts
+  (X2e: query / request arrays, zfileOpenRamDisk addresses, RW render state values, the texture words of
+  zrwprim and ZfxParticle). X2d: the 28-bit ordering tables.
 
 ## Not in scope
 

@@ -12,78 +12,85 @@
 static const char kProfileFile[] = "C:\\NgEngine\\Zge\\zprofile.c";
 
 BMX_ADDR(0x004a33c0)
-int zrwfclose(ZfileHandle **file)
+int zrwfclose(void *file)
 {
-    zfileClose(*file, 0);
-    *file = NULL;
+    ZfileHandle **slot = (ZfileHandle **)file;
+
+    zfileClose(*slot, 0);
+    *slot = NULL;
     gZrwRamDiskInfo++;
     return 0;
 }
 
 BMX_ADDR(0x004a33f0)
-int zrwfread(void *buffer, int size, int count, ZfileHandle **file)
+size_t zrwfread(void *buffer, size_t size, size_t count, void *file)
 {
-    return zfileRead(*file, buffer, (int)((uint32_t)size * (uint32_t)count), 0);
+    return (size_t)zfileRead(*(ZfileHandle **)file, buffer, (int)((uint32_t)size * (uint32_t)count), 0);
 }
 
 BMX_ADDR(0x004a3420)
-int zrwfwrite(const void *buffer, int size, int count, ZfileHandle **file)
+size_t zrwfwrite(const void *buffer, size_t size, size_t count, void *file)
 {
-    return zfileWrite(*file, buffer, (int)((uint32_t)size * (uint32_t)count), 0);
+    return (size_t)zfileWrite(*(ZfileHandle **)file, buffer, (int)((uint32_t)size * (uint32_t)count), 0);
 }
 
 BMX_ADDR(0x004a3450)
-char *zrwfgets(char *buffer, int size, ZfileHandle **file)
+char *zrwfgets(char *buffer, int32_t size, void *file)
 {
-    return zfileGets(*file, buffer, size);
+    return zfileGets(*(ZfileHandle **)file, buffer, size);
 }
 
 BMX_ADDR(0x004a3470)
-int zrwfflush(void)
+int zrwfflush(void *file)
 {
+    (void)file;
     return 0;
 }
 
 BMX_ADDR(0x004a3480)
-int zrwfputs(void)
+int zrwfputs(const char *text, void *file)
 {
+    (void)text;
+    (void)file;
     return 0;
 }
 
 /* True when the position (op 0x34) has reached the size. */
 BMX_ADDR(0x004a3490)
-int zrwfeof(ZfileHandle **file)
+int zrwfeof(void *file)
 {
+    ZfileHandle *handle = *(ZfileHandle **)file;
     uint32_t position = 0;
     uint32_t size = 0;
 
-    zfileOp34(*file, (uint32_t)(uintptr_t)&position, 0);
-    zfileGetSize(*file, (int *)&size, 0);
+    zfileOp34(handle, (uint32_t)(uintptr_t)&position, 0);
+    zfileGetSize(handle, (int *)&size, 0);
     return size <= position;
 }
 
 BMX_ADDR(0x004a34e0)
-uint32_t zrwfseek(ZfileHandle **file, uint32_t a, uint32_t b)
+int zrwfseek(void *file, int32_t offset, int32_t origin)
 {
-    return zfileOp30(*file, a, b, 0);
+    return (int)zfileOp30(*(ZfileHandle **)file, (uint32_t)offset, (uint32_t)origin, 0);
 }
 
 BMX_ADDR(0x004a3500)
 void RegisterCallBacksForFileSystem(void)
 {
-    void **rw = (void **)(uintptr_t)RwOSGetFileInterface();
+    RwFileFunctions *rw = RwOSGetFileInterface();
 
-    zmemCopy(&gZrwSavedFileInterface, (const void *)rw, sizeof(ZrwFileInterface));
-    rw[0] = BMX_FNPTR(void *, 0x004a3200, zrwRamDiskMatches);
-    rw[1] = BMX_FNPTR(void *, 0x004a3260, zrwfopen);
-    rw[2] = BMX_FNPTR(void *, 0x004a33c0, zrwfclose);
-    rw[3] = BMX_FNPTR(void *, 0x004a33f0, zrwfread);
-    rw[4] = BMX_FNPTR(void *, 0x004a3420, zrwfwrite);
-    rw[5] = BMX_FNPTR(void *, 0x004a3450, zrwfgets);
-    rw[6] = BMX_FNPTR(void *, 0x004a3480, zrwfputs);
-    rw[7] = BMX_FNPTR(void *, 0x004a3490, zrwfeof);
-    rw[8] = BMX_FNPTR(void *, 0x004a34e0, zrwfseek);
-    rw[9] = BMX_FNPTR(void *, 0x004a3470, zrwfflush);
+    zmemCopy(&gZrwSavedFileInterface, rw, sizeof gZrwSavedFileInterface);
+    rw->rwfexist = BMX_FNPTR(int(BMX_CDECL *)(const char *), 0x004a3200, zrwRamDiskMatches);
+    rw->rwfopen = BMX_FNPTR(void *(BMX_CDECL *)(const char *, const char *), 0x004a3260, zrwfopen);
+    rw->rwfclose = BMX_FNPTR(int(BMX_CDECL *)(void *), 0x004a33c0, zrwfclose);
+    rw->rwfread = BMX_FNPTR(size_t(BMX_CDECL *)(void *, size_t, size_t, void *), 0x004a33f0, zrwfread);
+    rw->rwfwrite =
+        BMX_FNPTR(size_t(BMX_CDECL *)(const void *, size_t, size_t, void *), 0x004a3420, zrwfwrite);
+    rw->rwfgets = BMX_FNPTR(char *(BMX_CDECL *)(char *, int32_t, void *), 0x004a3450, zrwfgets);
+    rw->rwfputs = BMX_FNPTR(int(BMX_CDECL *)(const char *, void *), 0x004a3480, zrwfputs);
+    rw->rwfeof = BMX_FNPTR(int(BMX_CDECL *)(void *), 0x004a3490, zrwfeof);
+    rw->rwfseek = BMX_FNPTR(int(BMX_CDECL *)(void *, int32_t, int32_t), 0x004a34e0, zrwfseek);
+    rw->rwfflush = BMX_FNPTR(int(BMX_CDECL *)(void *), 0x004a3470, zrwfflush);
     gZrwRamDiskNoInfo = gZrwRamDiskInfoSlots;
     gZrwRamDiskInfo = gZrwRamDiskInfoSlots;
     gZrwRamDiskFile = NULL;
@@ -101,7 +108,7 @@ void ImageBufferSizeType(const void *address, uint32_t size, const char *extensi
 BMX_ADDR(0x004a35c0)
 void zrwFileRamDiskClear(void)
 {
-    zmemCopy((void *)RwOSGetFileInterface(), &gZrwSavedFileInterface, sizeof(ZrwFileInterface));
+    zmemCopy(RwOSGetFileInterface(), &gZrwSavedFileInterface, sizeof gZrwSavedFileInterface);
     gZrwRamDiskNoInfo = NULL;
     gZrwRamDiskInfo = NULL;
     gZrwRamDiskFile = NULL;

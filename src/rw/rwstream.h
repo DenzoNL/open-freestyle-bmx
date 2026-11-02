@@ -105,7 +105,7 @@ int rwStubReturn1_4e334d(void);
 int rwStubReturn0_4e3354(void);
 int rwStubReturn1_4e3358(void);
 int rwStubReturn0_4e335f(void);
-const RwFileFunctions *RwOSGetFileInterface(void);
+RwFileFunctions *RwOSGetFileInterface(void);
 int _rwFSOpen(void);
 
 #endif

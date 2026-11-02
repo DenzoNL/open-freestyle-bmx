@@ -5377,7 +5377,7 @@ AT(gFxSpark, 0x0055c278);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gFxRippleDefaultGroup, gFxSpark) +
                        sizeof(((struct BmxGroup_gFxRippleDefaultGroup *)0)->gFxSpark) ==
-                   BMX_DATA_OFF(0x90, 0xb8),
+                   BMX_DATA_OFF(0x90, 0xc0),
                "gFxRippleDefaultGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0055c400..0x0055c53c.
@@ -12255,8 +12255,8 @@ extern char sThereIsAlreadyAWorldOpen[32];                                    /*
 extern char sZRWWORLDNoPVSData[24];                                           /* 0x005623a8 */
 extern ZVec3 gZrwDefaultGravity;                                              /* 0x005623c0 */
 extern BmxType_gZrwDefaultBounce gZrwDefaultBounce;                           /* 0x005623d0 */
-extern void *gFxGravity[2];                                                   /* 0x005623d8 */
-extern void *gFxFloorColl[2];                                                 /* 0x005623e0 */
+extern ZfxModifier gFxGravity;                                                /* 0x005623d8 */
+extern ZfxModifier gFxFloorColl;                                              /* 0x005623e0 */
 extern int gZrwMatPluginOffset;                                               /* 0x005623e8 */
 extern BmxType_gZglInitTexture gZglInitTexture;                               /* 0x005623f0 */
 extern struct BmxGroup_gZglExitTextureGroup gZglExitTextureGroup;             /* 0x005623f4 */

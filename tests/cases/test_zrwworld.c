@@ -75,24 +75,25 @@ S5_STUB1(sListCreate, 0x48c260)
 S5_STUB4(sRegister, 0x48ba30)
 S5_STUB1(sNameFind, 0x482da0)
 
-static void BMX_CDECL effectUpdate(ZrwEffectType *type, void *item, int arg)
+static int BMX_CDECL effectRender(const ZfxEffect *type, ZfxEmitter *item, int arg)
 {
     s5Log(0xe0);
     s5LogPtr(type);
     s5LogPtr(item);
     s5Log((uint32_t)arg);
+    return 0;
 }
 
-static void *BMX_CDECL effectCreate(ZrwEffectType *type, int size)
+static ZfxEmitter *BMX_CDECL effectCreate(ZfxEffect *type, uint16_t size)
 {
     s5Log(0xe1);
     s5LogPtr(type);
     s5Log((uint32_t)size);
-    return (void *)(uintptr_t)s5Ret(0xe1);
+    return (ZfxEmitter *)(uintptr_t)s5Ret(0xe1);
 }
 
-static void *BMX_CDECL effectApply(ZrwEffectType *type, void *object, void *item, uint32_t flags, void *a,
-                                   void *b)
+static void BMX_CDECL effectApply(const ZfxEffect *type, const void *object, ZfxEmitter *item, uint32_t flags,
+                                  void *a, const float *b)
 {
     s5Log(0xe2);
     s5LogPtr(type);
@@ -101,34 +102,33 @@ static void *BMX_CDECL effectApply(ZrwEffectType *type, void *object, void *item
     s5Log(flags);
     s5Log((uint32_t)(uintptr_t)a);
     s5Log((uint32_t)(uintptr_t)b);
-    return NULL;
 }
 
-static ZrwEffectType *newType(void)
+static ZfxEffect *newType(void)
 {
-    ZrwEffectType *t = dt_alloc(sizeof *t);
+    ZfxEffect *t = dt_alloc(sizeof *t);
 
     dt_fill(t, sizeof *t);
     t->create = effectCreate;
-    t->apply = effectApply;
-    t->update = effectUpdate;
+    t->spawn = effectApply;
+    t->render = effectRender;
     return t;
 }
 
-/* An effect record: only the type pointer at +0x2c is read. */
-static uint32_t *newItem(ZrwEffectType *type)
+/* An effect record: only the effect pointer at +0x2c is read. */
+static ZfxEmitter *newItem(ZfxEffect *type)
 {
-    uint32_t *item = dt_alloc(0x40);
+    ZfxEmitter *item = dt_alloc(0x40);
 
     dt_fill(item, 0x40);
-    item[0x2c / 4] = (uint32_t)(uintptr_t)type;
+    item->effect = type;
     return item;
 }
 
-static ZObj *newHostObject(ZrwEffectType **types, int n)
+static ZObj *newHostObject(ZfxEffect **types, int n)
 {
     ZObj *o = dt_alloc(sizeof *o);
-    ZrwEffectHost *host = dt_alloc(sizeof *host);
+    ZobjPEmitState *host = dt_alloc(sizeof *host);
 
     dt_fill(o, sizeof *o);
     dt_fill(host, sizeof *host);
@@ -142,7 +142,7 @@ static ZObj *newHostObject(ZrwEffectType **types, int n)
 
 static void setup_update_effects(DtCtx *c)
 {
-    ZrwEffectType *types[4];
+    ZfxEffect *types[4];
     int n = dt_range(0, 4);
 
     begin(c, 0);
@@ -173,8 +173,8 @@ static void setup_create_object(DtCtx *c)
 
 static void setup_apply_effect(DtCtx *c)
 {
-    ZrwEffectType *types[4];
-    ZrwEffectType *wanted = newType();
+    ZfxEffect *types[4];
+    ZfxEffect *wanted = newType();
     int n = dt_range(0, 3);
 
     begin(c, 0);

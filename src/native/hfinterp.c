@@ -410,7 +410,7 @@ static void walkParticles(HfCapture *c)
 {
     for (ZMemFreeNode *node = zmemFreeListFirst(gZobjPool); node != NULL; node = zmemFreeNodeNext(node)) {
         const ZObj *const object = zmemFreeNodePayload(node);
-        const ZrwEffectHost *host;
+        const ZobjPEmitState *host;
 
         if (object->ops != kEffectOps) {
             continue;

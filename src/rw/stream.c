@@ -25,7 +25,7 @@ static void rwStreamFree(RwStream *stream)
 
 /* The engine's file function table. */
 BMX_ADDR(0x004e8280)
-const RwFileFunctions *RwOSGetFileInterface(void)
+RwFileFunctions *RwOSGetFileInterface(void)
 {
     return &RwEngineInstance->fileFuncs;
 }

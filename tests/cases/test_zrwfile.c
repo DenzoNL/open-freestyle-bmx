@@ -38,27 +38,27 @@ static int BMX_CDECL opClose(void *file)
     return (int)ops.seek;
 }
 
-static uint32_t BMX_CDECL opRead(void *buffer, uint32_t size, uint32_t count, void *file)
+static size_t BMX_CDECL opRead(void *buffer, size_t size, size_t count, void *file)
 {
     dtgpLog(0x4ead0000u);
     dtgpLogP(buffer);
-    dtgpLog(size);
-    dtgpLog(count);
+    dtgpLog((uint32_t)size);
+    dtgpLog((uint32_t)count);
     dtgpLogP(file);
-    return count + ops.transfer;
+    return (uint32_t)count + ops.transfer;
 }
 
-static uint32_t BMX_CDECL opWrite(const void *buffer, uint32_t size, uint32_t count, void *file)
+static size_t BMX_CDECL opWrite(const void *buffer, size_t size, size_t count, void *file)
 {
     dtgpLog(0x3a1e0000u);
     dtgpLogP(buffer);
-    dtgpLog(size);
-    dtgpLog(count);
+    dtgpLog((uint32_t)size);
+    dtgpLog((uint32_t)count);
     dtgpLogP(file);
-    return count + ops.transfer;
+    return (uint32_t)count + ops.transfer;
 }
 
-static int BMX_CDECL opSeek(void *file, int32_t offset, int whence)
+static int BMX_CDECL opSeek(void *file, int32_t offset, int32_t whence)
 {
     dtgpLog(0x5ee40000u);
     dtgpLogP(file);
@@ -122,12 +122,12 @@ static void begin(const DtCtx *c)
 {
     dtgpBegin(c, DTGP_DEBUG);
     gZrwFileInitialized = (dt_u32() & 7) != 0;
-    gZrwFileOps.exists = opExists;
-    gZrwFileOps.open = opOpen;
-    gZrwFileOps.close = opClose;
-    gZrwFileOps.read = opRead;
-    gZrwFileOps.write = opWrite;
-    gZrwFileOps.seek = opSeek;
+    gZrwFileOps.rwfexist = opExists;
+    gZrwFileOps.rwfopen = opOpen;
+    gZrwFileOps.rwfclose = opClose;
+    gZrwFileOps.rwfread = opRead;
+    gZrwFileOps.rwfwrite = opWrite;
+    gZrwFileOps.rwfseek = opSeek;
     ops.open = (dt_u32() & 3) == 0 ? 0 : 0x00600000u + dt_range(0, 255) * 4u;
     ops.seek = (dt_u32() & 3) == 0 ? 1 : 0;
     ops.transfer = (dt_u32() & 3) == 0 ? (uint32_t)dt_range(-2, 2) : 0;
@@ -402,8 +402,8 @@ static void setupMapIndex(DtCtx *c)
 static void *BMX_CDECL stubListCreate(uint32_t size, uint32_t count, void *destroy)
 {
     dtgpLog(0xc4ea0000u);
-    dtgpLog(size);
-    dtgpLog(count);
+    dtgpLog((uint32_t)size);
+    dtgpLog((uint32_t)count);
     dtgpLogP(destroy);
     return (void *)(uintptr_t)(0x00630000u + dt_range(0, 255) * 0x10u);
 }

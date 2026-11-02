@@ -6,6 +6,7 @@
 #ifndef ZGE_ZPROFILE_H
 #define ZGE_ZPROFILE_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "compat/orig.h"
@@ -13,9 +14,8 @@
 #include "zge/com/zglrw/zrwramdisk.h"
 #include "zge/zfile.h"
 
-/* RenderWare's file interface: ten function pointers (open, close, read, write, gets, puts, eof, seek,
- * flush). */
-typedef void *ZrwFileInterface[10];
+/* RenderWare's file interface, saved while the callbacks are installed. */
+typedef RwFileFunctions ZrwFileInterface;
 #define gZrwSavedFileInterface ORIG_VAR(0x00676410, ZrwFileInterface, gZrwSavedFileInterface)
 /* Storage the RAM disk info pointers point into while the callbacks are installed. */
 typedef ZrwRamDiskInfo ZrwRamDiskInfoSlots[2];
@@ -70,14 +70,14 @@ typedef struct ZProfileEntry {
 BMX_LAYOUT32_ASSERT(sizeof(ZProfileEntry) == 0x24, "profile entry");
 
 /* Callbacks of the file interface; `file` is the slot RenderWare keeps the handle in. */
-int zrwfclose(ZfileHandle **file);
-int zrwfread(void *buffer, int size, int count, ZfileHandle **file);
-int zrwfwrite(const void *buffer, int size, int count, ZfileHandle **file);
-char *zrwfgets(char *buffer, int size, ZfileHandle **file);
-int zrwfflush(void);
-int zrwfputs(void);
-int zrwfeof(ZfileHandle **file);
-uint32_t zrwfseek(ZfileHandle **file, uint32_t a, uint32_t b);
+int zrwfclose(void *file);
+size_t zrwfread(void *buffer, size_t size, size_t count, void *file);
+size_t zrwfwrite(const void *buffer, size_t size, size_t count, void *file);
+char *zrwfgets(char *buffer, int32_t size, void *file);
+int zrwfflush(void *file);
+int zrwfputs(const char *text, void *file);
+int zrwfeof(void *file);
+int zrwfseek(void *file, int32_t offset, int32_t origin);
 
 /* Installs the callbacks into RenderWare's interface (keeping a copy of the old one), resets the RAM disk
  * state. */

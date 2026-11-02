@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 #include "compat/orig.h"
+#include "rw/rwcore.h"
 
 /* What a callback is called with (a pointer to it); operations fill the first 3 or all 4 words. */
 typedef struct ZrwFileEvent {
@@ -28,19 +29,8 @@ typedef struct ZrwFileHandle {
     void *file;
 } ZrwFileHandle;
 
-/* RenderWare's OS file interface as copied at initialisation (0x6752c0, ten function pointers). */
-typedef struct ZrwFileOps {
-    int(BMX_CDECL *exists)(const char *name);                                                  /* 0x00 */
-    void *(BMX_CDECL *open)(const char *name, const char *mode);                               /* 0x04 */
-    int(BMX_CDECL *close)(void *file);                                                         /* 0x08 */
-    uint32_t(BMX_CDECL *read)(void *buffer, uint32_t size, uint32_t count, void *file);        /* 0x0c */
-    uint32_t(BMX_CDECL *write)(const void *buffer, uint32_t size, uint32_t count, void *file); /* 0x10 */
-    void *pad14[3];                                                                            /* 0x14 */
-    int(BMX_CDECL *seek)(void *file, int32_t offset, int whence);                              /* 0x20 */
-    void *pad24;                                                                               /* 0x24 */
-} ZrwFileOps;
-
-BMX_LAYOUT32_ASSERT(sizeof(ZrwFileOps) == 0x28, "file ops");
+/* RenderWare's OS file interface as copied at initialisation (0x6752c0). */
+typedef RwFileFunctions ZrwFileOps;
 
 #define gZrwFileOps         ORIG_VAR(0x006752c0, ZrwFileOps, gZrwFileOps)
 #define gZrwFileInitialized ORIG_VAR(0x006752e8, int, gZrwFileInitialized)

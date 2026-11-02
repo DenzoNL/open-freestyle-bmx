@@ -421,114 +421,93 @@ struct BmxGroup_gFxRippleDefaultGroup gFxRippleDefaultGroup __attribute__((align
     .gFxSpark =
         {
             .destroy = zobjPEmitEffectDestroy,
-            .addModifier = (void *)zobjPEmitAddModifier,
-            .attach = (void *)zobjPEmitAddModifierByName,
-            .slots0c =
-                {
-                    (void *)zobjPEmitClearModifiers,
-                    (void *)zobjPEmitCreate,
-                    (void *)zobjPEmitDestroy,
-                    (void *)ngiffxSparkSpawn,
-                    (void *)zobjPEmitUpdate,
-                    (void *)ngiffxSparkRender,
-                },
+            .addModifier = zobjPEmitAddModifier,
+            .attach = zobjPEmitAddModifierByName,
+            .clearModifiers = zobjPEmitClearModifiers,
+            .create = zobjPEmitCreate,
+            .destroyEmitter = zobjPEmitDestroy,
+            .spawn = ngiffxSparkSpawn,
+            .update = zobjPEmitUpdate,
+            .render = ngiffxSparkRender,
         },
 };
 
 /* 0x0055c2b0 */
 ZfxEffect gFxShard = {
     .destroy = zobjPEmitEffectDestroy,
-    .addModifier = (void *)zobjPEmitAddModifier,
-    .attach = (void *)zobjPEmitAddModifierByName,
-    .slots0c =
-        {
-            (void *)zobjPEmitClearModifiers,
-            (void *)zobjPEmitCreate,
-            (void *)zobjPEmitDestroy,
-            (void *)ngiffxShardSpawn,
-            (void *)zobjPEmitUpdate,
-            (void *)ngiffxShardRender,
-        },
+    .addModifier = zobjPEmitAddModifier,
+    .attach = zobjPEmitAddModifierByName,
+    .clearModifiers = zobjPEmitClearModifiers,
+    .create = zobjPEmitCreate,
+    .destroyEmitter = zobjPEmitDestroy,
+    .spawn = ngiffxShardSpawn,
+    .update = zobjPEmitUpdate,
+    .render = ngiffxShardRender,
 };
 
 /* 0x0055c2e8 */
 ZfxEffect gFxSplash = {
     .destroy = zobjPEmitEffectDestroy,
-    .addModifier = (void *)zobjPEmitAddModifier,
-    .attach = (void *)zobjPEmitAddModifierByName,
-    .slots0c =
-        {
-            (void *)zobjPEmitClearModifiers,
-            (void *)zobjPEmitCreate,
-            (void *)zobjPEmitDestroy,
-            (void *)ngiffxSparkSpawn,
-            (void *)zobjPEmitUpdate,
-            (void *)ngiffxSplashRender,
-        },
+    .addModifier = zobjPEmitAddModifier,
+    .attach = zobjPEmitAddModifierByName,
+    .clearModifiers = zobjPEmitClearModifiers,
+    .create = zobjPEmitCreate,
+    .destroyEmitter = zobjPEmitDestroy,
+    .spawn = ngiffxSparkSpawn,
+    .update = zobjPEmitUpdate,
+    .render = ngiffxSplashRender,
 };
 
 /* 0x0055c320 */
 ZfxEffect gFxDust = {
     .destroy = zobjPEmitEffectDestroy,
-    .addModifier = (void *)zobjPEmitAddModifier,
-    .attach = (void *)zobjPEmitAddModifierByName,
-    .slots0c =
-        {
-            (void *)zobjPEmitClearModifiers,
-            (void *)zobjPEmitCreate,
-            (void *)zobjPEmitDestroy,
-            (void *)ngiffxDustSpawn,
-            (void *)zobjPEmitUpdate,
-            (void *)ngiffxDustRender,
-        },
+    .addModifier = zobjPEmitAddModifier,
+    .attach = zobjPEmitAddModifierByName,
+    .clearModifiers = zobjPEmitClearModifiers,
+    .create = zobjPEmitCreate,
+    .destroyEmitter = zobjPEmitDestroy,
+    .spawn = ngiffxDustSpawn,
+    .update = zobjPEmitUpdate,
+    .render = ngiffxDustRender,
 };
 
 /* 0x0055c358 */
 ZfxEffect gFxPoster = {
     .destroy = zobjPEmitEffectDestroy,
-    .addModifier = (void *)zobjPEmitAddModifier,
-    .attach = (void *)zobjPEmitAddModifierByName,
-    .slots0c =
-        {
-            (void *)zobjPEmitClearModifiers,
-            (void *)ngiffxPosterCreate,
-            (void *)zobjPEmitDestroy,
-            (void *)ngiffxPosterSpawn,
-            (void *)zobjPEmitUpdate,
-            (void *)ngiffxPosterRender,
-        },
+    .addModifier = zobjPEmitAddModifier,
+    .attach = zobjPEmitAddModifierByName,
+    .clearModifiers = zobjPEmitClearModifiers,
+    .create = ngiffxPosterCreate,
+    .destroyEmitter = zobjPEmitDestroy,
+    .spawn = ngiffxPosterSpawn,
+    .update = zobjPEmitUpdate,
+    .render = ngiffxPosterRender,
 };
 
 /* 0x0055c390 */
 ZfxEffect gFxRipple = {
     .destroy = zobjPEmitEffectDestroy,
-    .addModifier = (void *)zobjPEmitAddModifier,
-    .attach = (void *)zobjPEmitAddModifierByName,
-    .slots0c =
-        {
-            (void *)zobjPEmitClearModifiers,
-            (void *)zobjPEmitCreate,
-            (void *)zobjPEmitDestroy,
-            (void *)ngiffxRippleSpawn,
-            (void *)ngiffxUpdateEmitter,
-            (void *)ngiffxRippleRender,
-        },
+    .addModifier = zobjPEmitAddModifier,
+    .attach = zobjPEmitAddModifierByName,
+    .clearModifiers = zobjPEmitClearModifiers,
+    .create = zobjPEmitCreate,
+    .destroyEmitter = zobjPEmitDestroy,
+    .spawn = ngiffxRippleSpawn,
+    .update = ngiffxUpdateEmitter,
+    .render = ngiffxRippleRender,
 };
 
 /* 0x0055c3c8 */
 ZfxEffect gFxLightning = {
     .destroy = zobjPEmitEffectDestroy,
-    .addModifier = (void *)zobjPEmitAddModifier,
-    .attach = (void *)zobjPEmitAddModifierByName,
-    .slots0c =
-        {
-            (void *)zobjPEmitClearModifiers,
-            (void *)zobjPEmitCreate,
-            (void *)zobjPEmitDestroy,
-            (void *)ngiffxLightningSpawn,
-            (void *)zobjPEmitUpdate,
-            (void *)ngiffxLightningRender,
-        },
+    .addModifier = zobjPEmitAddModifier,
+    .attach = zobjPEmitAddModifierByName,
+    .clearModifiers = zobjPEmitClearModifiers,
+    .create = zobjPEmitCreate,
+    .destroyEmitter = zobjPEmitDestroy,
+    .spawn = ngiffxLightningSpawn,
+    .update = zobjPEmitUpdate,
+    .render = ngiffxLightningRender,
 };
 
 struct BmxGroup_gFxSparkCreateDefaultGroup gFxSparkCreateDefaultGroup __attribute__((aligned(16))) = {
@@ -1723,13 +1702,13 @@ struct BmxGroup_gFxLoadTextureGroup gFxLoadTextureGroup __attribute__((aligned(1
 };
 
 /* 0x005623d8 */
-void *gFxGravity[2] = {
+ZfxModifier gFxGravity = {
     zrwWorldNop,
     zrwParticleAccelerate,
 };
 
 /* 0x005623e0 */
-void *gFxFloorColl[2] = {
+ZfxModifier gFxFloorColl = {
     zrwParticleNop,
     zrwParticleFloorBounce,
 };

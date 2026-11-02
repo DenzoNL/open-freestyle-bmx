@@ -139,7 +139,7 @@ int zrwFileExists(void *unused, const char *name, uint32_t *exists, const ZrwFil
     if (exists == NULL && callback == NULL) {
         zdebugFail(kNeedResultOrCallback, kZrwFileFile, 0x113, 0);
     }
-    event.value = gZrwFileOps.exists(name) != 0;
+    event.value = gZrwFileOps.rwfexist(name) != 0;
     if (exists != NULL) {
         *exists = event.value;
     }
@@ -164,7 +164,7 @@ int zrwFileOpen(ZrwFileHandle *handle, const char *name, int mode, const ZrwFile
         zdebugFail("Invalid parameters", kZrwFileFile, 0x14e, 0);
     }
     zstrcpy(path, name);
-    file = gZrwFileOps.open(path, gZrwOpenModes[mode]);
+    file = gZrwFileOps.rwfopen(path, gZrwOpenModes[mode]);
     if (file == NULL) {
         zfileRegisterErrorMessage("rwfopen() failed.");
         return 0;
@@ -188,7 +188,7 @@ int zrwFileClose(ZrwFileHandle *handle, const ZrwFileCallback *callback)
     if (handle == NULL || handle->file == NULL) {
         zdebugFail(kInvalidHandle, kZrwFileFile, 0x173, 0);
     }
-    if (gZrwFileOps.close(handle->file) != 0) {
+    if (gZrwFileOps.rwfclose(handle->file) != 0) {
         zfileRegisterErrorMessage("rwfclose() failed");
         return 0;
     }
@@ -211,7 +211,7 @@ int zrwFileRead(ZrwFileHandle *handle, void *buffer, int count, const ZrwFileCal
     if (handle == NULL || handle->file == NULL) {
         zdebugFail(kInvalidHandle, kZrwFileFile, 0x192, 0);
     }
-    done = (int)gZrwFileOps.read(buffer, 1, (uint32_t)count, handle->file);
+    done = (int)gZrwFileOps.rwfread(buffer, 1, (size_t)count, handle->file);
     if (done != count) {
         zfileRegisterErrorMessage("rwfread() failed.");
     }
@@ -235,7 +235,7 @@ int zrwFileWrite(ZrwFileHandle *handle, const void *buffer, int count, const Zrw
     if (handle == NULL || handle->file == NULL) {
         zdebugFail(kInvalidHandle, kZrwFileFile, 0x1b6, 0);
     }
-    done = (int)gZrwFileOps.write(buffer, 1, (uint32_t)count, handle->file);
+    done = (int)gZrwFileOps.rwfwrite(buffer, 1, (size_t)count, handle->file);
     if (done != count) {
         zfileRegisterErrorMessage("rwfwrite() failed.");
     }
@@ -262,7 +262,7 @@ int zrwFileSeek(ZrwFileHandle *handle, uint32_t offset, int whence, const ZrwFil
     if (handle == NULL || handle->file == NULL) {
         zdebugFail(kInvalidHandle, kZrwFileFile, 0x1e0, 0);
     }
-    if (gZrwFileOps.seek(handle->file, (int32_t)offset, (int)origins[whence]) != 0) {
+    if (gZrwFileOps.rwfseek(handle->file, (int32_t)offset, (int32_t)origins[whence]) != 0) {
         zfileRegisterErrorMessage("rwfseek() failed");
         return 0;
     }
@@ -308,7 +308,7 @@ int zrwFileSystemInitialize(void)
     if (gZrwFileInitialized != 0) {
         zdebugFail("File system has already been intialized.", kZrwFileFile, 0x24b, 0);
     }
-    memcpy(&gZrwFileOps, (const void *)RwOSGetFileInterface(), sizeof gZrwFileOps);
+    memcpy(&gZrwFileOps, RwOSGetFileInterface(), sizeof gZrwFileOps);
     gZrwFileInitialized = 1;
     return 1;
 }

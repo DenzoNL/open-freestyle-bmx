@@ -68,8 +68,10 @@ int zrwRamDiskMatches(const char *path)
 }
 
 BMX_ADDR(0x004a3260)
-ZfileHandle **zrwfopen(void)
+void *zrwfopen(const char *path, const char *mode)
 {
+    (void)path; /* the RAM disk serves the file set with ImageBufferSizeType */
+    (void)mode;
     const char *keys[2];
     uint32_t values[2];
     const char *name;
@@ -111,5 +113,5 @@ ZfileHandle **zrwfopen(void)
     if (gZrwRamDiskFile == NULL) {
         zdebugFail("Error opening RAM disk file.", kZrwRamFile, 0xa7, 0);
     }
-    return &gZrwRamDiskFile;
+    return (void *)&gZrwRamDiskFile;
 }

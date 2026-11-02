@@ -25,7 +25,7 @@ typedef struct ZrwRamDiskInfo {
 #define gZrwRamDiskDevice ORIG_VAR(0x00563874, intptr_t, gZrwRamDiskDevice)
 
 /* Opens the set memory block as a RAM disk file; returns the address of gZrwRamDiskFile or NULL. */
-ZfileHandle **zrwfopen(void);
+void *zrwfopen(const char *path, const char *mode);
 /* 1 when the extension of `path` matches the one set (or none is set). */
 int zrwRamDiskMatches(const char *path);
 

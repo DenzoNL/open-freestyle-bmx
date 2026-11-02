@@ -290,7 +290,7 @@ static void hashAll(Hashes *out)
                                model->collisionClump ? RpClumpGetFrame(model->collisionClump) : NULL, part);
             }
         } else if (object->ops == kEffectOps) {
-            const ZList *items = ((const ZrwEffectHost *)object->data)->items;
+            const ZList *items = ((const ZobjPEmitState *)object->data)->items;
 
             gEmitters = (uint32_t)items->count > gEmitters ? (uint32_t)items->count : gEmitters;
             for (int i = 0; i < items->count; i++) {

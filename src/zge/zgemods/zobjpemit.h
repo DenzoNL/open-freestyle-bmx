@@ -12,6 +12,7 @@
 #include "compat/orig.h"
 #include "zge/zlist.h"
 #include "zge/zmath.h"
+#include "zge/zobj.h"
 
 /* Builds the view matrix of a camera at `eye` looking at `target`; returns out. Callers pass a fourth, unused
  * 0. */
@@ -35,27 +36,17 @@ void zobjPEmitAddModifier(ZfxEffect *effect, ZfxModifier *modifier, void *arg);
 void zobjPEmitAddModifierByName(ZfxEffect *effect, const char *name, void *arg);
 void zobjPEmitClearModifiers(ZfxEffect *effect);
 /* Creates and destroys the emitter of an effect (`capacity` particles); NULL when out of memory. */
-ZfxEmitter *zobjPEmitCreate(uint32_t effect, uint16_t capacity);
+ZfxEmitter *zobjPEmitCreate(ZfxEffect *effect, uint16_t capacity);
 void zobjPEmitDestroy(ZfxEffect *effect, ZfxEmitter *emitter);
 /* Advances the particles and runs the modifiers; returns the number of particles seen. */
 int zobjPEmitUpdate(ZfxEffect *effect, ZfxEmitter *emitter);
 
-/* Item class of an emitter object: methods at +0x14 (destroy) and +0x1c (update). */
-typedef struct ZobjPEmitClass {
-    uint8_t pad00[0x14];
-    void(BMX_CDECL *destroyItem)(struct ZobjPEmitClass *self, void *item); /* 0x14 */
-    uint32_t pad18;
-    int(BMX_CDECL *updateItem)(struct ZobjPEmitClass *self, void *item); /* 0x1c */
-} ZobjPEmitClass;
-
-typedef struct ZobjPEmitItem {
-    uint8_t pad00[0x2c];
-    ZobjPEmitClass *cls; /* 0x2c */
-} ZobjPEmitItem;
-
-/* State of an emitter object (at +0x30 of the object). */
+/*
+ * State of an effect object (ZObj.data, 0x3c bytes): its emitters, one per effect applied to it
+ * (zrwworld.c). The world's effect object sets the rect's last word and the direction to 1 and `value` to 1.
+ */
 typedef struct ZobjPEmitState {
-    ZList *items;       /* 0x00 */
+    ZList *items;       /* 0x00 ZfxEmitter records */
     void *updateNode;   /* 0x04 registered update function */
     float position[3];  /* 0x08 */
     uint32_t pad14;     /* 0x14 */
@@ -65,18 +56,18 @@ typedef struct ZobjPEmitState {
     uint32_t value;     /* 0x38 */
 } ZobjPEmitState;
 
-typedef struct ZobjPEmitObject {
-    uint8_t pad00[0x30];
-    ZobjPEmitState *state; /* 0x30 */
-} ZobjPEmitObject;
+BMX_LAYOUT32_ASSERT(sizeof(ZobjPEmitState) == 0x3c, "effect object state");
 
-/* Object methods: update every item, destroy (also frees the state), and the setters (0 without a state). */
-int zobjPEmitObjectUpdate(ZobjPEmitObject *object);
-int zobjPEmitObjectDestroy(ZobjPEmitObject *object);
-int zobjPEmitSetPosition(ZobjPEmitObject *object, const float *position);
-int zobjPEmitSetRect(ZobjPEmitObject *object, const float *rect);
-int zobjPEmitSetDirection(ZobjPEmitObject *object, const float *direction);
-int zobjPEmitSetValue(ZobjPEmitObject *object, uint32_t value);
+/*
+ * Object methods (gZrwWorldEffectOps): update every emitter, destroy (also frees the state), and the setters
+ * (0 without a state).
+ */
+int zobjPEmitObjectUpdate(ZObj *object);
+int zobjPEmitObjectDestroy(ZObj *object);
+int zobjPEmitSetPosition(ZObj *object, const float *position);
+int zobjPEmitSetRect(ZObj *object, const float *rect);
+int zobjPEmitSetDirection(ZObj *object, const float *direction);
+int zobjPEmitSetValue(ZObj *object, uint32_t value);
 int zobjPEmitInitialize(void);
 
 #define gZobjPEmitInitialized ORIG_VAR(0x006741b4, int, gZobjPEmitInitialized)

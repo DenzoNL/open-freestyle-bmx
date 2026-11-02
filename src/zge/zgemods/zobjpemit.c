@@ -12,19 +12,30 @@
 static const char kPEmitFile[] = "C:\\NgEngine\\Zge\\ZgeMods\\zobjPEmit.c";
 
 /* The modifier list of an effect sits at +0x24 of its table entry: head, tail, count. */
+_Static_assert(offsetof(ZfxEffect, modifierTail) - offsetof(ZfxEffect, modifiers) ==
+                       offsetof(ZrwList, tail) &&
+                   offsetof(ZfxEffect, modifierCount) - offsetof(ZfxEffect, modifiers) ==
+                       offsetof(ZrwList, count),
+               "an effect's modifier list is a ZrwList");
+
 static ZrwList *modifierList(ZfxEffect *effect)
 {
-    return (ZrwList *)&effect->modifiers;
+    return (ZrwList *)(void *)&effect->modifiers;
+}
+
+static ZobjPEmitState *emitterState(const ZObj *object)
+{
+    return object->data;
 }
 
 BMX_ADDR(0x00495380)
 void zobjPEmitEffectDestroy(ZfxEffect *effect)
 {
-    ((void(BMX_CDECL *)(ZfxEffect *))effect->slots0c[0])(effect);
+    effect->clearModifiers(effect);
 }
 
 BMX_ADDR(0x00495390)
-ZfxEmitter *zobjPEmitCreate(uint32_t effect, uint16_t capacity)
+ZfxEmitter *zobjPEmitCreate(ZfxEffect *effect, uint16_t capacity)
 {
     ZfxEmitter *emitter = zmemAlloc(sizeof *emitter);
 
@@ -267,38 +278,39 @@ void zobjAxisMatrix(ZMatrix *out, const ZVec3 *from, const ZVec3 *to)
 }
 
 BMX_ADDR(0x00495a10)
-int zobjPEmitObjectUpdate(ZobjPEmitObject *object)
+int zobjPEmitObjectUpdate(ZObj *object)
 {
-    ZobjPEmitItem *item = zlistFirst(object->state->items);
+    ZfxEmitter *item = zlistFirst(emitterState(object)->items);
 
     while (item != NULL) {
-        item->cls->updateItem(item->cls, item);
-        item = zlistNext(object->state->items);
+        item->effect->update(item->effect, item);
+        item = zlistNext(emitterState(object)->items);
     }
     return 1;
 }
 
 BMX_ADDR(0x00495a60)
-int zobjPEmitObjectDestroy(ZobjPEmitObject *object)
+int zobjPEmitObjectDestroy(ZObj *object)
 {
-    ZobjPEmitItem *item = zlistFirst(object->state->items);
+    ZobjPEmitState *const state = emitterState(object);
+    ZfxEmitter *item = zlistFirst(state->items);
 
     while (item != NULL) {
-        item->cls->destroyItem(item->cls, item);
-        item = zlistNext(object->state->items);
+        item->effect->destroyEmitter(item->effect, item);
+        item = zlistNext(state->items);
     }
-    zlistDestroy(object->state->items);
-    zrwUnregisterUpdateFunction(object->state->updateNode);
-    if (object->state != NULL) {
-        zmemFree(object->state);
+    zlistDestroy(state->items);
+    zrwUnregisterUpdateFunction(state->updateNode);
+    if (state != NULL) {
+        zmemFree(state);
     }
     return 1;
 }
 
 BMX_ADDR(0x00495ad0)
-int zobjPEmitSetPosition(ZobjPEmitObject *object, const float *position)
+int zobjPEmitSetPosition(ZObj *object, const float *position)
 {
-    ZobjPEmitState *state = object->state;
+    ZobjPEmitState *state = emitterState(object);
 
     if (state == NULL) {
         return 0;
@@ -308,9 +320,9 @@ int zobjPEmitSetPosition(ZobjPEmitObject *object, const float *position)
 }
 
 BMX_ADDR(0x00495b00)
-int zobjPEmitSetRect(ZobjPEmitObject *object, const float *rect)
+int zobjPEmitSetRect(ZObj *object, const float *rect)
 {
-    ZobjPEmitState *state = object->state;
+    ZobjPEmitState *state = emitterState(object);
 
     if (state == NULL) {
         return 0;
@@ -320,9 +332,9 @@ int zobjPEmitSetRect(ZobjPEmitObject *object, const float *rect)
 }
 
 BMX_ADDR(0x00495b30)
-int zobjPEmitSetDirection(ZobjPEmitObject *object, const float *direction)
+int zobjPEmitSetDirection(ZObj *object, const float *direction)
 {
-    ZobjPEmitState *state = object->state;
+    ZobjPEmitState *state = emitterState(object);
 
     if (state == NULL) {
         return 0;
@@ -332,12 +344,14 @@ int zobjPEmitSetDirection(ZobjPEmitObject *object, const float *direction)
 }
 
 BMX_ADDR(0x00495b60)
-int zobjPEmitSetValue(ZobjPEmitObject *object, uint32_t value)
+int zobjPEmitSetValue(ZObj *object, uint32_t value)
 {
-    if (object->state == NULL) {
+    ZobjPEmitState *state = emitterState(object);
+
+    if (state == NULL) {
         return 0;
     }
-    object->state->value = value;
+    state->value = value;
     return 1;
 }
 

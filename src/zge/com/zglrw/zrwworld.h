@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 #include "compat/orig.h"
+#include "zge/zgemods/zobjpemit.h"
 #include "zge/zlist.h"
 #include "zge/zmath.h"
 
@@ -47,41 +48,7 @@ _Static_assert(sizeof(ZrwWorldStats) == 0x1c, "world stats");
 #define gZrwWorldReady  ORIG_VAR(0x006741e0, int, gZrwWorldReady)
 #define gZrwWorldStats  ORIG_VAR(0x006741ec, ZrwWorldStats, gZrwWorldStats)
 
-/* An effect type (particle system): creates the per-object record and applies it. */
-typedef struct ZrwEffectType {
-    uint8_t pad00[0x10];
-    void *(BMX_CDECL *create)(struct ZrwEffectType *type, int size); /* 0x10 */
-    uint32_t pad14;
-    void *(BMX_CDECL *apply)(struct ZrwEffectType *type, void *object, void *item, uint32_t flags, void *a,
-                             void *b); /* 0x18 */
-    uint32_t pad1c;
-    void(BMX_CDECL *update)(struct ZrwEffectType *type, void *item, int arg); /* 0x20 */
-} ZrwEffectType;
-
-/* An effect record (0x100 bytes, made by ZrwEffectType.create); the world code only reads its type. */
-typedef struct ZrwEffectItem {
-    uint8_t pad00[0x2c];
-    ZrwEffectType *type; /* 0x2c */
-} ZrwEffectItem;
-
-BMX_LAYOUT32_ASSERT(offsetof(ZrwEffectItem, type) == 0x2c, "effect item");
-
-/* Per-object record of the effect object (0x3c bytes, at +0x30 of it). */
-typedef struct ZrwEffectHost {
-    struct ZList *items; /* 0x00 ZrwEffectItem records */
-    void *updateNode;    /* 0x04 */
-    uint32_t pad08[3];   /* 0x08 zero */
-    uint32_t pad14;      /* 0x14 never set */
-    uint32_t pad18[3];   /* 0x18 zero */
-    float one24;         /* 0x24 */
-    float one28;         /* 0x28 */
-    float one2c;         /* 0x2c */
-    float one30;         /* 0x30 */
-    uint32_t pad34;      /* 0x34 never set */
-    uint32_t active;     /* 0x38 */
-} ZrwEffectHost;
-
-BMX_LAYOUT32_ASSERT(sizeof(ZrwEffectHost) == 0x3c, "effect host");
+/* The effect types are ZfxEffect tables (ngiffx.h); the effect object is an emitter object (zobjpemit.h). */
 
 /* Creates the effect object (type 2); NULL on failure. */
 void *zrwworldCreateObject(void);
@@ -136,29 +103,10 @@ int zrwWorldLoadPvs(void);
 int zrwWorldRender(void);
 void zrwWorldNop(void);
 
-/* A particle (only the fields the two steps below touch are known). */
-typedef struct ZrwParticle {
-    uint8_t pad00[4];
-    ZVec3 position; /* 0x04 only y is used here */
-    uint8_t pad10[0x14];
-    ZVec3 velocity; /* 0x24 */
-} ZrwParticle;
-
-_Static_assert(offsetof(ZrwParticle, position) == 0x04, "particle");
-_Static_assert(offsetof(ZrwParticle, velocity) == 0x24, "particle");
-
-/* A particle system. */
-typedef struct ZrwParticleSystem {
-    ZList *particles; /* 0x00 list of ZrwParticle */
-    uint8_t pad04[0x24];
-    uint32_t lastStep; /* 0x28 time (zrwTimeGetTime) of the last acceleration step */
-} ZrwParticleSystem;
-
-BMX_LAYOUT32_ASSERT(offsetof(ZrwParticleSystem, lastStep) == 0x28, "particle system");
-
-/* Particle steps: the system pointer is a ZrwParticleSystem (typed as words for the original's signature). */
-void zrwParticleAccelerate(int enabled, uint32_t *system, const ZVec3 *acceleration);
+/* The particle steps, the apply functions of gFxGravity (arg: a ZVec3 acceleration) and gFxFloorColl (arg:
+ * the floor y and the bounce factor); nothing moves without a modifier or an emitter. */
+void zrwParticleAccelerate(ZfxModifier *self, ZfxEmitter *emitter, void *arg);
 void zrwParticleNop(void);
-void zrwParticleFloorBounce(int enabled, uint32_t *system, const float *params);
+void zrwParticleFloorBounce(ZfxModifier *self, ZfxEmitter *emitter, void *arg);
 
 #endif

@@ -158,7 +158,7 @@ static void setup_effect_destroy(DtCtx *c)
     ZfxEffect *effect = dt_alloc(sizeof *effect);
 
     ngBegin(c, 0);
-    effect->slots0c[0] = (void *)effectHook;
+    effect->clearModifiers = effectHook;
     DT_ARG_PTR(c, 0, effect);
 }
 
@@ -306,7 +306,7 @@ static void setup_update(DtCtx *c)
 
 /* ---- emitter objects ------------------------------------------------------------------------------- */
 
-static int BMX_CDECL itemUpdate(ZobjPEmitClass *self, void *item)
+static int BMX_CDECL itemUpdate(ZfxEffect *self, ZfxEmitter *item)
 {
     ngLog(0x1c0001);
     ngLogPtr(self);
@@ -314,7 +314,7 @@ static int BMX_CDECL itemUpdate(ZobjPEmitClass *self, void *item)
     return 1;
 }
 
-static void BMX_CDECL itemDestroy(ZobjPEmitClass *self, void *item)
+static void BMX_CDECL itemDestroy(ZfxEffect *self, ZfxEmitter *item)
 {
     ngLog(0x140001);
     ngLogPtr(self);
@@ -328,29 +328,29 @@ static int BMX_CDECL stubUnregister(void *node)
     return 1;
 }
 
-static ZobjPEmitObject *new_object(int items, int withState)
+static ZObj *new_object(int items, int withState)
 {
-    ZobjPEmitObject *o = dt_alloc(0x40);
-    ZobjPEmitClass *cls = dt_alloc(sizeof *cls);
+    ZObj *o = dt_alloc(sizeof *o);
+    ZfxEffect *cls = dt_alloc(sizeof *cls);
 
-    dt_fill(o, 0x40);
-    cls->updateItem = itemUpdate;
-    cls->destroyItem = itemDestroy;
-    o->state = NULL;
+    dt_fill(o, sizeof *o);
+    cls->update = itemUpdate;
+    cls->destroyEmitter = itemDestroy;
+    o->data = NULL;
     if (withState) {
         ZobjPEmitState *s = dt_zmemalloc(sizeof *s);
 
         dt_fill(s, sizeof *s);
         s->items = DT_ORIG(0x0048c260, ListCreateFn)(0x10);
         for (int i = 0; i < items; i++) {
-            ZobjPEmitItem *item = dt_alloc(sizeof *item);
+            ZfxEmitter *item = dt_alloc(sizeof *item);
 
             dt_fill(item, sizeof *item);
-            item->cls = cls;
+            item->effect = cls;
             DT_ORIG(0x0048c460, ListInsertFn)(s->items, item);
         }
         s->updateNode = (void *)(uintptr_t)(dt_u32() | 4u);
-        o->state = s;
+        o->data = s;
     }
     return o;
 }
