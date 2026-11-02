@@ -91,6 +91,16 @@ typedef int(BMX_STDCALL *DialogBoxFn)(void *instance, uintptr_t name, void *pare
 #define gZglSubSystem      ORIG_VAR(0x00672754, int, gZglSubSystem)
 #define gZglVideoMode      ORIG_VAR(0x00672758, uint32_t, gZglVideoMode)
 #define gZglSubSystemNames ORIG_VAR(0x006724d0, uint8_t, gZglSubSystemNames)
+/* Cleared by zrwInitApp; declared by the modules that use them (spelled as there). */
+#define gZrwZRaster           ORIG_VAR(0x006976c4, void *, gZrwZRaster)
+#define gZrwWorldCenterScaled ORIG_VAR(0x006976d8, ZVec3, gZrwWorldCenterScaled)
+#define gZrwPvsLoaded         ORIG_VAR(0x006976e4, int, gZrwPvsLoaded)
+#define gZrwPrimCamera        ORIG_VAR(0x006976f4, void *, gZrwPrimCamera)
+#define gZrwInUpdate          ORIG_VAR(0x006976f8, int, gZrwInUpdate)
+
+/* Zeroes one global. The original clears runs of adjacent globals with one fill; natively each global is its
+ * own definition (docs/PORTING.md X2a), so the runs are cleared global by global. */
+#define ZRW_CLEAR(var) zmemFill((void *)&(var), 0, (uint32_t)sizeof(var))
 
 typedef void *(BMX_STDCALL *GetDlgItemFn)(void *dialog, int id);
 typedef uintptr_t(BMX_STDCALL *SendMessageFn)(void *window, uint32_t message, uintptr_t wparam,
@@ -400,7 +410,11 @@ int zrwGetParameter(int id, void *out, const void *extra)
 BMX_ADDR(0x0048afe0)
 int zrwGraphicLibraryInitialize(void)
 {
-    zmemFill(&gZrwScreenW, 0, 0x10);
+    /* The original: one fill, 0x00697770..0x00697780. */
+    ZRW_CLEAR(gZrwScreenW);
+    ZRW_CLEAR(gZrwScreenH);
+    ZRW_CLEAR(gZrwRenderFlags);
+    ZRW_CLEAR(gZrwRenderExtra);
     gZrwScreenH = (uint32_t)gZrwWantH;
     gZrwScreenW = (uint32_t)gZrwWantW;
     gZrwFlags = (gZrwFlags & 0xfffffffbu) | 1;
@@ -571,8 +585,41 @@ int zrwInitApp(const char *commandLine)
     if (gZrwInitialized != 0) {
         zdebugFail("Already initialized", kZglFile, 0x38c, 0);
     }
-    zmemFill((void *)&gZrwRaster, 0, 0x88);
-    zmemFill(&gZrwInitialized, 0, 0xa8);
+    /* The original: two fills, 0x006976c0..0x00697748 and 0x00672760..0x00672808. */
+    ZRW_CLEAR(gZrwRaster);
+    ZRW_CLEAR(gZrwZRaster);
+    ZRW_CLEAR(gZrwDebugLight);
+    ZRW_CLEAR(gZrwOriginX);
+    ZRW_CLEAR(gZrwOriginY);
+    ZRW_CLEAR(gZrwOriginZ);
+    ZRW_CLEAR(gZrwWorldCenterScaled);
+    ZRW_CLEAR(gZrwPvsLoaded);
+    ZRW_CLEAR(gZrwDebugLightOn);
+    ZRW_CLEAR(gZrwLightParamA);
+    ZRW_CLEAR(gZrwLightParamB);
+    ZRW_CLEAR(gZrwPrimCamera);
+    ZRW_CLEAR(gZrwInUpdate);
+    ZRW_CLEAR(gZrwName);
+    ZRW_CLEAR(gZrwFrameLimit);
+    ZRW_CLEAR(gZrwInvScale);
+    ZRW_CLEAR(gZrwScale);
+    ZRW_CLEAR(gZrwFlags);
+    ZRW_CLEAR(gZrwClearOn);
+    ZRW_CLEAR(gZrwClearColor);
+    ZRW_CLEAR(gZrwClearColor2);
+    ZRW_CLEAR(gZrwLastTime);
+    ZRW_CLEAR(gZrwFpsTime);
+    ZRW_CLEAR(gZrwFps);
+    ZRW_CLEAR(gZrwFrames);
+    ZRW_CLEAR(gZrwInitialized);
+    ZRW_CLEAR(gZrwArgument);
+    ZRW_CLEAR(gZrwUpdateLists);
+    ZRW_CLEAR(gZrwStateStack);
+    ZRW_CLEAR(gZrwStateDepth);
+    ZRW_CLEAR(gZrwNodePool);
+    ZRW_CLEAR(gZrwSkipDevice);
+    ZRW_CLEAR(gZrwEngineOpen);
+    ZRW_CLEAR(gZrwEngineInit);
     gZrwInitialized = 1;
     gRwMalloc = (ZMemAllocFn)(uintptr_t)RwOsGetMemoryInterface()->rwmalloc;
     gRwFree = (ZMemFreeFn)(uintptr_t)RwOsGetMemoryInterface()->rwfree;

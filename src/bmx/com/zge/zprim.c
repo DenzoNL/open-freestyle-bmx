@@ -55,7 +55,14 @@ int zprimInit(void)
         zprimStateReset();
         zprimStatePush();
         zmemdmmUnlock(gZprimHandle);
-        zmemFill(&gZprimLibrary, 0, 10 * 4); /* library, pool, free, used, clip, groups */
+        /* The original clears library, pool, free, used, clip and groups in one fill
+         * (0x00678400..0x00678428); natively each is its own definition (docs/PORTING.md X2a). */
+        gZprimLibrary = 0;
+        gZprimPool = NULL;
+        gZprimFree = NULL;
+        gZprimUsed = NULL;
+        zmemFill(&gZprimClip, 0, (uint32_t)sizeof gZprimClip);
+        zmemFill(&gZprimGroups, 0, (uint32_t)sizeof gZprimGroups);
         zprimSetClip(0, 0, 0x27f, 0x1df);
         ZPrimAsset *pool = zmemStaticAlloc(kZprimAssetCount * sizeof(ZPrimAsset));
         gZprimPool = pool;

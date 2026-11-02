@@ -333,6 +333,12 @@ mechanical commits leave bmxtest.dll, dinput.dll and bmxnative.exe .text/.data/.
   ZtaginfNode / ZrwRenderColNode asserted to agree. compat/layout.h: BMX_LAYOUT32_ASSERT; the 409
   failing in-memory asserts converted. tools/probe64.py (--list, other errors): **418 -> 0 failing asserts
   outside src/data** (src/data: 1780, generator).
+- **Found after the merge (2026-11-02):** X2a's adjacency check looked at memset / memcpy only; four `zmemFill`
+  calls cleared runs of globals that X2a had made separate definitions (zrwInitApp 0x88 from gZrwRaster and
+  0xa8 from gZrwInitialized, zrwGraphicLibraryInitialize 0x10 from gZrwScreenW, zprim's 10 words from
+  gZprimLibrary). They only worked because the linker kept the definitions in source order. Now cleared global
+  by global (`ZRW_CLEAR`); replays unchanged. A wider search (every fill / copy with a literal size on a global)
+  found no other.
 - **Verified:** xcheck rec-20261101-140610 (5594 ticks) = native32-84da8fd hash, scripted ride (1014) equal
   (after the FILE, sizes and offsets commits); attract mode demo (Replay.ZAL, 2130 ticks) equal to the X2a
   exe; oracle subsets (winload with real assets, zsndseq, zprim, replay, RW plugins, light, clump).
