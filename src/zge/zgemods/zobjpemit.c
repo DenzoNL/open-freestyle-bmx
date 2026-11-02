@@ -20,7 +20,7 @@ static ZrwList *modifierList(ZfxEffect *effect)
 BMX_ADDR(0x00495380)
 void zobjPEmitEffectDestroy(ZfxEffect *effect)
 {
-    ((void(BMX_CDECL *)(ZfxEffect *))(uintptr_t)effect->pad0c[0])(effect);
+    ((void(BMX_CDECL *)(ZfxEffect *))effect->slots0c[0])(effect);
 }
 
 BMX_ADDR(0x00495390)

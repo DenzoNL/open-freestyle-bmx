@@ -11,6 +11,7 @@
 #include "rw/rwtexture.h"
 #include "rw/rwworld.h"
 #include "zge/com/zglrw/zrwcam.h"
+#include "zge/com/zglrw/zrwmat.h"
 #include "zge/pc/pcinput.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zramdisk.h"
@@ -149,7 +150,7 @@ typedef struct DdVtbl {
 #define gDirectDraw ORIG_VAR(0x0069730c, void *, gDirectDraw)
 #define gGdiSurface ORIG_VAR(0x006977cc, void *, gGdiSurface)
 
-#define gZglMaterials     ORIG_VAR(0x006723b0, ZMemFreeList *, gZglMaterials)
+#define gZglMaterials     (gZrwMat.pool) /* 0x006723b0 */
 #define gMovie            ORIG_VAR(0x006973a0, ZMovie, gMovie)
 #define gMovieSkip        ORIG_VAR(0x0067288c, int, gMovieSkip)
 #define gZglFileDeviceRw  ORIG_VAR(0x00562ff8, uint8_t, gZglFileDeviceRw)

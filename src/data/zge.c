@@ -736,7 +736,7 @@ ZMemFreeFn gRwFree;
 ZMemReallocFn gRwRealloc;
 
 struct BmxGroup_gZobjLightOpsGroup gZobjLightOpsGroup __attribute__((aligned(16))) = {
-    .gZobjLightOps = (uintptr_t)zobjLightDestroy,
+    .gZobjLightOps = (void *)zobjLightDestroy,
     .p_00561860 =
         {
             zobjLightSetParam,

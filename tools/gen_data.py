@@ -1906,9 +1906,10 @@ def check(exe, build):
     owners = {a: n for a, (n, _) in build_map(SRC).items()}
     table = (SRC / "data" / "units.c").read_text()
     units, leads = {}, {}
-    for m in re.finditer(r"\{(0x[0-9a-f]+), (0x[0-9a-f]+), \(const (?:void|char) \*\)&(\w+)(?: \+ (\d+))?\}", table):
+    for m in re.finditer(r"\{(0x[0-9a-f]+), (0x[0-9a-f]+), \(const (?:void|char) \*\)&(\w+)(?: \+ (?:BMX_DATA_OFF\((\d+), \d+\)|(\d+)))?\}",
+                         table):
         units[m.group(3)] = (int(m.group(1), 16), int(m.group(2), 16))
-        leads[m.group(3)] = int(m.group(4) or 0)
+        leads[m.group(3)] = int(m.group(4) or m.group(5) or 0)  # the 32-bit lead (tools/data_off64.py)
     if not units:
         return ["src/data/units.c: no units"], {}
     objdir = build / "CMakeFiles" / "bmx_data.dir" / "src" / "data"

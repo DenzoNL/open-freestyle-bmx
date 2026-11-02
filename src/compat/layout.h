@@ -23,4 +23,13 @@
 #define BMX_LAYOUT32_ASSERT(cond, msg) _Static_assert(1, msg)
 #endif
 
+/* An offset into src/data's definitions that differs with the pointer width: src/data/addrs.h (a global
+ * inside a group) and the group asserts of src/data/globals.h, both widths asserted. tools/data_off64.py
+ * computes o64. */
+#if BMX_LAYOUT32
+#define BMX_DATA_OFF(o32, o64) (o32)
+#else
+#define BMX_DATA_OFF(o32, o64) (o64)
+#endif
+
 #endif

@@ -876,7 +876,7 @@ int zscnptsReset(void)
     ZMemFreeList *points = gScnpts.points;
 
     gScnpts.count = 0;
-    gScnpts.field14 = 0;
+    gScnpts.markers = NULL;
     if (points == 0) {
         gScnpts.points =
             zmemFreeListCreate(sizeof(ZrwMarker), 0, BMX_FNPTR(ZMemDestroyFn, 0x00491dc0, zscnptsFreeNode));
@@ -905,7 +905,7 @@ int zscnptsInitialize(void)
     gScnpts.first = 0;
     gScnpts.points = 0;
     gScnpts.count = 0;
-    gScnpts.field14 = 0;
+    gScnpts.markers = NULL;
     gScnpts.points =
         zmemFreeListCreate(sizeof(ZrwMarker), 0, BMX_FNPTR(ZMemDestroyFn, 0x00491dc0, zscnptsFreeNode));
     return 1;

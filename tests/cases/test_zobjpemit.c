@@ -158,7 +158,7 @@ static void setup_effect_destroy(DtCtx *c)
     ZfxEffect *effect = dt_alloc(sizeof *effect);
 
     ngBegin(c, 0);
-    effect->pad0c[0] = (uint32_t)(uintptr_t)effectHook;
+    effect->slots0c[0] = (void *)effectHook;
     DT_ARG_PTR(c, 0, effect);
 }
 

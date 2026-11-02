@@ -343,8 +343,22 @@ mechanical commits leave bmxtest.dll, dinput.dll and bmxnative.exe .text/.data/.
   (after the FILE, sizes and offsets commits); attract mode demo (Replay.ZAL, 2130 ticks) equal to the X2a
   exe; oracle subsets (winload with real assets, zsndseq, zprim, replay, RW plugins, light, clump).
   Pending: full gate after the last commits.
-- **Left (X2c/X2e):** src/data generator: group offset asserts, 12 data initialisers storing pointers in u32,
-  memsets over groups by literal size (zrwworld 0xac, zrwzgl 0x10/0x88/0xa8, main.c 0x34); PropState
+- **src/data on 64-bit (2026-11-02):** src/data compiles for x86_64 with every assert holding.
+  - Offsets that differ with the pointer width are written `BMX_DATA_OFF(o32, o64)` (compat/layout.h) and
+    asserted on both widths: the group member and extent asserts of globals.h (132 groups), addrs.h (198 globals
+    reached inside a group) and units.c (28 units behind a `lead_`). tools/data_off64.py computes o64 from an
+    x86_64 compile of the headers and rewrites the three files; re-run it after changing a type inside a group.
+    Chosen over giving the code the group types (their member names are the code's ORIG_VAR macros), per-member
+    assembler symbols (object-format specific) and run-time offset variables (not constant expressions).
+  - Three addrs.h entries named a field by byte offset and now name it: gZglMaterials = gZrwMat.pool,
+    gZrwMarkers = gScnpts.markers (was the u32 `field14`), gTrickBarspinNames = &gTrickTurnNames[46].
+  - Pointers in u32 slots typed as pointers: the effect tables' slots (ZfxEffect.addModifier, slots0c), the
+    first slot of four object operation tables, gZrwWorldPathArgs.
+  - The two group memsets by literal size (zrwworld 0xac, main.c 0x34) clear global by global.
+  - The import thunks of src/data/imports.c are i386 code: their slot offsets are asserted on 32-bit only.
+  - Open for X3: bmxDataFind maps an original address linearly inside a unit (units.c's original ranges),
+    which is wrong past a moved member on 64-bit.
+- **Left (X2c/X2e):** PropState
   (0xb40 view, node states hold pointers; prop.c 0x300); contactSize / PhysContactSnap; d3dim2d deferred
   records; zrwcol 0x13000, zrwprim, zrwmodelrender buffers; byte offsets in game.c, physics.c, physics_air.c,
   rider.c, action.c, ngifzbsp.c, world.c (`object + 0xc`, pipeline + 0x10), driver/texture.c, zscene,

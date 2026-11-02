@@ -47,8 +47,8 @@ typedef const char *(BMX_CDECL *ZrwTextureNameFn)(void *texture);
 #define gZrwWorldTexDrop    ORIG_VAR(0x00562400, ZrwReleaseFn, gZrwWorldTexDrop)
 #define gZrwWorldMatRelease ORIG_VAR(0x00561024, ZrwReleaseFn, gZrwWorldMatRelease)
 #define gZrwWorldTexName    ORIG_VAR(0x00562410, ZrwTextureNameFn, gZrwWorldTexName)
-#define gZrwWorldEffectOps  ORIG_VAR(0x00562098, uint32_t, gZrwWorldEffectOps)
-#define gZrwWorldPathArgs   ORIG_VAR(0x00562128, uint32_t, gZrwWorldPathArgs)
+#define gZrwWorldEffectOps  ORIG_VAR(0x00562098, void *, gZrwWorldEffectOps)
+#define gZrwWorldPathArgs   ORIG_VAR(0x00562128, const void *, gZrwWorldPathArgs)
 typedef const char *ZrwLightKindTable[7];
 #define gZrwLightKinds    ORIG_VAR(0x0056210c, ZrwLightKindTable, gZrwLightKinds)
 #define gZrwClearColorRec ORIG_VAR(0x00697730, uint32_t, gZrwClearColorRec)
@@ -396,7 +396,12 @@ int zrwCreateWorld(void)
     if (gZrwWorldReady != 0) {
         zdebugFail("Already initialized", kZrwWorldFile, 0x348, 0);
     }
-    memset(&gZrwWorldReady, 0, 0xac);
+    /* The original clears 0x006741e0..0x0067428c in one memset: these and the 0x84-byte name buffer. */
+    gZrwWorldReady = 0;
+    gZrwWorldActive = 0;
+    gZrwWorldMaterials = NULL;
+    memset(&gZrwWorldStats, 0, sizeof gZrwWorldStats);
+    memset(&gZrwWorldName, 0, 0x84);
     gZrwWorldMaterials = zlistCreate(0x100);
     world = RpWorldCreate((const RwBBox *)box);
     if (world == NULL) {

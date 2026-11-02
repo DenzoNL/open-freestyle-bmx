@@ -72,9 +72,9 @@ BMX_LAYOUT32_ASSERT(sizeof(ZfxEmitter) == 0x30, "emitter layout");
 /* Handler table of an effect, in the exe's data (0x55c278 + 0x38 * n). */
 struct ZfxEffect {
     void(BMX_CDECL *destroy)(ZfxEffect *effect); /* 0x00 */
-    uint32_t pad04;
+    void *addModifier;                           /* 0x04 zobjPEmitAddModifier */
     void(BMX_CDECL *attach)(ZfxEffect *effect, const char *modifierName, const void *params); /* 0x08 */
-    uint32_t pad0c[6];
+    void *slots0c[6];           /* 0x0c clear modifiers, create, destroy, spawn, update, render */
     ZfxModifierNode *modifiers; /* 0x24 */
     uint8_t pad28[0x10];
 };

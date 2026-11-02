@@ -10,7 +10,7 @@
 static const char kZobjLightFile[] = "C:\\NgEngine\\Zge\\ZgeMods\\zobjLight.c";
 
 #define gZobjLightInitialized ORIG_VAR(0x00673f68, int, gZobjLightInitialized)
-#define gZobjLightOps         ORIG_VAR(0x00561858, uint32_t, gZobjLightOps)
+#define gZobjLightOps         ORIG_VAR(0x00561858, void *, gZobjLightOps)
 
 BMX_ADDR(0x0048ff50)
 int zobjLightDestroy(ZObjLight *light)
@@ -56,7 +56,7 @@ void *zobjLightCreate(int type, int param)
         return NULL;
     }
     zobjInit(light, 1);
-    light->ops = &gZobjLightOps;
+    light->ops = (const void *)&gZobjLightOps;
     if ((uint32_t)type <= 3) {
         light->handle = gZrwLightCreate(type, param);
         return light;

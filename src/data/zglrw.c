@@ -613,7 +613,7 @@ struct BmxGroup_gZrwVtMatCountGroup gZrwVtMatCountGroup __attribute__((aligned(1
 };
 
 struct BmxGroup_gZrwOpsSkinnedGroup gZrwOpsSkinnedGroup __attribute__((aligned(16))) = {
-    .gZrwOpsSkinned = (uintptr_t)zrwObjDestroy,
+    .gZrwOpsSkinned = (void *)zrwObjDestroy,
     .p_00560fac =
         {
             zrwObjUpdate,
@@ -628,7 +628,7 @@ struct BmxGroup_gZrwOpsSkinnedGroup gZrwOpsSkinnedGroup __attribute__((aligned(1
 };
 
 struct BmxGroup_gZrwOpsSimpleGroup gZrwOpsSimpleGroup __attribute__((aligned(16))) = {
-    .gZrwOpsSimple = (uintptr_t)zobjModelFree,
+    .gZrwOpsSimple = (void *)zobjModelFree,
     .p_00560fd4 =
         {
             zrwObjUpdateAgain,
@@ -892,7 +892,7 @@ BmxType_gZrwColSphereFn gZrwColSphereFn = zrwcolQuerySphere;
 char sCNgEngineZgeComZglRwZrwColC[40] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwCol.c";
 
 struct BmxGroup_gZrwWorldEffectOpsGroup gZrwWorldEffectOpsGroup __attribute__((aligned(16))) = {
-    .gZrwWorldEffectOps = (uintptr_t)zobjPEmitObjectDestroy,
+    .gZrwWorldEffectOps = (void *)zobjPEmitObjectDestroy,
     .p_0056209c =
         {
             zobjPEmitObjectUpdate,
@@ -922,7 +922,7 @@ BmxType_gZrwLightKinds gZrwLightKinds = {
 };
 
 /* 0x00562128 */
-uint32_t gZrwWorldPathArgs = (uintptr_t)&gZrwPathKey;
+const void *gZrwWorldPathArgs = &gZrwPathKey;
 
 /* 0x0056212c */
 const char *gZrwPvsKeys = gZrwPathKey;

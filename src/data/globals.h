@@ -1916,548 +1916,550 @@ struct BmxGroup_bmxInputTables {
     void *p_004b0f10;         /* 0x004b0f10 */
     uint32_t d_004b0f14[3];   /* 0x004b0f14 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_bmxInputTables, member) == (addr) - 0x004afc60, #member)
-AT(p_004afc60, 0x004afc60);
-AT(d_004afc64, 0x004afc64);
-AT(p_004afc70, 0x004afc70);
-AT(d_004afc74, 0x004afc74);
-AT(p_004afc80, 0x004afc80);
-AT(d_004afc84, 0x004afc84);
-AT(p_004afc90, 0x004afc90);
-AT(d_004afc94, 0x004afc94);
-AT(p_004afca0, 0x004afca0);
-AT(d_004afca4, 0x004afca4);
-AT(p_004afcb0, 0x004afcb0);
-AT(d_004afcb4, 0x004afcb4);
-AT(p_004afcc0, 0x004afcc0);
-AT(d_004afcc4, 0x004afcc4);
-AT(p_004afcd0, 0x004afcd0);
-AT(d_004afcd4, 0x004afcd4);
-AT(p_004afce0, 0x004afce0);
-AT(d_004afce4, 0x004afce4);
-AT(p_004afcf0, 0x004afcf0);
-AT(d_004afcf4, 0x004afcf4);
-AT(p_004afd00, 0x004afd00);
-AT(d_004afd04, 0x004afd04);
-AT(p_004afd10, 0x004afd10);
-AT(d_004afd14, 0x004afd14);
-AT(p_004aff20, 0x004aff20);
-AT(d_004aff24, 0x004aff24);
-AT(p_004aff30, 0x004aff30);
-AT(d_004aff34, 0x004aff34);
-AT(p_004aff40, 0x004aff40);
-AT(d_004aff44, 0x004aff44);
-AT(p_004aff50, 0x004aff50);
-AT(d_004aff54, 0x004aff54);
-AT(p_004aff60, 0x004aff60);
-AT(d_004aff64, 0x004aff64);
-AT(p_004aff70, 0x004aff70);
-AT(d_004aff74, 0x004aff74);
-AT(p_004aff80, 0x004aff80);
-AT(d_004aff84, 0x004aff84);
-AT(p_004aff90, 0x004aff90);
-AT(d_004aff94, 0x004aff94);
-AT(p_004affa0, 0x004affa0);
-AT(d_004affa4, 0x004affa4);
-AT(p_004affb0, 0x004affb0);
-AT(d_004affb4, 0x004affb4);
-AT(p_004affc0, 0x004affc0);
-AT(d_004affc4, 0x004affc4);
-AT(p_004affd0, 0x004affd0);
-AT(d_004affd4, 0x004affd4);
-AT(p_004affe0, 0x004affe0);
-AT(d_004affe4, 0x004affe4);
-AT(p_004afff0, 0x004afff0);
-AT(d_004afff4, 0x004afff4);
-AT(p_004b0000, 0x004b0000);
-AT(d_004b0004, 0x004b0004);
-AT(p_004b0010, 0x004b0010);
-AT(d_004b0014, 0x004b0014);
-AT(p_004b0020, 0x004b0020);
-AT(d_004b0024, 0x004b0024);
-AT(p_004b0030, 0x004b0030);
-AT(d_004b0034, 0x004b0034);
-AT(p_004b0040, 0x004b0040);
-AT(d_004b0044, 0x004b0044);
-AT(p_004b0050, 0x004b0050);
-AT(d_004b0054, 0x004b0054);
-AT(p_004b0060, 0x004b0060);
-AT(d_004b0064, 0x004b0064);
-AT(p_004b0070, 0x004b0070);
-AT(d_004b0074, 0x004b0074);
-AT(p_004b0080, 0x004b0080);
-AT(d_004b0084, 0x004b0084);
-AT(p_004b0090, 0x004b0090);
-AT(d_004b0094, 0x004b0094);
-AT(p_004b00a0, 0x004b00a0);
-AT(d_004b00a4, 0x004b00a4);
-AT(p_004b00b0, 0x004b00b0);
-AT(d_004b00b4, 0x004b00b4);
-AT(p_004b00c0, 0x004b00c0);
-AT(d_004b00c4, 0x004b00c4);
-AT(p_004b00d0, 0x004b00d0);
-AT(d_004b00d4, 0x004b00d4);
-AT(p_004b00e0, 0x004b00e0);
-AT(d_004b00e4, 0x004b00e4);
-AT(p_004b00f0, 0x004b00f0);
-AT(d_004b00f4, 0x004b00f4);
-AT(p_004b0100, 0x004b0100);
-AT(d_004b0104, 0x004b0104);
-AT(p_004b0110, 0x004b0110);
-AT(d_004b0114, 0x004b0114);
-AT(p_004b0120, 0x004b0120);
-AT(d_004b0124, 0x004b0124);
-AT(p_004b0130, 0x004b0130);
-AT(d_004b0134, 0x004b0134);
-AT(p_004b0140, 0x004b0140);
-AT(d_004b0144, 0x004b0144);
-AT(p_004b0150, 0x004b0150);
-AT(d_004b0154, 0x004b0154);
-AT(p_004b0160, 0x004b0160);
-AT(d_004b0164, 0x004b0164);
-AT(p_004b0170, 0x004b0170);
-AT(d_004b0174, 0x004b0174);
-AT(p_004b0180, 0x004b0180);
-AT(d_004b0184, 0x004b0184);
-AT(p_004b0190, 0x004b0190);
-AT(d_004b0194, 0x004b0194);
-AT(p_004b01a0, 0x004b01a0);
-AT(d_004b01a4, 0x004b01a4);
-AT(p_004b01b0, 0x004b01b0);
-AT(d_004b01b4, 0x004b01b4);
-AT(p_004b01c0, 0x004b01c0);
-AT(d_004b01c4, 0x004b01c4);
-AT(p_004b01d0, 0x004b01d0);
-AT(d_004b01d4, 0x004b01d4);
-AT(p_004b01e0, 0x004b01e0);
-AT(d_004b01e4, 0x004b01e4);
-AT(p_004b01f0, 0x004b01f0);
-AT(d_004b01f4, 0x004b01f4);
-AT(p_004b0200, 0x004b0200);
-AT(d_004b0204, 0x004b0204);
-AT(p_004b0210, 0x004b0210);
-AT(d_004b0214, 0x004b0214);
-AT(p_004b0220, 0x004b0220);
-AT(d_004b0224, 0x004b0224);
-AT(p_004b0230, 0x004b0230);
-AT(d_004b0234, 0x004b0234);
-AT(p_004b0240, 0x004b0240);
-AT(d_004b0244, 0x004b0244);
-AT(p_004b0250, 0x004b0250);
-AT(d_004b0254, 0x004b0254);
-AT(p_004b0260, 0x004b0260);
-AT(d_004b0264, 0x004b0264);
-AT(p_004b0270, 0x004b0270);
-AT(d_004b0274, 0x004b0274);
-AT(p_004b0280, 0x004b0280);
-AT(d_004b0284, 0x004b0284);
-AT(p_004b0290, 0x004b0290);
-AT(d_004b0294, 0x004b0294);
-AT(p_004b02a0, 0x004b02a0);
-AT(d_004b02a4, 0x004b02a4);
-AT(p_004b02b0, 0x004b02b0);
-AT(d_004b02b4, 0x004b02b4);
-AT(p_004b02c0, 0x004b02c0);
-AT(d_004b02c4, 0x004b02c4);
-AT(p_004b02d0, 0x004b02d0);
-AT(d_004b02d4, 0x004b02d4);
-AT(p_004b02e0, 0x004b02e0);
-AT(d_004b02e4, 0x004b02e4);
-AT(p_004b02f0, 0x004b02f0);
-AT(d_004b02f4, 0x004b02f4);
-AT(p_004b0300, 0x004b0300);
-AT(d_004b0304, 0x004b0304);
-AT(p_004b0310, 0x004b0310);
-AT(d_004b0314, 0x004b0314);
-AT(p_004b0320, 0x004b0320);
-AT(d_004b0324, 0x004b0324);
-AT(p_004b0330, 0x004b0330);
-AT(d_004b0334, 0x004b0334);
-AT(p_004b0340, 0x004b0340);
-AT(d_004b0344, 0x004b0344);
-AT(p_004b0350, 0x004b0350);
-AT(d_004b0354, 0x004b0354);
-AT(p_004b0360, 0x004b0360);
-AT(d_004b0364, 0x004b0364);
-AT(p_004b0370, 0x004b0370);
-AT(d_004b0374, 0x004b0374);
-AT(p_004b0380, 0x004b0380);
-AT(d_004b0384, 0x004b0384);
-AT(p_004b0390, 0x004b0390);
-AT(d_004b0394, 0x004b0394);
-AT(p_004b03a0, 0x004b03a0);
-AT(d_004b03a4, 0x004b03a4);
-AT(p_004b03b0, 0x004b03b0);
-AT(d_004b03b4, 0x004b03b4);
-AT(p_004b03c0, 0x004b03c0);
-AT(d_004b03c4, 0x004b03c4);
-AT(p_004b03d0, 0x004b03d0);
-AT(d_004b03d4, 0x004b03d4);
-AT(p_004b03e0, 0x004b03e0);
-AT(d_004b03e4, 0x004b03e4);
-AT(p_004b03f0, 0x004b03f0);
-AT(d_004b03f4, 0x004b03f4);
-AT(p_004b0400, 0x004b0400);
-AT(d_004b0404, 0x004b0404);
-AT(p_004b0410, 0x004b0410);
-AT(d_004b0414, 0x004b0414);
-AT(p_004b0420, 0x004b0420);
-AT(d_004b0424, 0x004b0424);
-AT(p_004b0430, 0x004b0430);
-AT(d_004b0434, 0x004b0434);
-AT(p_004b0440, 0x004b0440);
-AT(d_004b0444, 0x004b0444);
-AT(p_004b0450, 0x004b0450);
-AT(d_004b0454, 0x004b0454);
-AT(p_004b0460, 0x004b0460);
-AT(d_004b0464, 0x004b0464);
-AT(p_004b0470, 0x004b0470);
-AT(d_004b0474, 0x004b0474);
-AT(p_004b0480, 0x004b0480);
-AT(d_004b0484, 0x004b0484);
-AT(p_004b0490, 0x004b0490);
-AT(d_004b0494, 0x004b0494);
-AT(p_004b04a0, 0x004b04a0);
-AT(d_004b04a4, 0x004b04a4);
-AT(p_004b04b0, 0x004b04b0);
-AT(d_004b04b4, 0x004b04b4);
-AT(p_004b04c0, 0x004b04c0);
-AT(d_004b04c4, 0x004b04c4);
-AT(p_004b04d0, 0x004b04d0);
-AT(d_004b04d4, 0x004b04d4);
-AT(p_004b04e0, 0x004b04e0);
-AT(d_004b04e4, 0x004b04e4);
-AT(p_004b04f0, 0x004b04f0);
-AT(d_004b04f4, 0x004b04f4);
-AT(p_004b0500, 0x004b0500);
-AT(d_004b0504, 0x004b0504);
-AT(p_004b0510, 0x004b0510);
-AT(d_004b0514, 0x004b0514);
-AT(p_004b0520, 0x004b0520);
-AT(d_004b0524, 0x004b0524);
-AT(p_004b0530, 0x004b0530);
-AT(d_004b0534, 0x004b0534);
-AT(p_004b0540, 0x004b0540);
-AT(d_004b0544, 0x004b0544);
-AT(p_004b0550, 0x004b0550);
-AT(d_004b0554, 0x004b0554);
-AT(p_004b0560, 0x004b0560);
-AT(d_004b0564, 0x004b0564);
-AT(p_004b0570, 0x004b0570);
-AT(d_004b0574, 0x004b0574);
-AT(p_004b0580, 0x004b0580);
-AT(d_004b0584, 0x004b0584);
-AT(p_004b0590, 0x004b0590);
-AT(d_004b0594, 0x004b0594);
-AT(p_004b05a0, 0x004b05a0);
-AT(d_004b05a4, 0x004b05a4);
-AT(p_004b05b0, 0x004b05b0);
-AT(d_004b05b4, 0x004b05b4);
-AT(p_004b05c0, 0x004b05c0);
-AT(d_004b05c4, 0x004b05c4);
-AT(p_004b05d0, 0x004b05d0);
-AT(d_004b05d4, 0x004b05d4);
-AT(p_004b05e0, 0x004b05e0);
-AT(d_004b05e4, 0x004b05e4);
-AT(p_004b05f0, 0x004b05f0);
-AT(d_004b05f4, 0x004b05f4);
-AT(p_004b0600, 0x004b0600);
-AT(d_004b0604, 0x004b0604);
-AT(p_004b0610, 0x004b0610);
-AT(d_004b0614, 0x004b0614);
-AT(p_004b0620, 0x004b0620);
-AT(d_004b0624, 0x004b0624);
-AT(p_004b0630, 0x004b0630);
-AT(d_004b0634, 0x004b0634);
-AT(p_004b0640, 0x004b0640);
-AT(d_004b0644, 0x004b0644);
-AT(p_004b0650, 0x004b0650);
-AT(d_004b0654, 0x004b0654);
-AT(p_004b0660, 0x004b0660);
-AT(d_004b0664, 0x004b0664);
-AT(p_004b0670, 0x004b0670);
-AT(d_004b0674, 0x004b0674);
-AT(p_004b0680, 0x004b0680);
-AT(d_004b0684, 0x004b0684);
-AT(p_004b0690, 0x004b0690);
-AT(d_004b0694, 0x004b0694);
-AT(p_004b06a0, 0x004b06a0);
-AT(d_004b06a4, 0x004b06a4);
-AT(p_004b06b0, 0x004b06b0);
-AT(d_004b06b4, 0x004b06b4);
-AT(p_004b06c0, 0x004b06c0);
-AT(d_004b06c4, 0x004b06c4);
-AT(p_004b06d0, 0x004b06d0);
-AT(d_004b06d4, 0x004b06d4);
-AT(p_004b06e0, 0x004b06e0);
-AT(d_004b06e4, 0x004b06e4);
-AT(p_004b06f0, 0x004b06f0);
-AT(d_004b06f4, 0x004b06f4);
-AT(p_004b0700, 0x004b0700);
-AT(d_004b0704, 0x004b0704);
-AT(p_004b0710, 0x004b0710);
-AT(d_004b0714, 0x004b0714);
-AT(p_004b0720, 0x004b0720);
-AT(d_004b0724, 0x004b0724);
-AT(p_004b0730, 0x004b0730);
-AT(d_004b0734, 0x004b0734);
-AT(p_004b0740, 0x004b0740);
-AT(d_004b0744, 0x004b0744);
-AT(p_004b0750, 0x004b0750);
-AT(d_004b0754, 0x004b0754);
-AT(p_004b0760, 0x004b0760);
-AT(d_004b0764, 0x004b0764);
-AT(p_004b0770, 0x004b0770);
-AT(d_004b0774, 0x004b0774);
-AT(p_004b0780, 0x004b0780);
-AT(d_004b0784, 0x004b0784);
-AT(p_004b0790, 0x004b0790);
-AT(d_004b0794, 0x004b0794);
-AT(p_004b07a0, 0x004b07a0);
-AT(d_004b07a4, 0x004b07a4);
-AT(p_004b07b0, 0x004b07b0);
-AT(d_004b07b4, 0x004b07b4);
-AT(p_004b07c0, 0x004b07c0);
-AT(d_004b07c4, 0x004b07c4);
-AT(p_004b07d0, 0x004b07d0);
-AT(d_004b07d4, 0x004b07d4);
-AT(p_004b07e0, 0x004b07e0);
-AT(d_004b07e4, 0x004b07e4);
-AT(p_004b07f0, 0x004b07f0);
-AT(d_004b07f4, 0x004b07f4);
-AT(p_004b0800, 0x004b0800);
-AT(d_004b0804, 0x004b0804);
-AT(p_004b0810, 0x004b0810);
-AT(d_004b0814, 0x004b0814);
-AT(p_004b0820, 0x004b0820);
-AT(d_004b0824, 0x004b0824);
-AT(p_004b0830, 0x004b0830);
-AT(d_004b0834, 0x004b0834);
-AT(p_004b0840, 0x004b0840);
-AT(d_004b0844, 0x004b0844);
-AT(p_004b0850, 0x004b0850);
-AT(d_004b0854, 0x004b0854);
-AT(p_004b0860, 0x004b0860);
-AT(d_004b0864, 0x004b0864);
-AT(p_004b0870, 0x004b0870);
-AT(d_004b0874, 0x004b0874);
-AT(p_004b0880, 0x004b0880);
-AT(d_004b0884, 0x004b0884);
-AT(p_004b0890, 0x004b0890);
-AT(d_004b0894, 0x004b0894);
-AT(p_004b08a0, 0x004b08a0);
-AT(d_004b08a4, 0x004b08a4);
-AT(p_004b08b0, 0x004b08b0);
-AT(d_004b08b4, 0x004b08b4);
-AT(p_004b08c0, 0x004b08c0);
-AT(d_004b08c4, 0x004b08c4);
-AT(p_004b08d0, 0x004b08d0);
-AT(d_004b08d4, 0x004b08d4);
-AT(p_004b08e0, 0x004b08e0);
-AT(d_004b08e4, 0x004b08e4);
-AT(p_004b08f0, 0x004b08f0);
-AT(d_004b08f4, 0x004b08f4);
-AT(p_004b0900, 0x004b0900);
-AT(d_004b0904, 0x004b0904);
-AT(p_004b0910, 0x004b0910);
-AT(d_004b0914, 0x004b0914);
-AT(p_004b0920, 0x004b0920);
-AT(d_004b0924, 0x004b0924);
-AT(p_004b0930, 0x004b0930);
-AT(d_004b0934, 0x004b0934);
-AT(p_004b0940, 0x004b0940);
-AT(d_004b0944, 0x004b0944);
-AT(p_004b0950, 0x004b0950);
-AT(d_004b0954, 0x004b0954);
-AT(p_004b0960, 0x004b0960);
-AT(d_004b0964, 0x004b0964);
-AT(p_004b0970, 0x004b0970);
-AT(d_004b0974, 0x004b0974);
-AT(p_004b0980, 0x004b0980);
-AT(d_004b0984, 0x004b0984);
-AT(p_004b0990, 0x004b0990);
-AT(d_004b0994, 0x004b0994);
-AT(p_004b09a0, 0x004b09a0);
-AT(d_004b09a4, 0x004b09a4);
-AT(p_004b09b0, 0x004b09b0);
-AT(d_004b09b4, 0x004b09b4);
-AT(p_004b09c0, 0x004b09c0);
-AT(d_004b09c4, 0x004b09c4);
-AT(p_004b09d0, 0x004b09d0);
-AT(d_004b09d4, 0x004b09d4);
-AT(p_004b09e0, 0x004b09e0);
-AT(d_004b09e4, 0x004b09e4);
-AT(p_004b09f0, 0x004b09f0);
-AT(d_004b09f4, 0x004b09f4);
-AT(p_004b0a00, 0x004b0a00);
-AT(d_004b0a04, 0x004b0a04);
-AT(p_004b0a10, 0x004b0a10);
-AT(d_004b0a14, 0x004b0a14);
-AT(p_004b0a20, 0x004b0a20);
-AT(d_004b0a24, 0x004b0a24);
-AT(p_004b0a30, 0x004b0a30);
-AT(d_004b0a34, 0x004b0a34);
-AT(p_004b0a40, 0x004b0a40);
-AT(d_004b0a44, 0x004b0a44);
-AT(p_004b0a50, 0x004b0a50);
-AT(d_004b0a54, 0x004b0a54);
-AT(p_004b0a60, 0x004b0a60);
-AT(d_004b0a64, 0x004b0a64);
-AT(p_004b0a70, 0x004b0a70);
-AT(d_004b0a74, 0x004b0a74);
-AT(p_004b0a80, 0x004b0a80);
-AT(d_004b0a84, 0x004b0a84);
-AT(p_004b0a90, 0x004b0a90);
-AT(d_004b0a94, 0x004b0a94);
-AT(p_004b0aa0, 0x004b0aa0);
-AT(d_004b0aa4, 0x004b0aa4);
-AT(p_004b0ab0, 0x004b0ab0);
-AT(d_004b0ab4, 0x004b0ab4);
-AT(p_004b0ac0, 0x004b0ac0);
-AT(d_004b0ac4, 0x004b0ac4);
-AT(p_004b0ad0, 0x004b0ad0);
-AT(d_004b0ad4, 0x004b0ad4);
-AT(p_004b0ae0, 0x004b0ae0);
-AT(d_004b0ae4, 0x004b0ae4);
-AT(p_004b0af0, 0x004b0af0);
-AT(d_004b0af4, 0x004b0af4);
-AT(p_004b0b00, 0x004b0b00);
-AT(d_004b0b04, 0x004b0b04);
-AT(p_004b0b10, 0x004b0b10);
-AT(d_004b0b14, 0x004b0b14);
-AT(p_004b0b20, 0x004b0b20);
-AT(d_004b0b24, 0x004b0b24);
-AT(p_004b0b30, 0x004b0b30);
-AT(d_004b0b34, 0x004b0b34);
-AT(p_004b0b40, 0x004b0b40);
-AT(d_004b0b44, 0x004b0b44);
-AT(p_004b0b50, 0x004b0b50);
-AT(d_004b0b54, 0x004b0b54);
-AT(p_004b0b60, 0x004b0b60);
-AT(d_004b0b64, 0x004b0b64);
-AT(p_004b0b70, 0x004b0b70);
-AT(d_004b0b74, 0x004b0b74);
-AT(p_004b0b80, 0x004b0b80);
-AT(d_004b0b84, 0x004b0b84);
-AT(p_004b0b90, 0x004b0b90);
-AT(d_004b0b94, 0x004b0b94);
-AT(p_004b0ba0, 0x004b0ba0);
-AT(d_004b0ba4, 0x004b0ba4);
-AT(p_004b0bb0, 0x004b0bb0);
-AT(d_004b0bb4, 0x004b0bb4);
-AT(p_004b0bc0, 0x004b0bc0);
-AT(d_004b0bc4, 0x004b0bc4);
-AT(p_004b0bd0, 0x004b0bd0);
-AT(d_004b0bd4, 0x004b0bd4);
-AT(p_004b0be0, 0x004b0be0);
-AT(d_004b0be4, 0x004b0be4);
-AT(p_004b0bf0, 0x004b0bf0);
-AT(d_004b0bf4, 0x004b0bf4);
-AT(p_004b0c00, 0x004b0c00);
-AT(d_004b0c04, 0x004b0c04);
-AT(p_004b0c10, 0x004b0c10);
-AT(d_004b0c14, 0x004b0c14);
-AT(p_004b0c20, 0x004b0c20);
-AT(d_004b0c24, 0x004b0c24);
-AT(p_004b0c30, 0x004b0c30);
-AT(d_004b0c34, 0x004b0c34);
-AT(p_004b0c40, 0x004b0c40);
-AT(d_004b0c44, 0x004b0c44);
-AT(p_004b0c50, 0x004b0c50);
-AT(d_004b0c54, 0x004b0c54);
-AT(p_004b0c60, 0x004b0c60);
-AT(d_004b0c64, 0x004b0c64);
-AT(p_004b0c70, 0x004b0c70);
-AT(d_004b0c74, 0x004b0c74);
-AT(p_004b0c80, 0x004b0c80);
-AT(d_004b0c84, 0x004b0c84);
-AT(p_004b0c90, 0x004b0c90);
-AT(d_004b0c94, 0x004b0c94);
-AT(p_004b0ca0, 0x004b0ca0);
-AT(d_004b0ca4, 0x004b0ca4);
-AT(p_004b0cb0, 0x004b0cb0);
-AT(d_004b0cb4, 0x004b0cb4);
-AT(p_004b0cc0, 0x004b0cc0);
-AT(d_004b0cc4, 0x004b0cc4);
-AT(p_004b0cd0, 0x004b0cd0);
-AT(d_004b0cd4, 0x004b0cd4);
-AT(p_004b0ce0, 0x004b0ce0);
-AT(d_004b0ce4, 0x004b0ce4);
-AT(p_004b0cf0, 0x004b0cf0);
-AT(d_004b0cf4, 0x004b0cf4);
-AT(p_004b0d00, 0x004b0d00);
-AT(d_004b0d04, 0x004b0d04);
-AT(p_004b0d10, 0x004b0d10);
-AT(d_004b0d14, 0x004b0d14);
-AT(p_004b0d20, 0x004b0d20);
-AT(d_004b0d24, 0x004b0d24);
-AT(p_004b0d30, 0x004b0d30);
-AT(d_004b0d34, 0x004b0d34);
-AT(p_004b0d40, 0x004b0d40);
-AT(d_004b0d44, 0x004b0d44);
-AT(p_004b0d50, 0x004b0d50);
-AT(d_004b0d54, 0x004b0d54);
-AT(p_004b0d60, 0x004b0d60);
-AT(d_004b0d64, 0x004b0d64);
-AT(p_004b0d70, 0x004b0d70);
-AT(d_004b0d74, 0x004b0d74);
-AT(p_004b0d80, 0x004b0d80);
-AT(d_004b0d84, 0x004b0d84);
-AT(p_004b0d90, 0x004b0d90);
-AT(d_004b0d94, 0x004b0d94);
-AT(p_004b0da0, 0x004b0da0);
-AT(d_004b0da4, 0x004b0da4);
-AT(p_004b0db0, 0x004b0db0);
-AT(d_004b0db4, 0x004b0db4);
-AT(p_004b0dc0, 0x004b0dc0);
-AT(d_004b0dc4, 0x004b0dc4);
-AT(p_004b0dd0, 0x004b0dd0);
-AT(d_004b0dd4, 0x004b0dd4);
-AT(p_004b0de0, 0x004b0de0);
-AT(d_004b0de4, 0x004b0de4);
-AT(p_004b0df0, 0x004b0df0);
-AT(d_004b0df4, 0x004b0df4);
-AT(p_004b0e00, 0x004b0e00);
-AT(d_004b0e04, 0x004b0e04);
-AT(p_004b0e10, 0x004b0e10);
-AT(d_004b0e14, 0x004b0e14);
-AT(p_004b0e20, 0x004b0e20);
-AT(d_004b0e24, 0x004b0e24);
-AT(p_004b0e30, 0x004b0e30);
-AT(d_004b0e34, 0x004b0e34);
-AT(p_004b0e40, 0x004b0e40);
-AT(d_004b0e44, 0x004b0e44);
-AT(p_004b0e50, 0x004b0e50);
-AT(d_004b0e54, 0x004b0e54);
-AT(p_004b0e60, 0x004b0e60);
-AT(d_004b0e64, 0x004b0e64);
-AT(p_004b0e70, 0x004b0e70);
-AT(d_004b0e74, 0x004b0e74);
-AT(p_004b0e80, 0x004b0e80);
-AT(d_004b0e84, 0x004b0e84);
-AT(p_004b0e90, 0x004b0e90);
-AT(d_004b0e94, 0x004b0e94);
-AT(p_004b0ea0, 0x004b0ea0);
-AT(d_004b0ea4, 0x004b0ea4);
-AT(p_004b0eb0, 0x004b0eb0);
-AT(d_004b0eb4, 0x004b0eb4);
-AT(p_004b0ec0, 0x004b0ec0);
-AT(d_004b0ec4, 0x004b0ec4);
-AT(p_004b0ed0, 0x004b0ed0);
-AT(d_004b0ed4, 0x004b0ed4);
-AT(p_004b0ee0, 0x004b0ee0);
-AT(d_004b0ee4, 0x004b0ee4);
-AT(p_004b0ef0, 0x004b0ef0);
-AT(d_004b0ef4, 0x004b0ef4);
-AT(p_004b0f00, 0x004b0f00);
-AT(d_004b0f04, 0x004b0f04);
-AT(p_004b0f10, 0x004b0f10);
-AT(d_004b0f14, 0x004b0f14);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_bmxInputTables, member) ==                                       \
+                       BMX_DATA_OFF((addr) - 0x004afc60, off64),                                             \
+                   #member)
+AT(p_004afc60, 0x004afc60, 0x0);
+AT(d_004afc64, 0x004afc64, 0x8);
+AT(p_004afc70, 0x004afc70, 0x18);
+AT(d_004afc74, 0x004afc74, 0x20);
+AT(p_004afc80, 0x004afc80, 0x30);
+AT(d_004afc84, 0x004afc84, 0x38);
+AT(p_004afc90, 0x004afc90, 0x48);
+AT(d_004afc94, 0x004afc94, 0x50);
+AT(p_004afca0, 0x004afca0, 0x60);
+AT(d_004afca4, 0x004afca4, 0x68);
+AT(p_004afcb0, 0x004afcb0, 0x78);
+AT(d_004afcb4, 0x004afcb4, 0x80);
+AT(p_004afcc0, 0x004afcc0, 0x90);
+AT(d_004afcc4, 0x004afcc4, 0x98);
+AT(p_004afcd0, 0x004afcd0, 0xa8);
+AT(d_004afcd4, 0x004afcd4, 0xb0);
+AT(p_004afce0, 0x004afce0, 0xc0);
+AT(d_004afce4, 0x004afce4, 0xc8);
+AT(p_004afcf0, 0x004afcf0, 0xd8);
+AT(d_004afcf4, 0x004afcf4, 0xe0);
+AT(p_004afd00, 0x004afd00, 0xf0);
+AT(d_004afd04, 0x004afd04, 0xf8);
+AT(p_004afd10, 0x004afd10, 0x108);
+AT(d_004afd14, 0x004afd14, 0x110);
+AT(p_004aff20, 0x004aff20, 0x320);
+AT(d_004aff24, 0x004aff24, 0x328);
+AT(p_004aff30, 0x004aff30, 0x338);
+AT(d_004aff34, 0x004aff34, 0x340);
+AT(p_004aff40, 0x004aff40, 0x350);
+AT(d_004aff44, 0x004aff44, 0x358);
+AT(p_004aff50, 0x004aff50, 0x368);
+AT(d_004aff54, 0x004aff54, 0x370);
+AT(p_004aff60, 0x004aff60, 0x380);
+AT(d_004aff64, 0x004aff64, 0x388);
+AT(p_004aff70, 0x004aff70, 0x398);
+AT(d_004aff74, 0x004aff74, 0x3a0);
+AT(p_004aff80, 0x004aff80, 0x3b0);
+AT(d_004aff84, 0x004aff84, 0x3b8);
+AT(p_004aff90, 0x004aff90, 0x3c8);
+AT(d_004aff94, 0x004aff94, 0x3d0);
+AT(p_004affa0, 0x004affa0, 0x3e0);
+AT(d_004affa4, 0x004affa4, 0x3e8);
+AT(p_004affb0, 0x004affb0, 0x3f8);
+AT(d_004affb4, 0x004affb4, 0x400);
+AT(p_004affc0, 0x004affc0, 0x410);
+AT(d_004affc4, 0x004affc4, 0x418);
+AT(p_004affd0, 0x004affd0, 0x428);
+AT(d_004affd4, 0x004affd4, 0x430);
+AT(p_004affe0, 0x004affe0, 0x440);
+AT(d_004affe4, 0x004affe4, 0x448);
+AT(p_004afff0, 0x004afff0, 0x458);
+AT(d_004afff4, 0x004afff4, 0x460);
+AT(p_004b0000, 0x004b0000, 0x470);
+AT(d_004b0004, 0x004b0004, 0x478);
+AT(p_004b0010, 0x004b0010, 0x488);
+AT(d_004b0014, 0x004b0014, 0x490);
+AT(p_004b0020, 0x004b0020, 0x4a0);
+AT(d_004b0024, 0x004b0024, 0x4a8);
+AT(p_004b0030, 0x004b0030, 0x4b8);
+AT(d_004b0034, 0x004b0034, 0x4c0);
+AT(p_004b0040, 0x004b0040, 0x4d0);
+AT(d_004b0044, 0x004b0044, 0x4d8);
+AT(p_004b0050, 0x004b0050, 0x4e8);
+AT(d_004b0054, 0x004b0054, 0x4f0);
+AT(p_004b0060, 0x004b0060, 0x500);
+AT(d_004b0064, 0x004b0064, 0x508);
+AT(p_004b0070, 0x004b0070, 0x518);
+AT(d_004b0074, 0x004b0074, 0x520);
+AT(p_004b0080, 0x004b0080, 0x530);
+AT(d_004b0084, 0x004b0084, 0x538);
+AT(p_004b0090, 0x004b0090, 0x548);
+AT(d_004b0094, 0x004b0094, 0x550);
+AT(p_004b00a0, 0x004b00a0, 0x560);
+AT(d_004b00a4, 0x004b00a4, 0x568);
+AT(p_004b00b0, 0x004b00b0, 0x578);
+AT(d_004b00b4, 0x004b00b4, 0x580);
+AT(p_004b00c0, 0x004b00c0, 0x590);
+AT(d_004b00c4, 0x004b00c4, 0x598);
+AT(p_004b00d0, 0x004b00d0, 0x5a8);
+AT(d_004b00d4, 0x004b00d4, 0x5b0);
+AT(p_004b00e0, 0x004b00e0, 0x5c0);
+AT(d_004b00e4, 0x004b00e4, 0x5c8);
+AT(p_004b00f0, 0x004b00f0, 0x5d8);
+AT(d_004b00f4, 0x004b00f4, 0x5e0);
+AT(p_004b0100, 0x004b0100, 0x5f0);
+AT(d_004b0104, 0x004b0104, 0x5f8);
+AT(p_004b0110, 0x004b0110, 0x608);
+AT(d_004b0114, 0x004b0114, 0x610);
+AT(p_004b0120, 0x004b0120, 0x620);
+AT(d_004b0124, 0x004b0124, 0x628);
+AT(p_004b0130, 0x004b0130, 0x638);
+AT(d_004b0134, 0x004b0134, 0x640);
+AT(p_004b0140, 0x004b0140, 0x650);
+AT(d_004b0144, 0x004b0144, 0x658);
+AT(p_004b0150, 0x004b0150, 0x668);
+AT(d_004b0154, 0x004b0154, 0x670);
+AT(p_004b0160, 0x004b0160, 0x680);
+AT(d_004b0164, 0x004b0164, 0x688);
+AT(p_004b0170, 0x004b0170, 0x698);
+AT(d_004b0174, 0x004b0174, 0x6a0);
+AT(p_004b0180, 0x004b0180, 0x6b0);
+AT(d_004b0184, 0x004b0184, 0x6b8);
+AT(p_004b0190, 0x004b0190, 0x6c8);
+AT(d_004b0194, 0x004b0194, 0x6d0);
+AT(p_004b01a0, 0x004b01a0, 0x6e0);
+AT(d_004b01a4, 0x004b01a4, 0x6e8);
+AT(p_004b01b0, 0x004b01b0, 0x6f8);
+AT(d_004b01b4, 0x004b01b4, 0x700);
+AT(p_004b01c0, 0x004b01c0, 0x710);
+AT(d_004b01c4, 0x004b01c4, 0x718);
+AT(p_004b01d0, 0x004b01d0, 0x728);
+AT(d_004b01d4, 0x004b01d4, 0x730);
+AT(p_004b01e0, 0x004b01e0, 0x740);
+AT(d_004b01e4, 0x004b01e4, 0x748);
+AT(p_004b01f0, 0x004b01f0, 0x758);
+AT(d_004b01f4, 0x004b01f4, 0x760);
+AT(p_004b0200, 0x004b0200, 0x770);
+AT(d_004b0204, 0x004b0204, 0x778);
+AT(p_004b0210, 0x004b0210, 0x788);
+AT(d_004b0214, 0x004b0214, 0x790);
+AT(p_004b0220, 0x004b0220, 0x7a0);
+AT(d_004b0224, 0x004b0224, 0x7a8);
+AT(p_004b0230, 0x004b0230, 0x7b8);
+AT(d_004b0234, 0x004b0234, 0x7c0);
+AT(p_004b0240, 0x004b0240, 0x7d0);
+AT(d_004b0244, 0x004b0244, 0x7d8);
+AT(p_004b0250, 0x004b0250, 0x7e8);
+AT(d_004b0254, 0x004b0254, 0x7f0);
+AT(p_004b0260, 0x004b0260, 0x800);
+AT(d_004b0264, 0x004b0264, 0x808);
+AT(p_004b0270, 0x004b0270, 0x818);
+AT(d_004b0274, 0x004b0274, 0x820);
+AT(p_004b0280, 0x004b0280, 0x830);
+AT(d_004b0284, 0x004b0284, 0x838);
+AT(p_004b0290, 0x004b0290, 0x848);
+AT(d_004b0294, 0x004b0294, 0x850);
+AT(p_004b02a0, 0x004b02a0, 0x860);
+AT(d_004b02a4, 0x004b02a4, 0x868);
+AT(p_004b02b0, 0x004b02b0, 0x878);
+AT(d_004b02b4, 0x004b02b4, 0x880);
+AT(p_004b02c0, 0x004b02c0, 0x890);
+AT(d_004b02c4, 0x004b02c4, 0x898);
+AT(p_004b02d0, 0x004b02d0, 0x8a8);
+AT(d_004b02d4, 0x004b02d4, 0x8b0);
+AT(p_004b02e0, 0x004b02e0, 0x8c0);
+AT(d_004b02e4, 0x004b02e4, 0x8c8);
+AT(p_004b02f0, 0x004b02f0, 0x8d8);
+AT(d_004b02f4, 0x004b02f4, 0x8e0);
+AT(p_004b0300, 0x004b0300, 0x8f0);
+AT(d_004b0304, 0x004b0304, 0x8f8);
+AT(p_004b0310, 0x004b0310, 0x908);
+AT(d_004b0314, 0x004b0314, 0x910);
+AT(p_004b0320, 0x004b0320, 0x920);
+AT(d_004b0324, 0x004b0324, 0x928);
+AT(p_004b0330, 0x004b0330, 0x938);
+AT(d_004b0334, 0x004b0334, 0x940);
+AT(p_004b0340, 0x004b0340, 0x950);
+AT(d_004b0344, 0x004b0344, 0x958);
+AT(p_004b0350, 0x004b0350, 0x968);
+AT(d_004b0354, 0x004b0354, 0x970);
+AT(p_004b0360, 0x004b0360, 0x980);
+AT(d_004b0364, 0x004b0364, 0x988);
+AT(p_004b0370, 0x004b0370, 0x998);
+AT(d_004b0374, 0x004b0374, 0x9a0);
+AT(p_004b0380, 0x004b0380, 0x9b0);
+AT(d_004b0384, 0x004b0384, 0x9b8);
+AT(p_004b0390, 0x004b0390, 0x9c8);
+AT(d_004b0394, 0x004b0394, 0x9d0);
+AT(p_004b03a0, 0x004b03a0, 0x9e0);
+AT(d_004b03a4, 0x004b03a4, 0x9e8);
+AT(p_004b03b0, 0x004b03b0, 0x9f8);
+AT(d_004b03b4, 0x004b03b4, 0xa00);
+AT(p_004b03c0, 0x004b03c0, 0xa10);
+AT(d_004b03c4, 0x004b03c4, 0xa18);
+AT(p_004b03d0, 0x004b03d0, 0xa28);
+AT(d_004b03d4, 0x004b03d4, 0xa30);
+AT(p_004b03e0, 0x004b03e0, 0xa40);
+AT(d_004b03e4, 0x004b03e4, 0xa48);
+AT(p_004b03f0, 0x004b03f0, 0xa58);
+AT(d_004b03f4, 0x004b03f4, 0xa60);
+AT(p_004b0400, 0x004b0400, 0xa70);
+AT(d_004b0404, 0x004b0404, 0xa78);
+AT(p_004b0410, 0x004b0410, 0xa88);
+AT(d_004b0414, 0x004b0414, 0xa90);
+AT(p_004b0420, 0x004b0420, 0xaa0);
+AT(d_004b0424, 0x004b0424, 0xaa8);
+AT(p_004b0430, 0x004b0430, 0xab8);
+AT(d_004b0434, 0x004b0434, 0xac0);
+AT(p_004b0440, 0x004b0440, 0xad0);
+AT(d_004b0444, 0x004b0444, 0xad8);
+AT(p_004b0450, 0x004b0450, 0xae8);
+AT(d_004b0454, 0x004b0454, 0xaf0);
+AT(p_004b0460, 0x004b0460, 0xb00);
+AT(d_004b0464, 0x004b0464, 0xb08);
+AT(p_004b0470, 0x004b0470, 0xb18);
+AT(d_004b0474, 0x004b0474, 0xb20);
+AT(p_004b0480, 0x004b0480, 0xb30);
+AT(d_004b0484, 0x004b0484, 0xb38);
+AT(p_004b0490, 0x004b0490, 0xb48);
+AT(d_004b0494, 0x004b0494, 0xb50);
+AT(p_004b04a0, 0x004b04a0, 0xb60);
+AT(d_004b04a4, 0x004b04a4, 0xb68);
+AT(p_004b04b0, 0x004b04b0, 0xb78);
+AT(d_004b04b4, 0x004b04b4, 0xb80);
+AT(p_004b04c0, 0x004b04c0, 0xb90);
+AT(d_004b04c4, 0x004b04c4, 0xb98);
+AT(p_004b04d0, 0x004b04d0, 0xba8);
+AT(d_004b04d4, 0x004b04d4, 0xbb0);
+AT(p_004b04e0, 0x004b04e0, 0xbc0);
+AT(d_004b04e4, 0x004b04e4, 0xbc8);
+AT(p_004b04f0, 0x004b04f0, 0xbd8);
+AT(d_004b04f4, 0x004b04f4, 0xbe0);
+AT(p_004b0500, 0x004b0500, 0xbf0);
+AT(d_004b0504, 0x004b0504, 0xbf8);
+AT(p_004b0510, 0x004b0510, 0xc08);
+AT(d_004b0514, 0x004b0514, 0xc10);
+AT(p_004b0520, 0x004b0520, 0xc20);
+AT(d_004b0524, 0x004b0524, 0xc28);
+AT(p_004b0530, 0x004b0530, 0xc38);
+AT(d_004b0534, 0x004b0534, 0xc40);
+AT(p_004b0540, 0x004b0540, 0xc50);
+AT(d_004b0544, 0x004b0544, 0xc58);
+AT(p_004b0550, 0x004b0550, 0xc68);
+AT(d_004b0554, 0x004b0554, 0xc70);
+AT(p_004b0560, 0x004b0560, 0xc80);
+AT(d_004b0564, 0x004b0564, 0xc88);
+AT(p_004b0570, 0x004b0570, 0xc98);
+AT(d_004b0574, 0x004b0574, 0xca0);
+AT(p_004b0580, 0x004b0580, 0xcb0);
+AT(d_004b0584, 0x004b0584, 0xcb8);
+AT(p_004b0590, 0x004b0590, 0xcc8);
+AT(d_004b0594, 0x004b0594, 0xcd0);
+AT(p_004b05a0, 0x004b05a0, 0xce0);
+AT(d_004b05a4, 0x004b05a4, 0xce8);
+AT(p_004b05b0, 0x004b05b0, 0xcf8);
+AT(d_004b05b4, 0x004b05b4, 0xd00);
+AT(p_004b05c0, 0x004b05c0, 0xd10);
+AT(d_004b05c4, 0x004b05c4, 0xd18);
+AT(p_004b05d0, 0x004b05d0, 0xd28);
+AT(d_004b05d4, 0x004b05d4, 0xd30);
+AT(p_004b05e0, 0x004b05e0, 0xd40);
+AT(d_004b05e4, 0x004b05e4, 0xd48);
+AT(p_004b05f0, 0x004b05f0, 0xd58);
+AT(d_004b05f4, 0x004b05f4, 0xd60);
+AT(p_004b0600, 0x004b0600, 0xd70);
+AT(d_004b0604, 0x004b0604, 0xd78);
+AT(p_004b0610, 0x004b0610, 0xd88);
+AT(d_004b0614, 0x004b0614, 0xd90);
+AT(p_004b0620, 0x004b0620, 0xda0);
+AT(d_004b0624, 0x004b0624, 0xda8);
+AT(p_004b0630, 0x004b0630, 0xdb8);
+AT(d_004b0634, 0x004b0634, 0xdc0);
+AT(p_004b0640, 0x004b0640, 0xdd0);
+AT(d_004b0644, 0x004b0644, 0xdd8);
+AT(p_004b0650, 0x004b0650, 0xde8);
+AT(d_004b0654, 0x004b0654, 0xdf0);
+AT(p_004b0660, 0x004b0660, 0xe00);
+AT(d_004b0664, 0x004b0664, 0xe08);
+AT(p_004b0670, 0x004b0670, 0xe18);
+AT(d_004b0674, 0x004b0674, 0xe20);
+AT(p_004b0680, 0x004b0680, 0xe30);
+AT(d_004b0684, 0x004b0684, 0xe38);
+AT(p_004b0690, 0x004b0690, 0xe48);
+AT(d_004b0694, 0x004b0694, 0xe50);
+AT(p_004b06a0, 0x004b06a0, 0xe60);
+AT(d_004b06a4, 0x004b06a4, 0xe68);
+AT(p_004b06b0, 0x004b06b0, 0xe78);
+AT(d_004b06b4, 0x004b06b4, 0xe80);
+AT(p_004b06c0, 0x004b06c0, 0xe90);
+AT(d_004b06c4, 0x004b06c4, 0xe98);
+AT(p_004b06d0, 0x004b06d0, 0xea8);
+AT(d_004b06d4, 0x004b06d4, 0xeb0);
+AT(p_004b06e0, 0x004b06e0, 0xec0);
+AT(d_004b06e4, 0x004b06e4, 0xec8);
+AT(p_004b06f0, 0x004b06f0, 0xed8);
+AT(d_004b06f4, 0x004b06f4, 0xee0);
+AT(p_004b0700, 0x004b0700, 0xef0);
+AT(d_004b0704, 0x004b0704, 0xef8);
+AT(p_004b0710, 0x004b0710, 0xf08);
+AT(d_004b0714, 0x004b0714, 0xf10);
+AT(p_004b0720, 0x004b0720, 0xf20);
+AT(d_004b0724, 0x004b0724, 0xf28);
+AT(p_004b0730, 0x004b0730, 0xf38);
+AT(d_004b0734, 0x004b0734, 0xf40);
+AT(p_004b0740, 0x004b0740, 0xf50);
+AT(d_004b0744, 0x004b0744, 0xf58);
+AT(p_004b0750, 0x004b0750, 0xf68);
+AT(d_004b0754, 0x004b0754, 0xf70);
+AT(p_004b0760, 0x004b0760, 0xf80);
+AT(d_004b0764, 0x004b0764, 0xf88);
+AT(p_004b0770, 0x004b0770, 0xf98);
+AT(d_004b0774, 0x004b0774, 0xfa0);
+AT(p_004b0780, 0x004b0780, 0xfb0);
+AT(d_004b0784, 0x004b0784, 0xfb8);
+AT(p_004b0790, 0x004b0790, 0xfc8);
+AT(d_004b0794, 0x004b0794, 0xfd0);
+AT(p_004b07a0, 0x004b07a0, 0xfe0);
+AT(d_004b07a4, 0x004b07a4, 0xfe8);
+AT(p_004b07b0, 0x004b07b0, 0xff8);
+AT(d_004b07b4, 0x004b07b4, 0x1000);
+AT(p_004b07c0, 0x004b07c0, 0x1010);
+AT(d_004b07c4, 0x004b07c4, 0x1018);
+AT(p_004b07d0, 0x004b07d0, 0x1028);
+AT(d_004b07d4, 0x004b07d4, 0x1030);
+AT(p_004b07e0, 0x004b07e0, 0x1040);
+AT(d_004b07e4, 0x004b07e4, 0x1048);
+AT(p_004b07f0, 0x004b07f0, 0x1058);
+AT(d_004b07f4, 0x004b07f4, 0x1060);
+AT(p_004b0800, 0x004b0800, 0x1070);
+AT(d_004b0804, 0x004b0804, 0x1078);
+AT(p_004b0810, 0x004b0810, 0x1088);
+AT(d_004b0814, 0x004b0814, 0x1090);
+AT(p_004b0820, 0x004b0820, 0x10a0);
+AT(d_004b0824, 0x004b0824, 0x10a8);
+AT(p_004b0830, 0x004b0830, 0x10b8);
+AT(d_004b0834, 0x004b0834, 0x10c0);
+AT(p_004b0840, 0x004b0840, 0x10d0);
+AT(d_004b0844, 0x004b0844, 0x10d8);
+AT(p_004b0850, 0x004b0850, 0x10e8);
+AT(d_004b0854, 0x004b0854, 0x10f0);
+AT(p_004b0860, 0x004b0860, 0x1100);
+AT(d_004b0864, 0x004b0864, 0x1108);
+AT(p_004b0870, 0x004b0870, 0x1118);
+AT(d_004b0874, 0x004b0874, 0x1120);
+AT(p_004b0880, 0x004b0880, 0x1130);
+AT(d_004b0884, 0x004b0884, 0x1138);
+AT(p_004b0890, 0x004b0890, 0x1148);
+AT(d_004b0894, 0x004b0894, 0x1150);
+AT(p_004b08a0, 0x004b08a0, 0x1160);
+AT(d_004b08a4, 0x004b08a4, 0x1168);
+AT(p_004b08b0, 0x004b08b0, 0x1178);
+AT(d_004b08b4, 0x004b08b4, 0x1180);
+AT(p_004b08c0, 0x004b08c0, 0x1190);
+AT(d_004b08c4, 0x004b08c4, 0x1198);
+AT(p_004b08d0, 0x004b08d0, 0x11a8);
+AT(d_004b08d4, 0x004b08d4, 0x11b0);
+AT(p_004b08e0, 0x004b08e0, 0x11c0);
+AT(d_004b08e4, 0x004b08e4, 0x11c8);
+AT(p_004b08f0, 0x004b08f0, 0x11d8);
+AT(d_004b08f4, 0x004b08f4, 0x11e0);
+AT(p_004b0900, 0x004b0900, 0x11f0);
+AT(d_004b0904, 0x004b0904, 0x11f8);
+AT(p_004b0910, 0x004b0910, 0x1208);
+AT(d_004b0914, 0x004b0914, 0x1210);
+AT(p_004b0920, 0x004b0920, 0x1220);
+AT(d_004b0924, 0x004b0924, 0x1228);
+AT(p_004b0930, 0x004b0930, 0x1238);
+AT(d_004b0934, 0x004b0934, 0x1240);
+AT(p_004b0940, 0x004b0940, 0x1250);
+AT(d_004b0944, 0x004b0944, 0x1258);
+AT(p_004b0950, 0x004b0950, 0x1268);
+AT(d_004b0954, 0x004b0954, 0x1270);
+AT(p_004b0960, 0x004b0960, 0x1280);
+AT(d_004b0964, 0x004b0964, 0x1288);
+AT(p_004b0970, 0x004b0970, 0x1298);
+AT(d_004b0974, 0x004b0974, 0x12a0);
+AT(p_004b0980, 0x004b0980, 0x12b0);
+AT(d_004b0984, 0x004b0984, 0x12b8);
+AT(p_004b0990, 0x004b0990, 0x12c8);
+AT(d_004b0994, 0x004b0994, 0x12d0);
+AT(p_004b09a0, 0x004b09a0, 0x12e0);
+AT(d_004b09a4, 0x004b09a4, 0x12e8);
+AT(p_004b09b0, 0x004b09b0, 0x12f8);
+AT(d_004b09b4, 0x004b09b4, 0x1300);
+AT(p_004b09c0, 0x004b09c0, 0x1310);
+AT(d_004b09c4, 0x004b09c4, 0x1318);
+AT(p_004b09d0, 0x004b09d0, 0x1328);
+AT(d_004b09d4, 0x004b09d4, 0x1330);
+AT(p_004b09e0, 0x004b09e0, 0x1340);
+AT(d_004b09e4, 0x004b09e4, 0x1348);
+AT(p_004b09f0, 0x004b09f0, 0x1358);
+AT(d_004b09f4, 0x004b09f4, 0x1360);
+AT(p_004b0a00, 0x004b0a00, 0x1370);
+AT(d_004b0a04, 0x004b0a04, 0x1378);
+AT(p_004b0a10, 0x004b0a10, 0x1388);
+AT(d_004b0a14, 0x004b0a14, 0x1390);
+AT(p_004b0a20, 0x004b0a20, 0x13a0);
+AT(d_004b0a24, 0x004b0a24, 0x13a8);
+AT(p_004b0a30, 0x004b0a30, 0x13b8);
+AT(d_004b0a34, 0x004b0a34, 0x13c0);
+AT(p_004b0a40, 0x004b0a40, 0x13d0);
+AT(d_004b0a44, 0x004b0a44, 0x13d8);
+AT(p_004b0a50, 0x004b0a50, 0x13e8);
+AT(d_004b0a54, 0x004b0a54, 0x13f0);
+AT(p_004b0a60, 0x004b0a60, 0x1400);
+AT(d_004b0a64, 0x004b0a64, 0x1408);
+AT(p_004b0a70, 0x004b0a70, 0x1418);
+AT(d_004b0a74, 0x004b0a74, 0x1420);
+AT(p_004b0a80, 0x004b0a80, 0x1430);
+AT(d_004b0a84, 0x004b0a84, 0x1438);
+AT(p_004b0a90, 0x004b0a90, 0x1448);
+AT(d_004b0a94, 0x004b0a94, 0x1450);
+AT(p_004b0aa0, 0x004b0aa0, 0x1460);
+AT(d_004b0aa4, 0x004b0aa4, 0x1468);
+AT(p_004b0ab0, 0x004b0ab0, 0x1478);
+AT(d_004b0ab4, 0x004b0ab4, 0x1480);
+AT(p_004b0ac0, 0x004b0ac0, 0x1490);
+AT(d_004b0ac4, 0x004b0ac4, 0x1498);
+AT(p_004b0ad0, 0x004b0ad0, 0x14a8);
+AT(d_004b0ad4, 0x004b0ad4, 0x14b0);
+AT(p_004b0ae0, 0x004b0ae0, 0x14c0);
+AT(d_004b0ae4, 0x004b0ae4, 0x14c8);
+AT(p_004b0af0, 0x004b0af0, 0x14d8);
+AT(d_004b0af4, 0x004b0af4, 0x14e0);
+AT(p_004b0b00, 0x004b0b00, 0x14f0);
+AT(d_004b0b04, 0x004b0b04, 0x14f8);
+AT(p_004b0b10, 0x004b0b10, 0x1508);
+AT(d_004b0b14, 0x004b0b14, 0x1510);
+AT(p_004b0b20, 0x004b0b20, 0x1520);
+AT(d_004b0b24, 0x004b0b24, 0x1528);
+AT(p_004b0b30, 0x004b0b30, 0x1538);
+AT(d_004b0b34, 0x004b0b34, 0x1540);
+AT(p_004b0b40, 0x004b0b40, 0x1550);
+AT(d_004b0b44, 0x004b0b44, 0x1558);
+AT(p_004b0b50, 0x004b0b50, 0x1568);
+AT(d_004b0b54, 0x004b0b54, 0x1570);
+AT(p_004b0b60, 0x004b0b60, 0x1580);
+AT(d_004b0b64, 0x004b0b64, 0x1588);
+AT(p_004b0b70, 0x004b0b70, 0x1598);
+AT(d_004b0b74, 0x004b0b74, 0x15a0);
+AT(p_004b0b80, 0x004b0b80, 0x15b0);
+AT(d_004b0b84, 0x004b0b84, 0x15b8);
+AT(p_004b0b90, 0x004b0b90, 0x15c8);
+AT(d_004b0b94, 0x004b0b94, 0x15d0);
+AT(p_004b0ba0, 0x004b0ba0, 0x15e0);
+AT(d_004b0ba4, 0x004b0ba4, 0x15e8);
+AT(p_004b0bb0, 0x004b0bb0, 0x15f8);
+AT(d_004b0bb4, 0x004b0bb4, 0x1600);
+AT(p_004b0bc0, 0x004b0bc0, 0x1610);
+AT(d_004b0bc4, 0x004b0bc4, 0x1618);
+AT(p_004b0bd0, 0x004b0bd0, 0x1628);
+AT(d_004b0bd4, 0x004b0bd4, 0x1630);
+AT(p_004b0be0, 0x004b0be0, 0x1640);
+AT(d_004b0be4, 0x004b0be4, 0x1648);
+AT(p_004b0bf0, 0x004b0bf0, 0x1658);
+AT(d_004b0bf4, 0x004b0bf4, 0x1660);
+AT(p_004b0c00, 0x004b0c00, 0x1670);
+AT(d_004b0c04, 0x004b0c04, 0x1678);
+AT(p_004b0c10, 0x004b0c10, 0x1688);
+AT(d_004b0c14, 0x004b0c14, 0x1690);
+AT(p_004b0c20, 0x004b0c20, 0x16a0);
+AT(d_004b0c24, 0x004b0c24, 0x16a8);
+AT(p_004b0c30, 0x004b0c30, 0x16b8);
+AT(d_004b0c34, 0x004b0c34, 0x16c0);
+AT(p_004b0c40, 0x004b0c40, 0x16d0);
+AT(d_004b0c44, 0x004b0c44, 0x16d8);
+AT(p_004b0c50, 0x004b0c50, 0x16e8);
+AT(d_004b0c54, 0x004b0c54, 0x16f0);
+AT(p_004b0c60, 0x004b0c60, 0x1700);
+AT(d_004b0c64, 0x004b0c64, 0x1708);
+AT(p_004b0c70, 0x004b0c70, 0x1718);
+AT(d_004b0c74, 0x004b0c74, 0x1720);
+AT(p_004b0c80, 0x004b0c80, 0x1730);
+AT(d_004b0c84, 0x004b0c84, 0x1738);
+AT(p_004b0c90, 0x004b0c90, 0x1748);
+AT(d_004b0c94, 0x004b0c94, 0x1750);
+AT(p_004b0ca0, 0x004b0ca0, 0x1760);
+AT(d_004b0ca4, 0x004b0ca4, 0x1768);
+AT(p_004b0cb0, 0x004b0cb0, 0x1778);
+AT(d_004b0cb4, 0x004b0cb4, 0x1780);
+AT(p_004b0cc0, 0x004b0cc0, 0x1790);
+AT(d_004b0cc4, 0x004b0cc4, 0x1798);
+AT(p_004b0cd0, 0x004b0cd0, 0x17a8);
+AT(d_004b0cd4, 0x004b0cd4, 0x17b0);
+AT(p_004b0ce0, 0x004b0ce0, 0x17c0);
+AT(d_004b0ce4, 0x004b0ce4, 0x17c8);
+AT(p_004b0cf0, 0x004b0cf0, 0x17d8);
+AT(d_004b0cf4, 0x004b0cf4, 0x17e0);
+AT(p_004b0d00, 0x004b0d00, 0x17f0);
+AT(d_004b0d04, 0x004b0d04, 0x17f8);
+AT(p_004b0d10, 0x004b0d10, 0x1808);
+AT(d_004b0d14, 0x004b0d14, 0x1810);
+AT(p_004b0d20, 0x004b0d20, 0x1820);
+AT(d_004b0d24, 0x004b0d24, 0x1828);
+AT(p_004b0d30, 0x004b0d30, 0x1838);
+AT(d_004b0d34, 0x004b0d34, 0x1840);
+AT(p_004b0d40, 0x004b0d40, 0x1850);
+AT(d_004b0d44, 0x004b0d44, 0x1858);
+AT(p_004b0d50, 0x004b0d50, 0x1868);
+AT(d_004b0d54, 0x004b0d54, 0x1870);
+AT(p_004b0d60, 0x004b0d60, 0x1880);
+AT(d_004b0d64, 0x004b0d64, 0x1888);
+AT(p_004b0d70, 0x004b0d70, 0x1898);
+AT(d_004b0d74, 0x004b0d74, 0x18a0);
+AT(p_004b0d80, 0x004b0d80, 0x18b0);
+AT(d_004b0d84, 0x004b0d84, 0x18b8);
+AT(p_004b0d90, 0x004b0d90, 0x18c8);
+AT(d_004b0d94, 0x004b0d94, 0x18d0);
+AT(p_004b0da0, 0x004b0da0, 0x18e0);
+AT(d_004b0da4, 0x004b0da4, 0x18e8);
+AT(p_004b0db0, 0x004b0db0, 0x18f8);
+AT(d_004b0db4, 0x004b0db4, 0x1900);
+AT(p_004b0dc0, 0x004b0dc0, 0x1910);
+AT(d_004b0dc4, 0x004b0dc4, 0x1918);
+AT(p_004b0dd0, 0x004b0dd0, 0x1928);
+AT(d_004b0dd4, 0x004b0dd4, 0x1930);
+AT(p_004b0de0, 0x004b0de0, 0x1940);
+AT(d_004b0de4, 0x004b0de4, 0x1948);
+AT(p_004b0df0, 0x004b0df0, 0x1958);
+AT(d_004b0df4, 0x004b0df4, 0x1960);
+AT(p_004b0e00, 0x004b0e00, 0x1970);
+AT(d_004b0e04, 0x004b0e04, 0x1978);
+AT(p_004b0e10, 0x004b0e10, 0x1988);
+AT(d_004b0e14, 0x004b0e14, 0x1990);
+AT(p_004b0e20, 0x004b0e20, 0x19a0);
+AT(d_004b0e24, 0x004b0e24, 0x19a8);
+AT(p_004b0e30, 0x004b0e30, 0x19b8);
+AT(d_004b0e34, 0x004b0e34, 0x19c0);
+AT(p_004b0e40, 0x004b0e40, 0x19d0);
+AT(d_004b0e44, 0x004b0e44, 0x19d8);
+AT(p_004b0e50, 0x004b0e50, 0x19e8);
+AT(d_004b0e54, 0x004b0e54, 0x19f0);
+AT(p_004b0e60, 0x004b0e60, 0x1a00);
+AT(d_004b0e64, 0x004b0e64, 0x1a08);
+AT(p_004b0e70, 0x004b0e70, 0x1a18);
+AT(d_004b0e74, 0x004b0e74, 0x1a20);
+AT(p_004b0e80, 0x004b0e80, 0x1a30);
+AT(d_004b0e84, 0x004b0e84, 0x1a38);
+AT(p_004b0e90, 0x004b0e90, 0x1a48);
+AT(d_004b0e94, 0x004b0e94, 0x1a50);
+AT(p_004b0ea0, 0x004b0ea0, 0x1a60);
+AT(d_004b0ea4, 0x004b0ea4, 0x1a68);
+AT(p_004b0eb0, 0x004b0eb0, 0x1a78);
+AT(d_004b0eb4, 0x004b0eb4, 0x1a80);
+AT(p_004b0ec0, 0x004b0ec0, 0x1a90);
+AT(d_004b0ec4, 0x004b0ec4, 0x1a98);
+AT(p_004b0ed0, 0x004b0ed0, 0x1aa8);
+AT(d_004b0ed4, 0x004b0ed4, 0x1ab0);
+AT(p_004b0ee0, 0x004b0ee0, 0x1ac0);
+AT(d_004b0ee4, 0x004b0ee4, 0x1ac8);
+AT(p_004b0ef0, 0x004b0ef0, 0x1ad8);
+AT(d_004b0ef4, 0x004b0ef4, 0x1ae0);
+AT(p_004b0f00, 0x004b0f00, 0x1af0);
+AT(d_004b0f04, 0x004b0f04, 0x1af8);
+AT(p_004b0f10, 0x004b0f10, 0x1b08);
+AT(d_004b0f14, 0x004b0f14, 0x1b10);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_bmxInputTables, d_004b0f14) +
                        sizeof(((struct BmxGroup_bmxInputTables *)0)->d_004b0f14) ==
-                   0x12c0,
+                   BMX_DATA_OFF(0x12c0, 0x1b1c),
                "bmxInputTables");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0054d8a4..0x0054db58.
@@ -2491,15 +2493,17 @@ struct BmxGroup_d_0054e298Group {
     void *p_0054e29c[2];           /* 0x0054e29c */
     unsigned char pad_0054e2a4[4]; /* 0x0054e2a4 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_d_0054e298Group, member) == (addr) - 0x0054e290, #member)
-AT(d_0054e298, 0x0054e298);
-AT(p_0054e29c, 0x0054e29c);
-AT(pad_0054e2a4, 0x0054e2a4);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_d_0054e298Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x0054e290, off64),                                             \
+                   #member)
+AT(d_0054e298, 0x0054e298, 0x8);
+AT(p_0054e29c, 0x0054e29c, 0x10);
+AT(pad_0054e2a4, 0x0054e2a4, 0x20);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_0054e298Group, pad_0054e2a4) +
                        sizeof(((struct BmxGroup_d_0054e298Group *)0)->pad_0054e2a4) ==
-                   0x18,
+                   BMX_DATA_OFF(0x18, 0x24),
                "d_0054e298Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0054e780..0x0054e798.
@@ -2510,16 +2514,18 @@ struct BmxGroup_d_0054e780Group {
     uint32_t d_0054e78c; /* 0x0054e78c */
     void *p_0054e790[2]; /* 0x0054e790 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_d_0054e780Group, member) == (addr) - 0x0054e780, #member)
-AT(d_0054e780, 0x0054e780);
-AT(p_0054e784, 0x0054e784);
-AT(d_0054e78c, 0x0054e78c);
-AT(p_0054e790, 0x0054e790);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_d_0054e780Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x0054e780, off64),                                             \
+                   #member)
+AT(d_0054e780, 0x0054e780, 0x0);
+AT(p_0054e784, 0x0054e784, 0x8);
+AT(d_0054e78c, 0x0054e78c, 0x18);
+AT(p_0054e790, 0x0054e790, 0x20);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_0054e780Group, p_0054e790) +
                        sizeof(((struct BmxGroup_d_0054e780Group *)0)->p_0054e790) ==
-                   0x18,
+                   BMX_DATA_OFF(0x18, 0x30),
                "d_0054e780Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0054e798..0x0054e7a4.
@@ -2529,14 +2535,16 @@ struct BmxGroup_d_0054e798Group {
     uint32_t d_0054e798; /* 0x0054e798 */
     void *p_0054e79c[2]; /* 0x0054e79c */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_d_0054e798Group, member) == (addr) - 0x0054e790, #member)
-AT(d_0054e798, 0x0054e798);
-AT(p_0054e79c, 0x0054e79c);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_d_0054e798Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x0054e790, off64),                                             \
+                   #member)
+AT(d_0054e798, 0x0054e798, 0x8);
+AT(p_0054e79c, 0x0054e79c, 0x10);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_0054e798Group, p_0054e79c) +
                        sizeof(((struct BmxGroup_d_0054e798Group *)0)->p_0054e79c) ==
-                   0x14,
+                   BMX_DATA_OFF(0x14, 0x20),
                "d_0054e798Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0054e7c8..0x0054e7e0.
@@ -2547,15 +2555,17 @@ struct BmxGroup_gZpadFormatJoystickGroup {
     unsigned char d_0054e7c9[19]; /* 0x0054e7c9 */
     void *p_0054e7dc;             /* 0x0054e7dc */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZpadFormatJoystickGroup, member) == (addr) - 0x0054e7c0, #member)
-AT(gZpadFormatJoystick, 0x0054e7c8);
-AT(d_0054e7c9, 0x0054e7c9);
-AT(p_0054e7dc, 0x0054e7dc);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZpadFormatJoystickGroup, member) ==                             \
+                       BMX_DATA_OFF((addr) - 0x0054e7c0, off64),                                             \
+                   #member)
+AT(gZpadFormatJoystick, 0x0054e7c8, 0x8);
+AT(d_0054e7c9, 0x0054e7c9, 0x9);
+AT(p_0054e7dc, 0x0054e7dc, 0x20);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZpadFormatJoystickGroup, p_0054e7dc) +
                        sizeof(((struct BmxGroup_gZpadFormatJoystickGroup *)0)->p_0054e7dc) ==
-                   0x20,
+                   BMX_DATA_OFF(0x20, 0x28),
                "gZpadFormatJoystickGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0054e7e0..0x0054f2f8.
@@ -2566,16 +2576,18 @@ struct BmxGroup_gZpadFormatKeyboardGroup {
     void *p_0054e7f4;             /* 0x0054e7f4 */
     uint32_t d_0054e7f8[704];     /* 0x0054e7f8 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZpadFormatKeyboardGroup, member) == (addr) - 0x0054e7e0, #member)
-AT(gZpadFormatKeyboard, 0x0054e7e0);
-AT(d_0054e7e1, 0x0054e7e1);
-AT(p_0054e7f4, 0x0054e7f4);
-AT(d_0054e7f8, 0x0054e7f8);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZpadFormatKeyboardGroup, member) ==                             \
+                       BMX_DATA_OFF((addr) - 0x0054e7e0, off64),                                             \
+                   #member)
+AT(gZpadFormatKeyboard, 0x0054e7e0, 0x0);
+AT(d_0054e7e1, 0x0054e7e1, 0x1);
+AT(p_0054e7f4, 0x0054e7f4, 0x18);
+AT(d_0054e7f8, 0x0054e7f8, 0x20);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZpadFormatKeyboardGroup, d_0054e7f8) +
                        sizeof(((struct BmxGroup_gZpadFormatKeyboardGroup *)0)->d_0054e7f8) ==
-                   0xb18,
+                   BMX_DATA_OFF(0xb18, 0xb20),
                "gZpadFormatKeyboardGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0054f2f8..0x0054f328.
@@ -2635,14 +2647,16 @@ struct BmxGroup_d_00550240Group {
     uint32_t d_00550240; /* 0x00550240 */
     void *p_00550244[2]; /* 0x00550244 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_d_00550240Group, member) == (addr) - 0x00550240, #member)
-AT(d_00550240, 0x00550240);
-AT(p_00550244, 0x00550244);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_d_00550240Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00550240, off64),                                             \
+                   #member)
+AT(d_00550240, 0x00550240, 0x0);
+AT(p_00550244, 0x00550244, 0x8);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_00550240Group, p_00550244) +
                        sizeof(((struct BmxGroup_d_00550240Group *)0)->p_00550244) ==
-                   0xc,
+                   BMX_DATA_OFF(0xc, 0x18),
                "d_00550240Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00550290..0x00550bd8.
@@ -2654,17 +2668,19 @@ struct BmxGroup_d_00550290Group {
     void *p_005502a0[2];              /* 0x005502a0 */
     unsigned char pad_005502a8[2352]; /* 0x005502a8 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_d_00550290Group, member) == (addr) - 0x00550290, #member)
-AT(d_00550290, 0x00550290);
-AT(p_00550294, 0x00550294);
-AT(d_0055029c, 0x0055029c);
-AT(p_005502a0, 0x005502a0);
-AT(pad_005502a8, 0x005502a8);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_d_00550290Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00550290, off64),                                             \
+                   #member)
+AT(d_00550290, 0x00550290, 0x0);
+AT(p_00550294, 0x00550294, 0x8);
+AT(d_0055029c, 0x0055029c, 0x18);
+AT(p_005502a0, 0x005502a0, 0x20);
+AT(pad_005502a8, 0x005502a8, 0x30);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_00550290Group, pad_005502a8) +
                        sizeof(((struct BmxGroup_d_00550290Group *)0)->pad_005502a8) ==
-                   0x948,
+                   BMX_DATA_OFF(0x948, 0x960),
                "d_00550290Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00551208..0x00551418.
@@ -2675,15 +2691,17 @@ struct BmxGroup_d_00551208Group {
     void *p_0055130c[2];             /* 0x0055130c */
     unsigned char pad_00551314[260]; /* 0x00551314 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_d_00551208Group, member) == (addr) - 0x00551200, #member)
-AT(d_00551208, 0x00551208);
-AT(p_0055130c, 0x0055130c);
-AT(pad_00551314, 0x00551314);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_d_00551208Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00551200, off64),                                             \
+                   #member)
+AT(d_00551208, 0x00551208, 0x8);
+AT(p_0055130c, 0x0055130c, 0x110);
+AT(pad_00551314, 0x00551314, 0x120);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_00551208Group, pad_00551314) +
                        sizeof(((struct BmxGroup_d_00551208Group *)0)->pad_00551314) ==
-                   0x218,
+                   BMX_DATA_OFF(0x218, 0x224),
                "d_00551208Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0055151c..0x00551724.
@@ -2694,15 +2712,17 @@ struct BmxGroup_d_0055151cGroup {
     void *p_00551620;                /* 0x00551620 */
     unsigned char pad_00551624[256]; /* 0x00551624 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_d_0055151cGroup, member) == (addr) - 0x00551510, #member)
-AT(d_0055151c, 0x0055151c);
-AT(p_00551620, 0x00551620);
-AT(pad_00551624, 0x00551624);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_d_0055151cGroup, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00551510, off64),                                             \
+                   #member)
+AT(d_0055151c, 0x0055151c, 0xc);
+AT(p_00551620, 0x00551620, 0x110);
+AT(pad_00551624, 0x00551624, 0x118);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_0055151cGroup, pad_00551624) +
                        sizeof(((struct BmxGroup_d_0055151cGroup *)0)->pad_00551624) ==
-                   0x214,
+                   BMX_DATA_OFF(0x214, 0x218),
                "d_0055151cGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00551c54..0x00551f68.
@@ -4038,7 +4058,7 @@ AT(p_00554938, 0x00554938);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_00554928Group, p_00554938) +
                        sizeof(((struct BmxGroup_d_00554928Group *)0)->p_00554938) ==
-                   0x34,
+                   BMX_DATA_OFF(0x34, 0x50),
                "d_00554928Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00554964..0x005549ac.
@@ -4064,7 +4084,7 @@ AT(p_005549a8, 0x005549a8);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gFxSkidCornersGroup, p_005549a8) +
                        sizeof(((struct BmxGroup_gFxSkidCornersGroup *)0)->p_005549a8) ==
-                   0x4c,
+                   BMX_DATA_OFF(0x4c, 0x50),
                "gFxSkidCornersGroup");
 
 /* The type is local to bmx/com/action/fx.c. */
@@ -4104,14 +4124,16 @@ struct BmxGroup_gFxCreateBlockGroup {
     } gFxCreateBlock;       /* 0x00554ad8; the type is local to bmx/com/action/fx.c */
     uint32_t d_00554af8[7]; /* 0x00554af8 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gFxCreateBlockGroup, member) == (addr) - 0x00554ad0, #member)
-AT(gFxCreateBlock, 0x00554ad8);
-AT(d_00554af8, 0x00554af8);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gFxCreateBlockGroup, member) ==                                  \
+                       BMX_DATA_OFF((addr) - 0x00554ad0, off64),                                             \
+                   #member)
+AT(gFxCreateBlock, 0x00554ad8, 0x8);
+AT(d_00554af8, 0x00554af8, 0x30);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gFxCreateBlockGroup, d_00554af8) +
                        sizeof(((struct BmxGroup_gFxCreateBlockGroup *)0)->d_00554af8) ==
-                   0x44,
+                   BMX_DATA_OFF(0x44, 0x4c),
                "gFxCreateBlockGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00554c80..0x00554cb0.
@@ -4179,14 +4201,16 @@ struct BmxGroup_p_005570a8Group {
     void *p_005570a8[2];    /* 0x005570a8 */
     uint32_t d_005570b0[2]; /* 0x005570b0 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_005570a8Group, member) == (addr) - 0x005570a0, #member)
-AT(p_005570a8, 0x005570a8);
-AT(d_005570b0, 0x005570b0);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_005570a8Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x005570a0, off64),                                             \
+                   #member)
+AT(p_005570a8, 0x005570a8, 0x8);
+AT(d_005570b0, 0x005570b0, 0x18);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_005570a8Group, d_005570b0) +
                        sizeof(((struct BmxGroup_p_005570a8Group *)0)->d_005570b0) ==
-                   0x18,
+                   BMX_DATA_OFF(0x18, 0x20),
                "p_005570a8Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005570b8..0x005570c8.
@@ -4196,14 +4220,16 @@ struct BmxGroup_p_005570b8Group {
     void *p_005570b8[3]; /* 0x005570b8 */
     uint32_t d_005570c4; /* 0x005570c4 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_005570b8Group, member) == (addr) - 0x005570b0, #member)
-AT(p_005570b8, 0x005570b8);
-AT(d_005570c4, 0x005570c4);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_005570b8Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x005570b0, off64),                                             \
+                   #member)
+AT(p_005570b8, 0x005570b8, 0x8);
+AT(d_005570c4, 0x005570c4, 0x20);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_005570b8Group, d_005570c4) +
                        sizeof(((struct BmxGroup_p_005570b8Group *)0)->d_005570c4) ==
-                   0x18,
+                   BMX_DATA_OFF(0x18, 0x24),
                "p_005570b8Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005570c8..0x005570d8.
@@ -4213,14 +4239,16 @@ struct BmxGroup_p_005570c8Group {
     void *p_005570c8[3]; /* 0x005570c8 */
     uint32_t d_005570d4; /* 0x005570d4 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_005570c8Group, member) == (addr) - 0x005570c0, #member)
-AT(p_005570c8, 0x005570c8);
-AT(d_005570d4, 0x005570d4);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_005570c8Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x005570c0, off64),                                             \
+                   #member)
+AT(p_005570c8, 0x005570c8, 0x8);
+AT(d_005570d4, 0x005570d4, 0x20);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_005570c8Group, d_005570d4) +
                        sizeof(((struct BmxGroup_p_005570c8Group *)0)->d_005570d4) ==
-                   0x18,
+                   BMX_DATA_OFF(0x18, 0x24),
                "p_005570c8Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005570d8..0x005570e8.
@@ -4230,14 +4258,16 @@ struct BmxGroup_p_005570d8Group {
     void *p_005570d8[2];    /* 0x005570d8 */
     uint32_t d_005570e0[2]; /* 0x005570e0 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_005570d8Group, member) == (addr) - 0x005570d0, #member)
-AT(p_005570d8, 0x005570d8);
-AT(d_005570e0, 0x005570e0);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_005570d8Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x005570d0, off64),                                             \
+                   #member)
+AT(p_005570d8, 0x005570d8, 0x8);
+AT(d_005570e0, 0x005570e0, 0x18);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_005570d8Group, d_005570e0) +
                        sizeof(((struct BmxGroup_p_005570d8Group *)0)->d_005570e0) ==
-                   0x18,
+                   BMX_DATA_OFF(0x18, 0x20),
                "p_005570d8Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005570e8..0x005570f8.
@@ -4248,15 +4278,17 @@ struct BmxGroup_d_005570e8Group {
     void *p_005570ec[2];         /* 0x005570ec */
     uint32_t d_005570f4;         /* 0x005570f4 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_d_005570e8Group, member) == (addr) - 0x005570e0, #member)
-AT(d_005570e8, 0x005570e8);
-AT(p_005570ec, 0x005570ec);
-AT(d_005570f4, 0x005570f4);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_d_005570e8Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x005570e0, off64),                                             \
+                   #member)
+AT(d_005570e8, 0x005570e8, 0x8);
+AT(p_005570ec, 0x005570ec, 0x10);
+AT(d_005570f4, 0x005570f4, 0x20);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_005570e8Group, d_005570f4) +
                        sizeof(((struct BmxGroup_d_005570e8Group *)0)->d_005570f4) ==
-                   0x18,
+                   BMX_DATA_OFF(0x18, 0x24),
                "d_005570e8Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005570f8..0x00557108.
@@ -4267,15 +4299,17 @@ struct BmxGroup_d_005570f8Group {
     void *p_005570fc[2];         /* 0x005570fc */
     uint32_t d_00557104;         /* 0x00557104 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_d_005570f8Group, member) == (addr) - 0x005570f0, #member)
-AT(d_005570f8, 0x005570f8);
-AT(p_005570fc, 0x005570fc);
-AT(d_00557104, 0x00557104);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_d_005570f8Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x005570f0, off64),                                             \
+                   #member)
+AT(d_005570f8, 0x005570f8, 0x8);
+AT(p_005570fc, 0x005570fc, 0x10);
+AT(d_00557104, 0x00557104, 0x20);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_005570f8Group, d_00557104) +
                        sizeof(((struct BmxGroup_d_005570f8Group *)0)->d_00557104) ==
-                   0x18,
+                   BMX_DATA_OFF(0x18, 0x24),
                "d_005570f8Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00557108..0x00557118.
@@ -4285,14 +4319,16 @@ struct BmxGroup_p_00557108Group {
     void *p_00557108[3]; /* 0x00557108 */
     uint32_t d_00557114; /* 0x00557114 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_00557108Group, member) == (addr) - 0x00557100, #member)
-AT(p_00557108, 0x00557108);
-AT(d_00557114, 0x00557114);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_00557108Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00557100, off64),                                             \
+                   #member)
+AT(p_00557108, 0x00557108, 0x8);
+AT(d_00557114, 0x00557114, 0x20);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_00557108Group, d_00557114) +
                        sizeof(((struct BmxGroup_p_00557108Group *)0)->d_00557114) ==
-                   0x18,
+                   BMX_DATA_OFF(0x18, 0x24),
                "p_00557108Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00557118..0x00557128.
@@ -4302,14 +4338,16 @@ struct BmxGroup_p_00557118Group {
     void *p_00557118[3];           /* 0x00557118 */
     unsigned char pad_00557124[4]; /* 0x00557124 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_00557118Group, member) == (addr) - 0x00557110, #member)
-AT(p_00557118, 0x00557118);
-AT(pad_00557124, 0x00557124);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_00557118Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00557110, off64),                                             \
+                   #member)
+AT(p_00557118, 0x00557118, 0x8);
+AT(pad_00557124, 0x00557124, 0x20);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_00557118Group, pad_00557124) +
                        sizeof(((struct BmxGroup_p_00557118Group *)0)->pad_00557124) ==
-                   0x18,
+                   BMX_DATA_OFF(0x18, 0x24),
                "p_00557118Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00557128..0x00557138.
@@ -4319,14 +4357,16 @@ struct BmxGroup_p_00557128Group {
     void *p_00557128[3]; /* 0x00557128 */
     uint32_t d_00557134; /* 0x00557134 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_00557128Group, member) == (addr) - 0x00557120, #member)
-AT(p_00557128, 0x00557128);
-AT(d_00557134, 0x00557134);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_00557128Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00557120, off64),                                             \
+                   #member)
+AT(p_00557128, 0x00557128, 0x8);
+AT(d_00557134, 0x00557134, 0x20);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_00557128Group, d_00557134) +
                        sizeof(((struct BmxGroup_p_00557128Group *)0)->d_00557134) ==
-                   0x18,
+                   BMX_DATA_OFF(0x18, 0x24),
                "p_00557128Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00557138..0x00557148.
@@ -4336,14 +4376,16 @@ struct BmxGroup_p_00557138Group {
     void *p_00557138[3]; /* 0x00557138 */
     uint32_t d_00557144; /* 0x00557144 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_00557138Group, member) == (addr) - 0x00557130, #member)
-AT(p_00557138, 0x00557138);
-AT(d_00557144, 0x00557144);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_00557138Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00557130, off64),                                             \
+                   #member)
+AT(p_00557138, 0x00557138, 0x8);
+AT(d_00557144, 0x00557144, 0x20);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_00557138Group, d_00557144) +
                        sizeof(((struct BmxGroup_p_00557138Group *)0)->d_00557144) ==
-                   0x18,
+                   BMX_DATA_OFF(0x18, 0x24),
                "p_00557138Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00557148..0x00557158.
@@ -4353,14 +4395,16 @@ struct BmxGroup_p_00557148Group {
     void *p_00557148[3]; /* 0x00557148 */
     uint32_t d_00557154; /* 0x00557154 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_00557148Group, member) == (addr) - 0x00557140, #member)
-AT(p_00557148, 0x00557148);
-AT(d_00557154, 0x00557154);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_00557148Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00557140, off64),                                             \
+                   #member)
+AT(p_00557148, 0x00557148, 0x8);
+AT(d_00557154, 0x00557154, 0x20);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_00557148Group, d_00557154) +
                        sizeof(((struct BmxGroup_p_00557148Group *)0)->d_00557154) ==
-                   0x18,
+                   BMX_DATA_OFF(0x18, 0x24),
                "p_00557148Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00557158..0x00557168.
@@ -4370,14 +4414,16 @@ struct BmxGroup_p_00557158Group {
     void *p_00557158[3]; /* 0x00557158 */
     uint32_t d_00557164; /* 0x00557164 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_00557158Group, member) == (addr) - 0x00557150, #member)
-AT(p_00557158, 0x00557158);
-AT(d_00557164, 0x00557164);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_00557158Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00557150, off64),                                             \
+                   #member)
+AT(p_00557158, 0x00557158, 0x8);
+AT(d_00557164, 0x00557164, 0x20);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_00557158Group, d_00557164) +
                        sizeof(((struct BmxGroup_p_00557158Group *)0)->d_00557164) ==
-                   0x18,
+                   BMX_DATA_OFF(0x18, 0x24),
                "p_00557158Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00557168..0x00557178.
@@ -4387,14 +4433,16 @@ struct BmxGroup_p_00557168Group {
     void *p_00557168[3]; /* 0x00557168 */
     uint32_t d_00557174; /* 0x00557174 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_00557168Group, member) == (addr) - 0x00557160, #member)
-AT(p_00557168, 0x00557168);
-AT(d_00557174, 0x00557174);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_00557168Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00557160, off64),                                             \
+                   #member)
+AT(p_00557168, 0x00557168, 0x8);
+AT(d_00557174, 0x00557174, 0x20);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_00557168Group, d_00557174) +
                        sizeof(((struct BmxGroup_p_00557168Group *)0)->d_00557174) ==
-                   0x18,
+                   BMX_DATA_OFF(0x18, 0x24),
                "p_00557168Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00557178..0x00557184.
@@ -4404,14 +4452,16 @@ struct BmxGroup_d_00557178Group {
     unsigned char d_00557178[4]; /* 0x00557178 */
     void *p_0055717c[2];         /* 0x0055717c */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_d_00557178Group, member) == (addr) - 0x00557170, #member)
-AT(d_00557178, 0x00557178);
-AT(p_0055717c, 0x0055717c);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_d_00557178Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00557170, off64),                                             \
+                   #member)
+AT(d_00557178, 0x00557178, 0x8);
+AT(p_0055717c, 0x0055717c, 0x10);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_00557178Group, p_0055717c) +
                        sizeof(((struct BmxGroup_d_00557178Group *)0)->p_0055717c) ==
-                   0x14,
+                   BMX_DATA_OFF(0x14, 0x20),
                "d_00557178Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00557188..0x00557198.
@@ -4422,15 +4472,17 @@ struct BmxGroup_d_00557188Group {
     void *p_0055718c[2];         /* 0x0055718c */
     uint32_t d_00557194;         /* 0x00557194 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_d_00557188Group, member) == (addr) - 0x00557180, #member)
-AT(d_00557188, 0x00557188);
-AT(p_0055718c, 0x0055718c);
-AT(d_00557194, 0x00557194);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_d_00557188Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00557180, off64),                                             \
+                   #member)
+AT(d_00557188, 0x00557188, 0x8);
+AT(p_0055718c, 0x0055718c, 0x10);
+AT(d_00557194, 0x00557194, 0x20);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_00557188Group, d_00557194) +
                        sizeof(((struct BmxGroup_d_00557188Group *)0)->d_00557194) ==
-                   0x18,
+                   BMX_DATA_OFF(0x18, 0x24),
                "d_00557188Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00557198..0x005571a8.
@@ -4441,15 +4493,17 @@ struct BmxGroup_d_00557198Group {
     void *p_0055719c[2];         /* 0x0055719c */
     uint32_t d_005571a4;         /* 0x005571a4 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_d_00557198Group, member) == (addr) - 0x00557190, #member)
-AT(d_00557198, 0x00557198);
-AT(p_0055719c, 0x0055719c);
-AT(d_005571a4, 0x005571a4);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_d_00557198Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00557190, off64),                                             \
+                   #member)
+AT(d_00557198, 0x00557198, 0x8);
+AT(p_0055719c, 0x0055719c, 0x10);
+AT(d_005571a4, 0x005571a4, 0x20);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_00557198Group, d_005571a4) +
                        sizeof(((struct BmxGroup_d_00557198Group *)0)->d_005571a4) ==
-                   0x18,
+                   BMX_DATA_OFF(0x18, 0x24),
                "d_00557198Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005571a8..0x005571b8.
@@ -4460,15 +4514,17 @@ struct BmxGroup_d_005571a8Group {
     void *p_005571ac[2];         /* 0x005571ac */
     uint32_t d_005571b4;         /* 0x005571b4 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_d_005571a8Group, member) == (addr) - 0x005571a0, #member)
-AT(d_005571a8, 0x005571a8);
-AT(p_005571ac, 0x005571ac);
-AT(d_005571b4, 0x005571b4);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_d_005571a8Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x005571a0, off64),                                             \
+                   #member)
+AT(d_005571a8, 0x005571a8, 0x8);
+AT(p_005571ac, 0x005571ac, 0x10);
+AT(d_005571b4, 0x005571b4, 0x20);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_005571a8Group, d_005571b4) +
                        sizeof(((struct BmxGroup_d_005571a8Group *)0)->d_005571b4) ==
-                   0x18,
+                   BMX_DATA_OFF(0x18, 0x24),
                "d_005571a8Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00557260..0x00557298.
@@ -4516,19 +4572,21 @@ struct BmxGroup_gIndicatorTextGroup {
     OvlStrTable4 gTrickDoubleNames;  /* 0x00557308 */
     unsigned char pad_00557318[212]; /* 0x00557318 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gIndicatorTextGroup, member) == (addr) - 0x005572b0, #member)
-AT(d_005572bb, 0x005572bb);
-AT(gButtonGlyphs, 0x005572cb);
-AT(gIndicatorText, 0x005572d4);
-AT(gIndicatorColor, 0x005572e8);
-AT(d_005572fc, 0x005572fc);
-AT(gTrickDoubleNames, 0x00557308);
-AT(pad_00557318, 0x00557318);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gIndicatorTextGroup, member) ==                                  \
+                       BMX_DATA_OFF((addr) - 0x005572b0, off64),                                             \
+                   #member)
+AT(d_005572bb, 0x005572bb, 0xb);
+AT(gButtonGlyphs, 0x005572cb, 0x1b);
+AT(gIndicatorText, 0x005572d4, 0x28);
+AT(gIndicatorColor, 0x005572e8, 0x50);
+AT(d_005572fc, 0x005572fc, 0x64);
+AT(gTrickDoubleNames, 0x00557308, 0x70);
+AT(pad_00557318, 0x00557318, 0x90);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gIndicatorTextGroup, pad_00557318) +
                        sizeof(((struct BmxGroup_gIndicatorTextGroup *)0)->pad_00557318) ==
-                   0x13c,
+                   BMX_DATA_OFF(0x13c, 0x164),
                "gIndicatorTextGroup");
 
 /* The type is local to bmx/com/action/physics_roll.h. */
@@ -4592,14 +4650,16 @@ struct BmxGroup_gPhysStateSyncGroup {
     PhysStepTable gPhysStateSync;   /* 0x00557924 */
     unsigned char pad_00557940[68]; /* 0x00557940 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gPhysStateSyncGroup, member) == (addr) - 0x00557920, #member)
-AT(gPhysStateSync, 0x00557924);
-AT(pad_00557940, 0x00557940);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gPhysStateSyncGroup, member) ==                                  \
+                       BMX_DATA_OFF((addr) - 0x00557920, off64),                                             \
+                   #member)
+AT(gPhysStateSync, 0x00557924, 0x8);
+AT(pad_00557940, 0x00557940, 0x40);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gPhysStateSyncGroup, pad_00557940) +
                        sizeof(((struct BmxGroup_gPhysStateSyncGroup *)0)->pad_00557940) ==
-                   0x64,
+                   BMX_DATA_OFF(0x64, 0x84),
                "gPhysStateSyncGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00557d28..0x00558628.
@@ -4660,14 +4720,16 @@ struct BmxGroup_gRiderAirStepGroup {
     void *gRiderRollStep[6];     /* 0x005588d4 */
     RiderAirTable gRiderAirStep; /* 0x005588ec */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gRiderAirStepGroup, member) == (addr) - 0x005588d0, #member)
-AT(gRiderRollStep, 0x005588d4);
-AT(gRiderAirStep, 0x005588ec);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gRiderAirStepGroup, member) ==                                   \
+                       BMX_DATA_OFF((addr) - 0x005588d0, off64),                                             \
+                   #member)
+AT(gRiderRollStep, 0x005588d4, 0x8);
+AT(gRiderAirStep, 0x005588ec, 0x38);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gRiderAirStepGroup, gRiderAirStep) +
                        sizeof(((struct BmxGroup_gRiderAirStepGroup *)0)->gRiderAirStep) ==
-                   0x28,
+                   BMX_DATA_OFF(0x28, 0x50),
                "gRiderAirStepGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005588f8..0x00558a48.
@@ -4689,26 +4751,28 @@ struct BmxGroup_gRiderGrindStepGroup {
     char sFailedToCreateBikeActorForRiderLdBikeLo[64]; /* 0x005589fc */
     unsigned char pad_00558a3c[12];                    /* 0x00558a3c */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gRiderGrindStepGroup, member) == (addr) - 0x005588f0, #member)
-AT(gRiderGrindStep, 0x005588f8);
-AT(gRiderLipStep, 0x005588fc);
-AT(gRiderManualStep, 0x00558900);
-AT(gRiderStickDir, 0x00558904);
-AT(gRiderScoreWeight, 0x00558914);
-AT(pad_00558954, 0x00558954);
-AT(sInvalidMainUpdateProcNULL, 0x00558978);
-AT(pad_0055899c, 0x0055899c);
-AT(sDirectionBufferOutOfRangePost, 0x005589a0);
-AT(pad_005589c8, 0x005589c8);
-AT(sCZaxisBmxSrcComActionRiderC, 0x005589d0);
-AT(pad_005589f4, 0x005589f4);
-AT(sFailedToCreateBikeActorForRiderLdBikeLo, 0x005589fc);
-AT(pad_00558a3c, 0x00558a3c);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gRiderGrindStepGroup, member) ==                                 \
+                       BMX_DATA_OFF((addr) - 0x005588f0, off64),                                             \
+                   #member)
+AT(gRiderGrindStep, 0x005588f8, 0x8);
+AT(gRiderLipStep, 0x005588fc, 0x10);
+AT(gRiderManualStep, 0x00558900, 0x18);
+AT(gRiderStickDir, 0x00558904, 0x20);
+AT(gRiderScoreWeight, 0x00558914, 0x30);
+AT(pad_00558954, 0x00558954, 0x70);
+AT(sInvalidMainUpdateProcNULL, 0x00558978, 0x94);
+AT(pad_0055899c, 0x0055899c, 0xb8);
+AT(sDirectionBufferOutOfRangePost, 0x005589a0, 0xbc);
+AT(pad_005589c8, 0x005589c8, 0xe4);
+AT(sCZaxisBmxSrcComActionRiderC, 0x005589d0, 0xec);
+AT(pad_005589f4, 0x005589f4, 0x110);
+AT(sFailedToCreateBikeActorForRiderLdBikeLo, 0x005589fc, 0x118);
+AT(pad_00558a3c, 0x00558a3c, 0x158);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gRiderGrindStepGroup, pad_00558a3c) +
                        sizeof(((struct BmxGroup_gRiderGrindStepGroup *)0)->pad_00558a3c) ==
-                   0x158,
+                   BMX_DATA_OFF(0x158, 0x164),
                "gRiderGrindStepGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00558af7..0x00559b94.
@@ -4876,166 +4940,168 @@ struct BmxGroup_gRiderTrickComboGroup {
     char sUnTurndown[12];            /* 0x00559b84 */
     unsigned char pad_00559b90[4];   /* 0x00559b90 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gRiderTrickComboGroup, member) == (addr) - 0x00558af0, #member)
-AT(gRiderAirTrickPick, 0x00558af7);
-AT(gRiderTrickCombo, 0x00558b40);
-AT(d_00558c40, 0x00558c40);
-AT(s_00558c6c, 0x00558c6c);
-AT(d_00558c71, 0x00558c71);
-AT(s_00558cb8, 0x00558cb8);
-AT(d_00558cbd, 0x00558cbd);
-AT(s_00558cdc, 0x00558cdc);
-AT(d_00558ce3, 0x00558ce3);
-AT(s_00558d04, 0x00558d04);
-AT(d_00558d09, 0x00558d09);
-AT(s_00558d28, 0x00558d28);
-AT(d_00558d2f, 0x00558d2f);
-AT(s_00558d50, 0x00558d50);
-AT(d_00558d55, 0x00558d55);
-AT(s_00558d74, 0x00558d74);
-AT(d_00558d7b, 0x00558d7b);
-AT(s_00558dc0, 0x00558dc0);
-AT(d_00558dc7, 0x00558dc7);
-AT(s_00558de8, 0x00558de8);
-AT(d_00558ded, 0x00558ded);
-AT(s_00558e34, 0x00558e34);
-AT(d_00558e39, 0x00558e39);
-AT(s_00558ef0, 0x00558ef0);
-AT(d_00558ef7, 0x00558ef7);
-AT(s_00558f64, 0x00558f64);
-AT(d_00558f69, 0x00558f69);
-AT(gRiderTrickA, 0x00558f90);
-AT(gRiderTrickB, 0x00558f9c);
-AT(gTrickClassHi, 0x00558fa2);
-AT(gRiderTrickKind, 0x00558fa8);
-AT(gTrickClassLo, 0x00558fb4);
-AT(d_00558fd4, 0x00558fd4);
-AT(gRiderTrickAnim, 0x00558ff8);
-AT(gRiderPoseAnim, 0x00559030);
-AT(d_00559032, 0x00559032);
-AT(gPhysIkLimbMasks, 0x0055907c);
-AT(gScoreTrick, 0x00559118);
-AT(d_00559218, 0x00559218);
-AT(gScoreTierAdd, 0x0055926c);
-AT(d_0055928c, 0x0055928c);
-AT(gScoreTierMul, 0x0055931c);
-AT(d_0055935c, 0x0055935c);
-AT(gScoreSpinMul, 0x00559370);
-AT(gTrickTurnNames, 0x00559390);
-AT(p_00559490, 0x00559490);
-AT(gTrickSpinNames, 0x005594e0);
-AT(pad_005595e0, 0x005595e0);
-AT(sExtreme, 0x00559708);
-AT(pad_00559710, 0x00559710);
-AT(s1260, 0x00559714);
-AT(s1080, 0x0055971c);
-AT(s900, 0x00559724);
-AT(s720, 0x00559728);
-AT(s540, 0x0055972c);
-AT(s360, 0x00559730);
-AT(s180, 0x00559734);
-AT(sBusdriver, 0x00559738);
-AT(sBarspinSeatGrab, 0x00559744);
-AT(pad_00559758, 0x00559758);
-AT(sXUpSeatGrab, 0x0055975c);
-AT(pad_0055976c, 0x0055976c);
-AT(sSwitchFooter, 0x00559770);
-AT(sIndian, 0x00559780);
-AT(sRocketOneFooter, 0x00559788);
-AT(pad_0055979c, 0x0055979c);
-AT(sRocketBarspin, 0x005597a0);
-AT(pad_005597b0, 0x005597b0);
-AT(sRocketNoHander, 0x005597b4);
-AT(sRocketOneHander, 0x005597c8);
-AT(pad_005597dc, 0x005597dc);
-AT(sCrotchRocket, 0x005597e0);
-AT(sRocketXUp, 0x005597f0);
-AT(pad_005597fc, 0x005597fc);
-AT(sOneFootedBarspin, 0x00559800);
-AT(pad_00559814, 0x00559814);
-AT(sNoFootedBarspin, 0x00559818);
-AT(pad_0055982c, 0x0055982c);
-AT(sBarspinToBarspinBack, 0x00559830);
-AT(pad_00559848, 0x00559848);
-AT(sNoHandedBarspin, 0x0055984c);
-AT(pad_00559860, 0x00559860);
-AT(sNoHandedOneFooter, 0x00559864);
-AT(pad_0055987c, 0x0055987c);
-AT(sNoFootedOneHander, 0x00559880);
-AT(pad_00559898, 0x00559898);
-AT(sOneFootedXUp, 0x0055989c);
-AT(pad_005598ac, 0x005598ac);
-AT(sNoFootedXUp, 0x005598b0);
-AT(pad_005598c0, 0x005598c0);
-AT(sSwitchHander, 0x005598c4);
-AT(sDoubleSeatGrab, 0x005598d4);
-AT(sOneFootedSeatGrab, 0x005598e8);
-AT(pad_00559900, 0x00559900);
-AT(sNoFootedSeatGrab, 0x00559904);
-AT(pad_00559918, 0x00559918);
-AT(sOneHandedSeatGrab, 0x0055991c);
-AT(pad_00559934, 0x00559934);
-AT(sDoublePegGrab, 0x00559938);
-AT(pad_00559948, 0x00559948);
-AT(sRocketAir, 0x0055994c);
-AT(pad_00559958, 0x00559958);
-AT(sOneHandXUp, 0x0055995c);
-AT(sOneHandOneFooter, 0x0055996c);
-AT(pad_00559980, 0x00559980);
-AT(sNothing, 0x00559984);
-AT(pad_0055998c, 0x0055998c);
-AT(sNoHander, 0x00559990);
-AT(sNoFooter, 0x0055999c);
-AT(sSeatGrab, 0x005599a8);
-AT(sSuicideNoHander, 0x005599b4);
-AT(pad_005599c8, 0x005599c8);
-AT(sXDown, 0x005599cc);
-AT(sXUp, 0x005599d4);
-AT(sOneHander, 0x005599dc);
-AT(pad_005599e8, 0x005599e8);
-AT(sOneFooter, 0x005599ec);
-AT(pad_005599f8, 0x005599f8);
-AT(sBarspin, 0x005599fc);
-AT(pad_00559a04, 0x00559a04);
-AT(sNoseWheelie, 0x00559a08);
-AT(sManual, 0x00559a18);
-AT(sWallTap, 0x00559a20);
-AT(sFastPlant, 0x00559a2c);
-AT(pad_00559a38, 0x00559a38);
-AT(sDisaster, 0x00559a3c);
-AT(sTailTap, 0x00559a48);
-AT(sNosepick, 0x00559a54);
-AT(sIcepickStall, 0x00559a60);
-AT(sToothpickStall, 0x00559a70);
-AT(pad_00559a80, 0x00559a80);
-AT(sDoublePegStall, 0x00559a84);
-AT(sSprocketGrind, 0x00559a98);
-AT(pad_00559aa8, 0x00559aa8);
-AT(sCrookedGrind, 0x00559aac);
-AT(sLucEGrind, 0x00559abc);
-AT(pad_00559ac8, 0x00559ac8);
-AT(sLipSlide, 0x00559acc);
-AT(sIcepickGrind, 0x00559ad8);
-AT(sToothpickGrind, 0x00559ae8);
-AT(pad_00559af8, 0x00559af8);
-AT(sFeebleGrind, 0x00559afc);
-AT(sSmithGrind, 0x00559b0c);
-AT(pad_00559b18, 0x00559b18);
-AT(sDoublePegGrind, 0x00559b1c);
-AT(sSupermanIndian, 0x00559b30);
-AT(pad_00559b40, 0x00559b40);
-AT(sCandyBarLookdown, 0x00559b44);
-AT(pad_00559b58, 0x00559b58);
-AT(sCanCanLookdown, 0x00559b5c);
-AT(sDoubleTailwhip, 0x00559b70);
-AT(pad_00559b80, 0x00559b80);
-AT(sUnTurndown, 0x00559b84);
-AT(pad_00559b90, 0x00559b90);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gRiderTrickComboGroup, member) ==                                \
+                       BMX_DATA_OFF((addr) - 0x00558af0, off64),                                             \
+                   #member)
+AT(gRiderAirTrickPick, 0x00558af7, 0x7);
+AT(gRiderTrickCombo, 0x00558b40, 0x50);
+AT(d_00558c40, 0x00558c40, 0x150);
+AT(s_00558c6c, 0x00558c6c, 0x17c);
+AT(d_00558c71, 0x00558c71, 0x181);
+AT(s_00558cb8, 0x00558cb8, 0x1c8);
+AT(d_00558cbd, 0x00558cbd, 0x1cd);
+AT(s_00558cdc, 0x00558cdc, 0x1ec);
+AT(d_00558ce3, 0x00558ce3, 0x1f3);
+AT(s_00558d04, 0x00558d04, 0x214);
+AT(d_00558d09, 0x00558d09, 0x219);
+AT(s_00558d28, 0x00558d28, 0x238);
+AT(d_00558d2f, 0x00558d2f, 0x23f);
+AT(s_00558d50, 0x00558d50, 0x260);
+AT(d_00558d55, 0x00558d55, 0x265);
+AT(s_00558d74, 0x00558d74, 0x284);
+AT(d_00558d7b, 0x00558d7b, 0x28b);
+AT(s_00558dc0, 0x00558dc0, 0x2d0);
+AT(d_00558dc7, 0x00558dc7, 0x2d7);
+AT(s_00558de8, 0x00558de8, 0x2f8);
+AT(d_00558ded, 0x00558ded, 0x2fd);
+AT(s_00558e34, 0x00558e34, 0x344);
+AT(d_00558e39, 0x00558e39, 0x349);
+AT(s_00558ef0, 0x00558ef0, 0x400);
+AT(d_00558ef7, 0x00558ef7, 0x407);
+AT(s_00558f64, 0x00558f64, 0x474);
+AT(d_00558f69, 0x00558f69, 0x479);
+AT(gRiderTrickA, 0x00558f90, 0x4a0);
+AT(gRiderTrickB, 0x00558f9c, 0x4ac);
+AT(gTrickClassHi, 0x00558fa2, 0x4b2);
+AT(gRiderTrickKind, 0x00558fa8, 0x4b8);
+AT(gTrickClassLo, 0x00558fb4, 0x4c4);
+AT(d_00558fd4, 0x00558fd4, 0x4e4);
+AT(gRiderTrickAnim, 0x00558ff8, 0x508);
+AT(gRiderPoseAnim, 0x00559030, 0x540);
+AT(d_00559032, 0x00559032, 0x542);
+AT(gPhysIkLimbMasks, 0x0055907c, 0x58c);
+AT(gScoreTrick, 0x00559118, 0x628);
+AT(d_00559218, 0x00559218, 0x728);
+AT(gScoreTierAdd, 0x0055926c, 0x77c);
+AT(d_0055928c, 0x0055928c, 0x79c);
+AT(gScoreTierMul, 0x0055931c, 0x82c);
+AT(d_0055935c, 0x0055935c, 0x86c);
+AT(gScoreSpinMul, 0x00559370, 0x880);
+AT(gTrickTurnNames, 0x00559390, 0x8a0);
+AT(p_00559490, 0x00559490, 0xaa0);
+AT(gTrickSpinNames, 0x005594e0, 0xb40);
+AT(pad_005595e0, 0x005595e0, 0xd40);
+AT(sExtreme, 0x00559708, 0xe68);
+AT(pad_00559710, 0x00559710, 0xe70);
+AT(s1260, 0x00559714, 0xe74);
+AT(s1080, 0x0055971c, 0xe7c);
+AT(s900, 0x00559724, 0xe84);
+AT(s720, 0x00559728, 0xe88);
+AT(s540, 0x0055972c, 0xe8c);
+AT(s360, 0x00559730, 0xe90);
+AT(s180, 0x00559734, 0xe94);
+AT(sBusdriver, 0x00559738, 0xe98);
+AT(sBarspinSeatGrab, 0x00559744, 0xea4);
+AT(pad_00559758, 0x00559758, 0xeb8);
+AT(sXUpSeatGrab, 0x0055975c, 0xebc);
+AT(pad_0055976c, 0x0055976c, 0xecc);
+AT(sSwitchFooter, 0x00559770, 0xed0);
+AT(sIndian, 0x00559780, 0xee0);
+AT(sRocketOneFooter, 0x00559788, 0xee8);
+AT(pad_0055979c, 0x0055979c, 0xefc);
+AT(sRocketBarspin, 0x005597a0, 0xf00);
+AT(pad_005597b0, 0x005597b0, 0xf10);
+AT(sRocketNoHander, 0x005597b4, 0xf14);
+AT(sRocketOneHander, 0x005597c8, 0xf28);
+AT(pad_005597dc, 0x005597dc, 0xf3c);
+AT(sCrotchRocket, 0x005597e0, 0xf40);
+AT(sRocketXUp, 0x005597f0, 0xf50);
+AT(pad_005597fc, 0x005597fc, 0xf5c);
+AT(sOneFootedBarspin, 0x00559800, 0xf60);
+AT(pad_00559814, 0x00559814, 0xf74);
+AT(sNoFootedBarspin, 0x00559818, 0xf78);
+AT(pad_0055982c, 0x0055982c, 0xf8c);
+AT(sBarspinToBarspinBack, 0x00559830, 0xf90);
+AT(pad_00559848, 0x00559848, 0xfa8);
+AT(sNoHandedBarspin, 0x0055984c, 0xfac);
+AT(pad_00559860, 0x00559860, 0xfc0);
+AT(sNoHandedOneFooter, 0x00559864, 0xfc4);
+AT(pad_0055987c, 0x0055987c, 0xfdc);
+AT(sNoFootedOneHander, 0x00559880, 0xfe0);
+AT(pad_00559898, 0x00559898, 0xff8);
+AT(sOneFootedXUp, 0x0055989c, 0xffc);
+AT(pad_005598ac, 0x005598ac, 0x100c);
+AT(sNoFootedXUp, 0x005598b0, 0x1010);
+AT(pad_005598c0, 0x005598c0, 0x1020);
+AT(sSwitchHander, 0x005598c4, 0x1024);
+AT(sDoubleSeatGrab, 0x005598d4, 0x1034);
+AT(sOneFootedSeatGrab, 0x005598e8, 0x1048);
+AT(pad_00559900, 0x00559900, 0x1060);
+AT(sNoFootedSeatGrab, 0x00559904, 0x1064);
+AT(pad_00559918, 0x00559918, 0x1078);
+AT(sOneHandedSeatGrab, 0x0055991c, 0x107c);
+AT(pad_00559934, 0x00559934, 0x1094);
+AT(sDoublePegGrab, 0x00559938, 0x1098);
+AT(pad_00559948, 0x00559948, 0x10a8);
+AT(sRocketAir, 0x0055994c, 0x10ac);
+AT(pad_00559958, 0x00559958, 0x10b8);
+AT(sOneHandXUp, 0x0055995c, 0x10bc);
+AT(sOneHandOneFooter, 0x0055996c, 0x10cc);
+AT(pad_00559980, 0x00559980, 0x10e0);
+AT(sNothing, 0x00559984, 0x10e4);
+AT(pad_0055998c, 0x0055998c, 0x10ec);
+AT(sNoHander, 0x00559990, 0x10f0);
+AT(sNoFooter, 0x0055999c, 0x10fc);
+AT(sSeatGrab, 0x005599a8, 0x1108);
+AT(sSuicideNoHander, 0x005599b4, 0x1114);
+AT(pad_005599c8, 0x005599c8, 0x1128);
+AT(sXDown, 0x005599cc, 0x112c);
+AT(sXUp, 0x005599d4, 0x1134);
+AT(sOneHander, 0x005599dc, 0x113c);
+AT(pad_005599e8, 0x005599e8, 0x1148);
+AT(sOneFooter, 0x005599ec, 0x114c);
+AT(pad_005599f8, 0x005599f8, 0x1158);
+AT(sBarspin, 0x005599fc, 0x115c);
+AT(pad_00559a04, 0x00559a04, 0x1164);
+AT(sNoseWheelie, 0x00559a08, 0x1168);
+AT(sManual, 0x00559a18, 0x1178);
+AT(sWallTap, 0x00559a20, 0x1180);
+AT(sFastPlant, 0x00559a2c, 0x118c);
+AT(pad_00559a38, 0x00559a38, 0x1198);
+AT(sDisaster, 0x00559a3c, 0x119c);
+AT(sTailTap, 0x00559a48, 0x11a8);
+AT(sNosepick, 0x00559a54, 0x11b4);
+AT(sIcepickStall, 0x00559a60, 0x11c0);
+AT(sToothpickStall, 0x00559a70, 0x11d0);
+AT(pad_00559a80, 0x00559a80, 0x11e0);
+AT(sDoublePegStall, 0x00559a84, 0x11e4);
+AT(sSprocketGrind, 0x00559a98, 0x11f8);
+AT(pad_00559aa8, 0x00559aa8, 0x1208);
+AT(sCrookedGrind, 0x00559aac, 0x120c);
+AT(sLucEGrind, 0x00559abc, 0x121c);
+AT(pad_00559ac8, 0x00559ac8, 0x1228);
+AT(sLipSlide, 0x00559acc, 0x122c);
+AT(sIcepickGrind, 0x00559ad8, 0x1238);
+AT(sToothpickGrind, 0x00559ae8, 0x1248);
+AT(pad_00559af8, 0x00559af8, 0x1258);
+AT(sFeebleGrind, 0x00559afc, 0x125c);
+AT(sSmithGrind, 0x00559b0c, 0x126c);
+AT(pad_00559b18, 0x00559b18, 0x1278);
+AT(sDoublePegGrind, 0x00559b1c, 0x127c);
+AT(sSupermanIndian, 0x00559b30, 0x1290);
+AT(pad_00559b40, 0x00559b40, 0x12a0);
+AT(sCandyBarLookdown, 0x00559b44, 0x12a4);
+AT(pad_00559b58, 0x00559b58, 0x12b8);
+AT(sCanCanLookdown, 0x00559b5c, 0x12bc);
+AT(sDoubleTailwhip, 0x00559b70, 0x12d0);
+AT(pad_00559b80, 0x00559b80, 0x12e0);
+AT(sUnTurndown, 0x00559b84, 0x12e4);
+AT(pad_00559b90, 0x00559b90, 0x12f0);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gRiderTrickComboGroup, pad_00559b90) +
                        sizeof(((struct BmxGroup_gRiderTrickComboGroup *)0)->pad_00559b90) ==
-                   0x10a4,
+                   BMX_DATA_OFF(0x10a4, 0x12f4),
                "gRiderTrickComboGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00559d04..0x00559d14.
@@ -5052,7 +5118,7 @@ AT(p_00559d10, 0x00559d10);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_sTurndownGroup, p_00559d10) +
                        sizeof(((struct BmxGroup_sTurndownGroup *)0)->p_00559d10) ==
-                   0x14,
+                   BMX_DATA_OFF(0x14, 0x18),
                "sTurndownGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0055a450..0x0055a620.
@@ -5061,14 +5127,16 @@ struct BmxGroup_gKbLayoutLabelsGroup {
     KeyLabelTable gKbLayoutLabels;   /* 0x0055a450 */
     unsigned char pad_0055a5b8[104]; /* 0x0055a5b8 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gKbLayoutLabelsGroup, member) == (addr) - 0x0055a450, #member)
-AT(gKbLayoutLabels, 0x0055a450);
-AT(pad_0055a5b8, 0x0055a5b8);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gKbLayoutLabelsGroup, member) ==                                 \
+                       BMX_DATA_OFF((addr) - 0x0055a450, off64),                                             \
+                   #member)
+AT(gKbLayoutLabels, 0x0055a450, 0x0);
+AT(pad_0055a5b8, 0x0055a5b8, 0x2d0);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gKbLayoutLabelsGroup, pad_0055a5b8) +
                        sizeof(((struct BmxGroup_gKbLayoutLabelsGroup *)0)->pad_0055a5b8) ==
-                   0x1d0,
+                   BMX_DATA_OFF(0x1d0, 0x338),
                "gKbLayoutLabelsGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0055aaf0..0x0055ab10.
@@ -5093,14 +5161,16 @@ struct BmxGroup_gBikeCaptionsGroup {
     SelCaptionPtr60 gBikeCaptions;   /* 0x0055ad30 */
     unsigned char pad_0055ae20[276]; /* 0x0055ae20 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gBikeCaptionsGroup, member) == (addr) - 0x0055ad30, #member)
-AT(gBikeCaptions, 0x0055ad30);
-AT(pad_0055ae20, 0x0055ae20);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gBikeCaptionsGroup, member) ==                                   \
+                       BMX_DATA_OFF((addr) - 0x0055ad30, off64),                                             \
+                   #member)
+AT(gBikeCaptions, 0x0055ad30, 0x0);
+AT(pad_0055ae20, 0x0055ae20, 0x1e0);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gBikeCaptionsGroup, pad_0055ae20) +
                        sizeof(((struct BmxGroup_gBikeCaptionsGroup *)0)->pad_0055ae20) ==
-                   0x204,
+                   BMX_DATA_OFF(0x204, 0x2f4),
                "gBikeCaptionsGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0055b138..0x0055b24c.
@@ -5147,15 +5217,17 @@ struct BmxGroup_gNgAssetsDirGroup {
     void *p_0055ba08[8];           /* 0x0055ba08 */
     unsigned char pad_0055ba28[8]; /* 0x0055ba28 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gNgAssetsDirGroup, member) == (addr) - 0x0055ba00, #member)
-AT(gNgAssetsDir, 0x0055ba04);
-AT(p_0055ba08, 0x0055ba08);
-AT(pad_0055ba28, 0x0055ba28);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gNgAssetsDirGroup, member) ==                                    \
+                       BMX_DATA_OFF((addr) - 0x0055ba00, off64),                                             \
+                   #member)
+AT(gNgAssetsDir, 0x0055ba04, 0x8);
+AT(p_0055ba08, 0x0055ba08, 0x10);
+AT(pad_0055ba28, 0x0055ba28, 0x50);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gNgAssetsDirGroup, pad_0055ba28) +
                        sizeof(((struct BmxGroup_gNgAssetsDirGroup *)0)->pad_0055ba28) ==
-                   0x30,
+                   BMX_DATA_OFF(0x30, 0x58),
                "gNgAssetsDirGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0055bb98..0x0055bcf0.
@@ -5190,25 +5262,27 @@ struct BmxGroup_gNgRamDiskGroup {
         uint32_t pad;
     } gNgLightRef[3]; /* 0x0055bcc0; the type is local to bmx/com/zge/ngif/ngapp.c */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gNgRamDiskGroup, member) == (addr) - 0x0055bb90, #member)
-AT(gNgKeyMaps, 0x0055bb98);
-AT(gNgRamDisk, 0x0055bc38);
-AT(gNgLegalPending, 0x0055bc3c);
-AT(gNgWrapName, 0x0055bc40);
-AT(gNgLevelNames, 0x0055bc44);
-AT(gNgDebugFaceColor, 0x0055bc7c);
-AT(gNgDebugEdgeColor, 0x0055bc80);
-AT(gNgDebugTaggedColor, 0x0055bc84);
-AT(gNgDebugRollerColor, 0x0055bc88);
-AT(gNgMainLightColor, 0x0055bc8c);
-AT(d_0055bc8d, 0x0055bc8d);
-AT(gNgLightDir, 0x0055bc90);
-AT(gNgLightRef, 0x0055bcc0);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gNgRamDiskGroup, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x0055bb90, off64),                                             \
+                   #member)
+AT(gNgKeyMaps, 0x0055bb98, 0x8);
+AT(gNgRamDisk, 0x0055bc38, 0xa8);
+AT(gNgLegalPending, 0x0055bc3c, 0xac);
+AT(gNgWrapName, 0x0055bc40, 0xb0);
+AT(gNgLevelNames, 0x0055bc44, 0xb8);
+AT(gNgDebugFaceColor, 0x0055bc7c, 0x128);
+AT(gNgDebugEdgeColor, 0x0055bc80, 0x12c);
+AT(gNgDebugTaggedColor, 0x0055bc84, 0x130);
+AT(gNgDebugRollerColor, 0x0055bc88, 0x134);
+AT(gNgMainLightColor, 0x0055bc8c, 0x138);
+AT(d_0055bc8d, 0x0055bc8d, 0x139);
+AT(gNgLightDir, 0x0055bc90, 0x13c);
+AT(gNgLightRef, 0x0055bcc0, 0x16c);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gNgRamDiskGroup, gNgLightRef) +
                        sizeof(((struct BmxGroup_gNgRamDiskGroup *)0)->gNgLightRef) ==
-                   0x160,
+                   BMX_DATA_OFF(0x160, 0x19c),
                "gNgRamDiskGroup");
 
 /* The type is local to bmx/com/zge/ngif/ngapp.c. */
@@ -5302,7 +5376,7 @@ AT(gFxSpark, 0x0055c278);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gFxRippleDefaultGroup, gFxSpark) +
                        sizeof(((struct BmxGroup_gFxRippleDefaultGroup *)0)->gFxSpark) ==
-                   0x90,
+                   BMX_DATA_OFF(0x90, 0xb8),
                "gFxRippleDefaultGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0055c400..0x0055c53c.
@@ -5546,210 +5620,212 @@ struct BmxGroup_gZrollerRiderNamesGroup {
     unsigned char pad_0055e818[8];                     /* 0x0055e818 */
     uint16_t gSemitones[73]; /* 0x0055e820; the type is local to bmx/pc/zge/sound/winchan.c */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZrollerRiderNamesGroup, member) == (addr) - 0x0055dc50, #member)
-AT(gZrollerRiderNames, 0x0055dc50);
-AT(p_0055dc54, 0x0055dc54);
-AT(gZrollerBikeNames, 0x0055dc80);
-AT(p_0055dc84, 0x0055dc84);
-AT(pad_0055dd44, 0x0055dd44);
-AT(sXXbike01, 0x0055dd74);
-AT(sABbike04, 0x0055dd80);
-AT(sABbike03, 0x0055dd8c);
-AT(sABbike02, 0x0055dd98);
-AT(sABbike01, 0x0055dda4);
-AT(sSJbike04, 0x0055ddb0);
-AT(sSJbike03, 0x0055ddbc);
-AT(sSJbike02, 0x0055ddc8);
-AT(sSJbike01, 0x0055ddd4);
-AT(sJGbike04, 0x0055dde0);
-AT(sJGbike03, 0x0055ddec);
-AT(sJGbike02, 0x0055ddf8);
-AT(sJGbike01, 0x0055de04);
-AT(sLRbike04, 0x0055de10);
-AT(sLRbike03, 0x0055de1c);
-AT(sLRbike02, 0x0055de28);
-AT(sLRbike01, 0x0055de34);
-AT(sSBbike04, 0x0055de40);
-AT(sSBbike03, 0x0055de4c);
-AT(sSBbike02, 0x0055de58);
-AT(sSBbike01, 0x0055de64);
-AT(sKHbike04, 0x0055de70);
-AT(sKHbike03, 0x0055de7c);
-AT(sKHbike02, 0x0055de88);
-AT(sKHbike01, 0x0055de94);
-AT(sTMibike04, 0x0055dea0);
-AT(sTMibike03, 0x0055deac);
-AT(sTMibike02, 0x0055deb8);
-AT(sTMibike01, 0x0055dec4);
-AT(sCKbike04, 0x0055ded0);
-AT(sCKbike03, 0x0055dedc);
-AT(sCKbike02, 0x0055dee8);
-AT(sCKbike01, 0x0055def4);
-AT(sMLbike04, 0x0055df00);
-AT(sMLbike03, 0x0055df0c);
-AT(sMLbike02, 0x0055df18);
-AT(sMLbike01, 0x0055df24);
-AT(sTMcbike04, 0x0055df30);
-AT(sTMcbike03, 0x0055df3c);
-AT(sTMcbike02, 0x0055df48);
-AT(sTMcbike01, 0x0055df54);
-AT(sRNbike04, 0x0055df60);
-AT(sRNbike03, 0x0055df6c);
-AT(sRNbike02, 0x0055df78);
-AT(sRNbike01, 0x0055df84);
-AT(sDMbike04, 0x0055df90);
-AT(sDMbike03, 0x0055df9c);
-AT(sDMbike02, 0x0055dfa8);
-AT(sDMbike01, 0x0055dfb4);
-AT(sAmishBoy, 0x0055dfc0);
-AT(pad_0055dfcc, 0x0055dfcc);
-AT(sSlimJimGuy, 0x0055dfd0);
-AT(sJoeyGarcia, 0x0055dfe0);
-AT(sLeighRamsdell, 0x0055dff0);
-AT(pad_0055e000, 0x0055e000);
-AT(sShaunButler, 0x0055e004);
-AT(sKenanHarkin, 0x0055e014);
-AT(sTimMirra, 0x0055e024);
-AT(pad_0055e030, 0x0055e030);
-AT(sChadKagy, 0x0055e034);
-AT(pad_0055e040, 0x0055e040);
-AT(sMikeLaird, 0x0055e044);
-AT(pad_0055e050, 0x0055e050);
-AT(sTroyMcMurray, 0x0055e054);
-AT(pad_0055e064, 0x0055e064);
-AT(sRyanNyquist, 0x0055e068);
-AT(sDaveMirra, 0x0055e078);
-AT(pad_0055e084, 0x0055e084);
-AT(sZROLLERFailedToIntializeZRES, 0x0055e088);
-AT(pad_0055e0ac, 0x0055e0ac);
-AT(sCZaxisBmxSrcComZgeNgIFNgIFzrollerC, 0x0055e0b4);
-AT(pad_0055e0e0, 0x0055e0e0);
-AT(sZrollerUpdateZGL, 0x0055e0e8);
-AT(sZrollerCreateChaser, 0x0055e0fc);
-AT(pad_0055e110, 0x0055e110);
-AT(sZrollerLoadAssets, 0x0055e114);
-AT(pad_0055e128, 0x0055e128);
-AT(sRiderShadow, 0x0055e12c);
-AT(sOutOfPlayerDefs, 0x0055e13c);
-AT(pad_0055e150, 0x0055e150);
-AT(sBikeShadow, 0x0055e154);
-AT(pad_0055e160, 0x0055e160);
-AT(sInvalidBikeSelected, 0x0055e164);
-AT(pad_0055e17c, 0x0055e17c);
-AT(sZrollerCreateProp, 0x0055e180);
-AT(pad_0055e194, 0x0055e194);
-AT(sZrollerSetEngineState, 0x0055e198);
-AT(pad_0055e1b0, 0x0055e1b0);
-AT(sZrollerGetNumPlayerDefs, 0x0055e1b4);
-AT(pad_0055e1cc, 0x0055e1cc);
-AT(sZrollerLoadMdlPlayerCB, 0x0055e1d0);
-AT(pad_0055e1e8, 0x0055e1e8);
-AT(sZrollerIsPlayerClose, 0x0055e1ec);
-AT(pad_0055e204, 0x0055e204);
-AT(sChangePlayerModeLook, 0x0055e208);
-AT(pad_0055e220, 0x0055e220);
-AT(sZrollerAddPlayerMatsToLoadList, 0x0055e224);
-AT(pad_0055e244, 0x0055e244);
-AT(sZrollerChangePlayerSponsor, 0x0055e24c);
-AT(pad_0055e268, 0x0055e268);
-AT(sZrollerchangeboardsponsor, 0x0055e26c);
-AT(pad_0055e288, 0x0055e288);
-AT(sZrollerLoadMdlGenericCB, 0x0055e28c);
-AT(pad_0055e2a4, 0x0055e2a4);
-AT(sZrollerLoadMdlCommon, 0x0055e2a8);
-AT(pad_0055e2c0, 0x0055e2c0);
-AT(sLoadMdlCommonMat, 0x0055e2c4);
-AT(sZrollerProcessModelFlags, 0x0055e2d8);
-AT(pad_0055e2f4, 0x0055e2f4);
-AT(sZrollerProcessActorDrawFlags, 0x0055e2f8);
-AT(pad_0055e318, 0x0055e318);
-AT(sZrollerSetAnimMaterialPalette, 0x0055e31c);
-AT(pad_0055e33c, 0x0055e33c);
-AT(sZrollerInitializeLoadingScreen, 0x0055e340);
-AT(pad_0055e360, 0x0055e360);
-AT(sZrollerShutdownLoadingScreen, 0x0055e368);
-AT(pad_0055e388, 0x0055e388);
-AT(sZrollerDisplayLoadingScreen, 0x0055e38c);
-AT(pad_0055e3a8, 0x0055e3a8);
-AT(sZrollerSetLocal, 0x0055e3b0);
-AT(pad_0055e3c0, 0x0055e3c0);
-AT(sZrollerLoadModule, 0x0055e3c4);
-AT(pad_0055e3d8, 0x0055e3d8);
-AT(sLoadCodeModule, 0x0055e3dc);
-AT(pad_0055e3ec, 0x0055e3ec);
-AT(sZrollerAllocMaterials, 0x0055e3f0);
-AT(pad_0055e408, 0x0055e408);
-AT(sZrollerAddGenericMaterialsToLoad, 0x0055e40c);
-AT(pad_0055e430, 0x0055e430);
-AT(sZrollerInitializeMaps, 0x0055e434);
-AT(pad_0055e44c, 0x0055e44c);
-AT(sZrollerSetMap, 0x0055e450);
-AT(sZrollerLoadMaps, 0x0055e460);
-AT(pad_0055e470, 0x0055e470);
-AT(sZrollerLoadMatTerrainFirstCB, 0x0055e474);
-AT(pad_0055e494, 0x0055e494);
-AT(sZrollerLoadMatTerrainLastCB, 0x0055e498);
-AT(pad_0055e4b4, 0x0055e4b4);
-AT(sZrollerAssociateMapMaterials, 0x0055e4bc);
-AT(pad_0055e4dc, 0x0055e4dc);
-AT(sZroolerAssociateMaterialLlljlkfsdjflsjd, 0x0055e4e0);
-AT(pad_0055e50c, 0x0055e50c);
-AT(sAssociateMaterialPalAnimation, 0x0055e514);
-AT(pad_0055e538, 0x0055e538);
-AT(sZrollerGetPlayerStartPosHARDCODED, 0x0055e53c);
-AT(pad_0055e560, 0x0055e560);
-AT(sPlayerStartPointNotFoundUsingDefaultVal, 0x0055e568);
-AT(pad_0055e59c, 0x0055e59c);
-AT(sPlayerT, 0x0055e5a8);
-AT(pad_0055e5b0, 0x0055e5b0);
-AT(sPlayer, 0x0055e5b4);
-AT(sZrollerGetPlayerRestartPos, 0x0055e5bc);
-AT(pad_0055e5d8, 0x0055e5d8);
-AT(sZrollerInitPropLoadList, 0x0055e5dc);
-AT(pad_0055e5f4, 0x0055e5f4);
-AT(sZrollerAddPropToLoadList, 0x0055e5f8);
-AT(pad_0055e614, 0x0055e614);
-AT(sCreateProps, 0x0055e618);
-AT(sZrollerLoadPropMaterials, 0x0055e628);
-AT(pad_0055e644, 0x0055e644);
-AT(sZrollerCreatePropActor, 0x0055e648);
-AT(pad_0055e660, 0x0055e660);
-AT(sZrollerDestroyActor, 0x0055e664);
-AT(pad_0055e678, 0x0055e678);
-AT(sZrollerGetAsyncKeyState, 0x0055e67c);
-AT(pad_0055e694, 0x0055e694);
-AT(sZrollerSelectMap, 0x0055e698);
-AT(sZrollerSelectPlayer, 0x0055e6ac);
-AT(pad_0055e6c0, 0x0055e6c0);
-AT(sZrollerSelectBikeNum, 0x0055e6c4);
-AT(pad_0055e6dc, 0x0055e6dc);
-AT(sSetFogDistance, 0x0055e6e0);
-AT(sGetFogDistance, 0x0055e6f4);
-AT(sZrollerDisableFog, 0x0055e708);
-AT(pad_0055e71c, 0x0055e71c);
-AT(sZrollerSetFogColor, 0x0055e720);
-AT(pad_0055e734, 0x0055e734);
-AT(sZrollerReplaceMaterial, 0x0055e738);
-AT(pad_0055e750, 0x0055e750);
-AT(sZrollerSetShadeMode, 0x0055e754);
-AT(pad_0055e768, 0x0055e768);
-AT(sZrollerStartCrossFade, 0x0055e76c);
-AT(pad_0055e784, 0x0055e784);
-AT(sZrollerGetSceneStateNODATA, 0x0055e788);
-AT(pad_0055e7a8, 0x0055e7a8);
-AT(sFreeSceneState, 0x0055e7ac);
-AT(pad_0055e7bc, 0x0055e7bc);
-AT(sSetSceneState, 0x0055e7c0);
-AT(sZrollerSelectLook, 0x0055e7d0);
-AT(pad_0055e7e4, 0x0055e7e4);
-AT(sRegisteredTooManyDrawCallbacksToZroller, 0x0055e7e8);
-AT(pad_0055e818, 0x0055e818);
-AT(gSemitones, 0x0055e820);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZrollerRiderNamesGroup, member) ==                              \
+                       BMX_DATA_OFF((addr) - 0x0055dc50, off64),                                             \
+                   #member)
+AT(gZrollerRiderNames, 0x0055dc50, 0x0);
+AT(p_0055dc54, 0x0055dc54, 0x8);
+AT(gZrollerBikeNames, 0x0055dc80, 0x60);
+AT(p_0055dc84, 0x0055dc84, 0x68);
+AT(pad_0055dd44, 0x0055dd44, 0x1e8);
+AT(sXXbike01, 0x0055dd74, 0x218);
+AT(sABbike04, 0x0055dd80, 0x224);
+AT(sABbike03, 0x0055dd8c, 0x230);
+AT(sABbike02, 0x0055dd98, 0x23c);
+AT(sABbike01, 0x0055dda4, 0x248);
+AT(sSJbike04, 0x0055ddb0, 0x254);
+AT(sSJbike03, 0x0055ddbc, 0x260);
+AT(sSJbike02, 0x0055ddc8, 0x26c);
+AT(sSJbike01, 0x0055ddd4, 0x278);
+AT(sJGbike04, 0x0055dde0, 0x284);
+AT(sJGbike03, 0x0055ddec, 0x290);
+AT(sJGbike02, 0x0055ddf8, 0x29c);
+AT(sJGbike01, 0x0055de04, 0x2a8);
+AT(sLRbike04, 0x0055de10, 0x2b4);
+AT(sLRbike03, 0x0055de1c, 0x2c0);
+AT(sLRbike02, 0x0055de28, 0x2cc);
+AT(sLRbike01, 0x0055de34, 0x2d8);
+AT(sSBbike04, 0x0055de40, 0x2e4);
+AT(sSBbike03, 0x0055de4c, 0x2f0);
+AT(sSBbike02, 0x0055de58, 0x2fc);
+AT(sSBbike01, 0x0055de64, 0x308);
+AT(sKHbike04, 0x0055de70, 0x314);
+AT(sKHbike03, 0x0055de7c, 0x320);
+AT(sKHbike02, 0x0055de88, 0x32c);
+AT(sKHbike01, 0x0055de94, 0x338);
+AT(sTMibike04, 0x0055dea0, 0x344);
+AT(sTMibike03, 0x0055deac, 0x350);
+AT(sTMibike02, 0x0055deb8, 0x35c);
+AT(sTMibike01, 0x0055dec4, 0x368);
+AT(sCKbike04, 0x0055ded0, 0x374);
+AT(sCKbike03, 0x0055dedc, 0x380);
+AT(sCKbike02, 0x0055dee8, 0x38c);
+AT(sCKbike01, 0x0055def4, 0x398);
+AT(sMLbike04, 0x0055df00, 0x3a4);
+AT(sMLbike03, 0x0055df0c, 0x3b0);
+AT(sMLbike02, 0x0055df18, 0x3bc);
+AT(sMLbike01, 0x0055df24, 0x3c8);
+AT(sTMcbike04, 0x0055df30, 0x3d4);
+AT(sTMcbike03, 0x0055df3c, 0x3e0);
+AT(sTMcbike02, 0x0055df48, 0x3ec);
+AT(sTMcbike01, 0x0055df54, 0x3f8);
+AT(sRNbike04, 0x0055df60, 0x404);
+AT(sRNbike03, 0x0055df6c, 0x410);
+AT(sRNbike02, 0x0055df78, 0x41c);
+AT(sRNbike01, 0x0055df84, 0x428);
+AT(sDMbike04, 0x0055df90, 0x434);
+AT(sDMbike03, 0x0055df9c, 0x440);
+AT(sDMbike02, 0x0055dfa8, 0x44c);
+AT(sDMbike01, 0x0055dfb4, 0x458);
+AT(sAmishBoy, 0x0055dfc0, 0x464);
+AT(pad_0055dfcc, 0x0055dfcc, 0x470);
+AT(sSlimJimGuy, 0x0055dfd0, 0x474);
+AT(sJoeyGarcia, 0x0055dfe0, 0x484);
+AT(sLeighRamsdell, 0x0055dff0, 0x494);
+AT(pad_0055e000, 0x0055e000, 0x4a4);
+AT(sShaunButler, 0x0055e004, 0x4a8);
+AT(sKenanHarkin, 0x0055e014, 0x4b8);
+AT(sTimMirra, 0x0055e024, 0x4c8);
+AT(pad_0055e030, 0x0055e030, 0x4d4);
+AT(sChadKagy, 0x0055e034, 0x4d8);
+AT(pad_0055e040, 0x0055e040, 0x4e4);
+AT(sMikeLaird, 0x0055e044, 0x4e8);
+AT(pad_0055e050, 0x0055e050, 0x4f4);
+AT(sTroyMcMurray, 0x0055e054, 0x4f8);
+AT(pad_0055e064, 0x0055e064, 0x508);
+AT(sRyanNyquist, 0x0055e068, 0x50c);
+AT(sDaveMirra, 0x0055e078, 0x51c);
+AT(pad_0055e084, 0x0055e084, 0x528);
+AT(sZROLLERFailedToIntializeZRES, 0x0055e088, 0x52c);
+AT(pad_0055e0ac, 0x0055e0ac, 0x550);
+AT(sCZaxisBmxSrcComZgeNgIFNgIFzrollerC, 0x0055e0b4, 0x558);
+AT(pad_0055e0e0, 0x0055e0e0, 0x584);
+AT(sZrollerUpdateZGL, 0x0055e0e8, 0x58c);
+AT(sZrollerCreateChaser, 0x0055e0fc, 0x5a0);
+AT(pad_0055e110, 0x0055e110, 0x5b4);
+AT(sZrollerLoadAssets, 0x0055e114, 0x5b8);
+AT(pad_0055e128, 0x0055e128, 0x5cc);
+AT(sRiderShadow, 0x0055e12c, 0x5d0);
+AT(sOutOfPlayerDefs, 0x0055e13c, 0x5e0);
+AT(pad_0055e150, 0x0055e150, 0x5f4);
+AT(sBikeShadow, 0x0055e154, 0x5f8);
+AT(pad_0055e160, 0x0055e160, 0x604);
+AT(sInvalidBikeSelected, 0x0055e164, 0x608);
+AT(pad_0055e17c, 0x0055e17c, 0x620);
+AT(sZrollerCreateProp, 0x0055e180, 0x624);
+AT(pad_0055e194, 0x0055e194, 0x638);
+AT(sZrollerSetEngineState, 0x0055e198, 0x63c);
+AT(pad_0055e1b0, 0x0055e1b0, 0x654);
+AT(sZrollerGetNumPlayerDefs, 0x0055e1b4, 0x658);
+AT(pad_0055e1cc, 0x0055e1cc, 0x670);
+AT(sZrollerLoadMdlPlayerCB, 0x0055e1d0, 0x674);
+AT(pad_0055e1e8, 0x0055e1e8, 0x68c);
+AT(sZrollerIsPlayerClose, 0x0055e1ec, 0x690);
+AT(pad_0055e204, 0x0055e204, 0x6a8);
+AT(sChangePlayerModeLook, 0x0055e208, 0x6ac);
+AT(pad_0055e220, 0x0055e220, 0x6c4);
+AT(sZrollerAddPlayerMatsToLoadList, 0x0055e224, 0x6c8);
+AT(pad_0055e244, 0x0055e244, 0x6e8);
+AT(sZrollerChangePlayerSponsor, 0x0055e24c, 0x6f0);
+AT(pad_0055e268, 0x0055e268, 0x70c);
+AT(sZrollerchangeboardsponsor, 0x0055e26c, 0x710);
+AT(pad_0055e288, 0x0055e288, 0x72c);
+AT(sZrollerLoadMdlGenericCB, 0x0055e28c, 0x730);
+AT(pad_0055e2a4, 0x0055e2a4, 0x748);
+AT(sZrollerLoadMdlCommon, 0x0055e2a8, 0x74c);
+AT(pad_0055e2c0, 0x0055e2c0, 0x764);
+AT(sLoadMdlCommonMat, 0x0055e2c4, 0x768);
+AT(sZrollerProcessModelFlags, 0x0055e2d8, 0x77c);
+AT(pad_0055e2f4, 0x0055e2f4, 0x798);
+AT(sZrollerProcessActorDrawFlags, 0x0055e2f8, 0x79c);
+AT(pad_0055e318, 0x0055e318, 0x7bc);
+AT(sZrollerSetAnimMaterialPalette, 0x0055e31c, 0x7c0);
+AT(pad_0055e33c, 0x0055e33c, 0x7e0);
+AT(sZrollerInitializeLoadingScreen, 0x0055e340, 0x7e4);
+AT(pad_0055e360, 0x0055e360, 0x804);
+AT(sZrollerShutdownLoadingScreen, 0x0055e368, 0x80c);
+AT(pad_0055e388, 0x0055e388, 0x82c);
+AT(sZrollerDisplayLoadingScreen, 0x0055e38c, 0x830);
+AT(pad_0055e3a8, 0x0055e3a8, 0x84c);
+AT(sZrollerSetLocal, 0x0055e3b0, 0x854);
+AT(pad_0055e3c0, 0x0055e3c0, 0x864);
+AT(sZrollerLoadModule, 0x0055e3c4, 0x868);
+AT(pad_0055e3d8, 0x0055e3d8, 0x87c);
+AT(sLoadCodeModule, 0x0055e3dc, 0x880);
+AT(pad_0055e3ec, 0x0055e3ec, 0x890);
+AT(sZrollerAllocMaterials, 0x0055e3f0, 0x894);
+AT(pad_0055e408, 0x0055e408, 0x8ac);
+AT(sZrollerAddGenericMaterialsToLoad, 0x0055e40c, 0x8b0);
+AT(pad_0055e430, 0x0055e430, 0x8d4);
+AT(sZrollerInitializeMaps, 0x0055e434, 0x8d8);
+AT(pad_0055e44c, 0x0055e44c, 0x8f0);
+AT(sZrollerSetMap, 0x0055e450, 0x8f4);
+AT(sZrollerLoadMaps, 0x0055e460, 0x904);
+AT(pad_0055e470, 0x0055e470, 0x914);
+AT(sZrollerLoadMatTerrainFirstCB, 0x0055e474, 0x918);
+AT(pad_0055e494, 0x0055e494, 0x938);
+AT(sZrollerLoadMatTerrainLastCB, 0x0055e498, 0x93c);
+AT(pad_0055e4b4, 0x0055e4b4, 0x958);
+AT(sZrollerAssociateMapMaterials, 0x0055e4bc, 0x960);
+AT(pad_0055e4dc, 0x0055e4dc, 0x980);
+AT(sZroolerAssociateMaterialLlljlkfsdjflsjd, 0x0055e4e0, 0x984);
+AT(pad_0055e50c, 0x0055e50c, 0x9b0);
+AT(sAssociateMaterialPalAnimation, 0x0055e514, 0x9b8);
+AT(pad_0055e538, 0x0055e538, 0x9dc);
+AT(sZrollerGetPlayerStartPosHARDCODED, 0x0055e53c, 0x9e0);
+AT(pad_0055e560, 0x0055e560, 0xa04);
+AT(sPlayerStartPointNotFoundUsingDefaultVal, 0x0055e568, 0xa0c);
+AT(pad_0055e59c, 0x0055e59c, 0xa40);
+AT(sPlayerT, 0x0055e5a8, 0xa4c);
+AT(pad_0055e5b0, 0x0055e5b0, 0xa54);
+AT(sPlayer, 0x0055e5b4, 0xa58);
+AT(sZrollerGetPlayerRestartPos, 0x0055e5bc, 0xa60);
+AT(pad_0055e5d8, 0x0055e5d8, 0xa7c);
+AT(sZrollerInitPropLoadList, 0x0055e5dc, 0xa80);
+AT(pad_0055e5f4, 0x0055e5f4, 0xa98);
+AT(sZrollerAddPropToLoadList, 0x0055e5f8, 0xa9c);
+AT(pad_0055e614, 0x0055e614, 0xab8);
+AT(sCreateProps, 0x0055e618, 0xabc);
+AT(sZrollerLoadPropMaterials, 0x0055e628, 0xacc);
+AT(pad_0055e644, 0x0055e644, 0xae8);
+AT(sZrollerCreatePropActor, 0x0055e648, 0xaec);
+AT(pad_0055e660, 0x0055e660, 0xb04);
+AT(sZrollerDestroyActor, 0x0055e664, 0xb08);
+AT(pad_0055e678, 0x0055e678, 0xb1c);
+AT(sZrollerGetAsyncKeyState, 0x0055e67c, 0xb20);
+AT(pad_0055e694, 0x0055e694, 0xb38);
+AT(sZrollerSelectMap, 0x0055e698, 0xb3c);
+AT(sZrollerSelectPlayer, 0x0055e6ac, 0xb50);
+AT(pad_0055e6c0, 0x0055e6c0, 0xb64);
+AT(sZrollerSelectBikeNum, 0x0055e6c4, 0xb68);
+AT(pad_0055e6dc, 0x0055e6dc, 0xb80);
+AT(sSetFogDistance, 0x0055e6e0, 0xb84);
+AT(sGetFogDistance, 0x0055e6f4, 0xb98);
+AT(sZrollerDisableFog, 0x0055e708, 0xbac);
+AT(pad_0055e71c, 0x0055e71c, 0xbc0);
+AT(sZrollerSetFogColor, 0x0055e720, 0xbc4);
+AT(pad_0055e734, 0x0055e734, 0xbd8);
+AT(sZrollerReplaceMaterial, 0x0055e738, 0xbdc);
+AT(pad_0055e750, 0x0055e750, 0xbf4);
+AT(sZrollerSetShadeMode, 0x0055e754, 0xbf8);
+AT(pad_0055e768, 0x0055e768, 0xc0c);
+AT(sZrollerStartCrossFade, 0x0055e76c, 0xc10);
+AT(pad_0055e784, 0x0055e784, 0xc28);
+AT(sZrollerGetSceneStateNODATA, 0x0055e788, 0xc2c);
+AT(pad_0055e7a8, 0x0055e7a8, 0xc4c);
+AT(sFreeSceneState, 0x0055e7ac, 0xc50);
+AT(pad_0055e7bc, 0x0055e7bc, 0xc60);
+AT(sSetSceneState, 0x0055e7c0, 0xc64);
+AT(sZrollerSelectLook, 0x0055e7d0, 0xc74);
+AT(pad_0055e7e4, 0x0055e7e4, 0xc88);
+AT(sRegisteredTooManyDrawCallbacksToZroller, 0x0055e7e8, 0xc8c);
+AT(pad_0055e818, 0x0055e818, 0xcbc);
+AT(gSemitones, 0x0055e820, 0xcc4);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZrollerRiderNamesGroup, gSemitones) +
                        sizeof(((struct BmxGroup_gZrollerRiderNamesGroup *)0)->gSemitones) ==
-                   0xc62,
+                   BMX_DATA_OFF(0xc62, 0xd56),
                "gZrollerRiderNamesGroup");
 
 /* The type is local to bmx/pc/zge/sound/winchan.c. */
@@ -6032,14 +6108,16 @@ struct BmxGroup_gZProfilePrintAtGroup {
     void *gZProfilePrintAt; /* 0x00560038; the type is local to zge/zprofile.c */
     void *p_0056003c[7];    /* 0x0056003c */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZProfilePrintAtGroup, member) == (addr) - 0x00560030, #member)
-AT(gZProfilePrintAt, 0x00560038);
-AT(p_0056003c, 0x0056003c);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZProfilePrintAtGroup, member) ==                                \
+                       BMX_DATA_OFF((addr) - 0x00560030, off64),                                             \
+                   #member)
+AT(gZProfilePrintAt, 0x00560038, 0x8);
+AT(p_0056003c, 0x0056003c, 0x10);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZProfilePrintAtGroup, p_0056003c) +
                        sizeof(((struct BmxGroup_gZProfilePrintAtGroup *)0)->p_0056003c) ==
-                   0x28,
+                   BMX_DATA_OFF(0x28, 0x48),
                "gZProfilePrintAtGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0056006c..0x00560074.
@@ -6049,14 +6127,16 @@ struct BmxGroup_gZrwDbgSphereHookGroup {
     ZrwDbgSphereFn gZrwDbgSphereHook; /* 0x0056006c */
     void *p_00560070;                 /* 0x00560070 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZrwDbgSphereHookGroup, member) == (addr) - 0x00560060, #member)
-AT(gZrwDbgSphereHook, 0x0056006c);
-AT(p_00560070, 0x00560070);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZrwDbgSphereHookGroup, member) ==                               \
+                       BMX_DATA_OFF((addr) - 0x00560060, off64),                                             \
+                   #member)
+AT(gZrwDbgSphereHook, 0x0056006c, 0x10);
+AT(p_00560070, 0x00560070, 0x18);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZrwDbgSphereHookGroup, p_00560070) +
                        sizeof(((struct BmxGroup_gZrwDbgSphereHookGroup *)0)->p_00560070) ==
-                   0x14,
+                   BMX_DATA_OFF(0x14, 0x20),
                "gZrwDbgSphereHookGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00560078..0x00560080.
@@ -6066,14 +6146,16 @@ struct BmxGroup_gZdebugIndentGroup {
     ZDebugIndentFn gZdebugIndent; /* 0x00560078 */
     void *p_0056007c;             /* 0x0056007c */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZdebugIndentGroup, member) == (addr) - 0x00560070, #member)
-AT(gZdebugIndent, 0x00560078);
-AT(p_0056007c, 0x0056007c);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZdebugIndentGroup, member) ==                                   \
+                       BMX_DATA_OFF((addr) - 0x00560070, off64),                                             \
+                   #member)
+AT(gZdebugIndent, 0x00560078, 0x8);
+AT(p_0056007c, 0x0056007c, 0x10);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZdebugIndentGroup, p_0056007c) +
                        sizeof(((struct BmxGroup_gZdebugIndentGroup *)0)->p_0056007c) ==
-                   0x10,
+                   BMX_DATA_OFF(0x10, 0x18),
                "gZdebugIndentGroup");
 
 /* The type is local to zge/com/zglrw/zrwdbg.c. */
@@ -6086,14 +6168,16 @@ struct BmxGroup_gZobjCameraVtableGroup {
     ZObjCameraVtable gZobjCameraVtable; /* 0x00560518 */
     unsigned char pad_00560528[24];     /* 0x00560528 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZobjCameraVtableGroup, member) == (addr) - 0x00560510, #member)
-AT(gZobjCameraVtable, 0x00560518);
-AT(pad_00560528, 0x00560528);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZobjCameraVtableGroup, member) ==                               \
+                       BMX_DATA_OFF((addr) - 0x00560510, off64),                                             \
+                   #member)
+AT(gZobjCameraVtable, 0x00560518, 0x8);
+AT(pad_00560528, 0x00560528, 0x28);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZobjCameraVtableGroup, pad_00560528) +
                        sizeof(((struct BmxGroup_gZobjCameraVtableGroup *)0)->pad_00560528) ==
-                   0x30,
+                   BMX_DATA_OFF(0x30, 0x40),
                "gZobjCameraVtableGroup");
 
 /* The type is local to zge/com/zglrw/zrwzgl.c. */
@@ -6106,14 +6190,16 @@ struct BmxGroup_gZglExitModelGroup {
     void *gZglExitModel; /* 0x00560e7c; the type is local to zge/com/zglrw/zrwzgl.c */
     void *p_00560e80;    /* 0x00560e80 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZglExitModelGroup, member) == (addr) - 0x00560e70, #member)
-AT(gZglExitModel, 0x00560e7c);
-AT(p_00560e80, 0x00560e80);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZglExitModelGroup, member) ==                                   \
+                       BMX_DATA_OFF((addr) - 0x00560e70, off64),                                             \
+                   #member)
+AT(gZglExitModel, 0x00560e7c, 0x10);
+AT(p_00560e80, 0x00560e80, 0x18);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZglExitModelGroup, p_00560e80) +
                        sizeof(((struct BmxGroup_gZglExitModelGroup *)0)->p_00560e80) ==
-                   0x14,
+                   BMX_DATA_OFF(0x14, 0x20),
                "gZglExitModelGroup");
 
 /* The type is local to zge/com/zglrw/zrwmat.c. */
@@ -6150,14 +6236,16 @@ struct BmxGroup_gZrwVtSkeletonGroup {
     void *gZrwVtSkeleton; /* 0x00560ecc; the type is local to zge/com/zglrw/zrwmat.c */
     void *p_00560ed0;     /* 0x00560ed0 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZrwVtSkeletonGroup, member) == (addr) - 0x00560ec0, #member)
-AT(gZrwVtSkeleton, 0x00560ecc);
-AT(p_00560ed0, 0x00560ed0);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZrwVtSkeletonGroup, member) ==                                  \
+                       BMX_DATA_OFF((addr) - 0x00560ec0, off64),                                             \
+                   #member)
+AT(gZrwVtSkeleton, 0x00560ecc, 0x10);
+AT(p_00560ed0, 0x00560ed0, 0x18);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZrwVtSkeletonGroup, p_00560ed0) +
                        sizeof(((struct BmxGroup_gZrwVtSkeletonGroup *)0)->p_00560ed0) ==
-                   0x14,
+                   BMX_DATA_OFF(0x14, 0x20),
                "gZrwVtSkeletonGroup");
 
 /* The type is local to zge/com/zglrw/zrwmat.c. */
@@ -6173,14 +6261,16 @@ struct BmxGroup_gZrwVtMatCountGroup {
     ZrwModelCall gZrwVtMatCount; /* 0x00560eec */
     void *p_00560ef0;            /* 0x00560ef0 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZrwVtMatCountGroup, member) == (addr) - 0x00560ee0, #member)
-AT(gZrwVtMatCount, 0x00560eec);
-AT(p_00560ef0, 0x00560ef0);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZrwVtMatCountGroup, member) ==                                  \
+                       BMX_DATA_OFF((addr) - 0x00560ee0, off64),                                             \
+                   #member)
+AT(gZrwVtMatCount, 0x00560eec, 0x10);
+AT(p_00560ef0, 0x00560ef0, 0x18);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZrwVtMatCountGroup, p_00560ef0) +
                        sizeof(((struct BmxGroup_gZrwVtMatCountGroup *)0)->p_00560ef0) ==
-                   0x14,
+                   BMX_DATA_OFF(0x14, 0x20),
                "gZrwVtMatCountGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00560ef4..0x00560f18.
@@ -6190,49 +6280,55 @@ struct BmxGroup_gZobjSetColorGroup {
     ZobjColorFn gZobjSetColor; /* 0x00560ef4 */
     void *p_00560ef8[8];       /* 0x00560ef8 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZobjSetColorGroup, member) == (addr) - 0x00560ef0, #member)
-AT(gZobjSetColor, 0x00560ef4);
-AT(p_00560ef8, 0x00560ef8);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZobjSetColorGroup, member) ==                                   \
+                       BMX_DATA_OFF((addr) - 0x00560ef0, off64),                                             \
+                   #member)
+AT(gZobjSetColor, 0x00560ef4, 0x8);
+AT(p_00560ef8, 0x00560ef8, 0x10);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZobjSetColorGroup, p_00560ef8) +
                        sizeof(((struct BmxGroup_gZobjSetColorGroup *)0)->p_00560ef8) ==
-                   0x28,
+                   BMX_DATA_OFF(0x28, 0x50),
                "gZobjSetColorGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00560fa8..0x00560fd0.
  */
 struct BmxGroup_gZrwOpsSkinnedGroup {
     uint8_t lead_[8];              /* nothing: the members' offsets keep their original alignment */
-    uint32_t gZrwOpsSkinned;       /* 0x00560fa8 */
+    void *gZrwOpsSkinned;          /* 0x00560fa8 */
     void *p_00560fac[8];           /* 0x00560fac */
     unsigned char pad_00560fcc[4]; /* 0x00560fcc */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZrwOpsSkinnedGroup, member) == (addr) - 0x00560fa0, #member)
-AT(gZrwOpsSkinned, 0x00560fa8);
-AT(p_00560fac, 0x00560fac);
-AT(pad_00560fcc, 0x00560fcc);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZrwOpsSkinnedGroup, member) ==                                  \
+                       BMX_DATA_OFF((addr) - 0x00560fa0, off64),                                             \
+                   #member)
+AT(gZrwOpsSkinned, 0x00560fa8, 0x8);
+AT(p_00560fac, 0x00560fac, 0x10);
+AT(pad_00560fcc, 0x00560fcc, 0x50);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZrwOpsSkinnedGroup, pad_00560fcc) +
                        sizeof(((struct BmxGroup_gZrwOpsSkinnedGroup *)0)->pad_00560fcc) ==
-                   0x30,
+                   BMX_DATA_OFF(0x30, 0x54),
                "gZrwOpsSkinnedGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00560fd0..0x00560ff4.
  */
 struct BmxGroup_gZrwOpsSimpleGroup {
-    uint32_t gZrwOpsSimple; /* 0x00560fd0 */
-    void *p_00560fd4[8];    /* 0x00560fd4 */
+    void *gZrwOpsSimple; /* 0x00560fd0 */
+    void *p_00560fd4[8]; /* 0x00560fd4 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZrwOpsSimpleGroup, member) == (addr) - 0x00560fd0, #member)
-AT(gZrwOpsSimple, 0x00560fd0);
-AT(p_00560fd4, 0x00560fd4);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZrwOpsSimpleGroup, member) ==                                   \
+                       BMX_DATA_OFF((addr) - 0x00560fd0, off64),                                             \
+                   #member)
+AT(gZrwOpsSimple, 0x00560fd0, 0x0);
+AT(p_00560fd4, 0x00560fd4, 0x8);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZrwOpsSimpleGroup, p_00560fd4) +
                        sizeof(((struct BmxGroup_gZrwOpsSimpleGroup *)0)->p_00560fd4) ==
-                   0x24,
+                   BMX_DATA_OFF(0x24, 0x48),
                "gZrwOpsSimpleGroup");
 
 /* The type is local to zge/com/zglrw/zrwzgl.c. */
@@ -6245,14 +6341,16 @@ struct BmxGroup_gZglExitMaterialGroup {
     void *gZglExitMaterial; /* 0x0056101c; the type is local to zge/com/zglrw/zrwzgl.c */
     void *p_00561020;       /* 0x00561020 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZglExitMaterialGroup, member) == (addr) - 0x00561010, #member)
-AT(gZglExitMaterial, 0x0056101c);
-AT(p_00561020, 0x00561020);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZglExitMaterialGroup, member) ==                                \
+                       BMX_DATA_OFF((addr) - 0x00561010, off64),                                             \
+                   #member)
+AT(gZglExitMaterial, 0x0056101c, 0x10);
+AT(p_00561020, 0x00561020, 0x18);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZglExitMaterialGroup, p_00561020) +
                        sizeof(((struct BmxGroup_gZglExitMaterialGroup *)0)->p_00561020) ==
-                   0x14,
+                   BMX_DATA_OFF(0x14, 0x20),
                "gZglExitMaterialGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00561024..0x0056102c.
@@ -6263,14 +6361,16 @@ struct BmxGroup_gZrollerFreeHandleGroup {
                                                gZrwMaterialRelease, gZrwWorldMatRelease */
     void *p_00561028;                       /* 0x00561028 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZrollerFreeHandleGroup, member) == (addr) - 0x00561020, #member)
-AT(gZrollerFreeHandle, 0x00561024);
-AT(p_00561028, 0x00561028);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZrollerFreeHandleGroup, member) ==                              \
+                       BMX_DATA_OFF((addr) - 0x00561020, off64),                                             \
+                   #member)
+AT(gZrollerFreeHandle, 0x00561024, 0x8);
+AT(p_00561028, 0x00561028, 0x10);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZrollerFreeHandleGroup, p_00561028) +
                        sizeof(((struct BmxGroup_gZrollerFreeHandleGroup *)0)->p_00561028) ==
-                   0xc,
+                   BMX_DATA_OFF(0xc, 0x18),
                "gZrollerFreeHandleGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0056102c..0x00561034.
@@ -6280,14 +6380,16 @@ struct BmxGroup_gFxSetRasterGroup {
     void *gFxSetRaster; /* 0x0056102c; the type is local to bmx/com/zge/ngif/ngiffx.c */
     void *p_00561030;   /* 0x00561030 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gFxSetRasterGroup, member) == (addr) - 0x00561020, #member)
-AT(gFxSetRaster, 0x0056102c);
-AT(p_00561030, 0x00561030);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gFxSetRasterGroup, member) ==                                    \
+                       BMX_DATA_OFF((addr) - 0x00561020, off64),                                             \
+                   #member)
+AT(gFxSetRaster, 0x0056102c, 0x10);
+AT(p_00561030, 0x00561030, 0x18);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gFxSetRasterGroup, p_00561030) +
                        sizeof(((struct BmxGroup_gFxSetRasterGroup *)0)->p_00561030) ==
-                   0x14,
+                   BMX_DATA_OFF(0x14, 0x20),
                "gFxSetRasterGroup");
 
 /* The type is local to zge/com/zglrw/zrwworld.c. */
@@ -6303,14 +6405,16 @@ struct BmxGroup_gErrorCaptionGroup {
     const char *gErrorCaption; /* 0x005611d8 */
     void *p_005611dc;          /* 0x005611dc */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gErrorCaptionGroup, member) == (addr) - 0x005611d0, #member)
-AT(gErrorCaption, 0x005611d8);
-AT(p_005611dc, 0x005611dc);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gErrorCaptionGroup, member) ==                                   \
+                       BMX_DATA_OFF((addr) - 0x005611d0, off64),                                             \
+                   #member)
+AT(gErrorCaption, 0x005611d8, 0x8);
+AT(p_005611dc, 0x005611dc, 0x10);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gErrorCaptionGroup, p_005611dc) +
                        sizeof(((struct BmxGroup_gErrorCaptionGroup *)0)->p_005611dc) ==
-                   0x10,
+                   BMX_DATA_OFF(0x10, 0x18),
                "gErrorCaptionGroup");
 
 /* The type is local to zge/zge.c. */
@@ -6347,21 +6451,23 @@ typedef void *BmxType_gZglExitPrim;
  */
 struct BmxGroup_gZobjLightOpsGroup {
     uint8_t lead_[8];               /* nothing: the members' offsets keep their original alignment */
-    uint32_t gZobjLightOps;         /* 0x00561858 */
+    void *gZobjLightOps;            /* 0x00561858 */
     unsigned char pad_0056185c[4];  /* 0x0056185c */
     void *p_00561860[2];            /* 0x00561860 */
     unsigned char pad_00561868[20]; /* 0x00561868 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZobjLightOpsGroup, member) == (addr) - 0x00561850, #member)
-AT(gZobjLightOps, 0x00561858);
-AT(pad_0056185c, 0x0056185c);
-AT(p_00561860, 0x00561860);
-AT(pad_00561868, 0x00561868);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZobjLightOpsGroup, member) ==                                   \
+                       BMX_DATA_OFF((addr) - 0x00561850, off64),                                             \
+                   #member)
+AT(gZobjLightOps, 0x00561858, 0x8);
+AT(pad_0056185c, 0x0056185c, 0x10);
+AT(p_00561860, 0x00561860, 0x18);
+AT(pad_00561868, 0x00561868, 0x28);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZobjLightOpsGroup, pad_00561868) +
                        sizeof(((struct BmxGroup_gZobjLightOpsGroup *)0)->pad_00561868) ==
-                   0x2c,
+                   BMX_DATA_OFF(0x2c, 0x3c),
                "gZobjLightOpsGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005618a0..0x005618b0.
@@ -6370,14 +6476,16 @@ struct BmxGroup_p_005618a0Group {
     void *p_005618a0[2];           /* 0x005618a0 */
     unsigned char pad_005618a8[8]; /* 0x005618a8 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_005618a0Group, member) == (addr) - 0x005618a0, #member)
-AT(p_005618a0, 0x005618a0);
-AT(pad_005618a8, 0x005618a8);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_005618a0Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x005618a0, off64),                                             \
+                   #member)
+AT(p_005618a0, 0x005618a0, 0x0);
+AT(pad_005618a8, 0x005618a8, 0x10);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_005618a0Group, pad_005618a8) +
                        sizeof(((struct BmxGroup_p_005618a0Group *)0)->pad_005618a8) ==
-                   0x10,
+                   BMX_DATA_OFF(0x10, 0x18),
                "p_005618a0Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005618b0..0x005618d4.
@@ -6387,15 +6495,17 @@ struct BmxGroup_p_005618b0Group {
     unsigned char pad_005618c8[8]; /* 0x005618c8 */
     void *p_005618d0;              /* 0x005618d0 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_005618b0Group, member) == (addr) - 0x005618b0, #member)
-AT(p_005618b0, 0x005618b0);
-AT(pad_005618c8, 0x005618c8);
-AT(p_005618d0, 0x005618d0);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_005618b0Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x005618b0, off64),                                             \
+                   #member)
+AT(p_005618b0, 0x005618b0, 0x0);
+AT(pad_005618c8, 0x005618c8, 0x30);
+AT(p_005618d0, 0x005618d0, 0x38);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_005618b0Group, p_005618d0) +
                        sizeof(((struct BmxGroup_p_005618b0Group *)0)->p_005618d0) ==
-                   0x24,
+                   BMX_DATA_OFF(0x24, 0x40),
                "p_005618b0Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005618d4..0x005618dc.
@@ -6412,7 +6522,7 @@ AT(p_005618d8, 0x005618d8);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_005618d4Group, p_005618d8) +
                        sizeof(((struct BmxGroup_d_005618d4Group *)0)->p_005618d8) ==
-                   0xc,
+                   BMX_DATA_OFF(0xc, 0x10),
                "d_005618d4Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005618dc..0x005618e4.
@@ -6422,14 +6532,16 @@ struct BmxGroup_gSceneModelHandlersGroup {
     void *gSceneModelHandlers; /* 0x005618dc; the type is local to zge/zscene.c */
     void *p_005618e0;          /* 0x005618e0 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gSceneModelHandlersGroup, member) == (addr) - 0x005618d0, #member)
-AT(gSceneModelHandlers, 0x005618dc);
-AT(p_005618e0, 0x005618e0);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gSceneModelHandlersGroup, member) ==                             \
+                       BMX_DATA_OFF((addr) - 0x005618d0, off64),                                             \
+                   #member)
+AT(gSceneModelHandlers, 0x005618dc, 0x10);
+AT(p_005618e0, 0x005618e0, 0x18);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gSceneModelHandlersGroup, p_005618e0) +
                        sizeof(((struct BmxGroup_gSceneModelHandlersGroup *)0)->p_005618e0) ==
-                   0x14,
+                   BMX_DATA_OFF(0x14, 0x20),
                "gSceneModelHandlersGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005618e4..0x00561900.
@@ -6439,14 +6551,16 @@ struct BmxGroup_gSceneAnimHandlersGroup {
     void *gSceneAnimHandlers;       /* 0x005618e4; the type is local to zge/zscene.c */
     unsigned char pad_005618e8[24]; /* 0x005618e8 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gSceneAnimHandlersGroup, member) == (addr) - 0x005618e0, #member)
-AT(gSceneAnimHandlers, 0x005618e4);
-AT(pad_005618e8, 0x005618e8);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gSceneAnimHandlersGroup, member) ==                              \
+                       BMX_DATA_OFF((addr) - 0x005618e0, off64),                                             \
+                   #member)
+AT(gSceneAnimHandlers, 0x005618e4, 0x8);
+AT(pad_005618e8, 0x005618e8, 0x10);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gSceneAnimHandlersGroup, pad_005618e8) +
                        sizeof(((struct BmxGroup_gSceneAnimHandlersGroup *)0)->pad_005618e8) ==
-                   0x20,
+                   BMX_DATA_OFF(0x20, 0x28),
                "gSceneAnimHandlersGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00561900..0x00561908.
@@ -6455,14 +6569,16 @@ struct BmxGroup_d_00561900Group {
     uint32_t d_00561900; /* 0x00561900 */
     void *p_00561904;    /* 0x00561904 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_d_00561900Group, member) == (addr) - 0x00561900, #member)
-AT(d_00561900, 0x00561900);
-AT(p_00561904, 0x00561904);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_d_00561900Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00561900, off64),                                             \
+                   #member)
+AT(d_00561900, 0x00561900, 0x0);
+AT(p_00561904, 0x00561904, 0x8);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_00561900Group, p_00561904) +
                        sizeof(((struct BmxGroup_d_00561900Group *)0)->p_00561904) ==
-                   0x8,
+                   BMX_DATA_OFF(0x8, 0x10),
                "d_00561900Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00561908..0x00561918.
@@ -6474,16 +6590,18 @@ struct BmxGroup_d_00561908Group {
     uint32_t d_00561910; /* 0x00561910 */
     void *p_00561914;    /* 0x00561914 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_d_00561908Group, member) == (addr) - 0x00561900, #member)
-AT(d_00561908, 0x00561908);
-AT(p_0056190c, 0x0056190c);
-AT(d_00561910, 0x00561910);
-AT(p_00561914, 0x00561914);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_d_00561908Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00561900, off64),                                             \
+                   #member)
+AT(d_00561908, 0x00561908, 0x8);
+AT(p_0056190c, 0x0056190c, 0x10);
+AT(d_00561910, 0x00561910, 0x18);
+AT(p_00561914, 0x00561914, 0x20);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_00561908Group, p_00561914) +
                        sizeof(((struct BmxGroup_d_00561908Group *)0)->p_00561914) ==
-                   0x18,
+                   BMX_DATA_OFF(0x18, 0x28),
                "d_00561908Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00561918..0x00561920.
@@ -6493,14 +6611,16 @@ struct BmxGroup_d_00561918Group {
     uint32_t d_00561918; /* 0x00561918 */
     void *p_0056191c;    /* 0x0056191c */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_d_00561918Group, member) == (addr) - 0x00561910, #member)
-AT(d_00561918, 0x00561918);
-AT(p_0056191c, 0x0056191c);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_d_00561918Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00561910, off64),                                             \
+                   #member)
+AT(d_00561918, 0x00561918, 0x8);
+AT(p_0056191c, 0x0056191c, 0x10);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_00561918Group, p_0056191c) +
                        sizeof(((struct BmxGroup_d_00561918Group *)0)->p_0056191c) ==
-                   0x10,
+                   BMX_DATA_OFF(0x10, 0x18),
                "d_00561918Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00561920..0x00561928.
@@ -6509,14 +6629,16 @@ struct BmxGroup_d_00561920Group {
     uint32_t d_00561920; /* 0x00561920 */
     void *p_00561924;    /* 0x00561924 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_d_00561920Group, member) == (addr) - 0x00561920, #member)
-AT(d_00561920, 0x00561920);
-AT(p_00561924, 0x00561924);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_d_00561920Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00561920, off64),                                             \
+                   #member)
+AT(d_00561920, 0x00561920, 0x0);
+AT(p_00561924, 0x00561924, 0x8);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_00561920Group, p_00561924) +
                        sizeof(((struct BmxGroup_d_00561920Group *)0)->p_00561924) ==
-                   0x8,
+                   BMX_DATA_OFF(0x8, 0x10),
                "d_00561920Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00561d98..0x00561da0.
@@ -6526,14 +6648,16 @@ struct BmxGroup_gZrwCamSetFovGroup {
     ZrwCamSetFovFn gZrwCamSetFov; /* 0x00561d98 */
     void *p_00561d9c;             /* 0x00561d9c */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZrwCamSetFovGroup, member) == (addr) - 0x00561d90, #member)
-AT(gZrwCamSetFov, 0x00561d98);
-AT(p_00561d9c, 0x00561d9c);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZrwCamSetFovGroup, member) ==                                   \
+                       BMX_DATA_OFF((addr) - 0x00561d90, off64),                                             \
+                   #member)
+AT(gZrwCamSetFov, 0x00561d98, 0x8);
+AT(p_00561d9c, 0x00561d9c, 0x10);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZrwCamSetFovGroup, p_00561d9c) +
                        sizeof(((struct BmxGroup_gZrwCamSetFovGroup *)0)->p_00561d9c) ==
-                   0x10,
+                   BMX_DATA_OFF(0x10, 0x18),
                "gZrwCamSetFovGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00561da0..0x00561dac.
@@ -6542,14 +6666,16 @@ struct BmxGroup_gZrwCamSetViewGroup {
     ZrwCamSetViewFn gZrwCamSetView; /* 0x00561da0 */
     void *p_00561da4[2];            /* 0x00561da4 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZrwCamSetViewGroup, member) == (addr) - 0x00561da0, #member)
-AT(gZrwCamSetView, 0x00561da0);
-AT(p_00561da4, 0x00561da4);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZrwCamSetViewGroup, member) ==                                  \
+                       BMX_DATA_OFF((addr) - 0x00561da0, off64),                                             \
+                   #member)
+AT(gZrwCamSetView, 0x00561da0, 0x0);
+AT(p_00561da4, 0x00561da4, 0x8);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZrwCamSetViewGroup, p_00561da4) +
                        sizeof(((struct BmxGroup_gZrwCamSetViewGroup *)0)->p_00561da4) ==
-                   0xc,
+                   BMX_DATA_OFF(0xc, 0x18),
                "gZrwCamSetViewGroup");
 
 /* The type is local to zge/com/zglrw/zrwdbg.c. */
@@ -6565,14 +6691,16 @@ struct BmxGroup_gNgifSetViewportGroup {
     void *gNgifSetViewport; /* 0x00561db8; the type is local to bmx/com/zge/ngif/ngifpsx.c */
     void *p_00561dbc;       /* 0x00561dbc */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gNgifSetViewportGroup, member) == (addr) - 0x00561db0, #member)
-AT(gNgifSetViewport, 0x00561db8);
-AT(p_00561dbc, 0x00561dbc);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gNgifSetViewportGroup, member) ==                                \
+                       BMX_DATA_OFF((addr) - 0x00561db0, off64),                                             \
+                   #member)
+AT(gNgifSetViewport, 0x00561db8, 0x8);
+AT(p_00561dbc, 0x00561dbc, 0x10);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gNgifSetViewportGroup, p_00561dbc) +
                        sizeof(((struct BmxGroup_gNgifSetViewportGroup *)0)->p_00561dbc) ==
-                   0x10,
+                   BMX_DATA_OFF(0x10, 0x18),
                "gNgifSetViewportGroup");
 
 /* The type is local to bmx/com/zge/ngif/ngifpsx.c. */
@@ -6637,14 +6765,16 @@ struct BmxGroup_p_00561ec8Group {
     void *p_00561ec8[2];           /* 0x00561ec8 */
     unsigned char pad_00561ed0[8]; /* 0x00561ed0 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_00561ec8Group, member) == (addr) - 0x00561ec0, #member)
-AT(p_00561ec8, 0x00561ec8);
-AT(pad_00561ed0, 0x00561ed0);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_00561ec8Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00561ec0, off64),                                             \
+                   #member)
+AT(p_00561ec8, 0x00561ec8, 0x8);
+AT(pad_00561ed0, 0x00561ed0, 0x18);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_00561ec8Group, pad_00561ed0) +
                        sizeof(((struct BmxGroup_p_00561ec8Group *)0)->pad_00561ed0) ==
-                   0x18,
+                   BMX_DATA_OFF(0x18, 0x20),
                "p_00561ec8Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00561ed8..0x00561ef8.
@@ -6654,14 +6784,16 @@ struct BmxGroup_p_00561ed8Group {
     void *p_00561ed8;       /* 0x00561ed8 */
     uint32_t d_00561edc[7]; /* 0x00561edc */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_00561ed8Group, member) == (addr) - 0x00561ed0, #member)
-AT(p_00561ed8, 0x00561ed8);
-AT(d_00561edc, 0x00561edc);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_00561ed8Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00561ed0, off64),                                             \
+                   #member)
+AT(p_00561ed8, 0x00561ed8, 0x8);
+AT(d_00561edc, 0x00561edc, 0x10);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_00561ed8Group, d_00561edc) +
                        sizeof(((struct BmxGroup_p_00561ed8Group *)0)->d_00561edc) ==
-                   0x28,
+                   BMX_DATA_OFF(0x28, 0x2c),
                "p_00561ed8Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00561ef8..0x00561f04.
@@ -6671,14 +6803,16 @@ struct BmxGroup_p_00561ef8Group {
     void *p_00561ef8[2];           /* 0x00561ef8 */
     unsigned char pad_00561f00[4]; /* 0x00561f00 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_00561ef8Group, member) == (addr) - 0x00561ef0, #member)
-AT(p_00561ef8, 0x00561ef8);
-AT(pad_00561f00, 0x00561f00);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_00561ef8Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00561ef0, off64),                                             \
+                   #member)
+AT(p_00561ef8, 0x00561ef8, 0x8);
+AT(pad_00561f00, 0x00561f00, 0x18);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_00561ef8Group, pad_00561f00) +
                        sizeof(((struct BmxGroup_p_00561ef8Group *)0)->pad_00561f00) ==
-                   0x14,
+                   BMX_DATA_OFF(0x14, 0x1c),
                "p_00561ef8Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00561f04..0x00561f10.
@@ -6688,14 +6822,16 @@ struct BmxGroup_p_00561f04Group {
     void *p_00561f04;              /* 0x00561f04 */
     unsigned char pad_00561f08[8]; /* 0x00561f08 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_00561f04Group, member) == (addr) - 0x00561f00, #member)
-AT(p_00561f04, 0x00561f04);
-AT(pad_00561f08, 0x00561f08);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_00561f04Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00561f00, off64),                                             \
+                   #member)
+AT(p_00561f04, 0x00561f04, 0x8);
+AT(pad_00561f08, 0x00561f08, 0x10);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_00561f04Group, pad_00561f08) +
                        sizeof(((struct BmxGroup_p_00561f04Group *)0)->pad_00561f08) ==
-                   0x10,
+                   BMX_DATA_OFF(0x10, 0x18),
                "p_00561f04Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00561f10..0x00561f2c.
@@ -6704,14 +6840,16 @@ struct BmxGroup_p_00561f10Group {
     void *p_00561f10[2];    /* 0x00561f10 */
     uint32_t d_00561f18[5]; /* 0x00561f18 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_00561f10Group, member) == (addr) - 0x00561f10, #member)
-AT(p_00561f10, 0x00561f10);
-AT(d_00561f18, 0x00561f18);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_00561f10Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00561f10, off64),                                             \
+                   #member)
+AT(p_00561f10, 0x00561f10, 0x0);
+AT(d_00561f18, 0x00561f18, 0x10);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_00561f10Group, d_00561f18) +
                        sizeof(((struct BmxGroup_p_00561f10Group *)0)->d_00561f18) ==
-                   0x1c,
+                   BMX_DATA_OFF(0x1c, 0x24),
                "p_00561f10Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00561f2c..0x00561f38.
@@ -6722,15 +6860,17 @@ struct BmxGroup_gZpadProfilesGroup {
     void *p_00561f30;                 /* 0x00561f30 */
     unsigned char pad_00561f34[4];    /* 0x00561f34 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZpadProfilesGroup, member) == (addr) - 0x00561f20, #member)
-AT(gZpadProfiles, 0x00561f2c);
-AT(p_00561f30, 0x00561f30);
-AT(pad_00561f34, 0x00561f34);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZpadProfilesGroup, member) ==                                   \
+                       BMX_DATA_OFF((addr) - 0x00561f20, off64),                                             \
+                   #member)
+AT(gZpadProfiles, 0x00561f2c, 0x10);
+AT(p_00561f30, 0x00561f30, 0x18);
+AT(pad_00561f34, 0x00561f34, 0x20);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZpadProfilesGroup, pad_00561f34) +
                        sizeof(((struct BmxGroup_gZpadProfilesGroup *)0)->pad_00561f34) ==
-                   0x18,
+                   BMX_DATA_OFF(0x18, 0x24),
                "gZpadProfilesGroup");
 
 /* The type is local to zge/com/zglrw/zrwzgl.c. */
@@ -6749,19 +6889,21 @@ typedef void *BmxType_gZrwColSphereFn;
  */
 struct BmxGroup_gZrwWorldEffectOpsGroup {
     uint8_t lead_[8];               /* nothing: the members' offsets keep their original alignment */
-    uint32_t gZrwWorldEffectOps;    /* 0x00562098 */
+    void *gZrwWorldEffectOps;       /* 0x00562098 */
     void *p_0056209c[5];            /* 0x0056209c */
     unsigned char pad_005620b0[12]; /* 0x005620b0 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZrwWorldEffectOpsGroup, member) == (addr) - 0x00562090, #member)
-AT(gZrwWorldEffectOps, 0x00562098);
-AT(p_0056209c, 0x0056209c);
-AT(pad_005620b0, 0x005620b0);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZrwWorldEffectOpsGroup, member) ==                              \
+                       BMX_DATA_OFF((addr) - 0x00562090, off64),                                             \
+                   #member)
+AT(gZrwWorldEffectOps, 0x00562098, 0x8);
+AT(p_0056209c, 0x0056209c, 0x10);
+AT(pad_005620b0, 0x005620b0, 0x38);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZrwWorldEffectOpsGroup, pad_005620b0) +
                        sizeof(((struct BmxGroup_gZrwWorldEffectOpsGroup *)0)->pad_005620b0) ==
-                   0x2c,
+                   BMX_DATA_OFF(0x2c, 0x44),
                "gZrwWorldEffectOpsGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005620ec..0x0056210c.
@@ -6771,14 +6913,16 @@ struct BmxGroup_gFxLoadTextureGroup {
     void *gFxLoadTexture; /* 0x005620ec; the type is local to bmx/com/zge/ngif/ngiffx.c */
     void *p_005620f0[7];  /* 0x005620f0 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gFxLoadTextureGroup, member) == (addr) - 0x005620e0, #member)
-AT(gFxLoadTexture, 0x005620ec);
-AT(p_005620f0, 0x005620f0);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gFxLoadTextureGroup, member) ==                                  \
+                       BMX_DATA_OFF((addr) - 0x005620e0, off64),                                             \
+                   #member)
+AT(gFxLoadTexture, 0x005620ec, 0x10);
+AT(p_005620f0, 0x005620f0, 0x18);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gFxLoadTextureGroup, p_005620f0) +
                        sizeof(((struct BmxGroup_gFxLoadTextureGroup *)0)->p_005620f0) ==
-                   0x2c,
+                   BMX_DATA_OFF(0x2c, 0x50),
                "gFxLoadTextureGroup");
 
 /* The type is local to zge/com/zglrw/zrwworld.c. */
@@ -6800,14 +6944,16 @@ struct BmxGroup_gZglExitTextureGroup {
     void *gZglExitTexture; /* 0x005623f4; the type is local to zge/com/zglrw/zrwzgl.c */
     void *p_005623f8;      /* 0x005623f8 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZglExitTextureGroup, member) == (addr) - 0x005623f0, #member)
-AT(gZglExitTexture, 0x005623f4);
-AT(p_005623f8, 0x005623f8);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZglExitTextureGroup, member) ==                                 \
+                       BMX_DATA_OFF((addr) - 0x005623f0, off64),                                             \
+                   #member)
+AT(gZglExitTexture, 0x005623f4, 0x8);
+AT(p_005623f8, 0x005623f8, 0x10);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZglExitTextureGroup, p_005623f8) +
                        sizeof(((struct BmxGroup_gZglExitTextureGroup *)0)->p_005623f8) ==
-                   0xc,
+                   BMX_DATA_OFF(0xc, 0x18),
                "gZglExitTextureGroup");
 
 /* The type is local to zge/com/zglrw/zrwmat.c. */
@@ -6823,14 +6969,16 @@ struct BmxGroup_gZresTextureHeightGroup {
     ZresTextureSizeFn gZresTextureHeight; /* 0x00562408, also gNgifTextureHeight */
     void *p_0056240c;                     /* 0x0056240c */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZresTextureHeightGroup, member) == (addr) - 0x00562400, #member)
-AT(gZresTextureHeight, 0x00562408);
-AT(p_0056240c, 0x0056240c);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZresTextureHeightGroup, member) ==                              \
+                       BMX_DATA_OFF((addr) - 0x00562400, off64),                                             \
+                   #member)
+AT(gZresTextureHeight, 0x00562408, 0x8);
+AT(p_0056240c, 0x0056240c, 0x10);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZresTextureHeightGroup, p_0056240c) +
                        sizeof(((struct BmxGroup_gZresTextureHeightGroup *)0)->p_0056240c) ==
-                   0x10,
+                   BMX_DATA_OFF(0x10, 0x18),
                "gZresTextureHeightGroup");
 
 /* The type is local to zge/com/zglrw/zrwworld.c. */
@@ -6843,14 +6991,16 @@ struct BmxGroup_gZrwTextureHashGroup {
     ZrwTextureHashFn gZrwTextureHash; /* 0x00562414 */
     void *p_00562418[2];              /* 0x00562418 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZrwTextureHashGroup, member) == (addr) - 0x00562410, #member)
-AT(gZrwTextureHash, 0x00562414);
-AT(p_00562418, 0x00562418);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZrwTextureHashGroup, member) ==                                 \
+                       BMX_DATA_OFF((addr) - 0x00562410, off64),                                             \
+                   #member)
+AT(gZrwTextureHash, 0x00562414, 0x8);
+AT(p_00562418, 0x00562418, 0x10);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZrwTextureHashGroup, p_00562418) +
                        sizeof(((struct BmxGroup_gZrwTextureHashGroup *)0)->p_00562418) ==
-                   0x10,
+                   BMX_DATA_OFF(0x10, 0x20),
                "gZrwTextureHashGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00562420..0x00562428.
@@ -6859,14 +7009,16 @@ struct BmxGroup_gZrwTextureRetainGroup {
     void *gZrwTextureRetain; /* 0x00562420; the type is local to zge/com/zglrw/zrwmat.c */
     void *p_00562424;        /* 0x00562424 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZrwTextureRetainGroup, member) == (addr) - 0x00562420, #member)
-AT(gZrwTextureRetain, 0x00562420);
-AT(p_00562424, 0x00562424);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZrwTextureRetainGroup, member) ==                               \
+                       BMX_DATA_OFF((addr) - 0x00562420, off64),                                             \
+                   #member)
+AT(gZrwTextureRetain, 0x00562420, 0x0);
+AT(p_00562424, 0x00562424, 0x8);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZrwTextureRetainGroup, p_00562424) +
                        sizeof(((struct BmxGroup_gZrwTextureRetainGroup *)0)->p_00562424) ==
-                   0x8,
+                   BMX_DATA_OFF(0x8, 0x10),
                "gZrwTextureRetainGroup");
 
 /* The type is local to zge/com/zglrw/zrwtxr.c. */
@@ -6894,14 +7046,16 @@ struct BmxGroup_gZglFileDeviceRwGroup {
     void *gZglFileDeviceRw[15];    /* 0x00562ff8 */
     unsigned char pad_00563034[4]; /* 0x00563034 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZglFileDeviceRwGroup, member) == (addr) - 0x00562ff0, #member)
-AT(gZglFileDeviceRw, 0x00562ff8);
-AT(pad_00563034, 0x00563034);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZglFileDeviceRwGroup, member) ==                                \
+                       BMX_DATA_OFF((addr) - 0x00562ff0, off64),                                             \
+                   #member)
+AT(gZglFileDeviceRw, 0x00562ff8, 0x8);
+AT(pad_00563034, 0x00563034, 0x80);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZglFileDeviceRwGroup, pad_00563034) +
                        sizeof(((struct BmxGroup_gZglFileDeviceRwGroup *)0)->pad_00563034) ==
-                   0x48,
+                   BMX_DATA_OFF(0x48, 0x84),
                "gZglFileDeviceRwGroup");
 
 /* The type is local to zge/com/zglrw/zrwfile.c. */
@@ -6916,14 +7070,16 @@ struct BmxGroup_gZglFileDeviceRamGroup {
     void *gZglFileDeviceRam[15];   /* 0x00563240 */
     unsigned char pad_0056327c[4]; /* 0x0056327c */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZglFileDeviceRamGroup, member) == (addr) - 0x00563240, #member)
-AT(gZglFileDeviceRam, 0x00563240);
-AT(pad_0056327c, 0x0056327c);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZglFileDeviceRamGroup, member) ==                               \
+                       BMX_DATA_OFF((addr) - 0x00563240, off64),                                             \
+                   #member)
+AT(gZglFileDeviceRam, 0x00563240, 0x0);
+AT(pad_0056327c, 0x0056327c, 0x78);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZglFileDeviceRamGroup, pad_0056327c) +
                        sizeof(((struct BmxGroup_gZglFileDeviceRamGroup *)0)->pad_0056327c) ==
-                   0x40,
+                   BMX_DATA_OFF(0x40, 0x7c),
                "gZglFileDeviceRamGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00563408..0x00563420.
@@ -6961,14 +7117,16 @@ struct BmxGroup_p_00563a60Group {
     void *p_00563a60[3];           /* 0x00563a60 */
     unsigned char pad_00563a6c[4]; /* 0x00563a6c */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_00563a60Group, member) == (addr) - 0x00563a60, #member)
-AT(p_00563a60, 0x00563a60);
-AT(pad_00563a6c, 0x00563a6c);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_00563a60Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00563a60, off64),                                             \
+                   #member)
+AT(p_00563a60, 0x00563a60, 0x0);
+AT(pad_00563a6c, 0x00563a6c, 0x18);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_00563a60Group, pad_00563a6c) +
                        sizeof(((struct BmxGroup_p_00563a60Group *)0)->pad_00563a6c) ==
-                   0x10,
+                   BMX_DATA_OFF(0x10, 0x1c),
                "p_00563a60Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00563aa0..0x00563ab0.
@@ -6977,14 +7135,16 @@ struct BmxGroup_p_00563aa0Group {
     void *p_00563aa0;               /* 0x00563aa0 */
     unsigned char pad_00563aa4[12]; /* 0x00563aa4 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_00563aa0Group, member) == (addr) - 0x00563aa0, #member)
-AT(p_00563aa0, 0x00563aa0);
-AT(pad_00563aa4, 0x00563aa4);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_00563aa0Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00563aa0, off64),                                             \
+                   #member)
+AT(p_00563aa0, 0x00563aa0, 0x0);
+AT(pad_00563aa4, 0x00563aa4, 0x8);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_00563aa0Group, pad_00563aa4) +
                        sizeof(((struct BmxGroup_p_00563aa0Group *)0)->pad_00563aa4) ==
-                   0x10,
+                   BMX_DATA_OFF(0x10, 0x14),
                "p_00563aa0Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00563ad0..0x00563af0.
@@ -6993,14 +7153,16 @@ struct BmxGroup_gCrtFloatHooksGroup {
     void *gCrtFloatHooks[6]; /* 0x00563ad0; the type is local to zge/pc/pcprofile.c */
     uint32_t d_00563ae8[2];  /* 0x00563ae8 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gCrtFloatHooksGroup, member) == (addr) - 0x00563ad0, #member)
-AT(gCrtFloatHooks, 0x00563ad0);
-AT(d_00563ae8, 0x00563ae8);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gCrtFloatHooksGroup, member) ==                                  \
+                       BMX_DATA_OFF((addr) - 0x00563ad0, off64),                                             \
+                   #member)
+AT(gCrtFloatHooks, 0x00563ad0, 0x0);
+AT(d_00563ae8, 0x00563ae8, 0x30);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gCrtFloatHooksGroup, d_00563ae8) +
                        sizeof(((struct BmxGroup_gCrtFloatHooksGroup *)0)->d_00563ae8) ==
-                   0x20,
+                   BMX_DATA_OFF(0x20, 0x38),
                "gCrtFloatHooksGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00565b18..0x00565b28.
@@ -7012,16 +7174,18 @@ struct BmxGroup_p_00565b18Group {
     void *p_00565b20;              /* 0x00565b20 */
     uint32_t d_00565b24;           /* 0x00565b24 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_00565b18Group, member) == (addr) - 0x00565b10, #member)
-AT(p_00565b18, 0x00565b18);
-AT(pad_00565b1c, 0x00565b1c);
-AT(p_00565b20, 0x00565b20);
-AT(d_00565b24, 0x00565b24);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_00565b18Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00565b10, off64),                                             \
+                   #member)
+AT(p_00565b18, 0x00565b18, 0x8);
+AT(pad_00565b1c, 0x00565b1c, 0x10);
+AT(p_00565b20, 0x00565b20, 0x18);
+AT(d_00565b24, 0x00565b24, 0x20);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_00565b18Group, d_00565b24) +
                        sizeof(((struct BmxGroup_p_00565b18Group *)0)->d_00565b24) ==
-                   0x18,
+                   BMX_DATA_OFF(0x18, 0x24),
                "p_00565b18Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00565e4c..0x00565ed8.
@@ -7064,47 +7228,49 @@ struct BmxGroup_p_00565e4cGroup {
     uint32_t d_00565ed0; /* 0x00565ed0 */
     void *p_00565ed4;    /* 0x00565ed4 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_00565e4cGroup, member) == (addr) - 0x00565e40, #member)
-AT(p_00565e4c, 0x00565e4c);
-AT(d_00565e50, 0x00565e50);
-AT(p_00565e54, 0x00565e54);
-AT(d_00565e58, 0x00565e58);
-AT(p_00565e5c, 0x00565e5c);
-AT(d_00565e60, 0x00565e60);
-AT(p_00565e64, 0x00565e64);
-AT(d_00565e68, 0x00565e68);
-AT(p_00565e6c, 0x00565e6c);
-AT(d_00565e70, 0x00565e70);
-AT(p_00565e74, 0x00565e74);
-AT(d_00565e78, 0x00565e78);
-AT(p_00565e7c, 0x00565e7c);
-AT(d_00565e80, 0x00565e80);
-AT(p_00565e84, 0x00565e84);
-AT(d_00565e88, 0x00565e88);
-AT(p_00565e8c, 0x00565e8c);
-AT(d_00565e90, 0x00565e90);
-AT(p_00565e94, 0x00565e94);
-AT(d_00565e98, 0x00565e98);
-AT(p_00565e9c, 0x00565e9c);
-AT(d_00565ea0, 0x00565ea0);
-AT(p_00565ea4, 0x00565ea4);
-AT(d_00565ea8, 0x00565ea8);
-AT(p_00565eac, 0x00565eac);
-AT(d_00565eb0, 0x00565eb0);
-AT(p_00565eb4, 0x00565eb4);
-AT(d_00565eb8, 0x00565eb8);
-AT(p_00565ebc, 0x00565ebc);
-AT(d_00565ec0, 0x00565ec0);
-AT(p_00565ec4, 0x00565ec4);
-AT(d_00565ec8, 0x00565ec8);
-AT(p_00565ecc, 0x00565ecc);
-AT(d_00565ed0, 0x00565ed0);
-AT(p_00565ed4, 0x00565ed4);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_00565e4cGroup, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00565e40, off64),                                             \
+                   #member)
+AT(p_00565e4c, 0x00565e4c, 0x10);
+AT(d_00565e50, 0x00565e50, 0x18);
+AT(p_00565e54, 0x00565e54, 0x20);
+AT(d_00565e58, 0x00565e58, 0x28);
+AT(p_00565e5c, 0x00565e5c, 0x30);
+AT(d_00565e60, 0x00565e60, 0x38);
+AT(p_00565e64, 0x00565e64, 0x40);
+AT(d_00565e68, 0x00565e68, 0x48);
+AT(p_00565e6c, 0x00565e6c, 0x50);
+AT(d_00565e70, 0x00565e70, 0x58);
+AT(p_00565e74, 0x00565e74, 0x60);
+AT(d_00565e78, 0x00565e78, 0x68);
+AT(p_00565e7c, 0x00565e7c, 0x70);
+AT(d_00565e80, 0x00565e80, 0x78);
+AT(p_00565e84, 0x00565e84, 0x80);
+AT(d_00565e88, 0x00565e88, 0x88);
+AT(p_00565e8c, 0x00565e8c, 0x90);
+AT(d_00565e90, 0x00565e90, 0x98);
+AT(p_00565e94, 0x00565e94, 0xa0);
+AT(d_00565e98, 0x00565e98, 0xa8);
+AT(p_00565e9c, 0x00565e9c, 0xb0);
+AT(d_00565ea0, 0x00565ea0, 0xb8);
+AT(p_00565ea4, 0x00565ea4, 0xc0);
+AT(d_00565ea8, 0x00565ea8, 0xc8);
+AT(p_00565eac, 0x00565eac, 0xd0);
+AT(d_00565eb0, 0x00565eb0, 0xd8);
+AT(p_00565eb4, 0x00565eb4, 0xe0);
+AT(d_00565eb8, 0x00565eb8, 0xe8);
+AT(p_00565ebc, 0x00565ebc, 0xf0);
+AT(d_00565ec0, 0x00565ec0, 0xf8);
+AT(p_00565ec4, 0x00565ec4, 0x100);
+AT(d_00565ec8, 0x00565ec8, 0x108);
+AT(p_00565ecc, 0x00565ecc, 0x110);
+AT(d_00565ed0, 0x00565ed0, 0x118);
+AT(p_00565ed4, 0x00565ed4, 0x120);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_00565e4cGroup, p_00565ed4) +
                        sizeof(((struct BmxGroup_p_00565e4cGroup *)0)->p_00565ed4) ==
-                   0x98,
+                   BMX_DATA_OFF(0x98, 0x128),
                "p_00565e4cGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00565f14..0x00565fe8.
@@ -7165,65 +7331,67 @@ struct BmxGroup_p_00565f14Group {
     uint32_t d_00565fe0; /* 0x00565fe0 */
     void *p_00565fe4;    /* 0x00565fe4 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_00565f14Group, member) == (addr) - 0x00565f10, #member)
-AT(p_00565f14, 0x00565f14);
-AT(d_00565f18, 0x00565f18);
-AT(p_00565f1c, 0x00565f1c);
-AT(d_00565f20, 0x00565f20);
-AT(p_00565f24, 0x00565f24);
-AT(d_00565f28, 0x00565f28);
-AT(p_00565f2c, 0x00565f2c);
-AT(d_00565f30, 0x00565f30);
-AT(p_00565f34, 0x00565f34);
-AT(d_00565f38, 0x00565f38);
-AT(p_00565f3c, 0x00565f3c);
-AT(d_00565f40, 0x00565f40);
-AT(p_00565f44, 0x00565f44);
-AT(d_00565f48, 0x00565f48);
-AT(p_00565f4c, 0x00565f4c);
-AT(d_00565f50, 0x00565f50);
-AT(p_00565f54, 0x00565f54);
-AT(d_00565f58, 0x00565f58);
-AT(p_00565f5c, 0x00565f5c);
-AT(d_00565f60, 0x00565f60);
-AT(p_00565f64, 0x00565f64);
-AT(d_00565f68, 0x00565f68);
-AT(p_00565f6c, 0x00565f6c);
-AT(d_00565f70, 0x00565f70);
-AT(p_00565f74, 0x00565f74);
-AT(d_00565f78, 0x00565f78);
-AT(p_00565f7c, 0x00565f7c);
-AT(d_00565f80, 0x00565f80);
-AT(p_00565f84, 0x00565f84);
-AT(d_00565f88, 0x00565f88);
-AT(p_00565f8c, 0x00565f8c);
-AT(d_00565f90, 0x00565f90);
-AT(p_00565f94, 0x00565f94);
-AT(d_00565f98, 0x00565f98);
-AT(p_00565f9c, 0x00565f9c);
-AT(d_00565fa0, 0x00565fa0);
-AT(p_00565fa4, 0x00565fa4);
-AT(d_00565fa8, 0x00565fa8);
-AT(p_00565fac, 0x00565fac);
-AT(d_00565fb0, 0x00565fb0);
-AT(p_00565fb4, 0x00565fb4);
-AT(d_00565fb8, 0x00565fb8);
-AT(p_00565fbc, 0x00565fbc);
-AT(d_00565fc0, 0x00565fc0);
-AT(p_00565fc4, 0x00565fc4);
-AT(d_00565fc8, 0x00565fc8);
-AT(p_00565fcc, 0x00565fcc);
-AT(d_00565fd0, 0x00565fd0);
-AT(p_00565fd4, 0x00565fd4);
-AT(d_00565fd8, 0x00565fd8);
-AT(p_00565fdc, 0x00565fdc);
-AT(d_00565fe0, 0x00565fe0);
-AT(p_00565fe4, 0x00565fe4);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_00565f14Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00565f10, off64),                                             \
+                   #member)
+AT(p_00565f14, 0x00565f14, 0x8);
+AT(d_00565f18, 0x00565f18, 0x10);
+AT(p_00565f1c, 0x00565f1c, 0x18);
+AT(d_00565f20, 0x00565f20, 0x20);
+AT(p_00565f24, 0x00565f24, 0x28);
+AT(d_00565f28, 0x00565f28, 0x30);
+AT(p_00565f2c, 0x00565f2c, 0x38);
+AT(d_00565f30, 0x00565f30, 0x40);
+AT(p_00565f34, 0x00565f34, 0x48);
+AT(d_00565f38, 0x00565f38, 0x50);
+AT(p_00565f3c, 0x00565f3c, 0x58);
+AT(d_00565f40, 0x00565f40, 0x60);
+AT(p_00565f44, 0x00565f44, 0x68);
+AT(d_00565f48, 0x00565f48, 0x70);
+AT(p_00565f4c, 0x00565f4c, 0x78);
+AT(d_00565f50, 0x00565f50, 0x80);
+AT(p_00565f54, 0x00565f54, 0x88);
+AT(d_00565f58, 0x00565f58, 0x90);
+AT(p_00565f5c, 0x00565f5c, 0x98);
+AT(d_00565f60, 0x00565f60, 0xa0);
+AT(p_00565f64, 0x00565f64, 0xa8);
+AT(d_00565f68, 0x00565f68, 0xb0);
+AT(p_00565f6c, 0x00565f6c, 0xb8);
+AT(d_00565f70, 0x00565f70, 0xc0);
+AT(p_00565f74, 0x00565f74, 0xc8);
+AT(d_00565f78, 0x00565f78, 0xd0);
+AT(p_00565f7c, 0x00565f7c, 0xd8);
+AT(d_00565f80, 0x00565f80, 0xe0);
+AT(p_00565f84, 0x00565f84, 0xe8);
+AT(d_00565f88, 0x00565f88, 0xf0);
+AT(p_00565f8c, 0x00565f8c, 0xf8);
+AT(d_00565f90, 0x00565f90, 0x100);
+AT(p_00565f94, 0x00565f94, 0x108);
+AT(d_00565f98, 0x00565f98, 0x110);
+AT(p_00565f9c, 0x00565f9c, 0x118);
+AT(d_00565fa0, 0x00565fa0, 0x120);
+AT(p_00565fa4, 0x00565fa4, 0x128);
+AT(d_00565fa8, 0x00565fa8, 0x130);
+AT(p_00565fac, 0x00565fac, 0x138);
+AT(d_00565fb0, 0x00565fb0, 0x140);
+AT(p_00565fb4, 0x00565fb4, 0x148);
+AT(d_00565fb8, 0x00565fb8, 0x150);
+AT(p_00565fbc, 0x00565fbc, 0x158);
+AT(d_00565fc0, 0x00565fc0, 0x160);
+AT(p_00565fc4, 0x00565fc4, 0x168);
+AT(d_00565fc8, 0x00565fc8, 0x170);
+AT(p_00565fcc, 0x00565fcc, 0x178);
+AT(d_00565fd0, 0x00565fd0, 0x180);
+AT(p_00565fd4, 0x00565fd4, 0x188);
+AT(d_00565fd8, 0x00565fd8, 0x190);
+AT(p_00565fdc, 0x00565fdc, 0x198);
+AT(d_00565fe0, 0x00565fe0, 0x1a0);
+AT(p_00565fe4, 0x00565fe4, 0x1a8);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_00565f14Group, p_00565fe4) +
                        sizeof(((struct BmxGroup_p_00565f14Group *)0)->p_00565fe4) ==
-                   0xd8,
+                   BMX_DATA_OFF(0xd8, 0x1b0),
                "p_00565f14Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00566028..0x00566032.
@@ -7233,14 +7401,16 @@ struct BmxGroup_p_00566028Group {
     void *p_00566028[2];           /* 0x00566028 */
     unsigned char pad_00566030[2]; /* 0x00566030 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_00566028Group, member) == (addr) - 0x00566020, #member)
-AT(p_00566028, 0x00566028);
-AT(pad_00566030, 0x00566030);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_00566028Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00566020, off64),                                             \
+                   #member)
+AT(p_00566028, 0x00566028, 0x8);
+AT(pad_00566030, 0x00566030, 0x18);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_00566028Group, pad_00566030) +
                        sizeof(((struct BmxGroup_p_00566028Group *)0)->pad_00566030) ==
-                   0x12,
+                   BMX_DATA_OFF(0x12, 0x1a),
                "p_00566028Group");
 
 /* The type is local to rw/charset.c. */
@@ -7252,14 +7422,16 @@ struct BmxGroup_rwEngineRegistryGroup {
     RwPluginRegistry rwEngineRegistry; /* 0x00566dc0 */
     uint32_t d_00566dd4[67];           /* 0x00566dd4 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_rwEngineRegistryGroup, member) == (addr) - 0x00566dc0, #member)
-AT(rwEngineRegistry, 0x00566dc0);
-AT(d_00566dd4, 0x00566dd4);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_rwEngineRegistryGroup, member) ==                                \
+                       BMX_DATA_OFF((addr) - 0x00566dc0, off64),                                             \
+                   #member)
+AT(rwEngineRegistry, 0x00566dc0, 0x0);
+AT(d_00566dd4, 0x00566dd4, 0x20);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_rwEngineRegistryGroup, d_00566dd4) +
                        sizeof(((struct BmxGroup_rwEngineRegistryGroup *)0)->d_00566dd4) ==
-                   0x120,
+                   BMX_DATA_OFF(0x120, 0x12c),
                "rwEngineRegistryGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0056701c..0x00567100.
@@ -7322,67 +7494,69 @@ struct BmxGroup_d_0056701cGroup {
     void *p_005670f0;               /* 0x005670f0 */
     unsigned char pad_005670f4[12]; /* 0x005670f4 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_d_0056701cGroup, member) == (addr) - 0x00567010, #member)
-AT(d_0056701c, 0x0056701c);
-AT(p_00567020, 0x00567020);
-AT(d_00567024, 0x00567024);
-AT(p_00567028, 0x00567028);
-AT(d_0056702c, 0x0056702c);
-AT(p_00567030, 0x00567030);
-AT(d_00567034, 0x00567034);
-AT(p_00567038, 0x00567038);
-AT(d_0056703c, 0x0056703c);
-AT(p_00567040, 0x00567040);
-AT(d_00567044, 0x00567044);
-AT(p_00567048, 0x00567048);
-AT(d_0056704c, 0x0056704c);
-AT(p_00567050, 0x00567050);
-AT(d_00567054, 0x00567054);
-AT(p_00567058, 0x00567058);
-AT(d_0056705c, 0x0056705c);
-AT(p_00567060, 0x00567060);
-AT(d_00567064, 0x00567064);
-AT(p_00567068, 0x00567068);
-AT(d_0056706c, 0x0056706c);
-AT(p_00567070, 0x00567070);
-AT(d_00567074, 0x00567074);
-AT(p_00567078, 0x00567078);
-AT(d_0056707c, 0x0056707c);
-AT(p_00567080, 0x00567080);
-AT(d_00567084, 0x00567084);
-AT(p_00567088, 0x00567088);
-AT(d_0056708c, 0x0056708c);
-AT(p_00567090, 0x00567090);
-AT(d_00567094, 0x00567094);
-AT(p_00567098, 0x00567098);
-AT(d_0056709c, 0x0056709c);
-AT(p_005670a0, 0x005670a0);
-AT(d_005670a4, 0x005670a4);
-AT(p_005670a8, 0x005670a8);
-AT(d_005670ac, 0x005670ac);
-AT(p_005670b0, 0x005670b0);
-AT(d_005670b4, 0x005670b4);
-AT(p_005670b8, 0x005670b8);
-AT(d_005670bc, 0x005670bc);
-AT(p_005670c0, 0x005670c0);
-AT(d_005670c4, 0x005670c4);
-AT(p_005670c8, 0x005670c8);
-AT(d_005670cc, 0x005670cc);
-AT(p_005670d0, 0x005670d0);
-AT(d_005670d4, 0x005670d4);
-AT(p_005670d8, 0x005670d8);
-AT(d_005670dc, 0x005670dc);
-AT(p_005670e0, 0x005670e0);
-AT(d_005670e4, 0x005670e4);
-AT(p_005670e8, 0x005670e8);
-AT(d_005670ec, 0x005670ec);
-AT(p_005670f0, 0x005670f0);
-AT(pad_005670f4, 0x005670f4);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_d_0056701cGroup, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00567010, off64),                                             \
+                   #member)
+AT(d_0056701c, 0x0056701c, 0xc);
+AT(p_00567020, 0x00567020, 0x10);
+AT(d_00567024, 0x00567024, 0x18);
+AT(p_00567028, 0x00567028, 0x20);
+AT(d_0056702c, 0x0056702c, 0x28);
+AT(p_00567030, 0x00567030, 0x30);
+AT(d_00567034, 0x00567034, 0x38);
+AT(p_00567038, 0x00567038, 0x40);
+AT(d_0056703c, 0x0056703c, 0x48);
+AT(p_00567040, 0x00567040, 0x50);
+AT(d_00567044, 0x00567044, 0x58);
+AT(p_00567048, 0x00567048, 0x60);
+AT(d_0056704c, 0x0056704c, 0x68);
+AT(p_00567050, 0x00567050, 0x70);
+AT(d_00567054, 0x00567054, 0x78);
+AT(p_00567058, 0x00567058, 0x80);
+AT(d_0056705c, 0x0056705c, 0x88);
+AT(p_00567060, 0x00567060, 0x90);
+AT(d_00567064, 0x00567064, 0x98);
+AT(p_00567068, 0x00567068, 0xa0);
+AT(d_0056706c, 0x0056706c, 0xa8);
+AT(p_00567070, 0x00567070, 0xb0);
+AT(d_00567074, 0x00567074, 0xb8);
+AT(p_00567078, 0x00567078, 0xc0);
+AT(d_0056707c, 0x0056707c, 0xc8);
+AT(p_00567080, 0x00567080, 0xd0);
+AT(d_00567084, 0x00567084, 0xd8);
+AT(p_00567088, 0x00567088, 0xe0);
+AT(d_0056708c, 0x0056708c, 0xe8);
+AT(p_00567090, 0x00567090, 0xf0);
+AT(d_00567094, 0x00567094, 0xf8);
+AT(p_00567098, 0x00567098, 0x100);
+AT(d_0056709c, 0x0056709c, 0x108);
+AT(p_005670a0, 0x005670a0, 0x110);
+AT(d_005670a4, 0x005670a4, 0x118);
+AT(p_005670a8, 0x005670a8, 0x120);
+AT(d_005670ac, 0x005670ac, 0x128);
+AT(p_005670b0, 0x005670b0, 0x130);
+AT(d_005670b4, 0x005670b4, 0x138);
+AT(p_005670b8, 0x005670b8, 0x140);
+AT(d_005670bc, 0x005670bc, 0x148);
+AT(p_005670c0, 0x005670c0, 0x150);
+AT(d_005670c4, 0x005670c4, 0x158);
+AT(p_005670c8, 0x005670c8, 0x160);
+AT(d_005670cc, 0x005670cc, 0x168);
+AT(p_005670d0, 0x005670d0, 0x170);
+AT(d_005670d4, 0x005670d4, 0x178);
+AT(p_005670d8, 0x005670d8, 0x180);
+AT(d_005670dc, 0x005670dc, 0x188);
+AT(p_005670e0, 0x005670e0, 0x190);
+AT(d_005670e4, 0x005670e4, 0x198);
+AT(p_005670e8, 0x005670e8, 0x1a0);
+AT(d_005670ec, 0x005670ec, 0x1a8);
+AT(p_005670f0, 0x005670f0, 0x1b0);
+AT(pad_005670f4, 0x005670f4, 0x1b8);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_0056701cGroup, pad_005670f4) +
                        sizeof(((struct BmxGroup_d_0056701cGroup *)0)->pad_005670f4) ==
-                   0xf0,
+                   BMX_DATA_OFF(0xf0, 0x1c4),
                "d_0056701cGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0056727c..0x00567300.
@@ -7394,16 +7568,18 @@ struct BmxGroup_d_0056727cGroup {
     unsigned char pad_005672a0[92]; /* 0x005672a0 */
     void *p_005672fc;               /* 0x005672fc */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_d_0056727cGroup, member) == (addr) - 0x00567270, #member)
-AT(d_0056727c, 0x0056727c);
-AT(p_0056729c, 0x0056729c);
-AT(pad_005672a0, 0x005672a0);
-AT(p_005672fc, 0x005672fc);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_d_0056727cGroup, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00567270, off64),                                             \
+                   #member)
+AT(d_0056727c, 0x0056727c, 0xc);
+AT(p_0056729c, 0x0056729c, 0x30);
+AT(pad_005672a0, 0x005672a0, 0x38);
+AT(p_005672fc, 0x005672fc, 0x98);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_0056727cGroup, p_005672fc) +
                        sizeof(((struct BmxGroup_d_0056727cGroup *)0)->p_005672fc) ==
-                   0x90,
+                   BMX_DATA_OFF(0x90, 0xa0),
                "d_0056727cGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00567bb0..0x00567c08.
@@ -7419,7 +7595,7 @@ AT(p_00567c00, 0x00567c00);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_00567bb0Group, p_00567c00) +
                        sizeof(((struct BmxGroup_d_00567bb0Group *)0)->p_00567c00) ==
-                   0x58,
+                   BMX_DATA_OFF(0x58, 0x60),
                "d_00567bb0Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00567c08..0x00567c30.
@@ -7429,14 +7605,16 @@ struct BmxGroup_p_00567c08Group {
     void *p_00567c08[8];           /* 0x00567c08 */
     unsigned char pad_00567c28[8]; /* 0x00567c28 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_00567c08Group, member) == (addr) - 0x00567c00, #member)
-AT(p_00567c08, 0x00567c08);
-AT(pad_00567c28, 0x00567c28);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_00567c08Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00567c00, off64),                                             \
+                   #member)
+AT(p_00567c08, 0x00567c08, 0x8);
+AT(pad_00567c28, 0x00567c28, 0x48);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_00567c08Group, pad_00567c28) +
                        sizeof(((struct BmxGroup_p_00567c08Group *)0)->pad_00567c28) ==
-                   0x30,
+                   BMX_DATA_OFF(0x30, 0x50),
                "p_00567c08Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00569012..0x00569050.
@@ -7447,15 +7625,17 @@ struct BmxGroup_d_00569012Group {
     void *p_00569034[4];            /* 0x00569034 */
     unsigned char pad_00569044[12]; /* 0x00569044 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_d_00569012Group, member) == (addr) - 0x00569010, #member)
-AT(d_00569012, 0x00569012);
-AT(p_00569034, 0x00569034);
-AT(pad_00569044, 0x00569044);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_d_00569012Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00569010, off64),                                             \
+                   #member)
+AT(d_00569012, 0x00569012, 0x2);
+AT(p_00569034, 0x00569034, 0x28);
+AT(pad_00569044, 0x00569044, 0x48);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_00569012Group, pad_00569044) +
                        sizeof(((struct BmxGroup_d_00569012Group *)0)->pad_00569044) ==
-                   0x40,
+                   BMX_DATA_OFF(0x40, 0x54),
                "d_00569012Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005690ae..0x005691b0.
@@ -7528,77 +7708,79 @@ struct BmxGroup_p_005690aeGroup {
     BmxUnalignedPtr p_005691aa;    /* 0x005691aa */
     unsigned char pad_005691ae[2]; /* 0x005691ae */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_005690aeGroup, member) == (addr) - 0x005690a0, #member)
-AT(p_005690ae, 0x005690ae);
-AT(p_005690b2, 0x005690b2);
-AT(p_005690b6, 0x005690b6);
-AT(p_005690ba, 0x005690ba);
-AT(p_005690be, 0x005690be);
-AT(p_005690c2, 0x005690c2);
-AT(p_005690c6, 0x005690c6);
-AT(p_005690ca, 0x005690ca);
-AT(p_005690ce, 0x005690ce);
-AT(p_005690d2, 0x005690d2);
-AT(p_005690d6, 0x005690d6);
-AT(p_005690da, 0x005690da);
-AT(p_005690de, 0x005690de);
-AT(p_005690e2, 0x005690e2);
-AT(p_005690e6, 0x005690e6);
-AT(p_005690ea, 0x005690ea);
-AT(p_005690ee, 0x005690ee);
-AT(p_005690f2, 0x005690f2);
-AT(p_005690f6, 0x005690f6);
-AT(p_005690fa, 0x005690fa);
-AT(p_005690fe, 0x005690fe);
-AT(p_00569102, 0x00569102);
-AT(p_00569106, 0x00569106);
-AT(p_0056910a, 0x0056910a);
-AT(p_0056910e, 0x0056910e);
-AT(p_00569112, 0x00569112);
-AT(p_00569116, 0x00569116);
-AT(p_0056911a, 0x0056911a);
-AT(p_0056911e, 0x0056911e);
-AT(p_00569122, 0x00569122);
-AT(p_00569126, 0x00569126);
-AT(p_0056912a, 0x0056912a);
-AT(p_0056912e, 0x0056912e);
-AT(p_00569132, 0x00569132);
-AT(p_00569136, 0x00569136);
-AT(p_0056913a, 0x0056913a);
-AT(p_0056913e, 0x0056913e);
-AT(p_00569142, 0x00569142);
-AT(p_00569146, 0x00569146);
-AT(p_0056914a, 0x0056914a);
-AT(p_0056914e, 0x0056914e);
-AT(p_00569152, 0x00569152);
-AT(p_00569156, 0x00569156);
-AT(p_0056915a, 0x0056915a);
-AT(p_0056915e, 0x0056915e);
-AT(p_00569162, 0x00569162);
-AT(p_00569166, 0x00569166);
-AT(p_0056916a, 0x0056916a);
-AT(p_0056916e, 0x0056916e);
-AT(p_00569172, 0x00569172);
-AT(p_00569176, 0x00569176);
-AT(p_0056917a, 0x0056917a);
-AT(p_0056917e, 0x0056917e);
-AT(p_00569182, 0x00569182);
-AT(p_00569186, 0x00569186);
-AT(p_0056918a, 0x0056918a);
-AT(p_0056918e, 0x0056918e);
-AT(p_00569192, 0x00569192);
-AT(p_00569196, 0x00569196);
-AT(p_0056919a, 0x0056919a);
-AT(p_0056919e, 0x0056919e);
-AT(p_005691a2, 0x005691a2);
-AT(p_005691a6, 0x005691a6);
-AT(p_005691aa, 0x005691aa);
-AT(pad_005691ae, 0x005691ae);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_005690aeGroup, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x005690a0, off64),                                             \
+                   #member)
+AT(p_005690ae, 0x005690ae, 0xe);
+AT(p_005690b2, 0x005690b2, 0x16);
+AT(p_005690b6, 0x005690b6, 0x1e);
+AT(p_005690ba, 0x005690ba, 0x26);
+AT(p_005690be, 0x005690be, 0x2e);
+AT(p_005690c2, 0x005690c2, 0x36);
+AT(p_005690c6, 0x005690c6, 0x3e);
+AT(p_005690ca, 0x005690ca, 0x46);
+AT(p_005690ce, 0x005690ce, 0x4e);
+AT(p_005690d2, 0x005690d2, 0x56);
+AT(p_005690d6, 0x005690d6, 0x5e);
+AT(p_005690da, 0x005690da, 0x66);
+AT(p_005690de, 0x005690de, 0x6e);
+AT(p_005690e2, 0x005690e2, 0x76);
+AT(p_005690e6, 0x005690e6, 0x7e);
+AT(p_005690ea, 0x005690ea, 0x86);
+AT(p_005690ee, 0x005690ee, 0x8e);
+AT(p_005690f2, 0x005690f2, 0x96);
+AT(p_005690f6, 0x005690f6, 0x9e);
+AT(p_005690fa, 0x005690fa, 0xa6);
+AT(p_005690fe, 0x005690fe, 0xae);
+AT(p_00569102, 0x00569102, 0xb6);
+AT(p_00569106, 0x00569106, 0xbe);
+AT(p_0056910a, 0x0056910a, 0xc6);
+AT(p_0056910e, 0x0056910e, 0xce);
+AT(p_00569112, 0x00569112, 0xd6);
+AT(p_00569116, 0x00569116, 0xde);
+AT(p_0056911a, 0x0056911a, 0xe6);
+AT(p_0056911e, 0x0056911e, 0xee);
+AT(p_00569122, 0x00569122, 0xf6);
+AT(p_00569126, 0x00569126, 0xfe);
+AT(p_0056912a, 0x0056912a, 0x106);
+AT(p_0056912e, 0x0056912e, 0x10e);
+AT(p_00569132, 0x00569132, 0x116);
+AT(p_00569136, 0x00569136, 0x11e);
+AT(p_0056913a, 0x0056913a, 0x126);
+AT(p_0056913e, 0x0056913e, 0x12e);
+AT(p_00569142, 0x00569142, 0x136);
+AT(p_00569146, 0x00569146, 0x13e);
+AT(p_0056914a, 0x0056914a, 0x146);
+AT(p_0056914e, 0x0056914e, 0x14e);
+AT(p_00569152, 0x00569152, 0x156);
+AT(p_00569156, 0x00569156, 0x15e);
+AT(p_0056915a, 0x0056915a, 0x166);
+AT(p_0056915e, 0x0056915e, 0x16e);
+AT(p_00569162, 0x00569162, 0x176);
+AT(p_00569166, 0x00569166, 0x17e);
+AT(p_0056916a, 0x0056916a, 0x186);
+AT(p_0056916e, 0x0056916e, 0x18e);
+AT(p_00569172, 0x00569172, 0x196);
+AT(p_00569176, 0x00569176, 0x19e);
+AT(p_0056917a, 0x0056917a, 0x1a6);
+AT(p_0056917e, 0x0056917e, 0x1ae);
+AT(p_00569182, 0x00569182, 0x1b6);
+AT(p_00569186, 0x00569186, 0x1be);
+AT(p_0056918a, 0x0056918a, 0x1c6);
+AT(p_0056918e, 0x0056918e, 0x1ce);
+AT(p_00569192, 0x00569192, 0x1d6);
+AT(p_00569196, 0x00569196, 0x1de);
+AT(p_0056919a, 0x0056919a, 0x1e6);
+AT(p_0056919e, 0x0056919e, 0x1ee);
+AT(p_005691a2, 0x005691a2, 0x1f6);
+AT(p_005691a6, 0x005691a6, 0x1fe);
+AT(p_005691aa, 0x005691aa, 0x206);
+AT(pad_005691ae, 0x005691ae, 0x20e);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_005690aeGroup, pad_005691ae) +
                        sizeof(((struct BmxGroup_p_005690aeGroup *)0)->pad_005691ae) ==
-                   0x110,
+                   BMX_DATA_OFF(0x110, 0x210),
                "p_005690aeGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00569240..0x00569248.
@@ -7607,14 +7789,16 @@ struct BmxGroup_p_00569240Group {
     void *p_00569240;              /* 0x00569240 */
     unsigned char pad_00569244[4]; /* 0x00569244 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_00569240Group, member) == (addr) - 0x00569240, #member)
-AT(p_00569240, 0x00569240);
-AT(pad_00569244, 0x00569244);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_00569240Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00569240, off64),                                             \
+                   #member)
+AT(p_00569240, 0x00569240, 0x0);
+AT(pad_00569244, 0x00569244, 0x8);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_00569240Group, pad_00569244) +
                        sizeof(((struct BmxGroup_p_00569240Group *)0)->pad_00569244) ==
-                   0x8,
+                   BMX_DATA_OFF(0x8, 0xc),
                "p_00569240Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0056b410..0x0056b448.
@@ -7792,149 +7976,151 @@ struct BmxGroup_gGameRoundStatesGroup {
     PropState gPropDefaults;          /* 0x0056c4f8 */
     unsigned char pad_0056d038[576];  /* 0x0056d038 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gGameRoundStatesGroup, member) == (addr) - 0x0056b700, #member)
-AT(d_0056b70c, 0x0056b70c);
-AT(d_0056b724, 0x0056b724);
-AT(d_0056b744, 0x0056b744);
-AT(d_0056b74c, 0x0056b74c);
-AT(d_0056b754, 0x0056b754);
-AT(d_0056b75c, 0x0056b75c);
-AT(d_0056b764, 0x0056b764);
-AT(d_0056b76c, 0x0056b76c);
-AT(d_0056b77c, 0x0056b77c);
-AT(gGameRoundStates, 0x0056ba0c);
-AT(gGameHorseWord, 0x0056ba1c);
-AT(gGameMarkersA, 0x0056ba28);
-AT(gGameMarkersB, 0x0056bb28);
-AT(gGameExtent, 0x0056bc28);
-AT(gGameFrame, 0x0056bc2c);
-AT(gGameFrozen, 0x0056bc30);
-AT(pad_0056bc34, 0x0056bc34);
-AT(gOvlEmpty, 0x0056bd44);
-AT(gOvlHeightScroll, 0x0056bd48);
-AT(pad_0056bd4c, 0x0056bd4c);
-AT(gOvlScoreShown, 0x0056bd50);
-AT(pad_0056bd54, 0x0056bd54);
-AT(gOvlScoreTarget, 0x0056bd58);
-AT(gOvlScoreFlags, 0x0056bd5c);
-AT(pad_0056bd5d, 0x0056bd5d);
-AT(gOvlLastScreen, 0x0056bd60);
-AT(pad_0056bd61, 0x0056bd61);
-AT(gOvlTrickCount, 0x0056bd68);
-AT(gOvlTrickList, 0x0056bd6c);
-AT(gOvlFrame, 0x0056be14);
-AT(gOvlFlash, 0x0056be18);
-AT(pad_0056be1c, 0x0056be1c);
-AT(gOvlFlashHandles, 0x0056be20);
-AT(gOvlImgTiny, 0x0056be28);
-AT(gOvlBackdrop, 0x0056be2a);
-AT(pad_0056be2b, 0x0056be2b);
-AT(gOvlScoreHandle, 0x0056be2c);
-AT(pad_0056be2e, 0x0056be2e);
-AT(gOvlResA, 0x0056be30);
-AT(gOvlReturnScreen, 0x0056be32);
-AT(pad_0056be33, 0x0056be33);
-AT(gOvlStrings, 0x0056be34);
-AT(gOvlSharedPad, 0x0056be3c);
-AT(gOvlRunTimes, 0x0056be40);
-AT(gOvlIconHandle, 0x0056be90);
-AT(gOvlImgIcons, 0x0056be92);
-AT(gPhysHudHandle, 0x0056be94);
-AT(pad_0056be96, 0x0056be96);
-AT(gOvlFontTiny, 0x0056be98);
-AT(gOvlVolHandles, 0x0056bea4);
-AT(d_0056beb2, 0x0056beb2);
-AT(gOvlGoalHandles, 0x0056beb4);
-AT(gOvlScreenId, 0x0056beba);
-AT(pad_0056bebb, 0x0056bebb);
-AT(d_0056bebc, 0x0056bebc);
-AT(d_0056bebe, 0x0056bebe);
-AT(d_0056bec0, 0x0056bec0);
-AT(d_0056bec2, 0x0056bec2);
-AT(gOvlGoalRows, 0x0056bec4);
-AT(gOvlCaptionCurrent, 0x0056beec);
-AT(gOvlCaptionWanted, 0x0056beed);
-AT(pad_0056beee, 0x0056beee);
-AT(gOvlImgSmall, 0x0056bef4);
-AT(pad_0056bef6, 0x0056bef6);
-AT(gOvlBackdropRect, 0x0056bef8);
-AT(pad_0056befa, 0x0056befa);
-AT(gOvlMenuItems, 0x0056befc);
-AT(gOvlBalanceValue, 0x0056bf18);
-AT(pad_0056bf1c, 0x0056bf1c);
-AT(gOvlScreen, 0x0056bf20);
-AT(gOvlHeightHandles, 0x0056bf24);
-AT(gOvlPage, 0x0056bf30);
-AT(pad_0056bf31, 0x0056bf31);
-AT(gPhysHudFont, 0x0056bf38);
-AT(pad_0056bf39, 0x0056bf39);
-AT(gOvlHint, 0x0056bf44);
-AT(pad_0056bf48, 0x0056bf48);
-AT(gOvlGoalMsg, 0x0056bf4c);
-AT(pad_0056bf50, 0x0056bf50);
-AT(gOvlTimerShownTicks, 0x0056bf54);
-AT(gOvlTimerTicks, 0x0056bf58);
-AT(gOvlIndicator, 0x0056bf5c);
-AT(pad_0056bf60, 0x0056bf60);
-AT(gOvlNameCursor, 0x0056bf64);
-AT(pad_0056bf65, 0x0056bf65);
-AT(gOvlPulse, 0x0056bf68);
-AT(gOvlTrickRows, 0x0056bf6c);
-AT(d_0056bf96, 0x0056bf96);
-AT(gOvlFontIcons, 0x0056bf98);
-AT(gOvlDrawDelay, 0x0056bfa4);
-AT(gOvlStatusHandle, 0x0056bfa8);
-AT(pad_0056bfaa, 0x0056bfaa);
-AT(gOvlTimerText, 0x0056bfac);
-AT(d_0056bfb4, 0x0056bfb4);
-AT(d_0056bfb5, 0x0056bfb5);
-AT(gOvlHeightValue, 0x0056bfc0);
-AT(gOvlHeightTarget, 0x0056bfc4);
-AT(d_0056bfc8, 0x0056bfc8);
-AT(gOvlHeightKind, 0x0056bfca);
-AT(pad_0056bfcc, 0x0056bfcc);
-AT(gOvlElement8Value, 0x0056bfd9);
-AT(pad_0056bfda, 0x0056bfda);
-AT(gOvlHintHandles, 0x0056bfdc);
-AT(d_0056bfea, 0x0056bfea);
-AT(gOvlBalanceHandles, 0x0056bfec);
-AT(gOvlImgButton, 0x0056bffa);
-AT(gOvlCaptionHandle, 0x0056bffc);
-AT(pad_0056bffe, 0x0056bffe);
-AT(gOvlTimerHandle, 0x0056c000);
-AT(pad_0056c002, 0x0056c002);
-AT(gOvlFontButton, 0x0056c008);
-AT(pad_0056c014, 0x0056c014);
-AT(gOvlStatus, 0x0056c018);
-AT(pad_0056c020, 0x0056c020);
-AT(gOvlMenuItems2, 0x0056c028);
-AT(gOvlFade, 0x0056c050);
-AT(gOvlTrickView, 0x0056c070);
-AT(gOvlSaveSlot, 0x0056c074);
-AT(pad_0056c075, 0x0056c075);
-AT(gPhysTick, 0x0056c07c);
-AT(pad_0056c080, 0x0056c080);
-AT(gPhysRay, 0x0056c128);
-AT(gPhysBestEdge, 0x0056c200);
-AT(gPhysAlignEdge, 0x0056c238);
-AT(pad_0056c270, 0x0056c270);
-AT(gPhysNearEdge, 0x0056c2c0);
-AT(gPhysEdgeProbe, 0x0056c2f8);
-AT(gPhysGrindEdge, 0x0056c330);
-AT(pad_0056c368, 0x0056c368);
-AT(gPhysLipFace, 0x0056c3b8);
-AT(gPhysForceStep, 0x0056c440);
-AT(gPhysDebugDraw, 0x0056c444);
-AT(gPhysDebugEdges, 0x0056c448);
-AT(gPhysDebugFrame, 0x0056c44c);
-AT(pad_0056c450, 0x0056c450);
-AT(gPropDefaults, 0x0056c4f8);
-AT(pad_0056d038, 0x0056d038);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gGameRoundStatesGroup, member) ==                                \
+                       BMX_DATA_OFF((addr) - 0x0056b700, off64),                                             \
+                   #member)
+AT(d_0056b70c, 0x0056b70c, 0xc);
+AT(d_0056b724, 0x0056b724, 0x24);
+AT(d_0056b744, 0x0056b744, 0x44);
+AT(d_0056b74c, 0x0056b74c, 0x4c);
+AT(d_0056b754, 0x0056b754, 0x54);
+AT(d_0056b75c, 0x0056b75c, 0x5c);
+AT(d_0056b764, 0x0056b764, 0x64);
+AT(d_0056b76c, 0x0056b76c, 0x6c);
+AT(d_0056b77c, 0x0056b77c, 0x7c);
+AT(gGameRoundStates, 0x0056ba0c, 0x30c);
+AT(gGameHorseWord, 0x0056ba1c, 0x31c);
+AT(gGameMarkersA, 0x0056ba28, 0x328);
+AT(gGameMarkersB, 0x0056bb28, 0x528);
+AT(gGameExtent, 0x0056bc28, 0x728);
+AT(gGameFrame, 0x0056bc2c, 0x72c);
+AT(gGameFrozen, 0x0056bc30, 0x730);
+AT(pad_0056bc34, 0x0056bc34, 0x734);
+AT(gOvlEmpty, 0x0056bd44, 0x844);
+AT(gOvlHeightScroll, 0x0056bd48, 0x848);
+AT(pad_0056bd4c, 0x0056bd4c, 0x84c);
+AT(gOvlScoreShown, 0x0056bd50, 0x850);
+AT(pad_0056bd54, 0x0056bd54, 0x854);
+AT(gOvlScoreTarget, 0x0056bd58, 0x858);
+AT(gOvlScoreFlags, 0x0056bd5c, 0x85c);
+AT(pad_0056bd5d, 0x0056bd5d, 0x85d);
+AT(gOvlLastScreen, 0x0056bd60, 0x860);
+AT(pad_0056bd61, 0x0056bd61, 0x861);
+AT(gOvlTrickCount, 0x0056bd68, 0x868);
+AT(gOvlTrickList, 0x0056bd6c, 0x86c);
+AT(gOvlFrame, 0x0056be14, 0x914);
+AT(gOvlFlash, 0x0056be18, 0x918);
+AT(pad_0056be1c, 0x0056be1c, 0x91c);
+AT(gOvlFlashHandles, 0x0056be20, 0x920);
+AT(gOvlImgTiny, 0x0056be28, 0x928);
+AT(gOvlBackdrop, 0x0056be2a, 0x92a);
+AT(pad_0056be2b, 0x0056be2b, 0x92b);
+AT(gOvlScoreHandle, 0x0056be2c, 0x92c);
+AT(pad_0056be2e, 0x0056be2e, 0x92e);
+AT(gOvlResA, 0x0056be30, 0x930);
+AT(gOvlReturnScreen, 0x0056be32, 0x932);
+AT(pad_0056be33, 0x0056be33, 0x933);
+AT(gOvlStrings, 0x0056be34, 0x938);
+AT(gOvlSharedPad, 0x0056be3c, 0x948);
+AT(gOvlRunTimes, 0x0056be40, 0x94c);
+AT(gOvlIconHandle, 0x0056be90, 0x99c);
+AT(gOvlImgIcons, 0x0056be92, 0x99e);
+AT(gPhysHudHandle, 0x0056be94, 0x9a0);
+AT(pad_0056be96, 0x0056be96, 0x9a2);
+AT(gOvlFontTiny, 0x0056be98, 0x9a8);
+AT(gOvlVolHandles, 0x0056bea4, 0x9c0);
+AT(d_0056beb2, 0x0056beb2, 0x9ce);
+AT(gOvlGoalHandles, 0x0056beb4, 0x9d0);
+AT(gOvlScreenId, 0x0056beba, 0x9d6);
+AT(pad_0056bebb, 0x0056bebb, 0x9d7);
+AT(d_0056bebc, 0x0056bebc, 0x9d8);
+AT(d_0056bebe, 0x0056bebe, 0x9da);
+AT(d_0056bec0, 0x0056bec0, 0x9dc);
+AT(d_0056bec2, 0x0056bec2, 0x9de);
+AT(gOvlGoalRows, 0x0056bec4, 0x9e0);
+AT(gOvlCaptionCurrent, 0x0056beec, 0xa08);
+AT(gOvlCaptionWanted, 0x0056beed, 0xa09);
+AT(pad_0056beee, 0x0056beee, 0xa0a);
+AT(gOvlImgSmall, 0x0056bef4, 0xa10);
+AT(pad_0056bef6, 0x0056bef6, 0xa12);
+AT(gOvlBackdropRect, 0x0056bef8, 0xa14);
+AT(pad_0056befa, 0x0056befa, 0xa16);
+AT(gOvlMenuItems, 0x0056befc, 0xa18);
+AT(gOvlBalanceValue, 0x0056bf18, 0xa34);
+AT(pad_0056bf1c, 0x0056bf1c, 0xa38);
+AT(gOvlScreen, 0x0056bf20, 0xa40);
+AT(gOvlHeightHandles, 0x0056bf24, 0xa48);
+AT(gOvlPage, 0x0056bf30, 0xa54);
+AT(pad_0056bf31, 0x0056bf31, 0xa55);
+AT(gPhysHudFont, 0x0056bf38, 0xa5c);
+AT(pad_0056bf39, 0x0056bf39, 0xa5d);
+AT(gOvlHint, 0x0056bf44, 0xa68);
+AT(pad_0056bf48, 0x0056bf48, 0xa6c);
+AT(gOvlGoalMsg, 0x0056bf4c, 0xa70);
+AT(pad_0056bf50, 0x0056bf50, 0xa74);
+AT(gOvlTimerShownTicks, 0x0056bf54, 0xa78);
+AT(gOvlTimerTicks, 0x0056bf58, 0xa7c);
+AT(gOvlIndicator, 0x0056bf5c, 0xa80);
+AT(pad_0056bf60, 0x0056bf60, 0xa84);
+AT(gOvlNameCursor, 0x0056bf64, 0xa88);
+AT(pad_0056bf65, 0x0056bf65, 0xa89);
+AT(gOvlPulse, 0x0056bf68, 0xa8c);
+AT(gOvlTrickRows, 0x0056bf6c, 0xa90);
+AT(d_0056bf96, 0x0056bf96, 0xaba);
+AT(gOvlFontIcons, 0x0056bf98, 0xac0);
+AT(gOvlDrawDelay, 0x0056bfa4, 0xad8);
+AT(gOvlStatusHandle, 0x0056bfa8, 0xadc);
+AT(pad_0056bfaa, 0x0056bfaa, 0xade);
+AT(gOvlTimerText, 0x0056bfac, 0xae0);
+AT(d_0056bfb4, 0x0056bfb4, 0xae8);
+AT(d_0056bfb5, 0x0056bfb5, 0xae9);
+AT(gOvlHeightValue, 0x0056bfc0, 0xaf4);
+AT(gOvlHeightTarget, 0x0056bfc4, 0xaf8);
+AT(d_0056bfc8, 0x0056bfc8, 0xafc);
+AT(gOvlHeightKind, 0x0056bfca, 0xafe);
+AT(pad_0056bfcc, 0x0056bfcc, 0xb00);
+AT(gOvlElement8Value, 0x0056bfd9, 0xb0d);
+AT(pad_0056bfda, 0x0056bfda, 0xb0e);
+AT(gOvlHintHandles, 0x0056bfdc, 0xb10);
+AT(d_0056bfea, 0x0056bfea, 0xb1e);
+AT(gOvlBalanceHandles, 0x0056bfec, 0xb20);
+AT(gOvlImgButton, 0x0056bffa, 0xb2e);
+AT(gOvlCaptionHandle, 0x0056bffc, 0xb30);
+AT(pad_0056bffe, 0x0056bffe, 0xb32);
+AT(gOvlTimerHandle, 0x0056c000, 0xb34);
+AT(pad_0056c002, 0x0056c002, 0xb36);
+AT(gOvlFontButton, 0x0056c008, 0xb40);
+AT(pad_0056c014, 0x0056c014, 0xb58);
+AT(gOvlStatus, 0x0056c018, 0xb5c);
+AT(pad_0056c020, 0x0056c020, 0xb64);
+AT(gOvlMenuItems2, 0x0056c028, 0xb6c);
+AT(gOvlFade, 0x0056c050, 0xb94);
+AT(gOvlTrickView, 0x0056c070, 0xbb4);
+AT(gOvlSaveSlot, 0x0056c074, 0xbb8);
+AT(pad_0056c075, 0x0056c075, 0xbb9);
+AT(gPhysTick, 0x0056c07c, 0xbc0);
+AT(pad_0056c080, 0x0056c080, 0xbc4);
+AT(gPhysRay, 0x0056c128, 0xc70);
+AT(gPhysBestEdge, 0x0056c200, 0xd78);
+AT(gPhysAlignEdge, 0x0056c238, 0xdb8);
+AT(pad_0056c270, 0x0056c270, 0xdf8);
+AT(gPhysNearEdge, 0x0056c2c0, 0xe48);
+AT(gPhysEdgeProbe, 0x0056c2f8, 0xe88);
+AT(gPhysGrindEdge, 0x0056c330, 0xec8);
+AT(pad_0056c368, 0x0056c368, 0xf08);
+AT(gPhysLipFace, 0x0056c3b8, 0xf58);
+AT(gPhysForceStep, 0x0056c440, 0xff8);
+AT(gPhysDebugDraw, 0x0056c444, 0xffc);
+AT(gPhysDebugEdges, 0x0056c448, 0x1000);
+AT(gPhysDebugFrame, 0x0056c44c, 0x1008);
+AT(pad_0056c450, 0x0056c450, 0x100c);
+AT(gPropDefaults, 0x0056c4f8, 0x10b8);
+AT(pad_0056d038, 0x0056d038, 0x1c38);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gGameRoundStatesGroup, pad_0056d038) +
                        sizeof(((struct BmxGroup_gGameRoundStatesGroup *)0)->pad_0056d038) ==
-                   0x1b78,
+                   BMX_DATA_OFF(0x1b78, 0x1e78),
                "gGameRoundStatesGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00573260..0x00574584.
@@ -8086,14 +8272,16 @@ struct BmxGroup_gNgLightsGroup {
     void *gNgLights[3];             /* 0x005ab438; the type is local to bmx/com/zge/ngif/ngapp.c */
     unsigned char pad_005ab444[16]; /* 0x005ab444 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gNgLightsGroup, member) == (addr) - 0x005ab430, #member)
-AT(gNgLights, 0x005ab438);
-AT(pad_005ab444, 0x005ab444);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gNgLightsGroup, member) ==                                       \
+                       BMX_DATA_OFF((addr) - 0x005ab430, off64),                                             \
+                   #member)
+AT(gNgLights, 0x005ab438, 0x8);
+AT(pad_005ab444, 0x005ab444, 0x20);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gNgLightsGroup, pad_005ab444) +
                        sizeof(((struct BmxGroup_gNgLightsGroup *)0)->pad_005ab444) ==
-                   0x24,
+                   BMX_DATA_OFF(0x24, 0x30),
                "gNgLightsGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005ab4a8..0x005ab4e0.
@@ -8138,14 +8326,16 @@ struct BmxGroup_gPrimCursorGroup {
     uint8_t *gPrimCursor;              /* 0x005d2510, also gNgifPrim */
     unsigned char pad_005d2514[31956]; /* 0x005d2514 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gPrimCursorGroup, member) == (addr) - 0x005d2510, #member)
-AT(gPrimCursor, 0x005d2510);
-AT(pad_005d2514, 0x005d2514);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gPrimCursorGroup, member) ==                                     \
+                       BMX_DATA_OFF((addr) - 0x005d2510, off64),                                             \
+                   #member)
+AT(gPrimCursor, 0x005d2510, 0x0);
+AT(pad_005d2514, 0x005d2514, 0x8);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gPrimCursorGroup, pad_005d2514) +
                        sizeof(((struct BmxGroup_gPrimCursorGroup *)0)->pad_005d2514) ==
-                   0x7cd8,
+                   BMX_DATA_OFF(0x7cd8, 0x7cdc),
                "gPrimCursorGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005da2c8..0x005e63d8.
@@ -8172,15 +8362,17 @@ struct BmxGroup_gZbspPropFacesGroup {
     unsigned char pad_005e8068[952];  /* 0x005e8068 */
     ZbspNearFaceTable gZbspNearFaces; /* 0x005e8420 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZbspPropFacesGroup, member) == (addr) - 0x005e7fe0, #member)
-AT(gZbspPropFaces, 0x005e7fe0);
-AT(pad_005e8068, 0x005e8068);
-AT(gZbspNearFaces, 0x005e8420);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZbspPropFacesGroup, member) ==                                  \
+                       BMX_DATA_OFF((addr) - 0x005e7fe0, off64),                                             \
+                   #member)
+AT(gZbspPropFaces, 0x005e7fe0, 0x0);
+AT(pad_005e8068, 0x005e8068, 0xa0);
+AT(gZbspNearFaces, 0x005e8420, 0x458);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZbspPropFacesGroup, gZbspNearFaces) +
                        sizeof(((struct BmxGroup_gZbspPropFacesGroup *)0)->gZbspNearFaces) ==
-                   0x8bb8,
+                   BMX_DATA_OFF(0x8bb8, 0xa3b8),
                "gZbspPropFacesGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005f10a8..0x005f34ac.
@@ -8276,14 +8468,15 @@ struct BmxGroup_gZresGroup {
     ZresState gZres;                  /* 0x005f8f60 */
     unsigned char pad_005fb034[1684]; /* 0x005fb034 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZresGroup, member) == (addr) - 0x005f8f60, #member)
-AT(gZres, 0x005f8f60);
-AT(pad_005fb034, 0x005fb034);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZresGroup, member) == BMX_DATA_OFF((addr) - 0x005f8f60, off64), \
+                   #member)
+AT(gZres, 0x005f8f60, 0x0);
+AT(pad_005fb034, 0x005fb034, 0x20f8);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZresGroup, pad_005fb034) +
                        sizeof(((struct BmxGroup_gZresGroup *)0)->pad_005fb034) ==
-                   0x2768,
+                   BMX_DATA_OFF(0x2768, 0x278c),
                "gZresGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005fb740..0x005fb760.
@@ -8292,14 +8485,16 @@ struct BmxGroup_gNgRollerNodeGroup {
     ZrwUpdateNode *gNgRollerNode;   /* 0x005fb740, also gZrollerUpdateHandle */
     unsigned char pad_005fb744[28]; /* 0x005fb744 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gNgRollerNodeGroup, member) == (addr) - 0x005fb740, #member)
-AT(gNgRollerNode, 0x005fb740);
-AT(pad_005fb744, 0x005fb744);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gNgRollerNodeGroup, member) ==                                   \
+                       BMX_DATA_OFF((addr) - 0x005fb740, off64),                                             \
+                   #member)
+AT(gNgRollerNode, 0x005fb740, 0x0);
+AT(pad_005fb744, 0x005fb744, 0x8);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gNgRollerNodeGroup, pad_005fb744) +
                        sizeof(((struct BmxGroup_gNgRollerNodeGroup *)0)->pad_005fb744) ==
-                   0x20,
+                   BMX_DATA_OFF(0x20, 0x24),
                "gNgRollerNodeGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005fbe38..0x005fbebc.
@@ -8328,14 +8523,16 @@ struct BmxGroup_gWinstrmDirectSoundGroup {
     DsDevice *gWinstrmDirectSound;    /* 0x005fff28, also gWinchanDirectSound */
     unsigned char pad_005fff2c[3676]; /* 0x005fff2c */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gWinstrmDirectSoundGroup, member) == (addr) - 0x005fff20, #member)
-AT(gWinstrmDirectSound, 0x005fff28);
-AT(pad_005fff2c, 0x005fff2c);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gWinstrmDirectSoundGroup, member) ==                             \
+                       BMX_DATA_OFF((addr) - 0x005fff20, off64),                                             \
+                   #member)
+AT(gWinstrmDirectSound, 0x005fff28, 0x8);
+AT(pad_005fff2c, 0x005fff2c, 0x10);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gWinstrmDirectSoundGroup, pad_005fff2c) +
                        sizeof(((struct BmxGroup_gWinstrmDirectSoundGroup *)0)->pad_005fff2c) ==
-                   0xe68,
+                   BMX_DATA_OFF(0xe68, 0xe6c),
                "gWinstrmDirectSoundGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00601218..0x00601328.
@@ -8396,14 +8593,16 @@ struct BmxGroup_gMotionBufferGroup {
     void *gMotionBuffer;               /* 0x00641e30 */
     unsigned char pad_00641e34[52480]; /* 0x00641e34 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gMotionBufferGroup, member) == (addr) - 0x00641e30, #member)
-AT(gMotionBuffer, 0x00641e30);
-AT(pad_00641e34, 0x00641e34);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gMotionBufferGroup, member) ==                                   \
+                       BMX_DATA_OFF((addr) - 0x00641e30, off64),                                             \
+                   #member)
+AT(gMotionBuffer, 0x00641e30, 0x0);
+AT(pad_00641e34, 0x00641e34, 0x8);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gMotionBufferGroup, pad_00641e34) +
                        sizeof(((struct BmxGroup_gMotionBufferGroup *)0)->pad_00641e34) ==
-                   0xcd04,
+                   BMX_DATA_OFF(0xcd04, 0xcd08),
                "gMotionBufferGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0064f9c8..0x0064fcb8.
@@ -8627,7 +8826,7 @@ AT(gZrwMat, 0x006723a8);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZrwMatGroup, gZrwMat) +
                        sizeof(((struct BmxGroup_gZrwMatGroup *)0)->gZrwMat) ==
-                   0xbc,
+                   BMX_DATA_OFF(0xbc, 0xd0),
                "gZrwMatGroup");
 
 /* The type is local to zge/com/zglrw/zrwzgl.c. */
@@ -8674,15 +8873,17 @@ struct BmxGroup_gZtaginfRootGroup {
     unsigned char pad_006728f8[4]; /* 0x006728f8 */
     void *gZtaginfData;            /* 0x006728fc */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZtaginfRootGroup, member) == (addr) - 0x006728c0, #member)
-AT(gZtaginfRoot, 0x006728c4);
-AT(pad_006728f8, 0x006728f8);
-AT(gZtaginfData, 0x006728fc);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZtaginfRootGroup, member) ==                                    \
+                       BMX_DATA_OFF((addr) - 0x006728c0, off64),                                             \
+                   #member)
+AT(gZtaginfRoot, 0x006728c4, 0x8);
+AT(pad_006728f8, 0x006728f8, 0x48);
+AT(gZtaginfData, 0x006728fc, 0x50);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZtaginfRootGroup, gZtaginfData) +
                        sizeof(((struct BmxGroup_gZtaginfRootGroup *)0)->gZtaginfData) ==
-                   0x40,
+                   BMX_DATA_OFF(0x40, 0x58),
                "gZtaginfRootGroup");
 
 /* The type is local to zge/com/zglrw/zrwmodelrender.c. */
@@ -8719,18 +8920,20 @@ struct BmxGroup_bmxZrwWorldState {
     char gZrwWorldName;              /* 0x00674208, also gZrwPvsBuffer */
     unsigned char pad_00674209[131]; /* 0x00674209 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_bmxZrwWorldState, member) == (addr) - 0x006741e0, #member)
-AT(gZrwWorldReady, 0x006741e0);
-AT(gZrwWorldActive, 0x006741e4);
-AT(gZrwWorldMaterials, 0x006741e8);
-AT(gZrwWorldStats, 0x006741ec);
-AT(gZrwWorldName, 0x00674208);
-AT(pad_00674209, 0x00674209);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_bmxZrwWorldState, member) ==                                     \
+                       BMX_DATA_OFF((addr) - 0x006741e0, off64),                                             \
+                   #member)
+AT(gZrwWorldReady, 0x006741e0, 0x0);
+AT(gZrwWorldActive, 0x006741e4, 0x4);
+AT(gZrwWorldMaterials, 0x006741e8, 0x8);
+AT(gZrwWorldStats, 0x006741ec, 0x10);
+AT(gZrwWorldName, 0x00674208, 0x2c);
+AT(pad_00674209, 0x00674209, 0x2d);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_bmxZrwWorldState, pad_00674209) +
                        sizeof(((struct BmxGroup_bmxZrwWorldState *)0)->pad_00674209) ==
-                   0xac,
+                   BMX_DATA_OFF(0xac, 0xb0),
                "bmxZrwWorldState");
 
 /* The type is local to zge/com/zglrw/zrwfile.c. */
@@ -8792,14 +8995,16 @@ struct BmxGroup_gZrollerShadowGroup {
     ZrollerShadow gZrollerShadow;   /* 0x00678440 */
     unsigned char pad_00678468[20]; /* 0x00678468 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZrollerShadowGroup, member) == (addr) - 0x00678440, #member)
-AT(gZrollerShadow, 0x00678440);
-AT(pad_00678468, 0x00678468);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZrollerShadowGroup, member) ==                                  \
+                       BMX_DATA_OFF((addr) - 0x00678440, off64),                                             \
+                   #member)
+AT(gZrollerShadow, 0x00678440, 0x0);
+AT(pad_00678468, 0x00678468, 0x30);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZrollerShadowGroup, pad_00678468) +
                        sizeof(((struct BmxGroup_gZrollerShadowGroup *)0)->pad_00678468) ==
-                   0x3c,
+                   BMX_DATA_OFF(0x3c, 0x44),
                "gZrollerShadowGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00678494..0x00678560.
@@ -8809,14 +9014,16 @@ struct BmxGroup_gZrollerEdgesGroup {
     ZList *gZrollerEdges;            /* 0x00678494, also gNgRoller */
     unsigned char pad_00678498[200]; /* 0x00678498 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZrollerEdgesGroup, member) == (addr) - 0x00678490, #member)
-AT(gZrollerEdges, 0x00678494);
-AT(pad_00678498, 0x00678498);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZrollerEdgesGroup, member) ==                                   \
+                       BMX_DATA_OFF((addr) - 0x00678490, off64),                                             \
+                   #member)
+AT(gZrollerEdges, 0x00678494, 0x8);
+AT(pad_00678498, 0x00678498, 0x10);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZrollerEdgesGroup, pad_00678498) +
                        sizeof(((struct BmxGroup_gZrollerEdgesGroup *)0)->pad_00678498) ==
-                   0xd0,
+                   BMX_DATA_OFF(0xd0, 0xd8),
                "gZrollerEdgesGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00678560..0x0068c3d4.
@@ -8834,7 +9041,7 @@ AT(gNgifOrderTable, 0x0068c3d0);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gNgifPrim3DBufferGroup, gNgifOrderTable) +
                        sizeof(((struct BmxGroup_gNgifPrim3DBufferGroup *)0)->gNgifOrderTable) ==
-                   0x13e74,
+                   BMX_DATA_OFF(0x13e74, 0x13e78),
                "gNgifPrim3DBufferGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0068fc00..0x0068fc20.
@@ -8918,14 +9125,16 @@ struct BmxGroup_gExtrasTitlesGroup {
     ExtrasTitleList gExtrasTitles;    /* 0x0068fff0 */
     unsigned char pad_00690000[1232]; /* 0x00690000 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gExtrasTitlesGroup, member) == (addr) - 0x0068fff0, #member)
-AT(gExtrasTitles, 0x0068fff0);
-AT(pad_00690000, 0x00690000);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gExtrasTitlesGroup, member) ==                                   \
+                       BMX_DATA_OFF((addr) - 0x0068fff0, off64),                                             \
+                   #member)
+AT(gExtrasTitles, 0x0068fff0, 0x0);
+AT(pad_00690000, 0x00690000, 0x20);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gExtrasTitlesGroup, pad_00690000) +
                        sizeof(((struct BmxGroup_gExtrasTitlesGroup *)0)->pad_00690000) ==
-                   0x4e0,
+                   BMX_DATA_OFF(0x4e0, 0x4f0),
                "gExtrasTitlesGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00690898..0x00690990.
@@ -8952,14 +9161,16 @@ struct BmxGroup_gHiscoreSpriteGroup {
     ZPrimAsset *gHiscoreSprite;      /* 0x0069123c */
     unsigned char pad_00691240[240]; /* 0x00691240 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gHiscoreSpriteGroup, member) == (addr) - 0x00691230, #member)
-AT(gHiscoreSprite, 0x0069123c);
-AT(pad_00691240, 0x00691240);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gHiscoreSpriteGroup, member) ==                                  \
+                       BMX_DATA_OFF((addr) - 0x00691230, off64),                                             \
+                   #member)
+AT(gHiscoreSprite, 0x0069123c, 0x10);
+AT(pad_00691240, 0x00691240, 0x18);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gHiscoreSpriteGroup, pad_00691240) +
                        sizeof(((struct BmxGroup_gHiscoreSpriteGroup *)0)->pad_00691240) ==
-                   0x100,
+                   BMX_DATA_OFF(0x100, 0x108),
                "gHiscoreSpriteGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00691704..0x0069181f.
@@ -9084,14 +9295,16 @@ struct BmxGroup_gPlayerRecsGroup {
     OvlPlayerRecs gPlayerRecs;       /* 0x00691f40, also gPhysRiders */
     unsigned char pad_00693e20[104]; /* 0x00693e20 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gPlayerRecsGroup, member) == (addr) - 0x00691f40, #member)
-AT(gPlayerRecs, 0x00691f40);
-AT(pad_00693e20, 0x00693e20);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gPlayerRecsGroup, member) ==                                     \
+                       BMX_DATA_OFF((addr) - 0x00691f40, off64),                                             \
+                   #member)
+AT(gPlayerRecs, 0x00691f40, 0x0);
+AT(pad_00693e20, 0x00693e20, 0x1f60);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gPlayerRecsGroup, pad_00693e20) +
                        sizeof(((struct BmxGroup_gPlayerRecsGroup *)0)->pad_00693e20) ==
-                   0x1f48,
+                   BMX_DATA_OFF(0x1f48, 0x1fc8),
                "gPlayerRecsGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00694460..0x00694fa4.
@@ -9102,16 +9315,18 @@ struct BmxGroup_gPropRecordsGroup {
     unsigned char d_00694ca1[3];    /* 0x00694ca1 */
     PropNodeStates gPropNodeStates; /* 0x00694ca4 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gPropRecordsGroup, member) == (addr) - 0x00694460, #member)
-AT(gPropRecords, 0x00694460);
-AT(d_00694ca0, 0x00694ca0);
-AT(d_00694ca1, 0x00694ca1);
-AT(gPropNodeStates, 0x00694ca4);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gPropRecordsGroup, member) ==                                    \
+                       BMX_DATA_OFF((addr) - 0x00694460, off64),                                             \
+                   #member)
+AT(gPropRecords, 0x00694460, 0x0);
+AT(d_00694ca0, 0x00694ca0, 0x880);
+AT(d_00694ca1, 0x00694ca1, 0x881);
+AT(gPropNodeStates, 0x00694ca4, 0x888);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gPropRecordsGroup, gPropNodeStates) +
                        sizeof(((struct BmxGroup_gPropRecordsGroup *)0)->gPropNodeStates) ==
-                   0xb44,
+                   BMX_DATA_OFF(0xb44, 0xe88),
                "gPropRecordsGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x006951e8..0x006951ff.
@@ -9202,15 +9417,17 @@ struct BmxGroup_gPhysMotionsGroup {
     ActionMotions gActionMotions;   /* 0x00696300 */
     unsigned char pad_006966b8[36]; /* 0x006966b8 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gPhysMotionsGroup, member) == (addr) - 0x006962f0, #member)
-AT(gPhysMotions, 0x006962fc);
-AT(gActionMotions, 0x00696300);
-AT(pad_006966b8, 0x006966b8);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gPhysMotionsGroup, member) ==                                    \
+                       BMX_DATA_OFF((addr) - 0x006962f0, off64),                                             \
+                   #member)
+AT(gPhysMotions, 0x006962fc, 0x10);
+AT(gActionMotions, 0x00696300, 0x18);
+AT(pad_006966b8, 0x006966b8, 0x3d0);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gPhysMotionsGroup, pad_006966b8) +
                        sizeof(((struct BmxGroup_gPhysMotionsGroup *)0)->pad_006966b8) ==
-                   0x3ec,
+                   BMX_DATA_OFF(0x3ec, 0x3f4),
                "gPhysMotionsGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00696720..0x00696740.
@@ -9235,14 +9452,16 @@ struct BmxGroup_rwD3DStateGroup {
     RwD3DStateCache rwD3DState;     /* 0x00696740 */
     unsigned char pad_006968a0[80]; /* 0x006968a0 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_rwD3DStateGroup, member) == (addr) - 0x00696740, #member)
-AT(rwD3DState, 0x00696740);
-AT(pad_006968a0, 0x006968a0);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_rwD3DStateGroup, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x00696740, off64),                                             \
+                   #member)
+AT(rwD3DState, 0x00696740, 0x0);
+AT(pad_006968a0, 0x006968a0, 0x168);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_rwD3DStateGroup, pad_006968a0) +
                        sizeof(((struct BmxGroup_rwD3DStateGroup *)0)->pad_006968a0) ==
-                   0x1b0,
+                   BMX_DATA_OFF(0x1b0, 0x1b8),
                "rwD3DStateGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00696a88..0x00696b00.
@@ -9252,14 +9471,16 @@ struct BmxGroup_rwD3DIm3DWorkGroup {
     RwD3DIm3DWork *rwD3DIm3DWork;    /* 0x00696a88 */
     unsigned char pad_00696a8c[116]; /* 0x00696a8c */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_rwD3DIm3DWorkGroup, member) == (addr) - 0x00696a80, #member)
-AT(rwD3DIm3DWork, 0x00696a88);
-AT(pad_00696a8c, 0x00696a8c);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_rwD3DIm3DWorkGroup, member) ==                                   \
+                       BMX_DATA_OFF((addr) - 0x00696a80, off64),                                             \
+                   #member)
+AT(rwD3DIm3DWork, 0x00696a88, 0x8);
+AT(pad_00696a8c, 0x00696a8c, 0x10);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_rwD3DIm3DWorkGroup, pad_00696a8c) +
                        sizeof(((struct BmxGroup_rwD3DIm3DWorkGroup *)0)->pad_00696a8c) ==
-                   0x80,
+                   BMX_DATA_OFF(0x80, 0x84),
                "rwD3DIm3DWorkGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0069730c..0x00697320.
@@ -9269,14 +9490,16 @@ struct BmxGroup_gDirectDrawGroup {
     void *gDirectDraw;              /* 0x0069730c */
     unsigned char pad_00697310[16]; /* 0x00697310 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gDirectDrawGroup, member) == (addr) - 0x00697300, #member)
-AT(gDirectDraw, 0x0069730c);
-AT(pad_00697310, 0x00697310);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gDirectDrawGroup, member) ==                                     \
+                       BMX_DATA_OFF((addr) - 0x00697300, off64),                                             \
+                   #member)
+AT(gDirectDraw, 0x0069730c, 0x10);
+AT(pad_00697310, 0x00697310, 0x18);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gDirectDrawGroup, pad_00697310) +
                        sizeof(((struct BmxGroup_gDirectDrawGroup *)0)->pad_00697310) ==
-                   0x20,
+                   BMX_DATA_OFF(0x20, 0x28),
                "gDirectDrawGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0069737c..0x006973a0.
@@ -9286,14 +9509,16 @@ struct BmxGroup_rpLodFreeListGroup {
     RwFreeList *rpLodFreeList;      /* 0x0069737c, also rpLodReserved */
     unsigned char pad_00697380[32]; /* 0x00697380 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_rpLodFreeListGroup, member) == (addr) - 0x00697370, #member)
-AT(rpLodFreeList, 0x0069737c);
-AT(pad_00697380, 0x00697380);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_rpLodFreeListGroup, member) ==                                   \
+                       BMX_DATA_OFF((addr) - 0x00697370, off64),                                             \
+                   #member)
+AT(rpLodFreeList, 0x0069737c, 0x10);
+AT(pad_00697380, 0x00697380, 0x18);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_rpLodFreeListGroup, pad_00697380) +
                        sizeof(((struct BmxGroup_rpLodFreeListGroup *)0)->pad_00697380) ==
-                   0x30,
+                   BMX_DATA_OFF(0x30, 0x38),
                "rpLodFreeListGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x006973a0..0x006976c0.
@@ -9302,14 +9527,15 @@ struct BmxGroup_gMovieGroup {
     ZMovie gMovie;                   /* 0x006973a0 */
     unsigned char pad_0069762c[148]; /* 0x0069762c */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gMovieGroup, member) == (addr) - 0x006973a0, #member)
-AT(gMovie, 0x006973a0);
-AT(pad_0069762c, 0x0069762c);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(                                                                                          \
+        offsetof(struct BmxGroup_gMovieGroup, member) == BMX_DATA_OFF((addr) - 0x006973a0, off64), #member)
+AT(gMovie, 0x006973a0, 0x0);
+AT(pad_0069762c, 0x0069762c, 0x380);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gMovieGroup, pad_0069762c) +
                        sizeof(((struct BmxGroup_gMovieGroup *)0)->pad_0069762c) ==
-                   0x320,
+                   BMX_DATA_OFF(0x320, 0x414),
                "gMovieGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00697728..0x0069772c.
@@ -9363,26 +9589,28 @@ struct BmxGroup_bmxWinMainGlobals {
     int gZrwKeysLocked;             /* 0x006977b0 */
     unsigned char pad_006977b4[24]; /* 0x006977b4 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_bmxWinMainGlobals, member) == (addr) - 0x00697780, #member)
-AT(gZrwWindow, 0x00697780);
-AT(gZglInstance, 0x00697784);
-AT(gZrwFullscreen, 0x00697788);
-AT(gWindow0, 0x0069778c);
-AT(gWindow1, 0x00697790);
-AT(gAppTitle, 0x00697794);
-AT(gZrwWantW, 0x00697798);
-AT(gZrwWantH, 0x0069779c);
-AT(gZglWantW2, 0x006977a0);
-AT(gZglWantH2, 0x006977a4);
-AT(gZglWantDepth, 0x006977a8);
-AT(gZrwQuit, 0x006977ac);
-AT(gZrwKeysLocked, 0x006977b0);
-AT(pad_006977b4, 0x006977b4);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_bmxWinMainGlobals, member) ==                                    \
+                       BMX_DATA_OFF((addr) - 0x00697780, off64),                                             \
+                   #member)
+AT(gZrwWindow, 0x00697780, 0x0);
+AT(gZglInstance, 0x00697784, 0x8);
+AT(gZrwFullscreen, 0x00697788, 0x10);
+AT(gWindow0, 0x0069778c, 0x14);
+AT(gWindow1, 0x00697790, 0x18);
+AT(gAppTitle, 0x00697794, 0x20);
+AT(gZrwWantW, 0x00697798, 0x28);
+AT(gZrwWantH, 0x0069779c, 0x2c);
+AT(gZglWantW2, 0x006977a0, 0x30);
+AT(gZglWantH2, 0x006977a4, 0x34);
+AT(gZglWantDepth, 0x006977a8, 0x38);
+AT(gZrwQuit, 0x006977ac, 0x3c);
+AT(gZrwKeysLocked, 0x006977b0, 0x40);
+AT(pad_006977b4, 0x006977b4, 0x44);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_bmxWinMainGlobals, pad_006977b4) +
                        sizeof(((struct BmxGroup_bmxWinMainGlobals *)0)->pad_006977b4) ==
-                   0x4c,
+                   BMX_DATA_OFF(0x4c, 0x5c),
                "bmxWinMainGlobals");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x006977cc..0x006977f0.
@@ -9392,14 +9620,16 @@ struct BmxGroup_gGdiSurfaceGroup {
     void *gGdiSurface;              /* 0x006977cc, also gDirectDrawSurface */
     unsigned char pad_006977d0[32]; /* 0x006977d0 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gGdiSurfaceGroup, member) == (addr) - 0x006977c0, #member)
-AT(gGdiSurface, 0x006977cc);
-AT(pad_006977d0, 0x006977d0);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gGdiSurfaceGroup, member) ==                                     \
+                       BMX_DATA_OFF((addr) - 0x006977c0, off64),                                             \
+                   #member)
+AT(gGdiSurface, 0x006977cc, 0x10);
+AT(pad_006977d0, 0x006977d0, 0x18);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gGdiSurfaceGroup, pad_006977d0) +
                        sizeof(((struct BmxGroup_gGdiSurfaceGroup *)0)->pad_006977d0) ==
-                   0x30,
+                   BMX_DATA_OFF(0x30, 0x38),
                "gGdiSurfaceGroup");
 
 /* The original's .idata up to the end of its import slots, 0x00699498..0x0069987c. */
@@ -9654,261 +9884,262 @@ struct BmxGroup_bmxImports {
     void *end_00699874;                       /* 0x00699874 */
     void *end_00699878;                       /* 0x00699878 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_bmxImports, member) == (addr) - 0x00699498, #member)
-AT(ADVAPI32_RegQueryValueExA, 0x00699498);
-AT(ADVAPI32_RegCloseKey, 0x0069949c);
-AT(ADVAPI32_RegOpenKeyExA, 0x006994a0);
-AT(ADVAPI32_RegCreateKeyExA, 0x006994a4);
-AT(end_006994a8, 0x006994a8);
-AT(end_006994ac, 0x006994ac);
-AT(end_006994b0, 0x006994b0);
-AT(end_006994b4, 0x006994b4);
-AT(end_006994b8, 0x006994b8);
-AT(end_006994bc, 0x006994bc);
-AT(end_006994c0, 0x006994c0);
-AT(end_006994c4, 0x006994c4);
-AT(end_006994c8, 0x006994c8);
-AT(end_006994cc, 0x006994cc);
-AT(end_006994d0, 0x006994d0);
-AT(AVIFIL32_AVIStreamGetFrame, 0x006994d4);
-AT(AVIFIL32_AVIStreamReadFormat, 0x006994d8);
-AT(AVIFIL32_AVIFileExit, 0x006994dc);
-AT(AVIFIL32_AVIStreamGetFrameClose, 0x006994e0);
-AT(AVIFIL32_AVISaveOptionsFree, 0x006994e4);
-AT(AVIFIL32_AVIStreamRelease, 0x006994e8);
-AT(AVIFIL32_AVIFileOpenA, 0x006994ec);
-AT(AVIFIL32_AVIStreamTimeToSample, 0x006994f0);
-AT(AVIFIL32_AVIStreamLength, 0x006994f4);
-AT(AVIFIL32_AVIStreamStart, 0x006994f8);
-AT(AVIFIL32_AVIFileRelease, 0x006994fc);
-AT(AVIFIL32_AVIStreamSampleToTime, 0x00699500);
-AT(AVIFIL32_AVIStreamGetFrameOpen, 0x00699504);
-AT(AVIFIL32_AVIStreamInfoA, 0x00699508);
-AT(AVIFIL32_AVIStreamRead, 0x0069950c);
-AT(AVIFIL32_AVIFileInit, 0x00699510);
-AT(AVIFIL32_AVIStreamAddRef, 0x00699514);
-AT(AVIFIL32_AVIFileGetStream, 0x00699518);
-AT(end_0069951c, 0x0069951c);
-AT(end_00699520, 0x00699520);
-AT(end_00699524, 0x00699524);
-AT(end_00699528, 0x00699528);
-AT(end_0069952c, 0x0069952c);
-AT(end_00699530, 0x00699530);
-AT(end_00699534, 0x00699534);
-AT(end_00699538, 0x00699538);
-AT(end_0069953c, 0x0069953c);
-AT(end_00699540, 0x00699540);
-AT(end_00699544, 0x00699544);
-AT(end_00699548, 0x00699548);
-AT(end_0069954c, 0x0069954c);
-AT(end_00699550, 0x00699550);
-AT(DDRAW_DirectDrawCreate, 0x00699554);
-AT(DDRAW_DirectDrawEnumerateA, 0x00699558);
-AT(end_0069955c, 0x0069955c);
-AT(end_00699560, 0x00699560);
-AT(end_00699564, 0x00699564);
-AT(end_00699568, 0x00699568);
-AT(end_0069956c, 0x0069956c);
-AT(end_00699570, 0x00699570);
-AT(end_00699574, 0x00699574);
-AT(end_00699578, 0x00699578);
-AT(end_0069957c, 0x0069957c);
-AT(end_00699580, 0x00699580);
-AT(end_00699584, 0x00699584);
-AT(DINPUT_DirectInputCreateEx, 0x00699588);
-AT(end_0069958c, 0x0069958c);
-AT(end_00699590, 0x00699590);
-AT(end_00699594, 0x00699594);
-AT(end_00699598, 0x00699598);
-AT(end_0069959c, 0x0069959c);
-AT(end_006995a0, 0x006995a0);
-AT(end_006995a4, 0x006995a4);
-AT(end_006995a8, 0x006995a8);
-AT(end_006995ac, 0x006995ac);
-AT(end_006995b0, 0x006995b0);
-AT(end_006995b4, 0x006995b4);
-AT(KERNEL32_ReadFile, 0x006995b8);
-AT(KERNEL32_FreeLibrary, 0x006995bc);
-AT(KERNEL32_CloseHandle, 0x006995c0);
-AT(KERNEL32_LoadLibraryA, 0x006995c4);
-AT(KERNEL32_SetFilePointer, 0x006995c8);
-AT(KERNEL32_EnterCriticalSection, 0x006995cc);
-AT(KERNEL32_LeaveCriticalSection, 0x006995d0);
-AT(KERNEL32_DeleteCriticalSection, 0x006995d4);
-AT(KERNEL32_InitializeCriticalSection, 0x006995d8);
-AT(KERNEL32_CreateFileA, 0x006995dc);
-AT(KERNEL32_FreeEnvironmentStringsW, 0x006995e0);
-AT(KERNEL32_LCMapStringA, 0x006995e4);
-AT(KERNEL32_GetTimeZoneInformation, 0x006995e8);
-AT(KERNEL32_LCMapStringW, 0x006995ec);
-AT(KERNEL32_OutputDebugStringA, 0x006995f0);
-AT(KERNEL32_DebugBreak, 0x006995f4);
-AT(KERNEL32_Sleep, 0x006995f8);
-AT(KERNEL32_GetTickCount, 0x006995fc);
-AT(KERNEL32_QueryPerformanceFrequency, 0x00699600);
-AT(KERNEL32_QueryPerformanceCounter, 0x00699604);
-AT(KERNEL32_HeapFree, 0x00699608);
-AT(KERNEL32_GetModuleFileNameA, 0x0069960c);
-AT(KERNEL32_HeapAlloc, 0x00699610);
-AT(KERNEL32_GetModuleHandleA, 0x00699614);
-AT(KERNEL32_GetStartupInfoA, 0x00699618);
-AT(KERNEL32_GetCommandLineA, 0x0069961c);
-AT(KERNEL32_GetVersion, 0x00699620);
-AT(KERNEL32_ExitProcess, 0x00699624);
-AT(KERNEL32_TerminateProcess, 0x00699628);
-AT(KERNEL32_GetCurrentProcess, 0x0069962c);
-AT(KERNEL32_GetEnvironmentVariableA, 0x00699630);
-AT(KERNEL32_GetVersionExA, 0x00699634);
-AT(KERNEL32_HeapDestroy, 0x00699638);
-AT(KERNEL32_HeapCreate, 0x0069963c);
-AT(KERNEL32_VirtualFree, 0x00699640);
-AT(KERNEL32_VirtualAlloc, 0x00699644);
-AT(KERNEL32_HeapReAlloc, 0x00699648);
-AT(KERNEL32_IsBadWritePtr, 0x0069964c);
-AT(KERNEL32_GetLastError, 0x00699650);
-AT(KERNEL32_SetConsoleCtrlHandler, 0x00699654);
-AT(KERNEL32_UnhandledExceptionFilter, 0x00699658);
-AT(KERNEL32_FreeEnvironmentStringsA, 0x0069965c);
-AT(KERNEL32_GetProcAddress, 0x00699660);
-AT(KERNEL32_WideCharToMultiByte, 0x00699664);
-AT(KERNEL32_GetEnvironmentStrings, 0x00699668);
-AT(KERNEL32_GetEnvironmentStringsW, 0x0069966c);
-AT(KERNEL32_SetHandleCount, 0x00699670);
-AT(KERNEL32_GetStdHandle, 0x00699674);
-AT(KERNEL32_GetFileType, 0x00699678);
-AT(KERNEL32_RtlUnwind, 0x0069967c);
-AT(KERNEL32_WriteFile, 0x00699680);
-AT(KERNEL32_RaiseException, 0x00699684);
-AT(KERNEL32_MultiByteToWideChar, 0x00699688);
-AT(KERNEL32_GetSystemTime, 0x0069968c);
-AT(KERNEL32_GetLocalTime, 0x00699690);
-AT(KERNEL32_FlushFileBuffers, 0x00699694);
-AT(KERNEL32_GetCPInfo, 0x00699698);
-AT(KERNEL32_GetACP, 0x0069969c);
-AT(KERNEL32_GetOEMCP, 0x006996a0);
-AT(KERNEL32_GetStringTypeA, 0x006996a4);
-AT(KERNEL32_GetStringTypeW, 0x006996a8);
-AT(KERNEL32_SetStdHandle, 0x006996ac);
-AT(KERNEL32_SetEndOfFile, 0x006996b0);
-AT(KERNEL32_CompareStringA, 0x006996b4);
-AT(KERNEL32_CompareStringW, 0x006996b8);
-AT(KERNEL32_SetEnvironmentVariableA, 0x006996bc);
-AT(end_006996c0, 0x006996c0);
-AT(end_006996c4, 0x006996c4);
-AT(end_006996c8, 0x006996c8);
-AT(end_006996cc, 0x006996cc);
-AT(end_006996d0, 0x006996d0);
-AT(end_006996d4, 0x006996d4);
-AT(end_006996d8, 0x006996d8);
-AT(end_006996dc, 0x006996dc);
-AT(end_006996e0, 0x006996e0);
-AT(end_006996e4, 0x006996e4);
-AT(end_006996e8, 0x006996e8);
-AT(end_006996ec, 0x006996ec);
-AT(end_006996f0, 0x006996f0);
-AT(end_006996f4, 0x006996f4);
-AT(end_006996f8, 0x006996f8);
-AT(end_006996fc, 0x006996fc);
-AT(end_00699700, 0x00699700);
-AT(end_00699704, 0x00699704);
-AT(end_00699708, 0x00699708);
-AT(end_0069970c, 0x0069970c);
-AT(end_00699710, 0x00699710);
-AT(end_00699714, 0x00699714);
-AT(end_00699718, 0x00699718);
-AT(end_0069971c, 0x0069971c);
-AT(MSVFW32_DrawDibDraw, 0x00699720);
-AT(MSVFW32_DrawDibOpen, 0x00699724);
-AT(MSVFW32_DrawDibClose, 0x00699728);
-AT(end_0069972c, 0x0069972c);
-AT(end_00699730, 0x00699730);
-AT(end_00699734, 0x00699734);
-AT(end_00699738, 0x00699738);
-AT(end_0069973c, 0x0069973c);
-AT(end_00699740, 0x00699740);
-AT(end_00699744, 0x00699744);
-AT(end_00699748, 0x00699748);
-AT(end_0069974c, 0x0069974c);
-AT(end_00699750, 0x00699750);
-AT(end_00699754, 0x00699754);
-AT(USER32_DispatchMessageA, 0x00699758);
-AT(USER32_EndDialog, 0x0069975c);
-AT(USER32_GetDlgItem, 0x00699760);
-AT(USER32_SendMessageA, 0x00699764);
-AT(USER32_TranslateMessage, 0x00699768);
-AT(USER32_ShowWindow, 0x0069976c);
-AT(USER32_SetWindowPos, 0x00699770);
-AT(USER32_PostQuitMessage, 0x00699774);
-AT(USER32_DialogBoxParamA, 0x00699778);
-AT(USER32_SetFocus, 0x0069977c);
-AT(USER32_AdjustWindowRect, 0x00699780);
-AT(USER32_RegisterClassA, 0x00699784);
-AT(USER32_LoadCursorA, 0x00699788);
-AT(USER32_DefWindowProcA, 0x0069978c);
-AT(USER32_ClipCursor, 0x00699790);
-AT(USER32_GetWindowLongA, 0x00699794);
-AT(USER32_GetClientRect, 0x00699798);
-AT(USER32_ReleaseDC, 0x0069979c);
-AT(USER32_GetDC, 0x006997a0);
-AT(USER32_CreateWindowExA, 0x006997a4);
-AT(USER32_ShowCursor, 0x006997a8);
-AT(USER32_SetWindowLongA, 0x006997ac);
-AT(USER32_DestroyWindow, 0x006997b0);
-AT(USER32_PeekMessageA, 0x006997b4);
-AT(USER32_UpdateWindow, 0x006997b8);
-AT(USER32_MessageBoxA, 0x006997bc);
-AT(USER32_SetWindowTextA, 0x006997c0);
-AT(USER32_ClientToScreen, 0x006997c4);
-AT(end_006997c8, 0x006997c8);
-AT(end_006997cc, 0x006997cc);
-AT(end_006997d0, 0x006997d0);
-AT(end_006997d4, 0x006997d4);
-AT(end_006997d8, 0x006997d8);
-AT(end_006997dc, 0x006997dc);
-AT(end_006997e0, 0x006997e0);
-AT(end_006997e4, 0x006997e4);
-AT(end_006997e8, 0x006997e8);
-AT(end_006997ec, 0x006997ec);
-AT(end_006997f0, 0x006997f0);
-AT(end_006997f4, 0x006997f4);
-AT(end_006997f8, 0x006997f8);
-AT(end_006997fc, 0x006997fc);
-AT(end_00699800, 0x00699800);
-AT(end_00699804, 0x00699804);
-AT(WINMM_waveOutWrite, 0x00699808);
-AT(WINMM_waveOutOpen, 0x0069980c);
-AT(WINMM_timeGetDevCaps, 0x00699810);
-AT(WINMM_timeBeginPeriod, 0x00699814);
-AT(WINMM_sndPlaySoundA, 0x00699818);
-AT(WINMM_waveOutRestart, 0x0069981c);
-AT(WINMM_waveOutPause, 0x00699820);
-AT(WINMM_timeSetEvent, 0x00699824);
-AT(WINMM_waveOutReset, 0x00699828);
-AT(WINMM_waveOutUnprepareHeader, 0x0069982c);
-AT(WINMM_waveOutClose, 0x00699830);
-AT(WINMM_timeKillEvent, 0x00699834);
-AT(WINMM_timeGetTime, 0x00699838);
-AT(WINMM_waveOutPrepareHeader, 0x0069983c);
-AT(WINMM_timeEndPeriod, 0x00699840);
-AT(end_00699844, 0x00699844);
-AT(end_00699848, 0x00699848);
-AT(end_0069984c, 0x0069984c);
-AT(end_00699850, 0x00699850);
-AT(end_00699854, 0x00699854);
-AT(end_00699858, 0x00699858);
-AT(end_0069985c, 0x0069985c);
-AT(end_00699860, 0x00699860);
-AT(end_00699864, 0x00699864);
-AT(end_00699868, 0x00699868);
-AT(end_0069986c, 0x0069986c);
-AT(end_00699870, 0x00699870);
-AT(end_00699874, 0x00699874);
-AT(end_00699878, 0x00699878);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_bmxImports, member) == BMX_DATA_OFF((addr) - 0x00699498, off64), \
+                   #member)
+AT(ADVAPI32_RegQueryValueExA, 0x00699498, 0x0);
+AT(ADVAPI32_RegCloseKey, 0x0069949c, 0x8);
+AT(ADVAPI32_RegOpenKeyExA, 0x006994a0, 0x10);
+AT(ADVAPI32_RegCreateKeyExA, 0x006994a4, 0x18);
+AT(end_006994a8, 0x006994a8, 0x20);
+AT(end_006994ac, 0x006994ac, 0x28);
+AT(end_006994b0, 0x006994b0, 0x30);
+AT(end_006994b4, 0x006994b4, 0x38);
+AT(end_006994b8, 0x006994b8, 0x40);
+AT(end_006994bc, 0x006994bc, 0x48);
+AT(end_006994c0, 0x006994c0, 0x50);
+AT(end_006994c4, 0x006994c4, 0x58);
+AT(end_006994c8, 0x006994c8, 0x60);
+AT(end_006994cc, 0x006994cc, 0x68);
+AT(end_006994d0, 0x006994d0, 0x70);
+AT(AVIFIL32_AVIStreamGetFrame, 0x006994d4, 0x78);
+AT(AVIFIL32_AVIStreamReadFormat, 0x006994d8, 0x80);
+AT(AVIFIL32_AVIFileExit, 0x006994dc, 0x88);
+AT(AVIFIL32_AVIStreamGetFrameClose, 0x006994e0, 0x90);
+AT(AVIFIL32_AVISaveOptionsFree, 0x006994e4, 0x98);
+AT(AVIFIL32_AVIStreamRelease, 0x006994e8, 0xa0);
+AT(AVIFIL32_AVIFileOpenA, 0x006994ec, 0xa8);
+AT(AVIFIL32_AVIStreamTimeToSample, 0x006994f0, 0xb0);
+AT(AVIFIL32_AVIStreamLength, 0x006994f4, 0xb8);
+AT(AVIFIL32_AVIStreamStart, 0x006994f8, 0xc0);
+AT(AVIFIL32_AVIFileRelease, 0x006994fc, 0xc8);
+AT(AVIFIL32_AVIStreamSampleToTime, 0x00699500, 0xd0);
+AT(AVIFIL32_AVIStreamGetFrameOpen, 0x00699504, 0xd8);
+AT(AVIFIL32_AVIStreamInfoA, 0x00699508, 0xe0);
+AT(AVIFIL32_AVIStreamRead, 0x0069950c, 0xe8);
+AT(AVIFIL32_AVIFileInit, 0x00699510, 0xf0);
+AT(AVIFIL32_AVIStreamAddRef, 0x00699514, 0xf8);
+AT(AVIFIL32_AVIFileGetStream, 0x00699518, 0x100);
+AT(end_0069951c, 0x0069951c, 0x108);
+AT(end_00699520, 0x00699520, 0x110);
+AT(end_00699524, 0x00699524, 0x118);
+AT(end_00699528, 0x00699528, 0x120);
+AT(end_0069952c, 0x0069952c, 0x128);
+AT(end_00699530, 0x00699530, 0x130);
+AT(end_00699534, 0x00699534, 0x138);
+AT(end_00699538, 0x00699538, 0x140);
+AT(end_0069953c, 0x0069953c, 0x148);
+AT(end_00699540, 0x00699540, 0x150);
+AT(end_00699544, 0x00699544, 0x158);
+AT(end_00699548, 0x00699548, 0x160);
+AT(end_0069954c, 0x0069954c, 0x168);
+AT(end_00699550, 0x00699550, 0x170);
+AT(DDRAW_DirectDrawCreate, 0x00699554, 0x178);
+AT(DDRAW_DirectDrawEnumerateA, 0x00699558, 0x180);
+AT(end_0069955c, 0x0069955c, 0x188);
+AT(end_00699560, 0x00699560, 0x190);
+AT(end_00699564, 0x00699564, 0x198);
+AT(end_00699568, 0x00699568, 0x1a0);
+AT(end_0069956c, 0x0069956c, 0x1a8);
+AT(end_00699570, 0x00699570, 0x1b0);
+AT(end_00699574, 0x00699574, 0x1b8);
+AT(end_00699578, 0x00699578, 0x1c0);
+AT(end_0069957c, 0x0069957c, 0x1c8);
+AT(end_00699580, 0x00699580, 0x1d0);
+AT(end_00699584, 0x00699584, 0x1d8);
+AT(DINPUT_DirectInputCreateEx, 0x00699588, 0x1e0);
+AT(end_0069958c, 0x0069958c, 0x1e8);
+AT(end_00699590, 0x00699590, 0x1f0);
+AT(end_00699594, 0x00699594, 0x1f8);
+AT(end_00699598, 0x00699598, 0x200);
+AT(end_0069959c, 0x0069959c, 0x208);
+AT(end_006995a0, 0x006995a0, 0x210);
+AT(end_006995a4, 0x006995a4, 0x218);
+AT(end_006995a8, 0x006995a8, 0x220);
+AT(end_006995ac, 0x006995ac, 0x228);
+AT(end_006995b0, 0x006995b0, 0x230);
+AT(end_006995b4, 0x006995b4, 0x238);
+AT(KERNEL32_ReadFile, 0x006995b8, 0x240);
+AT(KERNEL32_FreeLibrary, 0x006995bc, 0x248);
+AT(KERNEL32_CloseHandle, 0x006995c0, 0x250);
+AT(KERNEL32_LoadLibraryA, 0x006995c4, 0x258);
+AT(KERNEL32_SetFilePointer, 0x006995c8, 0x260);
+AT(KERNEL32_EnterCriticalSection, 0x006995cc, 0x268);
+AT(KERNEL32_LeaveCriticalSection, 0x006995d0, 0x270);
+AT(KERNEL32_DeleteCriticalSection, 0x006995d4, 0x278);
+AT(KERNEL32_InitializeCriticalSection, 0x006995d8, 0x280);
+AT(KERNEL32_CreateFileA, 0x006995dc, 0x288);
+AT(KERNEL32_FreeEnvironmentStringsW, 0x006995e0, 0x290);
+AT(KERNEL32_LCMapStringA, 0x006995e4, 0x298);
+AT(KERNEL32_GetTimeZoneInformation, 0x006995e8, 0x2a0);
+AT(KERNEL32_LCMapStringW, 0x006995ec, 0x2a8);
+AT(KERNEL32_OutputDebugStringA, 0x006995f0, 0x2b0);
+AT(KERNEL32_DebugBreak, 0x006995f4, 0x2b8);
+AT(KERNEL32_Sleep, 0x006995f8, 0x2c0);
+AT(KERNEL32_GetTickCount, 0x006995fc, 0x2c8);
+AT(KERNEL32_QueryPerformanceFrequency, 0x00699600, 0x2d0);
+AT(KERNEL32_QueryPerformanceCounter, 0x00699604, 0x2d8);
+AT(KERNEL32_HeapFree, 0x00699608, 0x2e0);
+AT(KERNEL32_GetModuleFileNameA, 0x0069960c, 0x2e8);
+AT(KERNEL32_HeapAlloc, 0x00699610, 0x2f0);
+AT(KERNEL32_GetModuleHandleA, 0x00699614, 0x2f8);
+AT(KERNEL32_GetStartupInfoA, 0x00699618, 0x300);
+AT(KERNEL32_GetCommandLineA, 0x0069961c, 0x308);
+AT(KERNEL32_GetVersion, 0x00699620, 0x310);
+AT(KERNEL32_ExitProcess, 0x00699624, 0x318);
+AT(KERNEL32_TerminateProcess, 0x00699628, 0x320);
+AT(KERNEL32_GetCurrentProcess, 0x0069962c, 0x328);
+AT(KERNEL32_GetEnvironmentVariableA, 0x00699630, 0x330);
+AT(KERNEL32_GetVersionExA, 0x00699634, 0x338);
+AT(KERNEL32_HeapDestroy, 0x00699638, 0x340);
+AT(KERNEL32_HeapCreate, 0x0069963c, 0x348);
+AT(KERNEL32_VirtualFree, 0x00699640, 0x350);
+AT(KERNEL32_VirtualAlloc, 0x00699644, 0x358);
+AT(KERNEL32_HeapReAlloc, 0x00699648, 0x360);
+AT(KERNEL32_IsBadWritePtr, 0x0069964c, 0x368);
+AT(KERNEL32_GetLastError, 0x00699650, 0x370);
+AT(KERNEL32_SetConsoleCtrlHandler, 0x00699654, 0x378);
+AT(KERNEL32_UnhandledExceptionFilter, 0x00699658, 0x380);
+AT(KERNEL32_FreeEnvironmentStringsA, 0x0069965c, 0x388);
+AT(KERNEL32_GetProcAddress, 0x00699660, 0x390);
+AT(KERNEL32_WideCharToMultiByte, 0x00699664, 0x398);
+AT(KERNEL32_GetEnvironmentStrings, 0x00699668, 0x3a0);
+AT(KERNEL32_GetEnvironmentStringsW, 0x0069966c, 0x3a8);
+AT(KERNEL32_SetHandleCount, 0x00699670, 0x3b0);
+AT(KERNEL32_GetStdHandle, 0x00699674, 0x3b8);
+AT(KERNEL32_GetFileType, 0x00699678, 0x3c0);
+AT(KERNEL32_RtlUnwind, 0x0069967c, 0x3c8);
+AT(KERNEL32_WriteFile, 0x00699680, 0x3d0);
+AT(KERNEL32_RaiseException, 0x00699684, 0x3d8);
+AT(KERNEL32_MultiByteToWideChar, 0x00699688, 0x3e0);
+AT(KERNEL32_GetSystemTime, 0x0069968c, 0x3e8);
+AT(KERNEL32_GetLocalTime, 0x00699690, 0x3f0);
+AT(KERNEL32_FlushFileBuffers, 0x00699694, 0x3f8);
+AT(KERNEL32_GetCPInfo, 0x00699698, 0x400);
+AT(KERNEL32_GetACP, 0x0069969c, 0x408);
+AT(KERNEL32_GetOEMCP, 0x006996a0, 0x410);
+AT(KERNEL32_GetStringTypeA, 0x006996a4, 0x418);
+AT(KERNEL32_GetStringTypeW, 0x006996a8, 0x420);
+AT(KERNEL32_SetStdHandle, 0x006996ac, 0x428);
+AT(KERNEL32_SetEndOfFile, 0x006996b0, 0x430);
+AT(KERNEL32_CompareStringA, 0x006996b4, 0x438);
+AT(KERNEL32_CompareStringW, 0x006996b8, 0x440);
+AT(KERNEL32_SetEnvironmentVariableA, 0x006996bc, 0x448);
+AT(end_006996c0, 0x006996c0, 0x450);
+AT(end_006996c4, 0x006996c4, 0x458);
+AT(end_006996c8, 0x006996c8, 0x460);
+AT(end_006996cc, 0x006996cc, 0x468);
+AT(end_006996d0, 0x006996d0, 0x470);
+AT(end_006996d4, 0x006996d4, 0x478);
+AT(end_006996d8, 0x006996d8, 0x480);
+AT(end_006996dc, 0x006996dc, 0x488);
+AT(end_006996e0, 0x006996e0, 0x490);
+AT(end_006996e4, 0x006996e4, 0x498);
+AT(end_006996e8, 0x006996e8, 0x4a0);
+AT(end_006996ec, 0x006996ec, 0x4a8);
+AT(end_006996f0, 0x006996f0, 0x4b0);
+AT(end_006996f4, 0x006996f4, 0x4b8);
+AT(end_006996f8, 0x006996f8, 0x4c0);
+AT(end_006996fc, 0x006996fc, 0x4c8);
+AT(end_00699700, 0x00699700, 0x4d0);
+AT(end_00699704, 0x00699704, 0x4d8);
+AT(end_00699708, 0x00699708, 0x4e0);
+AT(end_0069970c, 0x0069970c, 0x4e8);
+AT(end_00699710, 0x00699710, 0x4f0);
+AT(end_00699714, 0x00699714, 0x4f8);
+AT(end_00699718, 0x00699718, 0x500);
+AT(end_0069971c, 0x0069971c, 0x508);
+AT(MSVFW32_DrawDibDraw, 0x00699720, 0x510);
+AT(MSVFW32_DrawDibOpen, 0x00699724, 0x518);
+AT(MSVFW32_DrawDibClose, 0x00699728, 0x520);
+AT(end_0069972c, 0x0069972c, 0x528);
+AT(end_00699730, 0x00699730, 0x530);
+AT(end_00699734, 0x00699734, 0x538);
+AT(end_00699738, 0x00699738, 0x540);
+AT(end_0069973c, 0x0069973c, 0x548);
+AT(end_00699740, 0x00699740, 0x550);
+AT(end_00699744, 0x00699744, 0x558);
+AT(end_00699748, 0x00699748, 0x560);
+AT(end_0069974c, 0x0069974c, 0x568);
+AT(end_00699750, 0x00699750, 0x570);
+AT(end_00699754, 0x00699754, 0x578);
+AT(USER32_DispatchMessageA, 0x00699758, 0x580);
+AT(USER32_EndDialog, 0x0069975c, 0x588);
+AT(USER32_GetDlgItem, 0x00699760, 0x590);
+AT(USER32_SendMessageA, 0x00699764, 0x598);
+AT(USER32_TranslateMessage, 0x00699768, 0x5a0);
+AT(USER32_ShowWindow, 0x0069976c, 0x5a8);
+AT(USER32_SetWindowPos, 0x00699770, 0x5b0);
+AT(USER32_PostQuitMessage, 0x00699774, 0x5b8);
+AT(USER32_DialogBoxParamA, 0x00699778, 0x5c0);
+AT(USER32_SetFocus, 0x0069977c, 0x5c8);
+AT(USER32_AdjustWindowRect, 0x00699780, 0x5d0);
+AT(USER32_RegisterClassA, 0x00699784, 0x5d8);
+AT(USER32_LoadCursorA, 0x00699788, 0x5e0);
+AT(USER32_DefWindowProcA, 0x0069978c, 0x5e8);
+AT(USER32_ClipCursor, 0x00699790, 0x5f0);
+AT(USER32_GetWindowLongA, 0x00699794, 0x5f8);
+AT(USER32_GetClientRect, 0x00699798, 0x600);
+AT(USER32_ReleaseDC, 0x0069979c, 0x608);
+AT(USER32_GetDC, 0x006997a0, 0x610);
+AT(USER32_CreateWindowExA, 0x006997a4, 0x618);
+AT(USER32_ShowCursor, 0x006997a8, 0x620);
+AT(USER32_SetWindowLongA, 0x006997ac, 0x628);
+AT(USER32_DestroyWindow, 0x006997b0, 0x630);
+AT(USER32_PeekMessageA, 0x006997b4, 0x638);
+AT(USER32_UpdateWindow, 0x006997b8, 0x640);
+AT(USER32_MessageBoxA, 0x006997bc, 0x648);
+AT(USER32_SetWindowTextA, 0x006997c0, 0x650);
+AT(USER32_ClientToScreen, 0x006997c4, 0x658);
+AT(end_006997c8, 0x006997c8, 0x660);
+AT(end_006997cc, 0x006997cc, 0x668);
+AT(end_006997d0, 0x006997d0, 0x670);
+AT(end_006997d4, 0x006997d4, 0x678);
+AT(end_006997d8, 0x006997d8, 0x680);
+AT(end_006997dc, 0x006997dc, 0x688);
+AT(end_006997e0, 0x006997e0, 0x690);
+AT(end_006997e4, 0x006997e4, 0x698);
+AT(end_006997e8, 0x006997e8, 0x6a0);
+AT(end_006997ec, 0x006997ec, 0x6a8);
+AT(end_006997f0, 0x006997f0, 0x6b0);
+AT(end_006997f4, 0x006997f4, 0x6b8);
+AT(end_006997f8, 0x006997f8, 0x6c0);
+AT(end_006997fc, 0x006997fc, 0x6c8);
+AT(end_00699800, 0x00699800, 0x6d0);
+AT(end_00699804, 0x00699804, 0x6d8);
+AT(WINMM_waveOutWrite, 0x00699808, 0x6e0);
+AT(WINMM_waveOutOpen, 0x0069980c, 0x6e8);
+AT(WINMM_timeGetDevCaps, 0x00699810, 0x6f0);
+AT(WINMM_timeBeginPeriod, 0x00699814, 0x6f8);
+AT(WINMM_sndPlaySoundA, 0x00699818, 0x700);
+AT(WINMM_waveOutRestart, 0x0069981c, 0x708);
+AT(WINMM_waveOutPause, 0x00699820, 0x710);
+AT(WINMM_timeSetEvent, 0x00699824, 0x718);
+AT(WINMM_waveOutReset, 0x00699828, 0x720);
+AT(WINMM_waveOutUnprepareHeader, 0x0069982c, 0x728);
+AT(WINMM_waveOutClose, 0x00699830, 0x730);
+AT(WINMM_timeKillEvent, 0x00699834, 0x738);
+AT(WINMM_timeGetTime, 0x00699838, 0x740);
+AT(WINMM_waveOutPrepareHeader, 0x0069983c, 0x748);
+AT(WINMM_timeEndPeriod, 0x00699840, 0x750);
+AT(end_00699844, 0x00699844, 0x758);
+AT(end_00699848, 0x00699848, 0x760);
+AT(end_0069984c, 0x0069984c, 0x768);
+AT(end_00699850, 0x00699850, 0x770);
+AT(end_00699854, 0x00699854, 0x778);
+AT(end_00699858, 0x00699858, 0x780);
+AT(end_0069985c, 0x0069985c, 0x788);
+AT(end_00699860, 0x00699860, 0x790);
+AT(end_00699864, 0x00699864, 0x798);
+AT(end_00699868, 0x00699868, 0x7a0);
+AT(end_0069986c, 0x0069986c, 0x7a8);
+AT(end_00699870, 0x00699870, 0x7b0);
+AT(end_00699874, 0x00699874, 0x7b8);
+AT(end_00699878, 0x00699878, 0x7c0);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_bmxImports, end_00699878) +
                        sizeof(((struct BmxGroup_bmxImports *)0)->end_00699878) ==
-                   0x3e4,
+                   BMX_DATA_OFF(0x3e4, 0x7c8),
                "bmxImports");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0069b504..0x0069b520.
@@ -10130,7 +10361,7 @@ AT(p_0069b9f8, 0x0069b9f8);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_0069b9f4Group, p_0069b9f8) +
                        sizeof(((struct BmxGroup_d_0069b9f4Group *)0)->p_0069b9f8) ==
-                   0x30,
+                   BMX_DATA_OFF(0x30, 0x58),
                "d_0069b9f4Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0069baec..0x0069bb90.
@@ -10140,14 +10371,16 @@ struct BmxGroup_p_0069baecGroup {
     void *p_0069baec[17]; /* 0x0069baec */
     float d_0069bb30[24]; /* 0x0069bb30 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_0069baecGroup, member) == (addr) - 0x0069bae0, #member)
-AT(p_0069baec, 0x0069baec);
-AT(d_0069bb30, 0x0069bb30);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_0069baecGroup, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x0069bae0, off64),                                             \
+                   #member)
+AT(p_0069baec, 0x0069baec, 0x10);
+AT(d_0069bb30, 0x0069bb30, 0x98);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_0069baecGroup, d_0069bb30) +
                        sizeof(((struct BmxGroup_p_0069baecGroup *)0)->d_0069bb30) ==
-                   0xb0,
+                   BMX_DATA_OFF(0xb0, 0xf8),
                "p_0069baecGroup");
 
 /* The type is local to rw/camera.c. */
@@ -10164,15 +10397,17 @@ struct BmxGroup_d_0069bdfcGroup {
     void *p_0069be00[20];        /* 0x0069be00 */
     float d_0069be50;            /* 0x0069be50 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_d_0069bdfcGroup, member) == (addr) - 0x0069bdf0, #member)
-AT(d_0069bdfc, 0x0069bdfc);
-AT(p_0069be00, 0x0069be00);
-AT(d_0069be50, 0x0069be50);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_d_0069bdfcGroup, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x0069bdf0, off64),                                             \
+                   #member)
+AT(d_0069bdfc, 0x0069bdfc, 0xc);
+AT(p_0069be00, 0x0069be00, 0x10);
+AT(d_0069be50, 0x0069be50, 0xb0);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_0069bdfcGroup, d_0069be50) +
                        sizeof(((struct BmxGroup_d_0069bdfcGroup *)0)->d_0069be50) ==
-                   0x64,
+                   BMX_DATA_OFF(0x64, 0xb4),
                "d_0069bdfcGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0069bee0..0x0069bef8.
@@ -10181,14 +10416,16 @@ struct BmxGroup_p_0069bee0Group {
     void *p_0069bee0[4]; /* 0x0069bee0 */
     float d_0069bef0[2]; /* 0x0069bef0 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_0069bee0Group, member) == (addr) - 0x0069bee0, #member)
-AT(p_0069bee0, 0x0069bee0);
-AT(d_0069bef0, 0x0069bef0);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_0069bee0Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x0069bee0, off64),                                             \
+                   #member)
+AT(p_0069bee0, 0x0069bee0, 0x0);
+AT(d_0069bef0, 0x0069bef0, 0x20);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_0069bee0Group, d_0069bef0) +
                        sizeof(((struct BmxGroup_p_0069bee0Group *)0)->d_0069bef0) ==
-                   0x18,
+                   BMX_DATA_OFF(0x18, 0x28),
                "p_0069bee0Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0069c5c0..0x0069c5d4.
@@ -10265,14 +10502,16 @@ struct BmxGroup_p_0069d120Group {
     void *p_0069d120[14];          /* 0x0069d120 */
     unsigned char pad_0069d158[8]; /* 0x0069d158 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_0069d120Group, member) == (addr) - 0x0069d120, #member)
-AT(p_0069d120, 0x0069d120);
-AT(pad_0069d158, 0x0069d158);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_0069d120Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x0069d120, off64),                                             \
+                   #member)
+AT(p_0069d120, 0x0069d120, 0x0);
+AT(pad_0069d158, 0x0069d158, 0x70);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_0069d120Group, pad_0069d158) +
                        sizeof(((struct BmxGroup_p_0069d120Group *)0)->pad_0069d158) ==
-                   0x40,
+                   BMX_DATA_OFF(0x40, 0x78),
                "p_0069d120Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0069dfb0..0x0069dfe0.
@@ -10281,14 +10520,16 @@ struct BmxGroup_p_0069dfb0Group {
     void *p_0069dfb0[10];          /* 0x0069dfb0 */
     unsigned char pad_0069dfd8[8]; /* 0x0069dfd8 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_0069dfb0Group, member) == (addr) - 0x0069dfb0, #member)
-AT(p_0069dfb0, 0x0069dfb0);
-AT(pad_0069dfd8, 0x0069dfd8);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_0069dfb0Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x0069dfb0, off64),                                             \
+                   #member)
+AT(p_0069dfb0, 0x0069dfb0, 0x0);
+AT(pad_0069dfd8, 0x0069dfd8, 0x50);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_0069dfb0Group, pad_0069dfd8) +
                        sizeof(((struct BmxGroup_p_0069dfb0Group *)0)->pad_0069dfd8) ==
-                   0x30,
+                   BMX_DATA_OFF(0x30, 0x58),
                "p_0069dfb0Group");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0069e190..0x0069e1c0.
@@ -10297,14 +10538,16 @@ struct BmxGroup_p_0069e190Group {
     void *p_0069e190[10];          /* 0x0069e190 */
     unsigned char pad_0069e1b8[8]; /* 0x0069e1b8 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_p_0069e190Group, member) == (addr) - 0x0069e190, #member)
-AT(p_0069e190, 0x0069e190);
-AT(pad_0069e1b8, 0x0069e1b8);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_p_0069e190Group, member) ==                                      \
+                       BMX_DATA_OFF((addr) - 0x0069e190, off64),                                             \
+                   #member)
+AT(p_0069e190, 0x0069e190, 0x0);
+AT(pad_0069e1b8, 0x0069e1b8, 0x50);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_p_0069e190Group, pad_0069e1b8) +
                        sizeof(((struct BmxGroup_p_0069e190Group *)0)->pad_0069e1b8) ==
-                   0x30,
+                   BMX_DATA_OFF(0x30, 0x58),
                "p_0069e190Group");
 
 /* Every definition, by original address. */
@@ -11984,7 +12227,7 @@ extern ZrwWorldCloseFn gZrwWorldClose;                                        /*
 extern ZrwWorldFindFn gZrwWorldFind;                                          /* 0x005620e8 */
 extern struct BmxGroup_gFxLoadTextureGroup gFxLoadTextureGroup;               /* 0x005620ec */
 extern BmxType_gZrwLightKinds gZrwLightKinds;                                 /* 0x0056210c */
-extern uint32_t gZrwWorldPathArgs;                                            /* 0x00562128 */
+extern const void *gZrwWorldPathArgs;                                         /* 0x00562128 */
 extern const char *gZrwPvsKeys;                                               /* 0x0056212c */
 extern BmxType_gZrwPathKey gZrwPathKey;                                       /* 0x00562130 */
 extern char sERROR[8];                                                        /* 0x00562138 */

@@ -81,9 +81,9 @@ typedef struct ZscnptsState {
     uint8_t pad04[4];
     uint16_t count; /* 0x674008 */
     uint8_t pad0a[2];
-    uint32_t field0c;     /* 0x67400c */
-    ZMemFreeList *points; /* 0x674010 */
-    uint32_t field14;     /* 0x674014 */
+    uint32_t field0c;          /* 0x67400c */
+    ZMemFreeList *points;      /* 0x674010 */
+    struct ZrwMarker *markers; /* 0x674014 the level's markers (gZrwMarkers, zge/com/zglrw/zrwcam.h) */
 } ZscnptsState;
 
 #define gScnpts ORIG_VAR(0x00674000, ZscnptsState, gScnpts)

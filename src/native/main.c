@@ -106,7 +106,10 @@ static void commandLineText(char *out, size_t size, int argc, char **argv)
 
 static void initGlobals(void)
 {
-    memset((void *)BMX_ORIG(0x00697780), 0, 0x34);
+    /* The original clears 0x00697780..0x006977b4 in one memset; the rest is set below. */
+    gHwnd = NULL;
+    gHinstance = NULL;
+    ORIG_VAR(0x006977b0, int, gZrwKeysLocked) = 0;
     gAppTitle = (const char *)BMX_ORIG(0x0056137c);
     gWidth = 0x280;
     gHeight = 0x1e0;

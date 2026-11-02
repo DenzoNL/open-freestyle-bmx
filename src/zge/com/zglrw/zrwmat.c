@@ -30,8 +30,8 @@ typedef uint32_t(BMX_CDECL *ZrwMatCountFn)(void *model);
 #define gZrwVtNodeMatrix  ORIG_VAR(0x00560eb8, ZrwMatCall4Fn, gZrwVtNodeMatrix)
 #define gZrwVtSkeleton    ORIG_VAR(0x00560ecc, ZrwMatCall2Fn, gZrwVtSkeleton)
 /* Object types of the two kinds of model (a single clump, or a skinned one). */
-#define gZrwOpsSimple  ORIG_VAR(0x00560fd0, uint32_t, gZrwOpsSimple)
-#define gZrwOpsSkinned ORIG_VAR(0x00560fa8, uint32_t, gZrwOpsSkinned)
+#define gZrwOpsSimple  ORIG_VAR(0x00560fd0, void *, gZrwOpsSimple)
+#define gZrwOpsSkinned ORIG_VAR(0x00560fa8, void *, gZrwOpsSkinned)
 /* Non-zero: models get flag 2 set (set by the viewer). */
 #define gZrwModelFlag2 ORIG_VAR(0x0067230c, int, gZrwModelFlag2)
 

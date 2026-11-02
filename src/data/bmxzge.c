@@ -421,16 +421,16 @@ struct BmxGroup_gFxRippleDefaultGroup gFxRippleDefaultGroup __attribute__((align
     .gFxSpark =
         {
             .destroy = zobjPEmitEffectDestroy,
-            .pad04 = (uintptr_t)zobjPEmitAddModifier,
+            .addModifier = (void *)zobjPEmitAddModifier,
             .attach = (void *)zobjPEmitAddModifierByName,
-            .pad0c =
+            .slots0c =
                 {
-                    (uintptr_t)zobjPEmitClearModifiers,
-                    (uintptr_t)zobjPEmitCreate,
-                    (uintptr_t)zobjPEmitDestroy,
-                    (uintptr_t)ngiffxSparkSpawn,
-                    (uintptr_t)zobjPEmitUpdate,
-                    (uintptr_t)ngiffxSparkRender,
+                    (void *)zobjPEmitClearModifiers,
+                    (void *)zobjPEmitCreate,
+                    (void *)zobjPEmitDestroy,
+                    (void *)ngiffxSparkSpawn,
+                    (void *)zobjPEmitUpdate,
+                    (void *)ngiffxSparkRender,
                 },
         },
 };
@@ -438,96 +438,96 @@ struct BmxGroup_gFxRippleDefaultGroup gFxRippleDefaultGroup __attribute__((align
 /* 0x0055c2b0 */
 ZfxEffect gFxShard = {
     .destroy = zobjPEmitEffectDestroy,
-    .pad04 = (uintptr_t)zobjPEmitAddModifier,
+    .addModifier = (void *)zobjPEmitAddModifier,
     .attach = (void *)zobjPEmitAddModifierByName,
-    .pad0c =
+    .slots0c =
         {
-            (uintptr_t)zobjPEmitClearModifiers,
-            (uintptr_t)zobjPEmitCreate,
-            (uintptr_t)zobjPEmitDestroy,
-            (uintptr_t)ngiffxShardSpawn,
-            (uintptr_t)zobjPEmitUpdate,
-            (uintptr_t)ngiffxShardRender,
+            (void *)zobjPEmitClearModifiers,
+            (void *)zobjPEmitCreate,
+            (void *)zobjPEmitDestroy,
+            (void *)ngiffxShardSpawn,
+            (void *)zobjPEmitUpdate,
+            (void *)ngiffxShardRender,
         },
 };
 
 /* 0x0055c2e8 */
 ZfxEffect gFxSplash = {
     .destroy = zobjPEmitEffectDestroy,
-    .pad04 = (uintptr_t)zobjPEmitAddModifier,
+    .addModifier = (void *)zobjPEmitAddModifier,
     .attach = (void *)zobjPEmitAddModifierByName,
-    .pad0c =
+    .slots0c =
         {
-            (uintptr_t)zobjPEmitClearModifiers,
-            (uintptr_t)zobjPEmitCreate,
-            (uintptr_t)zobjPEmitDestroy,
-            (uintptr_t)ngiffxSparkSpawn,
-            (uintptr_t)zobjPEmitUpdate,
-            (uintptr_t)ngiffxSplashRender,
+            (void *)zobjPEmitClearModifiers,
+            (void *)zobjPEmitCreate,
+            (void *)zobjPEmitDestroy,
+            (void *)ngiffxSparkSpawn,
+            (void *)zobjPEmitUpdate,
+            (void *)ngiffxSplashRender,
         },
 };
 
 /* 0x0055c320 */
 ZfxEffect gFxDust = {
     .destroy = zobjPEmitEffectDestroy,
-    .pad04 = (uintptr_t)zobjPEmitAddModifier,
+    .addModifier = (void *)zobjPEmitAddModifier,
     .attach = (void *)zobjPEmitAddModifierByName,
-    .pad0c =
+    .slots0c =
         {
-            (uintptr_t)zobjPEmitClearModifiers,
-            (uintptr_t)zobjPEmitCreate,
-            (uintptr_t)zobjPEmitDestroy,
-            (uintptr_t)ngiffxDustSpawn,
-            (uintptr_t)zobjPEmitUpdate,
-            (uintptr_t)ngiffxDustRender,
+            (void *)zobjPEmitClearModifiers,
+            (void *)zobjPEmitCreate,
+            (void *)zobjPEmitDestroy,
+            (void *)ngiffxDustSpawn,
+            (void *)zobjPEmitUpdate,
+            (void *)ngiffxDustRender,
         },
 };
 
 /* 0x0055c358 */
 ZfxEffect gFxPoster = {
     .destroy = zobjPEmitEffectDestroy,
-    .pad04 = (uintptr_t)zobjPEmitAddModifier,
+    .addModifier = (void *)zobjPEmitAddModifier,
     .attach = (void *)zobjPEmitAddModifierByName,
-    .pad0c =
+    .slots0c =
         {
-            (uintptr_t)zobjPEmitClearModifiers,
-            (uintptr_t)ngiffxPosterCreate,
-            (uintptr_t)zobjPEmitDestroy,
-            (uintptr_t)ngiffxPosterSpawn,
-            (uintptr_t)zobjPEmitUpdate,
-            (uintptr_t)ngiffxPosterRender,
+            (void *)zobjPEmitClearModifiers,
+            (void *)ngiffxPosterCreate,
+            (void *)zobjPEmitDestroy,
+            (void *)ngiffxPosterSpawn,
+            (void *)zobjPEmitUpdate,
+            (void *)ngiffxPosterRender,
         },
 };
 
 /* 0x0055c390 */
 ZfxEffect gFxRipple = {
     .destroy = zobjPEmitEffectDestroy,
-    .pad04 = (uintptr_t)zobjPEmitAddModifier,
+    .addModifier = (void *)zobjPEmitAddModifier,
     .attach = (void *)zobjPEmitAddModifierByName,
-    .pad0c =
+    .slots0c =
         {
-            (uintptr_t)zobjPEmitClearModifiers,
-            (uintptr_t)zobjPEmitCreate,
-            (uintptr_t)zobjPEmitDestroy,
-            (uintptr_t)ngiffxRippleSpawn,
-            (uintptr_t)ngiffxUpdateEmitter,
-            (uintptr_t)ngiffxRippleRender,
+            (void *)zobjPEmitClearModifiers,
+            (void *)zobjPEmitCreate,
+            (void *)zobjPEmitDestroy,
+            (void *)ngiffxRippleSpawn,
+            (void *)ngiffxUpdateEmitter,
+            (void *)ngiffxRippleRender,
         },
 };
 
 /* 0x0055c3c8 */
 ZfxEffect gFxLightning = {
     .destroy = zobjPEmitEffectDestroy,
-    .pad04 = (uintptr_t)zobjPEmitAddModifier,
+    .addModifier = (void *)zobjPEmitAddModifier,
     .attach = (void *)zobjPEmitAddModifierByName,
-    .pad0c =
+    .slots0c =
         {
-            (uintptr_t)zobjPEmitClearModifiers,
-            (uintptr_t)zobjPEmitCreate,
-            (uintptr_t)zobjPEmitDestroy,
-            (uintptr_t)ngiffxLightningSpawn,
-            (uintptr_t)zobjPEmitUpdate,
-            (uintptr_t)ngiffxLightningRender,
+            (void *)zobjPEmitClearModifiers,
+            (void *)zobjPEmitCreate,
+            (void *)zobjPEmitDestroy,
+            (void *)ngiffxLightningSpawn,
+            (void *)zobjPEmitUpdate,
+            (void *)ngiffxLightningRender,
         },
 };
 

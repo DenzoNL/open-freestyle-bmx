@@ -219,8 +219,9 @@ typedef uint32_t OvlSize2[2];
 #define gScoreRecordSlot ORIG_VAR(0x00553658, OvlBytes16, gScoreRecordSlot)
 
 /* Tables (.data). */
-#define gTrickTurnNames    ORIG_VAR(0x00559390, OvlStrTable, gTrickTurnNames)
-#define gTrickBarspinNames ORIG_VAR(0x00559448, OvlStrTable, gTrickBarspinNames)
+#define gTrickTurnNames ORIG_VAR(0x00559390, OvlStrTable, gTrickTurnNames)
+/* The barspin names are the turn table's entries from 46 on (0x00559448). */
+#define gTrickBarspinNames (&gTrickTurnNames[46])
 #define gTrickSpinNames    ORIG_VAR(0x005594e0, OvlStrTable, gTrickSpinNames)
 #define gTrickDoubleNames  ORIG_VAR(0x00557308, OvlStrTable4, gTrickDoubleNames)
 #define gTrickClassHi      ORIG_VAR(0x00558fa2, OvlBytes128, gTrickClassHi)

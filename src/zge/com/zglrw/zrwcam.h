@@ -7,6 +7,7 @@
 
 #include "compat/orig.h"
 #include "zge/zmath.h"
+#include "zge/zscene.h"
 
 /* A named marker of the level scene (the "Player<n>" start points), kept in a singly linked list. */
 typedef struct ZrwMarker {
@@ -19,7 +20,8 @@ typedef struct ZrwMarker {
 
 BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZrwMarker, next) == 0x4c, "marker layout");
 
-#define gZrwMarkers ORIG_VAR(0x00674014, ZrwMarker *, gZrwMarkers)
+/* The scene point state's last field (0x00674014). */
+#define gZrwMarkers (gScnpts.markers)
 
 /* Looks a marker up by the hash of its base name and its number; NULL when absent. */
 ZrwMarker *zrwcamFindMarker(int hash, int index);
