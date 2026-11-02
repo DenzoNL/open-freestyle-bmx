@@ -164,7 +164,7 @@ int ztaginfReadNode(ZtaginfNode *node, void *iff)
         uint32_t *indices = zmemAlloc(bytes);
 
         ziffRead(iff, indices, bytes);
-        node->faces = zmemAlloc((uint32_t)(node->faceCount * sizeof *node->faces));
+        node->faces = (struct ZbspLevelFace **)zmemAlloc((uint32_t)(node->faceCount * sizeof *node->faces));
         for (uint32_t i = 0; i < node->faceCount; i++) {
             node->faces[i] = &gZtaginfFaces[indices[i]];
         }
