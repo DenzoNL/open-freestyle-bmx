@@ -597,8 +597,8 @@ int zoverRigCollidePoint(ZRigPoint *p, float *impact, ZRigHit *hit)
         hit->normal.y = (float)((double)f->normal.y + hit->normal.y);
         hit->normal.z = (float)((double)f->normal.z + hit->normal.z);
         hit->d = (float)((double)f->d + hit->d);
-        if (h->object != 0) {
-            const void *object = (const void *)(uintptr_t)(uint32_t)h->object;
+        if (h->object != NULL) {
+            const void *object = h->object;
 
             hit->kind = kZoverHitObject;
             hit->tag = *(const uint16_t *)object;

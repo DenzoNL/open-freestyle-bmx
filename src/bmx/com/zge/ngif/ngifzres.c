@@ -49,7 +49,7 @@ int ngifzresInitLevels(void)
         uint32_t size;
 
         gZres.mapData = ngifzresLoadAsset(gZresTablesLib, 0, 0, &size, 0);
-        gZres.mapFile = zfileOpenRamDisk((uint32_t)(uintptr_t)gZres.mapData, size);
+        gZres.mapFile = zfileOpenRamDisk(gZres.mapData, size);
         gZres.mapIff = ziffOpen(gZres.mapFile, kIdForm, 0);
         ziffFindChunk(gZres.mapIff, kIdMapHeader);
         ziffRead(gZres.mapIff, &gZres.levelCount, 8);
@@ -94,7 +94,7 @@ int ngifzresInitPlayers(void)
         uint32_t size;
 
         gZres.playerData = ngifzresLoadAsset(gZresMiscLib, 1, 0, &size, 1);
-        gZres.playerFile = zfileOpenRamDisk((uint32_t)(uintptr_t)gZres.playerData, size);
+        gZres.playerFile = zfileOpenRamDisk(gZres.playerData, size);
         gZres.playerIff = ziffOpen(gZres.playerFile, kIdForm, 0);
         ziffFindChunk(gZres.playerIff, kIdPlayerHeader);
         ziffRead(gZres.playerIff, &gZres.playerCount, 8);

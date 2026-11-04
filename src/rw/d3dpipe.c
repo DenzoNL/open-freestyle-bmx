@@ -973,7 +973,7 @@ void rwD3DRenderMeshes(RwD3DIm3DWork *work)
         if ((uint32_t)(rwD3DIm3DLevel->base + rwD3DIm3DLevel->numTL + (int32_t)count * 2) > rwD3DBufferSize) {
             rwD3DIm3DGrow(count * 2 + 0x14 + (uint32_t)rwD3DIm3DLevel->numTL);
         }
-        RwRenderStateSet(kStateTextureRaster, (int32_t)(uintptr_t)raster);
+        RwRenderStateSet(kStateTextureRaster, (intptr_t)raster);
         if (raster != NULL) {
             RwRenderStateSet(kStateTextureFilter, filter);
             RwRenderStateSet(kStateTextureAddress, address);

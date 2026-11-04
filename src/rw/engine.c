@@ -468,7 +468,7 @@ float RwIm2DGetNearScreenZ(void)
 
 /* Sets a render state through the device; needs a current camera, else reports and returns 0. */
 BMX_ADDR(0x004db820)
-int RwRenderStateSet(int32_t state, int32_t value)
+int RwRenderStateSet(int32_t state, intptr_t value)
 {
     if (RwEngineInstance->curCamera == NULL) {
         RwError error;

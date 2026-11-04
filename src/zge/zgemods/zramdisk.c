@@ -7,6 +7,10 @@
 #include "zge/zmem.h"
 #include "zge/zstring.h"
 
+#if UINTPTR_MAX != 0xffffffffu
+#include <stdlib.h>
+#endif
+
 static const char kRamdiskFile[] = "C:\\NgEngine\\Zge\\ZgeMods\\zramdisk.c";
 static const char kNotInitialized[] = "File system has not been intialized.";
 static const char kInvalidHandle[] = "Invalid RAM disk file handle";
@@ -39,12 +43,19 @@ const char *zramdiskGetName(ZfileDevice *device)
 }
 
 BMX_ADDR(0x0049ead0)
-const char *zramdiskControl(ZfileDevice *device, int command, const char *const *keys, const uint32_t *values)
+const char *zramdiskControl(ZfileDevice *device, uint32_t command, const char *const *keys,
+                            const void *values)
 {
     requireInitialized(0xbb);
     if (command == 2 && zstrcmp(keys[0], "ADDRESS") == 0 && zstrcmp(keys[1], "SIZE") == 0) {
+        const uintptr_t *block = values;
+
         /* the original also checks the name buffer for NULL ("Invalid file name created for RAM disk") */
-        zstrFormat(gZramdiskName, "rd00:%#10x:%#10x", values[0], values[1]);
+#if UINTPTR_MAX == 0xffffffffu
+        zstrFormat(gZramdiskName, "rd00:%#10x:%#10x", block[0], block[1]);
+#else
+        zstrFormat(gZramdiskName, "rd00:%#18llx:%#10x", (unsigned long long)block[0], (uint32_t)block[1]);
+#endif
         return gZramdiskName;
     }
     zfileRegisterErrorMessage("Invalid RAM disk file name attributes");
@@ -122,14 +133,19 @@ BMX_ADDR(0x0049ee80)
 int zramdiskOpen(ZfileHandle *file, const char *name, int mode, const ZramdiskCallback *callback)
 {
     ZramdiskFile *rf;
-    uint32_t address, size, flags;
+    uintptr_t address;
+    uint32_t size, flags;
     const char *colon;
 
     requireInitialized(0x193);
     if (name == NULL || mode >= 4 || file == NULL) {
         zdebugFail("Invalid parameters", kRamdiskFile, 0x194, 0);
     }
+#if UINTPTR_MAX == 0xffffffffu
     address = (uint32_t)zstrtoul(name, 16);
+#else
+    address = (uintptr_t)strtoull(name, NULL, 16); /* zstrtoul's unsigned long is 32 bits on Windows */
+#endif
     colon = zstrchr(name, ':');
     if (colon == NULL) {
         zfileRegisterErrorMessage("Invalid file name");

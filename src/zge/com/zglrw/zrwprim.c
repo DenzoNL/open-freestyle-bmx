@@ -132,7 +132,7 @@ static void primSetTexture(uint32_t flags, uint32_t texture)
     if (state == gZrwRenderFlags) {
         const void *raster = (material == NULL) ? NULL : zrwmatGetRaster(material, 0);
 
-        if ((uint32_t)(uintptr_t)raster == (uint32_t)gZrwRenderExtra) {
+        if (raster == gZrwRenderExtra) {
             return;
         }
     }

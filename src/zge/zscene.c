@@ -23,7 +23,7 @@ static const char zsceneFile[] = "C:\\NgEngine\\Zge\\zScene.c";
 /* Extension handlers (models, animations): {extension, handler}, ended by a NULL extension. */
 typedef struct ZsceneExtension {
     const char *extension;
-    int(BMX_CDECL *handler)(uint32_t *request);
+    int(BMX_CDECL *handler)(ZsceneRequest *request);
 } ZsceneExtension;
 
 #define gSceneModelHandlers ORIG_VAR(0x005618dc, const ZsceneExtension *, gSceneModelHandlers)
@@ -165,16 +165,16 @@ fail:
 }
 
 BMX_ADDR(0x00490630)
-int zsceneFindNode(ZsceneNode *node, int32_t *query)
+int zsceneFindNode(ZsceneNode *node, ZsceneQuery *query)
 {
-    if (node->type == query[0]) {
-        if (query[1] == 0) {
-            query[1] = -1;
-            query[3] = (int32_t)(intptr_t)node;
+    if (node->type == query->kind) {
+        if (query->key == 0) {
+            query->key = -1;
+            query->node = node;
             return 0;
         }
-        if ((int32_t)node->nameHash == query[1]) {
-            query[3] = (int32_t)(intptr_t)node;
+        if ((int32_t)node->nameHash == query->key) {
+            query->node = node;
             return 0;
         }
     }
@@ -184,14 +184,14 @@ int zsceneFindNode(ZsceneNode *node, int32_t *query)
     if (node->sibling != 0 && zsceneFindNode(node->sibling, query) == 0) {
         return 0;
     }
-    return (int)(intptr_t)node;
+    return BMX_LAYOUT32 ? (int)(intptr_t)node : 1; /* not found: any non-zero value */
 }
 
 BMX_ADDR(0x004906a0)
-int zsceneEntryMatch(ZsceneEntry *entry, int32_t *query)
+int zsceneEntryMatch(ZsceneEntry *entry, ZsceneQuery *query)
 {
-    if ((int8_t)entry->flags == query[0] && (int32_t)entry->id == query[1]) {
-        query[2] = (int32_t)(intptr_t)entry;
+    if ((int8_t)entry->flags == query->kind && (int32_t)entry->id == query->key) {
+        query->entry = entry;
         return 0;
     }
     return 1;
@@ -238,7 +238,7 @@ int zsceneLoadChunks(void *data, uint32_t size, const char *directory, int kind,
             zdebugFail(zstrFormatTemp("Scene component file not found:%s", path), zsceneFile, 750, 0);
             return 0;
         }
-        file = zfileOpenRamDisk((uint32_t)(uintptr_t)image, dataSize);
+        file = zfileOpenRamDisk(image, dataSize);
         if (file == 0) {
             zdebugFail("Couldn't open ramdisk file", zsceneFile, 752, 0);
             return 0;
@@ -381,29 +381,28 @@ int zsceneForgetEntry(int type, int kind, void *object, ZsceneEntry *entry)
 }
 
 BMX_ADDR(0x00490cc0)
-int zsceneLoadModelFile(uint32_t *request)
+int zsceneLoadModelFile(ZsceneRequest *request)
 {
-    void *model = zrwmatLoadModel((void *)(uintptr_t)request[0]);
+    void *model = zrwmatLoadModel((void *)(uintptr_t)request->file); /* the path */
 
-    request[2] = (uint32_t)(uintptr_t)model;
+    request->model = model;
     return model != 0;
 }
 
 BMX_ADDR(0x00490d90)
-int zsceneLoadAnimFile(uint32_t *request)
+int zsceneLoadAnimFile(ZsceneRequest *request)
 {
     uint32_t size;
-    void *image = zfileLoad((const char *)(uintptr_t)request[0], (int *)&size);
+    void *image = zfileLoad(request->file, (int *)&size);
     ZfileHandle *file;
     void *iff;
     ZsceneAnim *list = 0;
 
     if (image == 0) {
-        zdebugFail(zstrFormatTemp("AnimLib not found:%s", (const char *)(uintptr_t)request[0]), zsceneFile,
-                   1062, 0);
+        zdebugFail(zstrFormatTemp("AnimLib not found:%s", request->file), zsceneFile, 1062, 0);
         return 0;
     }
-    file = zfileOpenRamDisk((uint32_t)(uintptr_t)image, size);
+    file = zfileOpenRamDisk(image, size);
     iff = ziffOpen(file, 0x4d524f46, 0);
     if (iff != 0) {
         int found;
@@ -422,22 +421,21 @@ int zsceneLoadAnimFile(uint32_t *request)
         }
         ziffClose(iff);
     }
-    request[1] = (uint32_t)(uintptr_t)list;
+    request->anims = list;
     zfileClose(file, 0);
     zfileFreeBuffer(image);
     return 1;
 }
 
 BMX_ADDR(0x00490e90)
-int zsceneLoadAnimLibrary(uint32_t *request)
+int zsceneLoadAnimLibrary(ZsceneRequest *request)
 {
     ZsceneAnim *list = 0;
-    int lib = zassetOpenLibrary((const char *)(uintptr_t)request[0]);
+    int lib = zassetOpenLibrary(request->file);
     int count;
 
     if (lib == 0) {
-        zdebugFail(zstrFormatTemp("AnimLib not found:%s", (const char *)(uintptr_t)request[0]), zsceneFile,
-                   1096, 0);
+        zdebugFail(zstrFormatTemp("AnimLib not found:%s", request->file), zsceneFile, 1096, 0);
         return 0;
     }
     for (count = zassetCount(lib); count != 0; count--) {
@@ -445,7 +443,7 @@ int zsceneLoadAnimLibrary(uint32_t *request)
         void *image = zmemAlloc(size);
 
         if (zassetRead(lib, image) != 0) {
-            ZfileHandle *file = zfileOpenRamDisk((uint32_t)(uintptr_t)image, size);
+            ZfileHandle *file = zfileOpenRamDisk(image, size);
             void *iff = ziffOpen(file, 0x4d524f46, 0);
 
             if (iff != 0) {
@@ -472,7 +470,7 @@ int zsceneLoadAnimLibrary(uint32_t *request)
         zassetNext(lib);
     }
     zassetCloseLibrary(lib);
-    request[1] = (uint32_t)(uintptr_t)list;
+    request->anims = list;
     return 1;
 }
 
@@ -515,7 +513,7 @@ int zsceneInitialize(const char *path)
 BMX_ADDR(0x004911c0)
 int zsceneOpen(const char *name)
 {
-    int32_t query[4];
+    ZsceneQuery query;
     ZsceneNode *current;
     ZsceneNode *node = 0;
     uint32_t size;
@@ -527,23 +525,23 @@ int zsceneOpen(const char *name)
         zdebugFail("There is already a scene open", zsceneFile, 1265, 0);
         return 0;
     }
-    query[0] = 0;
-    query[1] = zstrHash(name);
-    query[2] = 0;
-    query[3] = 0;
+    query.kind = 0;
+    query.key = zstrHash(name);
+    query.entry = NULL;
+    query.node = NULL;
     current = gScene.current;
-    if (current->type == 0 && (query[1] == 0 || current->nameHash == (uint32_t)query[1])) {
+    if (current->type == 0 && (query.key == 0 || current->nameHash == (uint32_t)query.key)) {
         node = current;
     } else {
         int found = 1;
 
         if (current->child != 0) {
-            found = zsceneFindNode(current->child, query);
-            node = (ZsceneNode *)(intptr_t)query[3];
+            found = zsceneFindNode(current->child, &query);
+            node = query.node;
         }
         if ((current->child == 0 || found != 0) && current->sibling != 0) {
-            zsceneFindNode(current->sibling, query);
-            node = (ZsceneNode *)(intptr_t)query[3];
+            zsceneFindNode(current->sibling, &query);
+            node = query.node;
         }
     }
     if (node == 0) {
@@ -595,47 +593,48 @@ typedef void(BMX_CDECL *ZMemEachFn)(void *payload, void *arg);
  * The node of the query's type and name below the open scene (or the last one of the file). A name hash
  * of 0 takes the first node of the type and marks the query with -1.
  */
-static ZsceneNode *findNodeOfType(int32_t *query)
+static ZsceneNode *findNodeOfType(ZsceneQuery *query)
 {
     ZsceneNode *start = gScene.open != 0 ? gScene.open : gScene.current;
     ZsceneNode *node = 0;
     int found = 1;
 
-    if (start->type == query[0] && (query[1] == 0 || start->nameHash == (uint32_t)query[1])) {
-        if (query[1] == 0) {
-            query[1] = -1;
+    if (start->type == query->kind && (query->key == 0 || start->nameHash == (uint32_t)query->key)) {
+        if (query->key == 0) {
+            query->key = -1;
         }
         return start;
     }
     if (start->child != 0) {
         found = zsceneFindNode(start->child, query);
-        node = (ZsceneNode *)(intptr_t)query[3];
+        node = query->node;
     }
     if ((start->child == 0 || found != 0) && start->sibling != 0) {
         zsceneFindNode(start->sibling, query);
-        node = (ZsceneNode *)(intptr_t)query[3];
+        node = query->node;
     }
     return node;
 }
 
 /* Falls back to the common scene when the search found nothing. */
-static ZsceneNode *findInCommon(int32_t *query, ZsceneNode *node)
+static ZsceneNode *findInCommon(ZsceneQuery *query, ZsceneNode *node)
 {
     int found = 1;
 
     if (node != 0) {
         return node;
     }
-    if (gScene.common.type == query[0] && (query[1] == 0 || (int32_t)gScene.common.nameHash == query[1])) {
+    if (gScene.common.type == query->kind &&
+        (query->key == 0 || (int32_t)gScene.common.nameHash == query->key)) {
         return &gScene.common;
     }
     if (gScene.common.child != 0) {
         found = zsceneFindNode(gScene.common.child, query);
-        node = (ZsceneNode *)(intptr_t)query[3];
+        node = query->node;
     }
     if ((gScene.common.child == 0 || found != 0) && gScene.common.sibling != 0) {
         zsceneFindNode(gScene.common.sibling, query);
-        node = (ZsceneNode *)(intptr_t)query[3];
+        node = query->node;
     }
     return node;
 }
@@ -659,16 +658,16 @@ BMX_ADDR(0x00491410)
 void *zsceneFindModel(int flags, const char *name)
 {
     const uint32_t hash = (uint32_t)zstrHash(name);
-    int32_t query[4];
-    int32_t search[3] = {1, (int32_t)hash, 0};
+    ZsceneQuery query;
+    ZsceneQuery search = {1, (int32_t)hash, NULL, NULL};
     ZsceneEntry *entry;
     ZsceneNode *node;
     void *model;
     void *object;
     char extension[4];
 
-    zmemFreeListForEach(gScene.entries, BMX_FNPTR(ZMemEachFn, 0x004906a0, zsceneEntryMatch), search);
-    entry = (ZsceneEntry *)(intptr_t)search[2];
+    zmemFreeListForEach(gScene.entries, BMX_FNPTR(ZMemEachFn, 0x004906a0, zsceneEntryMatch), &search);
+    entry = search.entry;
     if (entry != 0) {
         if ((uint8_t)(entry->flags >> 8) == 0) {
             model = zrwmatModelFromObject(zobjGetModel(entry->object));
@@ -679,12 +678,13 @@ void *zsceneFindModel(int flags, const char *name)
     } else {
         const ZsceneExtension *handler;
         const char *file;
+        ZsceneRequest request;
 
-        query[0] = 1;
-        query[1] = (int32_t)hash;
-        query[2] = 0;
-        query[3] = 0;
-        node = findInCommon(query, findNodeOfType(query));
+        query.kind = 1;
+        query.key = (int32_t)hash;
+        query.entry = NULL;
+        query.node = NULL;
+        node = findInCommon(&query, findNodeOfType(&query));
         if (node == 0) {
             zdebugFail(zstrFormatTemp("Model not in scene:%s", name), zsceneFile, 1388, 0);
             return 0;
@@ -697,15 +697,15 @@ void *zsceneFindModel(int flags, const char *name)
             zdebugFail(zstrFormatTemp("Unknown model extension:%s", extension), zsceneFile, 1397, 0);
             return 0;
         }
-        /* The request reuses the query's stack slots: {file, 0, result}. */
-        query[0] = (int32_t)(intptr_t)file;
-        query[1] = 0;
-        query[2] = 0;
-        if (handler->handler((uint32_t *)query) == 0) {
+        /* The original builds the request in the query's stack slots. */
+        request.file = file;
+        request.anims = NULL;
+        request.model = NULL;
+        if (handler->handler(&request) == 0) {
             zdebugFail(zstrFormatTemp("Model not found:%s", file), zsceneFile, 1406, 0);
             return 0;
         }
-        model = (void *)(intptr_t)query[2];
+        model = request.model;
     }
     if (model == 0) {
         return 0;
@@ -739,24 +739,24 @@ BMX_ADDR(0x00491720)
 void *zsceneFindAnim(int flags, const char *name)
 {
     const uint32_t hash = (uint32_t)zstrHash(name);
-    int32_t search[3] = {2, (int32_t)hash, 0};
-    int32_t query[4];
+    ZsceneQuery search = {2, (int32_t)hash, NULL, NULL};
+    ZsceneQuery query;
     ZsceneNode *node;
     ZsceneEntry *entry;
     const ZsceneExtension *handler;
     const char *file;
     char extension[4];
-    uint32_t request[2];
+    ZsceneRequest request;
 
-    zmemFreeListForEach(gScene.entries, BMX_FNPTR(ZMemEachFn, 0x004906a0, zsceneEntryMatch), search);
-    if (search[2] != 0) {
-        return (void *)(intptr_t)search[2];
+    zmemFreeListForEach(gScene.entries, BMX_FNPTR(ZMemEachFn, 0x004906a0, zsceneEntryMatch), &search);
+    if (search.entry != NULL) {
+        return search.entry;
     }
-    query[0] = 2;
-    query[1] = (int32_t)hash;
-    query[2] = 0;
-    query[3] = 0;
-    node = findInCommon(query, findNodeOfType(query));
+    query.kind = 2;
+    query.key = (int32_t)hash;
+    query.entry = NULL;
+    query.node = NULL;
+    node = findInCommon(&query, findNodeOfType(&query));
     if (node == 0) {
         zdebugFail(zstrFormatTemp("Anim not in scene:%s", name), zsceneFile, 1489, 0);
         return 0;
@@ -769,9 +769,10 @@ void *zsceneFindAnim(int flags, const char *name)
         zdebugFail("Unknown extension", zsceneFile, 1498, 0);
         return 0;
     }
-    request[0] = (uint32_t)(uintptr_t)file;
-    request[1] = 0;
-    if (handler->handler(request) == 0) {
+    request.file = file;
+    request.anims = NULL;
+    request.model = NULL;
+    if (handler->handler(&request) == 0) {
         zdebugFail(zstrFormatTemp("Anim not found:%s", file), zsceneFile, 1507, 0);
         return 0;
     }
@@ -782,7 +783,7 @@ void *zsceneFindAnim(int flags, const char *name)
         entry = zmemFreeListAlloc(gScene.entries);
         entry->node = node;
         entry->id = hash;
-        entry->object = (void *)(uintptr_t)request[1];
+        entry->object = request.anims;
         entry->flags = (entry->flags & 0xffff0202u) | 0x10202u;
     }
     if ((flags & 1) != 0) {
@@ -792,7 +793,7 @@ void *zsceneFindAnim(int flags, const char *name)
 }
 
 BMX_ADDR(0x00491a80)
-int zsceneAnimTable(void *library, uint32_t *table, int size)
+int zsceneAnimTable(void *library, void **table, int size)
 {
     const ZsceneAnim *node = ((const ZsceneEntry *)library)->object;
     int count = 0;
@@ -807,16 +808,16 @@ int zsceneAnimTable(void *library, uint32_t *table, int size)
         return 0;
     }
     if (node != 0) {
-        uint32_t *dst = table + count;
+        void **dst = table + count;
 
         do {
             dst--;
-            *dst = (uint32_t)(uintptr_t)node->anim;
+            *dst = node->anim;
             node = node->next;
         } while (node != 0);
     }
     if (count < size) {
-        uint32_t *dst = table + count;
+        void **dst = table + count;
         int left = size - count;
 
         do {

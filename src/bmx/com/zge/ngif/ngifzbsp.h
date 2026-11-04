@@ -133,7 +133,7 @@ typedef struct ZbspFaceHit {
     float dist;  /* distance of p above the face plane */
     ZVec3 point; /* closest point of the face */
     uint32_t pad14;
-    int32_t object; /* owning prop's collision object, 0 for level geometry */
+    PhysPropObject *object; /* owning prop's collision object, NULL for level geometry */
 } ZbspFaceHit;
 
 typedef struct ZbspFaceQuery {

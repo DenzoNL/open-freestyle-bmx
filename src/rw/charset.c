@@ -251,7 +251,7 @@ __attribute__((regparm(3))) int rtCharsetPrintText(RtCharset *charset, const cha
     RwRenderStateSet(4, 0);
     RwRenderStateSet(6, 0);
     RwRenderStateSet(7, 1);
-    RwRenderStateSet(1, (int32_t)(uintptr_t)charset);
+    RwRenderStateSet(1, (intptr_t)charset);
     RwRenderStateSet(8, 5);
     RwRenderStateSet(9, 6);
     for (int32_t i = 0; i < length * 4; i++) {

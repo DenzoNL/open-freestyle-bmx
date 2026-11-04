@@ -119,7 +119,7 @@ static void attach_env(DtCtx *c)
     maybe_fill(&rwCameraRegistry, 0x500);
     rpBoneStreamResult = (int32_t)dt_u32();
     rpLodCamera = (void *)(uintptr_t)dt_u32();
-    rpLodReserved = (int32_t)dt_u32();
+    rpLodFreeList = (RwFreeList *)(uintptr_t)dt_u32();
     rwtEnd();
 }
 

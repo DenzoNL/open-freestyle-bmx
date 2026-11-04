@@ -201,7 +201,7 @@ uint32_t actionInitialize(void)
         if (entry == NULL) {
             break;
         }
-        gActionMotions[count] = (uint32_t)(uintptr_t)entry->motion;
+        gActionMotions[count] = entry->motion;
         count++;
     }
     if (count >= 0xef) {

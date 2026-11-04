@@ -477,7 +477,7 @@ static void scene_faces(const PhysRider *r, uint32_t steps)
         h[i].point.x = p->x + rf(-60, 60);
         h[i].point.y = p->y + rf(-60, 60);
         h[i].point.z = p->z + rf(-60, 60);
-        h[i].object = (dt_u32() & 7) ? 0 : (int32_t)dt_u32();
+        h[i].object = (dt_u32() & 7) ? NULL : (PhysPropObject *)(uintptr_t)dt_u32();
     }
     h[n].face = NULL;
     q->hits = h;

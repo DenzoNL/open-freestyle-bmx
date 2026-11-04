@@ -201,8 +201,8 @@ ZActor *zrollerCreatePlayerActor(const uint16_t *def)
     color[0] = color[1] = color[2] = color[3] = 0xff;
     gZobjSetColor(zobjGetModel(shadowObject), color);
     gZobjSetFlags(modelOf(riderObject), 8, 0);
-    zobjSetVisible((int32_t)(uintptr_t)shadowObject, 0);
-    if (gZrollerUpdateHandle != 0) {
+    zobjSetVisible(shadowObject, 0);
+    if (gZrollerUpdateHandle != NULL) {
         gZrollerUnregister(gZrollerUpdateHandle);
     }
     gZrollerUpdateHandle =
@@ -212,8 +212,8 @@ ZActor *zrollerCreatePlayerActor(const uint16_t *def)
         return NULL;
     }
     zactorSetSkeleton(actor, 0);
-    actor->object = (int32_t)(uintptr_t)riderObject;
-    actor->shadow = (int32_t)(uintptr_t)shadowObject;
+    actor->object = riderObject;
+    actor->shadow = shadowObject;
     zactorSetupRider(actor);
     return actor;
 }
@@ -240,10 +240,10 @@ ZActor *zrollerCreateBikeActor(const uint32_t *def)
     color[0] = color[1] = color[2] = color[3] = 0xff;
     gZobjSetColor(zobjGetModel(shadowObject), color);
     gZobjSetFlags(modelOf(bikeObject), 8, 0);
-    zobjSetVisible((int32_t)(uintptr_t)shadowObject, 0);
+    zobjSetVisible(shadowObject, 0);
     zactorSetSkeleton(actor, 1);
-    actor->object = (int32_t)(uintptr_t)bikeObject;
-    actor->shadow = (int32_t)(uintptr_t)shadowObject;
+    actor->object = bikeObject;
+    actor->shadow = shadowObject;
     zactorSetupBike(actor);
     return actor;
 }

@@ -183,7 +183,6 @@ BMX_LAYOUT32_ASSERT(sizeof(RpSkinGeometry) == 0xc, "RpSkinGeometry layout");
 #define rpLodEngineOffset     ORIG_VAR(0x00697370, int32_t, rpLodEngineOffset)
 #define rpLodAtomicOffset     ORIG_VAR(0x00697374, int32_t, rpLodAtomicOffset)
 #define rpLodCamera           ORIG_VAR(0x00697378, void *, rpLodCamera)
-#define rpLodReserved         ORIG_VAR(0x0069737c, int32_t, rpLodReserved)
 
 /* Register a plugin on an object type: data size, plugin id and constructor/destructor/copy callbacks. */
 int32_t RpAtomicRegisterPlugin(int32_t size, int32_t pluginID, RwPluginObjectConstructor constructCB,

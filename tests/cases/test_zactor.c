@@ -476,7 +476,7 @@ static void setup_visible(DtCtx *c)
     obj[0] = dt_u32();
     obj[0x28 / 4] = (uint32_t)(uintptr_t)vtab;
     vtab[0x14 / 4] = (c->seed & 1) ? (uint32_t)(uintptr_t)vis_cb : 0;
-    a->object = (int32_t)(uintptr_t)obj;
+    a->object = (struct ZObj *)(void *)obj;
     DT_ARG_PTR(c, 0, a);
 }
 

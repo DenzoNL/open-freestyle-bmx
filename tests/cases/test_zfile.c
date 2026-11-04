@@ -60,13 +60,16 @@ static const char *BMX_CDECL dev_name(ZfileDevice *d)
     return ((FakeDevice *)d)->name;
 }
 
-static uint32_t BMX_CDECL dev_control(ZfileDevice *d, uint32_t cmd, uint32_t a, uint32_t b)
+static const char *BMX_CDECL dev_control(ZfileDevice *d, uint32_t cmd, const char *const *keys,
+                                         const void *block)
 {
+    const uint32_t a = (uint32_t)(uintptr_t)keys;
+    const uint32_t b = (uint32_t)(uintptr_t)block;
+
     logU(0x300 + devId(d));
     logU(cmd);
     if (cmd == 2) {
-        const char *const *keys = (const char *const *)(uintptr_t)a;
-        const uint32_t *values = (const uint32_t *)(uintptr_t)b;
+        const uint32_t *values = block;
         logStr(keys[0]);
         logStr(keys[1]);
         logU(values[0]);
@@ -75,7 +78,7 @@ static uint32_t BMX_CDECL dev_control(ZfileDevice *d, uint32_t cmd, uint32_t a, 
         logU(dt_canon(a));
         logU(dt_canon(b));
     }
-    return gControlResult;
+    return (const char *)(uintptr_t)gControlResult;
 }
 
 static int BMX_CDECL dev_open(ZfileHandle *f, const char *path, int mode, int flags)
@@ -117,20 +120,20 @@ static int BMX_CDECL dev_write(ZfileHandle *f, const void *buf, int count, int f
     return count - 1;
 }
 
-static uint32_t BMX_CDECL dev_op30(ZfileHandle *f, uint32_t a, uint32_t b, uint32_t c)
+static uint32_t BMX_CDECL dev_op30(ZfileHandle *f, uint32_t a, uint32_t b, const void *c)
 {
     logU(0x800 + devId(f->device));
     logU(a);
     logU(b);
-    logU(c);
+    logU((uint32_t)(uintptr_t)c);
     return gOpAnswer;
 }
 
-static uint32_t BMX_CDECL dev_op34(ZfileHandle *f, uint32_t a, uint32_t b)
+static uint32_t BMX_CDECL dev_op34(ZfileHandle *f, uint32_t *a, const void *b)
 {
     logU(0x900 + devId(f->device));
-    logU(a);
-    logU(b);
+    logU((uint32_t)(uintptr_t)a);
+    logU((uint32_t)(uintptr_t)b);
     return gOpAnswer + 1;
 }
 

@@ -452,7 +452,7 @@ static void pushOffFaces(const CameraState *cam, ZVec3 *eye)
 
             zvec3NormalizeScaled(&dir, &dir);
             dot = zvec3Dot(&dir, &normal);
-            if (x87Below(dot, 0.0f) && dot > -0x1.666666p-1f && hit->object == 0) {
+            if (x87Below(dot, 0.0f) && dot > -0x1.666666p-1f && hit->object == NULL) {
                 const float len = (float)zvec3Length(&d);
                 double push;
 

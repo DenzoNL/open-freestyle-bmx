@@ -73,7 +73,7 @@ void *zrwfopen(const char *path, const char *mode)
     (void)path; /* the RAM disk serves the file set with ImageBufferSizeType */
     (void)mode;
     const char *keys[2];
-    uint32_t values[2];
+    uintptr_t values[2];
     const char *name;
 
     if (gZrwRamDiskInfo == gZrwRamDiskNoInfo) {
@@ -102,10 +102,9 @@ void *zrwfopen(const char *path, const char *mode)
     }
     keys[0] = "ADDRESS";
     keys[1] = "SIZE";
-    values[0] = gZrwRamDiskInfo->address;
+    values[0] = (uintptr_t)gZrwRamDiskInfo->address;
     values[1] = gZrwRamDiskInfo->size;
-    name = (const char *)(uintptr_t)zfileDeviceControl(
-        (ZfileDevice *)gZrwRamDiskDevice, 2, (uint32_t)(uintptr_t)keys, (uint32_t)(uintptr_t)values);
+    name = zfileDeviceControl((ZfileDevice *)gZrwRamDiskDevice, 2, keys, values);
     if (name == NULL) {
         return NULL;
     }

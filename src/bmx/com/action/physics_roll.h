@@ -29,7 +29,8 @@ _Static_assert(sizeof(PhysDebugVertex) == 0x14, "PhysDebugVertex size");
 /* TODO(file): zge/ngif (ngifzcollide.c, ngifzbsp.c, ngifpsx.c). */
 ORIG_FN(0x00469b00, int, ngifzCollideLine, (const ZVec3 *from, const ZVec3 *to, PhysRayHit *hit));
 ORIG_FN(0x004665c0, const uint8_t *, ngifzBspGetInfo, (int object));
-ORIG_FN(0x00469530, int, ngifzCollideObjectValid, (int object));
+/* The shape kind byte of the object (never NULL: a zero byte when it has no shape). */
+ORIG_FN(0x00469530, const uint8_t *, ngifzCollideObjectValid, (int object));
 ORIG_FN(0x00466610, void, ngifzBspObjectHit, (PhysPropObject * object, int a));
 ORIG_FN(0x00463710, void, ngifDrawLine3D, (int mode, const PhysDebugVertex *a, const PhysDebugVertex *b));
 

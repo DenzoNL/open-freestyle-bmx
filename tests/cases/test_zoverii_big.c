@@ -182,7 +182,7 @@ static void make_faces(const ZVec3 *from, const ZVec3 *to)
             uint16_t *object = dt_alloc(8);
 
             dt_fill(object, 8);
-            hits[i].object = (int32_t)(uintptr_t)object;
+            hits[i].object = (PhysPropObject *)(void *)object;
         } else {
             hits[i].object = 0;
         }

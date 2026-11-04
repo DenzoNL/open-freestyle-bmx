@@ -324,7 +324,7 @@ void zstrNameTable2Add(ZNameHandlerFn handler, const char *name)
 
 /* Calls the handler registered under name (if any) with a and b. */
 BMX_ADDR(0x00482fc0)
-void zstrNameTable2Call(const char *name, uint32_t a, uint32_t b)
+void zstrNameTable2Call(const char *name, const void *a, void *b)
 {
     const ZNameEntry *entry = zstrNameTableFindEntry(gNameTables[2], name);
     if (entry != NULL) {

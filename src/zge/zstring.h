@@ -34,8 +34,8 @@ typedef struct ZNameEntry {
     int hash; /* zstrHash(name) */
 } ZNameEntry;
 
-/* Handler stored in name table 2, invoked by zstrNameTable2Call. */
-typedef void(BMX_CDECL *ZNameHandlerFn)(uint32_t a, uint32_t b);
+/* Handler stored in name table 2, invoked by zstrNameTable2Call (the effect creators: object, parameters). */
+typedef void(BMX_CDECL *ZNameHandlerFn)(const void *a, void *b);
 
 typedef ZList *ZNameTables[3];
 #define gNameTablesReady ORIG_VAR(0x00670518, int, gNameTablesReady)
@@ -71,6 +71,6 @@ void *zstrNameTable0Find(const char *name);
 void zstrNameTable1Add(void *value, const char *name);
 void *zstrNameTable1Find(const char *name);
 void zstrNameTable2Add(ZNameHandlerFn handler, const char *name);
-void zstrNameTable2Call(const char *name, uint32_t a, uint32_t b);
+void zstrNameTable2Call(const char *name, const void *a, void *b);
 
 #endif

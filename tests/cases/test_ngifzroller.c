@@ -256,20 +256,20 @@ static void BMX_CDECL stubSetFlags(void *model, int set, int clear)
     ngLog((uint32_t)clear);
 }
 
-static int BMX_CDECL stubRegister(int priority, void *callback, void *arg, int flag)
+static void *BMX_CDECL stubRegister(int priority, void *callback, void *arg, int flag)
 {
     ngLog(0x561470);
     ngLog((uint32_t)priority);
     ngLog(dt_canon((uint32_t)(uintptr_t)callback));
     ngLog(dt_canon((uint32_t)(uintptr_t)arg));
     ngLog((uint32_t)flag);
-    return (int)(dt_u32() | 1);
+    return (void *)(uintptr_t)(dt_u32() | 1);
 }
 
-static void BMX_CDECL stubUnregister(int handle)
+static void BMX_CDECL stubUnregister(void *handle)
 {
     ngLog(0x561474);
-    ngLog((uint32_t)handle);
+    ngLog((uint32_t)(uintptr_t)handle);
 }
 
 static void BMX_CDECL stubClearPose(void)
@@ -314,7 +314,7 @@ static void actorHooks(void)
     gZobjSetFlags = stubSetFlags;
     gZrollerRegister = stubRegister;
     gZrollerUnregister = stubUnregister;
-    gZrollerUpdateHandle = (dt_u32() & 1) ? (int)dt_u32() : 0;
+    gZrollerUpdateHandle = (dt_u32() & 1) ? (void *)(uintptr_t)dt_u32() : NULL;
     gZrollerShadow.shadow.slots = gZrollerShadowSlots;
     dt_fill(&gZrollerShadowSlots, sizeof gZrollerShadowSlots);
     dt_stub(0x004646f0, NULL, (void *)stubClearPose);

@@ -53,7 +53,7 @@ typedef void(BMX_CDECL *ZrwDbgSphereFn)(const ZVec3 *center, float radius, const
 #define gZrwDbgSphereHook   ORIG_VAR(0x0056006c, ZrwDbgSphereFn, gZrwDbgSphereHook)
 /* zrwzgl.h's render state (flags and the current raster); that header clashes with zrwmodel.h. */
 #define gZrwRenderFlags     ORIG_VAR(0x00697778, uint32_t, gZrwRenderFlags)
-#define gZrwRenderExtra     ORIG_VAR(0x0069777c, int, gZrwRenderExtra)
+#define gZrwRenderExtra     ORIG_VAR(0x0069777c, const void *, gZrwRenderExtra)
 #define gZrwRenderStateHook ORIG_VAR(0x00561490, ZrwRenderStateHookFn, gZrwRenderStateHook)
 #define gZrwBeginHook       ORIG_VAR(0x00561494, ZrwRenderHookFn, gZrwBeginHook)
 #define gZrwEndHook         ORIG_VAR(0x00561498, ZrwRenderHookFn, gZrwEndHook)
@@ -470,7 +470,7 @@ void *zrwModelRenderBillboard(void *object)
     zrwModelSetColor(model, &model->color);
     gZrwBeginHook();
     renderFlags = (gZrwRenderFlags & 0xffff22ffu) | 0x2222;
-    if (gZrwRenderFlags != renderFlags || gZrwRenderExtra != 0) {
+    if (gZrwRenderFlags != renderFlags || gZrwRenderExtra != NULL) {
         gZrwRenderStateHook(renderFlags, NULL);
     }
     axis.x = 0;
@@ -519,7 +519,7 @@ static void flushTriangles(RpGeometry *geometry, int material, int count)
     void *raster = RwTextureGetRaster(RpMaterialGetTexture(rpMaterial));
 
     /* the original fetches the raster a second time */
-    if ((int)(uintptr_t)raster != gZrwRenderExtra) {
+    if (raster != gZrwRenderExtra) {
         raster = RwTextureGetRaster(RpMaterialGetTexture(rpMaterial));
         gZrwRenderStateHook(gZrwRenderFlags, raster);
     }
@@ -581,7 +581,7 @@ void *zrwModelRenderAtomic(void *atomic)
         const uint32_t renderFlags = (gZrwRenderFlags & 0xffff12f5u) | 0x1220;
 
         if (gZrwRenderFlags != renderFlags) {
-            gZrwRenderStateHook(renderFlags, (const void *)(uintptr_t)gZrwRenderExtra);
+            gZrwRenderStateHook(renderFlags, gZrwRenderExtra);
         }
     }
     RwRenderStateSet(4, 0);

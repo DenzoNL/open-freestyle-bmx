@@ -154,7 +154,7 @@ void fxSpawn(const void *obj, int index, const ZVec3 *pos, uint32_t seed)
         spark.vel.x = (float)((double)(int16_t)bmxFtol((double)(zmathRandom() & 0xff) - 128.0) * 0.03125f);
         spark.vel.y = (float)((double)(int16_t)(zmathRandom() & 0x7f) * -0.015625f);
         spark.vel.z = (float)((double)(int16_t)bmxFtol((double)(zmathRandom() & 0xff) - 128.0) * 0.03125f);
-        zstrNameTable2Call("spark", (uint32_t)(uintptr_t)node, (uint32_t)(uintptr_t)&spark);
+        zstrNameTable2Call("spark", node, &spark);
     }
 }
 
@@ -195,7 +195,7 @@ void fxImpactSparks(const ZVec3 *pos, const ZVec3 *vel)
         impact.vel.x = (float)((double)vel->x * 0.5f);
         impact.vel.y = (float)((double)vel->y * 0.5f);
         impact.vel.z = (float)((double)vel->z * 0.5f);
-        zstrNameTable2Call("dust", (uint32_t)(uintptr_t)node, (uint32_t)(uintptr_t)&impact);
+        zstrNameTable2Call("dust", node, &impact);
     }
 }
 
@@ -296,7 +296,7 @@ void fxShards(const ZVec3 *pos, const ZVec3 *vel)
         shard.spin.z = (float)(int16_t)(zmathRandom() % 1000);
         shard.size = (float)(int16_t)(zmathRandom() % 0x50 + 5);
         shard.life = (int32_t)(zmathRandom() % 2000 + 1000);
-        zstrNameTable2Call("shard", (uint32_t)(uintptr_t)node, (uint32_t)(uintptr_t)&shard);
+        zstrNameTable2Call("shard", node, &shard);
     }
 }
 
@@ -381,7 +381,7 @@ void fxSkidMark(const ZVec3 *from, const ZVec3 *to, int flags, const ZVec3 *norm
     skid.corner[3].pos.x = (float)((hx + gFxSkidCorners[3].pos.x) - target[2]);
     skid.corner[3].pos.y = (float)((hyf + gFxSkidCorners[3].pos.y) - target[3]);
     skid.corner[3].pos.z = (float)((hzf + gFxSkidCorners[3].pos.z) - target[4]);
-    zstrNameTable2Call("skid", (uint32_t)(uintptr_t)node, (uint32_t)(uintptr_t)&skid);
+    zstrNameTable2Call("skid", node, &skid);
 }
 
 BMX_ADDR(0x004095a0)
@@ -466,8 +466,8 @@ void fxWaterSplash(const uint8_t *obj, int unused, const float *offset)
     splash.life = 1000;
     splash.color[0] = splash.color[1] = splash.color[2] = 0xff;
     splash.color[3] = 0x40;
-    zstrNameTable2Call("ripple", (uint32_t)(uintptr_t)node, (uint32_t)(uintptr_t)&ripple);
-    zstrNameTable2Call("splash", (uint32_t)(uintptr_t)node, (uint32_t)(uintptr_t)&splash);
+    zstrNameTable2Call("ripple", node, &ripple);
+    zstrNameTable2Call("splash", node, &splash);
 }
 
 /* Empty (the callers pass debug draw parameters; the shipped build does nothing). */

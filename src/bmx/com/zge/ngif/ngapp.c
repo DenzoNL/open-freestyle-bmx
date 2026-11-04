@@ -87,7 +87,7 @@ typedef int(BMX_STDCALL *SetWindowTextFn)(void *window, const char *text);
 #define gNgLegal2       ORIG_VAR(0x005ab490, void *, gNgLegal2)
 #define gNgLegalTime    ORIG_VAR(0x0055bd04, uint32_t, gNgLegalTime)
 #define gNgLegalPending ORIG_VAR(0x0055bc3c, int, gNgLegalPending)
-#define gNgRamDisk      ORIG_VAR(0x0055bc38, uint32_t, gNgRamDisk)
+#define gNgRamDisk      ORIG_VAR(0x0055bc38, intptr_t, gNgRamDisk)
 #define gNgAssetsDir    ORIG_VAR(0x0055ba04, const char *, gNgAssetsDir)
 #define gNgWrapName     ORIG_VAR(0x0055bc40, const char *, gNgWrapName)
 #define gNgArtName      ORIG_VAR(0x005ab3b8, char, gNgArtName)
@@ -469,8 +469,8 @@ void ngappLoadInterfaceArt(void)
     uint32_t size;
     ZfileDeviceTable *devices;
     const char *names[2];
-    uint32_t values[2];
-    uint32_t path;
+    uintptr_t values[2];
+    const char *path;
     uint32_t i;
 
     if (gNgArt != NULL) {
@@ -493,24 +493,23 @@ void ngappLoadInterfaceArt(void)
     }
     for (i = 0; i < devices->count;) {
         if (zstrcmp(zfileDeviceName(devices->device[i]), "rd00") == 0) {
-            gNgRamDisk = (uint32_t)(uintptr_t)devices->device[i];
+            gNgRamDisk = (intptr_t)devices->device[i];
             break;
         }
         i++;
     }
-    if (gNgRamDisk == 0xffffffffu) {
+    if (gNgRamDisk == -1) {
         zdebugFail("Could not locate a RAM disk device on this system!", kNgAppFile, 0x3e1, 0);
     }
-    values[0] = (uint32_t)(uintptr_t)gNgArt;
+    values[0] = (uintptr_t)gNgArt;
     values[1] = size;
     names[0] = "ADDRESS";
     names[1] = "SIZE";
-    path = zfileDeviceControl((ZfileDevice *)(uintptr_t)gNgRamDisk, 2, (uint32_t)(uintptr_t)names,
-                              (uint32_t)(uintptr_t)values);
-    if (path == 0) {
+    path = zfileDeviceControl((ZfileDevice *)gNgRamDisk, 2, names, values);
+    if (path == NULL) {
         zdebugFail("Could not generate file name for RAM disk", kNgAppFile, 0x3ec, 0);
     }
-    zstrcpy(&gNgArtName, (const char *)(uintptr_t)path);
+    zstrcpy(&gNgArtName, path);
     guiSetAssetFile(&gNgArtName);
 }
 

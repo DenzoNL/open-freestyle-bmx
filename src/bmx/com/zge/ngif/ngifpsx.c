@@ -215,8 +215,8 @@ int ngifReturnOneB(void)
 /* ---- engine hooks (function pointers in the exe's data) ----------------------------------------- */
 
 typedef int(BMX_CDECL *NgifUpdateFn)(void);
-typedef int(BMX_CDECL *NgifRegisterFn)(int type, NgifUpdateFn callback, void *arg, int append);
-typedef void(BMX_CDECL *NgifUnregisterFn)(int node);
+typedef void *(BMX_CDECL *NgifRegisterFn)(int type, NgifUpdateFn callback, void *arg, int append);
+typedef void(BMX_CDECL *NgifUnregisterFn)(void *node);
 typedef void(BMX_CDECL *NgifQueryFn)(int what, void *out, int arg);
 typedef void *(BMX_CDECL *NgifCameraFn)(void);
 typedef void(BMX_CDECL *NgifSetViewportFn)(void *camera, int flags, const float *rect);
@@ -273,7 +273,7 @@ int ngifpsxUpdate(void)
             gNgifUnregister(gNgifScriptNode);
             gNgifSetViewOffset(camera, 0.0f, 0.0f);
             gNgifScript = NULL;
-            gNgifScriptNode = 0;
+            gNgifScriptNode = NULL;
             return 1;
         }
         const int8_t second = gNgifScript[1];

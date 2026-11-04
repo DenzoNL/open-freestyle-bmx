@@ -235,7 +235,7 @@ __attribute__((regparm(1))) void rwD3DRestoreState(const RwD3DSavedState *saved)
         rwD3DDevSetTextureStageState(0, 0x12, (uint32_t)saved->mipFilter);
         s->mipFilter = saved->mipFilter;
     }
-    rwD3DSetRenderState(1, (int32_t)(uintptr_t)saved->textureRaster);
+    rwD3DSetRenderState(1, (intptr_t)saved->textureRaster);
     if (s->fogColor != saved->fogColor) {
         rwD3DDevSetRenderState(0x22, (uint32_t)saved->fogColor);
         s->fogColor = saved->fogColor;

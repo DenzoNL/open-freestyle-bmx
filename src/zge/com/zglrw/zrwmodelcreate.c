@@ -912,7 +912,7 @@ ZrwModel *zrwModelLoadFromBuffer(const uint32_t *buffer)
         zdebugFail("Not a MODL", kModelCreateFile, 0x577, 0);
         return NULL;
     }
-    file = zfileOpenRamDisk((uint32_t)(uintptr_t)buffer, size + 8);
+    file = zfileOpenRamDisk(buffer, size + 8);
     if (file == NULL) {
         zdebugFail("Couldn't open MODL", kModelCreateFile, 0x57b, 0);
         return NULL;
@@ -948,7 +948,7 @@ ZrwModel *zrwModelLoadFromFile(const char *path)
     }
     length = buffer[1];
     if (buffer[0] == kChunkModl) {
-        ZfileHandle *file = zfileOpenRamDisk((uint32_t)(uintptr_t)buffer, length + 8);
+        ZfileHandle *file = zfileOpenRamDisk(buffer, length + 8);
 
         if (file == NULL) {
             zdebugFail("Couldn't open MODL", kModelCreateFile, 0x57b, 0);

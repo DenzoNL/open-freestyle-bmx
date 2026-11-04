@@ -63,7 +63,7 @@ int zrwfeof(void *file)
     uint32_t position = 0;
     uint32_t size = 0;
 
-    zfileOp34(handle, (uint32_t)(uintptr_t)&position, 0);
+    zfileOp34(handle, &position, NULL);
     zfileGetSize(handle, (int *)&size, 0);
     return size <= position;
 }
@@ -71,7 +71,7 @@ int zrwfeof(void *file)
 BMX_ADDR(0x004a34e0)
 int zrwfseek(void *file, int32_t offset, int32_t origin)
 {
-    return (int)zfileOp30(*(ZfileHandle **)file, (uint32_t)offset, (uint32_t)origin, 0);
+    return (int)zfileOp30(*(ZfileHandle **)file, (uint32_t)offset, (uint32_t)origin, NULL);
 }
 
 BMX_ADDR(0x004a3500)
@@ -99,7 +99,7 @@ void RegisterCallBacksForFileSystem(void)
 BMX_ADDR(0x004a3580)
 void ImageBufferSizeType(const void *address, uint32_t size, const char *extension)
 {
-    gZrwRamDiskNoInfo->address = (uint32_t)(uintptr_t)address;
+    gZrwRamDiskNoInfo->address = address;
     gZrwRamDiskNoInfo->size = size;
     gZrwRamDiskNoInfo->extension = extension;
     gZrwRamDiskNoInfo++;

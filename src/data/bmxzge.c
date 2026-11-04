@@ -236,7 +236,7 @@ struct BmxGroup_gNgRamDiskGroup gNgRamDiskGroup __attribute__((aligned(16))) = {
                    0x520041e, 0x71f0611, 0x94b0848, 0xb4c0a4d, 0xf490e47, 0xd1c0c4e, 0x6c81401, 0xff07d0,
                    0x5cd04cb, 0x7d006c8, 0x94b084c, 0xb9d0a4d, 0xf9c0e52, 0xd1c0ccf, 0xff1401,  0,
                    0x520041e, 0x71f0611, 0x9d208c7, 0xb390ac9, 0xfd10ed3, 0xd1c0c29, 0x6c81401, 0xff07d0},
-    .gNgRamDisk = 0xffffffff,
+    .gNgRamDisk = -1,
     .gNgLegalPending = 1,
     .gNgWrapName = sIntwrapZal,
     .gNgLevelNames =
@@ -2067,13 +2067,13 @@ void *gFxCube;
 struct BmxGroup_gNgifPrimBufferGroup gNgifPrimBufferGroup __attribute__((aligned(16)));
 
 /* 0x005d2500 */
-int gNgifFlushNode;
+void *gNgifFlushNode;
 
 /* 0x005d2504, also gZprimFrameEnded */
 int gNgifFlushPending2;
 
 /* 0x005d2508 */
-int gNgifFlushNode2;
+void *gNgifFlushNode2;
 
 /* 0x005d250c */
 uint32_t *gNgifPrimStart;
@@ -2331,10 +2331,10 @@ struct BmxGroup_gNgifColorGroup gNgifColorGroup __attribute__((aligned(16)));
 struct BmxGroup_gFxDustTexturesGroup gFxDustTexturesGroup __attribute__((aligned(16)));
 
 /* 0x0068fcf8 */
-int gFxAnimHandle;
+void *gFxAnimHandle;
 
 /* 0x0068fcfc */
-int gNgifScriptNode;
+void *gNgifScriptNode;
 
 /* 0x0068fd00 */
 ZfxSkidTable gFxSkids;

@@ -399,8 +399,8 @@ int rwD3DDevDrawIndexedPrimitive(uint32_t type, uint32_t fvf, const void *vertic
                                  const uint16_t *indices, uint32_t numIndices, uint32_t flags);
 
 /* rw/d3dstate.c */
-__attribute__((regparm(2))) int rwD3DSetRenderState(int32_t state, int32_t value);
-int rwD3DRenderStateSet(int32_t state, int32_t value);
+__attribute__((regparm(2))) int rwD3DSetRenderState(int32_t state, intptr_t arg);
+int rwD3DRenderStateSet(int32_t state, intptr_t value);
 int rwD3DRenderStateGet(int32_t state, void *value);
 void *rwD3DRasterHandle(const RwRaster *raster);
 __attribute__((regparm(1))) int rwD3DSetTextureRaster(RwRaster *raster);

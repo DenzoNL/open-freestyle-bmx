@@ -45,8 +45,8 @@ typedef struct PhysFace {
     uint8_t pad018[0x4];
     void *
         vert[4]; /* vert[0..2] point at q0..q2; for triangles slot 3 holds the level face it was built from */
-    int32_t object; /* owning prop's collision object, 0 for level geometry */
-    ZVec3 p0;       /* the three corners in world units */
+    struct PhysPropObject *object; /* owning prop's collision object, NULL for level geometry */
+    ZVec3 p0;                      /* the three corners in world units */
     uint8_t pad03c[0x4];
     ZVec3 p1;
     uint8_t pad04c[0x4];

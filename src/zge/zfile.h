@@ -21,20 +21,24 @@ typedef struct ZfileHandle {
 /* Device function table. Slots 0x08..0x1f are unused by this module. */
 typedef struct ZfileDevice {
     const char *(BMX_CDECL *name)(struct ZfileDevice *device); /* 0x00 */
-    uint32_t(BMX_CDECL *control)(struct ZfileDevice *device, uint32_t command, uint32_t a,
-                                 uint32_t b); /* 0x04 */
-    uint8_t pad08[0x18];
+    /* 0x04 the file name for a set of attributes: `keys` names them, `values` (device-specific) holds them */
+    const char *(BMX_CDECL *control)(struct ZfileDevice *device, uint32_t command, const char *const *keys,
+                                     const void *values);
+    void *slots08[6];                                                                   /* 0x08 */
     int(BMX_CDECL *open)(ZfileHandle *file, const char *path, int mode, int flags);     /* 0x20 */
     int(BMX_CDECL *close)(ZfileHandle *file, int flags);                                /* 0x24 */
     int(BMX_CDECL *read)(ZfileHandle *file, void *buffer, int count, int flags);        /* 0x28 */
     int(BMX_CDECL *write)(ZfileHandle *file, const void *buffer, int count, int flags); /* 0x2c */
-    uint32_t(BMX_CDECL *op30)(ZfileHandle *file, uint32_t a, uint32_t b, uint32_t c);   /* 0x30 */
-    uint32_t(BMX_CDECL *op34)(ZfileHandle *file, uint32_t a, uint32_t b);               /* 0x34 */
-    uint32_t(BMX_CDECL *getSize)(ZfileHandle *file, int *size, uint32_t flags);         /* 0x38 */
+    uint32_t(BMX_CDECL *op30)(ZfileHandle *file, uint32_t offset, uint32_t whence,
+                              const void *callback);                                        /* 0x30 seek */
+    uint32_t(BMX_CDECL *op34)(ZfileHandle *file, uint32_t *position, const void *callback); /* 0x34 tell */
+    uint32_t(BMX_CDECL *getSize)(ZfileHandle *file, int *size, uint32_t flags);             /* 0x38 */
 } ZfileDevice;
 
 BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZfileDevice, open) == 0x20, "device layout");
 BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZfileDevice, getSize) == 0x38, "device layout");
+/* Fifteen pointer slots at every width (the tables in src/data are void *[15]). */
+_Static_assert(sizeof(ZfileDevice) == 15 * sizeof(void *), "device layout");
 
 enum { kZfileMaxDevices = 16, kZfileErrorBytes = 0x40, kZfileNameBytes = 0x80 };
 
@@ -66,7 +70,8 @@ int zfileInitialize(void);
 int zfileDestroyHandle(ZfileHandle *file);
 ZfileDeviceTable *zfileGetDevices(void);
 const char *zfileDeviceName(ZfileDevice *device);
-uint32_t zfileDeviceControl(ZfileDevice *device, uint32_t command, uint32_t a, uint32_t b);
+const char *zfileDeviceControl(ZfileDevice *device, uint32_t command, const char *const *keys,
+                               const void *values);
 /* Device named by the first four characters of the path, else the default device. */
 ZfileDevice *zfileFindDevice(const char *path);
 ZfileDevice *zfileDefaultDevice(void);
@@ -76,8 +81,9 @@ int zfileClose(ZfileHandle *file, int flags);
 int zfileRead(ZfileHandle *file, void *buffer, int count, int flags);
 /* Writes count bytes; returns the number written. */
 int zfileWrite(ZfileHandle *file, const void *buffer, int count, int flags);
-uint32_t zfileOp30(ZfileHandle *file, uint32_t a, uint32_t b, uint32_t c);
-uint32_t zfileOp34(ZfileHandle *file, uint32_t a, uint32_t b);
+/* Seeks (whence as in fseek) and tells the position; the callback is always NULL here. */
+uint32_t zfileOp30(ZfileHandle *file, uint32_t offset, uint32_t whence, const void *callback);
+uint32_t zfileOp34(ZfileHandle *file, uint32_t *position, const void *callback);
 uint32_t zfileGetSize(ZfileHandle *file, int *size, uint32_t flags);
 /* Reads a whole file into a new buffer (see gZfileLoadPool); stores its size when sizeOut is set. */
 void *zfileLoad(const char *path, int *sizeOut);
@@ -92,7 +98,7 @@ char *zfileBuildFileName(const char *dir, const char *file);
 char *zfileGetDirectory(const char *path, char *out);
 /* Copies the extension (fewer than four characters after the last dot); NULL otherwise. */
 char *zfileGetExtension(const char *path, char *out);
-/* Opens the RAM disk file for a memory block (address, size); returns a handle or NULL. */
-ZfileHandle *zfileOpenRamDisk(uint32_t address, uint32_t size);
+/* Opens the RAM disk file for a memory block; returns a handle or NULL. */
+ZfileHandle *zfileOpenRamDisk(const void *data, uint32_t size);
 
 #endif

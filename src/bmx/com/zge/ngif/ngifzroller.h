@@ -45,13 +45,13 @@ typedef void *ZrollerShadowSlots[2];
 
 #define gZrollerShadow       ORIG_VAR(0x00678440, ZrollerShadow, gZrollerShadow)
 #define gZrollerShadowSlots  ORIG_VAR(0x005fb710, ZrollerShadowSlots, gZrollerShadowSlots)
-#define gZrollerUpdateHandle ORIG_VAR(0x005fb740, int, gZrollerUpdateHandle)
+#define gZrollerUpdateHandle ORIG_VAR(0x005fb740, void *, gZrollerUpdateHandle)
 
 /* Renderer hooks: free a model table handle, query world data, (un)register update callbacks. */
 typedef void(BMX_CDECL *ZrollerFreeHandleFn)(int handle);
 typedef void(BMX_CDECL *ZrollerQueryFn)(int what, float *out, int arg);
-typedef int(BMX_CDECL *ZrollerRegisterFn)(int priority, void *callback, void *arg, int flag);
-typedef void(BMX_CDECL *ZrollerUnregisterFn)(int handle);
+typedef void *(BMX_CDECL *ZrollerRegisterFn)(int priority, void *callback, void *arg, int flag);
+typedef void(BMX_CDECL *ZrollerUnregisterFn)(void *node);
 #define gZrollerFreeHandle ORIG_VAR(0x00561024, ZrollerFreeHandleFn, gZrollerFreeHandle)
 #define gZrollerQuery      ORIG_VAR(0x00561488, ZrollerQueryFn, gZrollerQuery)
 #define gZrollerRegister   ORIG_VAR(0x00561470, ZrollerRegisterFn, gZrollerRegister)

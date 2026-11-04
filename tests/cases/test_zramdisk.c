@@ -297,7 +297,7 @@ static void setup_zrw_matches(DtCtx *c)
     ZrwRamDiskInfo *info = dt_alloc(sizeof *info);
 
     begin(c, 1);
-    info->address = dt_u32();
+    info->address = (const void *)(uintptr_t)dt_u32();
     info->size = dt_u32();
     info->extension = (dt_u32() % 4 == 0) ? NULL : kExts[dt_u32() % 6];
     gZrwRamDiskInfo = info;
@@ -310,7 +310,7 @@ static void setup_zrwfopen(DtCtx *c)
     uint8_t *block = dt_alloc(128);
 
     dt_real_env(c, 1);
-    info->address = (uint32_t)(uintptr_t)block;
+    info->address = block;
     info->size = 128;
     info->extension = NULL;
     gZrwRamDiskInfo = (dt_u32() % 6 == 0) ? gZrwRamDiskNoInfo : info;

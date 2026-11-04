@@ -226,7 +226,7 @@ static void camFaceQuery(const ZVec3 *eye)
         dt_fill(&hits[i], sizeof hits[i]);
         hits[i].face = f;
         rvec(&hits[i].point, eye, (dt_u32() & 3) == 0 ? 400.0f : 150.0f);
-        hits[i].object = (dt_u32() & 3) == 0 ? (int32_t)dt_u32() : 0;
+        hits[i].object = (dt_u32() & 3) == 0 ? (PhysPropObject *)(uintptr_t)dt_u32() : NULL;
     }
     hits[n].face = NULL;
 }

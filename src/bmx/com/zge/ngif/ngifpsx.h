@@ -35,11 +35,11 @@ typedef uint32_t NgifWords[1];
 #define gNgifFlushPending  ORIG_VAR(0x005d24fc, int, gNgifFlushPending)
 #define gNgifFlushPending2 ORIG_VAR(0x005d2504, int, gNgifFlushPending2)
 /* Update node handles of the two flush callbacks. */
-#define gNgifFlushNode  ORIG_VAR(0x005d2500, int, gNgifFlushNode)
-#define gNgifFlushNode2 ORIG_VAR(0x005d2508, int, gNgifFlushNode2)
+#define gNgifFlushNode  ORIG_VAR(0x005d2500, void *, gNgifFlushNode)
+#define gNgifFlushNode2 ORIG_VAR(0x005d2508, void *, gNgifFlushNode2)
 /* Particle effect script (pairs of bytes, 0x80 ends it) and the update node that plays it. */
 #define gNgifScript     ORIG_VAR(0x005ab4f0, const int8_t *, gNgifScript)
-#define gNgifScriptNode ORIG_VAR(0x0068fcfc, int, gNgifScriptNode)
+#define gNgifScriptNode ORIG_VAR(0x0068fcfc, void *, gNgifScriptNode)
 
 /* Free list of the glyph texture tables (0x20 handles per font). */
 #define gNgifGlyphPages ORIG_VAR(0x0068ff94, struct ZMemFreeList *, gNgifGlyphPages)

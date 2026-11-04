@@ -31,7 +31,7 @@ static const uint32_t kBikePartOrder[kZactorBikeParts] = {0, 1, 2, 4, 3, 5, 6, 7
 
 static void *actorObject(const void *actor)
 {
-    return (void *)(uintptr_t)((const ZActor *)actor)->object;
+    return ((const ZActor *)actor)->object;
 }
 
 /*
@@ -244,9 +244,9 @@ static const ZAngle3 kTwistPlus = {0, 0, 0x4000};
 static const ZAngle3 kTwistMinus = {0, 0, (ZAngle)0xc000};
 
 /* The skeleton of a model object (ZObj.data). */
-static void *objectSkeleton(int32_t object)
+static void *objectSkeleton(const ZObj *object)
 {
-    return ((ZObj *)(uintptr_t)object)->data;
+    return object->data;
 }
 
 /*
@@ -310,13 +310,13 @@ void zactorSyncPose(void *actor)
     pos.y = zactorGetPos(a)->y;
     pos.z = zactorGetPos(a)->z;
     pos.y = (float)((double)pos.y + a->player->ch[0].height);
-    zobjSetPosition((void *)(uintptr_t)a->object, &pos);
-    zobjSetPosition((void *)(uintptr_t)a->shadow, &pos);
+    zobjSetPosition(a->object, &pos);
+    zobjSetPosition(a->shadow, &pos);
     angles.x = a->rot[0];
     angles.y = (ZAngle)-a->rot[1];
     angles.z = (ZAngle)-a->rot[2];
-    zobjSetAngles((void *)(uintptr_t)a->object, &angles);
-    zobjSetAngles((void *)(uintptr_t)a->shadow, &angles);
+    zobjSetAngles(a->object, &angles);
+    zobjSetAngles(a->shadow, &angles);
 }
 
 /* Index of the rider the player controls (byte at 0x56b408); read directly, not through comdata. */

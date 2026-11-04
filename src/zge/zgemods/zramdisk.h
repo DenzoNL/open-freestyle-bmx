@@ -48,9 +48,13 @@ typedef char ZramdiskDeviceName[8];
 
 /* Device name ("rd00"). */
 const char *zramdiskGetName(ZfileDevice *device);
-/* Command 2 with the attributes ADDRESS and SIZE: the file name for a memory block, else NULL. */
-const char *zramdiskControl(ZfileDevice *device, int command, const char *const *keys,
-                            const uint32_t *values);
+/*
+ * Command 2 with the attributes ADDRESS and SIZE (`values` is a uintptr_t[2]): the file name for a memory
+ * block, else NULL. 32-bit builds write both as %#10x like the original; 64-bit builds need 16 digits for the
+ * address (docs/PORTING.md "X2e").
+ */
+const char *zramdiskControl(ZfileDevice *device, uint32_t command, const char *const *keys,
+                            const void *values);
 /* Slots 0x08, 0x10, 0x14 and 0x18 complete at once (a result and/or callback is required). */
 int zramdiskSlot08(uint32_t arg, int *result, const ZramdiskCallback *callback);
 int zramdiskSlot10(uint32_t arg, int *result, const ZramdiskCallback *callback);

@@ -262,13 +262,13 @@ static void setupScriptStep(DtCtx *c)
         script[0] = -0x80;
     }
     gNgifScript = (dt_u32() & 3) ? script : NULL;
-    gNgifScriptNode = (int)dt_u32();
+    gNgifScriptNode = (void *)(uintptr_t)dt_u32();
 }
 
 static void setupScriptSet(DtCtx *c)
 {
     psxBegin(c);
-    gNgifScriptNode = (dt_u32() & 1) ? (int)dt_u32() : 0;
+    gNgifScriptNode = (dt_u32() & 1) ? (void *)(uintptr_t)dt_u32() : NULL;
     DT_ARG_PTR(c, 0, dt_alloc(16));
 }
 
@@ -400,8 +400,8 @@ static void setupFrame(DtCtx *c)
     gNgifPrim3D = (uint32_t *)(uintptr_t)dt_u32();
     gNgifFlushPending = (int)(dt_u32() & 1);
     gNgifFlushPending2 = (int)(dt_u32() & 1);
-    gNgifFlushNode = (dt_u32() & 1) ? (int)dt_u32() : 0;
-    gNgifFlushNode2 = (dt_u32() & 1) ? (int)dt_u32() : 0;
+    gNgifFlushNode = (dt_u32() & 1) ? (void *)(uintptr_t)dt_u32() : NULL;
+    gNgifFlushNode2 = (dt_u32() & 1) ? (void *)(uintptr_t)dt_u32() : NULL;
     gNgifPrimStart = (dt_u32() & 1) ? (uint32_t *)(uintptr_t)dt_u32() : NULL;
     gNgifPrim = (uint32_t *)(uintptr_t)dt_u32();
     gNgifOrderTable = (uint32_t *)(uintptr_t)dt_u32();

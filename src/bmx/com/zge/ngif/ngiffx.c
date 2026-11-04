@@ -52,7 +52,7 @@ typedef float ZfxParams[16];
 #define gFxAdjusting   ORIG_VAR(0x005ab4a4, int32_t, gFxAdjusting)
 #define gFxQualityStep ORIG_VAR(0x005ab4a8, float, gFxQualityStep)
 #define gFxDebugFloat  ORIG_VAR(0x005ab454, float, gFxDebugFloat)
-#define gFxSceneObject ORIG_VAR(0x0068ff98, int32_t, gFxSceneObject)
+#define gFxSceneObject ORIG_VAR(0x0068ff98, const void *, gFxSceneObject)
 
 /* Texture animation config: "ANIM" objects with frames named by a table of strings. */
 typedef const char *ZfxNames[16];
@@ -70,11 +70,12 @@ typedef const char *ZfxNames[16];
 typedef uint32_t ZfxDustTextures[16];
 #define gFxDustTextures ORIG_VAR(0x0068fc20, ZfxDustTextures, gFxDustTextures)
 #define gFxWorldObject  ORIG_VAR(0x0068ff80, uint8_t *, gFxWorldObject)
-#define gFxAnimHandle   ORIG_VAR(0x0068fcf8, int, gFxAnimHandle)
+#define gFxAnimHandle   ORIG_VAR(0x0068fcf8, void *, gFxAnimHandle)
 
 /* Renderer entry points reached through pointers in the exe's data. */
 typedef void(BMX_CDECL *ZfxSetParamFn)(int id, void *model, const void *value);
-typedef void(BMX_CDECL *ZfxDrawFn)(uint32_t flags, const void *primitives, int count, int a, int b);
+typedef void(BMX_CDECL *ZfxDrawFn)(uint32_t flags, const void *primitives, int count, const void *matrix,
+                                   int zero);
 typedef void *(BMX_CDECL *ZfxCameraFn)(void);
 typedef ZObjCamera *(BMX_CDECL *ZfxCameraObjectFn)(void *camera);
 typedef uint32_t(BMX_CDECL *ZfxTextureByHashFn)(int hash, int flags);
@@ -96,7 +97,7 @@ typedef void(BMX_CDECL *ZfxSetRasterFn)(uint32_t material, void *raster, int ind
 
 /* Code the effects call in the exe: effect creation by name, modifier attach, axis matrix, scene calls. */
 ORIG_FN(0x00495d50, void, ngiffxSpawn,
-        (uint32_t handle, const char *name, int flags, int unused, const void *params));
+        (const void *object, const char *name, uint32_t flags, const void *unused, const void *params));
 
 /* Copies a 32 bit word between float / integer views without touching its bits. */
 #define COPY32(dst, src) __builtin_memcpy(&(dst), &(src), 4)
@@ -115,7 +116,7 @@ static inline void storeFloat(uint32_t *word, float f)
 }
 
 BMX_ADDR(0x0045c690)
-void ngiffxLoadAnimTable(const char *name, uint32_t *table, int size)
+void ngiffxLoadAnimTable(const char *name, void **table, int size)
 {
     void *library = zsceneFindAnim(0, name);
 
@@ -189,7 +190,7 @@ void ngiffxAdaptQuality(void)
 BMX_ADDR(0x0045c920)
 void ngiffxSetQuality(float quality)
 {
-    gFxSetParam(5, zobjGetModel((const void *)(intptr_t)gFxSceneObject), &quality);
+    gFxSetParam(5, zobjGetModel(gFxSceneObject), &quality);
 }
 
 /* Random byte minus 128 as a signed value, as the original's (short)_ftol of the double. */
@@ -298,7 +299,7 @@ int ngiffxSparkRender(const ZfxEffect *effect, ZfxEmitter *emitter, int unused)
             setVertex(&v[0], p->prev.x, p->prev.y, p->prev.z, 0.0f, 0.0f, color);
             setVertex(&v[1], p->pos.x, p->pos.y, p->pos.z, 0.0f, 0.0f, color);
             line.texture = p->texture;
-            gFxDrawLines(0x2202, &line, 1, 0, 0);
+            gFxDrawLines(0x2202, &line, 1, NULL, 0);
         } else {
             ZVec3 a = p->pos, b = p->prev, side;
             float dx, dy, dz;
@@ -327,7 +328,7 @@ int ngiffxSparkRender(const ZfxEffect *effect, ZfxEmitter *emitter, int unused)
                       (float)((double)s * side.z + dz), 1.0f, 0.0f, color);
             zmatrixTransformPoint((ZVec3 *)&v[3], &camera, (ZVec3 *)&v[3]);
             quad = (ZfxQuad){p->texture, {&v[0], &v[1], &v[2], &v[3]}};
-            gFxDrawQuads(0x2202, &quad, 1, 0, 0);
+            gFxDrawQuads(0x2202, &quad, 1, NULL, 0);
         }
         p = zlistNext(emitter->particles);
         drawn++;
@@ -443,7 +444,7 @@ int ngiffxShardRender(const ZfxEffect *effect, ZfxEmitter *emitter, int unused)
         zvec3Add((ZVec3 *)&v[2], (ZVec3 *)&v[2], &p->pos);
         triangles[0] = (ZfxTriangle){p->texture, {&v[0], &v[1], &v[2]}};
         triangles[1] = (ZfxTriangle){p->texture, {&v[2], &v[1], &v[0]}};
-        gFxDrawTriangles(0x6502, triangles, 2, 0, 0);
+        gFxDrawTriangles(0x6502, triangles, 2, NULL, 0);
         p = zlistNext(emitter->particles);
         drawn++;
     } while (p != NULL);
@@ -482,7 +483,7 @@ int ngiffxSplashRender(const ZfxEffect *effect, ZfxEmitter *emitter, int unused)
         v[3] = (ZfxVertex){.x = s, .y = -s, .z = 0.0f, .u = 1.0f, .v = 0.0f, .color = color};
         zmatrixTransformPoint((ZVec3 *)&v[3], &matrix, (ZVec3 *)&v[3]);
         quad = (ZfxQuad){p->texture, {&v[0], &v[1], &v[2], &v[3]}};
-        gFxDrawQuads(0x2202, &quad, 1, 0, 0);
+        gFxDrawQuads(0x2202, &quad, 1, NULL, 0);
         p = zlistNext(emitter->particles);
         drawn++;
     } while (p != NULL);
@@ -560,7 +561,7 @@ int ngiffxDustRender(const ZfxEffect *effect, ZfxEmitter *emitter, int unused)
         v[3] = (ZfxVertex){.x = s, .y = -s, .z = 0.0f, .u = 1.0f, .v = 0.0f, .color = color};
         zmatrixTransformPoint((ZVec3 *)&v[3], &matrix, (ZVec3 *)&v[3]);
         quad = (ZfxQuad){gFxDustTextures[(15000u - rem * 15u) / 1000u], {&v[0], &v[1], &v[2], &v[3]}};
-        gFxDrawQuads(0x2202, &quad, 1, 0, 0);
+        gFxDrawQuads(0x2202, &quad, 1, NULL, 0);
         p = zlistNext(emitter->particles);
         drawn++;
     } while (p != NULL);
@@ -647,7 +648,7 @@ int ngiffxPosterRender(const ZfxEffect *effect, ZfxEmitter *emitter, int unused)
             v[i].color = color;
         }
         quad = (ZfxQuad){p->texture, {&v[0], &v[1], &v[2], &v[3]}};
-        gFxDrawQuads(0x4102, &quad, 1, 0, 0);
+        gFxDrawQuads(0x4102, &quad, 1, NULL, 0);
         p = zlistNext(emitter->particles);
         drawn++;
     }
@@ -725,7 +726,7 @@ int ngiffxRippleRender(const ZfxEffect *effect, ZfxEmitter *emitter, int unused)
                            .v = 0.0f,
                            .color = color};
         quad = (ZfxQuad){p->texture, {&v[0], &v[1], &v[2], &v[3]}};
-        gFxDrawQuads(0x2203, &quad, 1, 0, 0);
+        gFxDrawQuads(0x2203, &quad, 1, NULL, 0);
         p = zlistNext(emitter->particles);
         drawn++;
     }
@@ -897,7 +898,7 @@ int ngiffxLightningRender(const ZfxEffect *effect, ZfxEmitter *emitter, int unus
             setVertex(&v[0], p->prev.x, p->prev.y, p->prev.z, 0.0f, 0.0f, color);
             setVertex(&v[1], p->pos.x, p->pos.y, p->pos.z, 0.0f, 0.0f, color);
             line.texture = p->texture;
-            gFxDrawLines(0x2202, &line, 1, 0, 0);
+            gFxDrawLines(0x2202, &line, 1, NULL, 0);
         } else {
             ZVec3 a = p->pos, b = p->prev;
             float dx, dy, dz;
@@ -928,7 +929,7 @@ int ngiffxLightningRender(const ZfxEffect *effect, ZfxEmitter *emitter, int unus
             setVertex(&v[3], dx, (float)((double)dy - p->size), dz, 1.0f, 0.0f, color);
             zmatrixTransformPoint((ZVec3 *)&v[3], &camera, (ZVec3 *)&v[3]);
             quad.texture = p->texture;
-            gFxDrawQuads(0x2202, &quad, 1, 0, 0);
+            gFxDrawQuads(0x2202, &quad, 1, NULL, 0);
         }
         p = zlistNext(emitter->particles);
         drawn++;
@@ -937,73 +938,73 @@ int ngiffxLightningRender(const ZfxEffect *effect, ZfxEmitter *emitter, int unus
 }
 
 BMX_ADDR(0x0045f030)
-void ngiffxCreateSpark(uint32_t handle, float *params)
+void ngiffxCreateSpark(const void *object, float *params)
 {
     if (params == NULL) {
-        ngiffxSpawn(handle, "spark", 2, 0, gFxSparkCreateDefault);
+        ngiffxSpawn(object, "spark", 2, NULL, gFxSparkCreateDefault);
         return;
     }
     COPY32(params[12], gFxSparkTexture);
-    ngiffxSpawn(handle, "spark", 2, 0, params);
+    ngiffxSpawn(object, "spark", 2, NULL, params);
 }
 
 BMX_ADDR(0x0045f0a0)
-void ngiffxCreateShard(uint32_t handle, const void *params)
+void ngiffxCreateShard(const void *object, const void *params)
 {
-    ngiffxSpawn(handle, "shard", 1, 0, params);
+    ngiffxSpawn(object, "shard", 1, NULL, params);
 }
 
 BMX_ADDR(0x0045f0d0)
-void ngiffxCreateSplash(uint32_t handle, float *params)
+void ngiffxCreateSplash(const void *object, float *params)
 {
     if (params == NULL) {
-        ngiffxSpawn(handle, "splash", 2, 0, gFxSplashCreateDefault);
+        ngiffxSpawn(object, "splash", 2, NULL, gFxSplashCreateDefault);
         return;
     }
     COPY32(params[12], gFxSplashTexture);
-    ngiffxSpawn(handle, "splash", 0x20, 0, params);
+    ngiffxSpawn(object, "splash", 0x20, NULL, params);
 }
 
 BMX_ADDR(0x0045f140)
-void ngiffxCreateDust(uint32_t handle, const void *params)
+void ngiffxCreateDust(const void *object, const void *params)
 {
-    ngiffxSpawn(handle, "dust", 1, 0, params != NULL ? params : gFxDustDefault);
+    ngiffxSpawn(object, "dust", 1, NULL, params != NULL ? params : gFxDustDefault);
 }
 
 BMX_ADDR(0x0045f190)
-void ngiffxCreatePoster(uint32_t handle, const void *params)
+void ngiffxCreatePoster(const void *object, const void *params)
 {
-    ngiffxSpawn(handle, "poster", 1, 0, params != NULL ? params : gFxPosterDefault);
+    ngiffxSpawn(object, "poster", 1, NULL, params != NULL ? params : gFxPosterDefault);
 }
 
 /* Ripples spawn three times, each lower, larger and fainter than the one before. */
 BMX_ADDR(0x0045f1e0)
-void ngiffxCreateRipple(uint32_t handle, uint32_t *params)
+void ngiffxCreateRipple(const void *object, uint32_t *params)
 {
     if (params == NULL) {
-        ngiffxSpawn(handle, "ripple", 1, 0, gFxRippleDefault);
+        ngiffxSpawn(object, "ripple", 1, NULL, gFxRippleDefault);
         return;
     }
     params[8] = gFxRippleTexture;
     params[4] = 1000;
     params[5] = 0x41f00000;
     params[6] = 0x437a0000;
-    ngiffxSpawn(handle, "ripple", 1, 0, params);
+    ngiffxSpawn(object, "ripple", 1, NULL, params);
     storeFloat(&params[1], (float)((double)loadFloat(&params[1]) - 5.0));
     params[4] = 0x4e2;
     params[5] = 0x41a00000;
     params[6] = 0x43480000;
-    ngiffxSpawn(handle, "ripple", 1, 0, params);
+    ngiffxSpawn(object, "ripple", 1, NULL, params);
     storeFloat(&params[1], (float)((double)loadFloat(&params[1]) - 10.0));
     params[4] = 0x5dc;
     params[5] = 0x41200000;
     params[6] = 0x43160000;
-    ngiffxSpawn(handle, "ripple", 1, 0, params);
+    ngiffxSpawn(object, "ripple", 1, NULL, params);
 }
 
 /* Skid marks are posters; a zero texture selects SKID, a texture of 1 selects RIPPLE. */
 BMX_ADDR(0x0045f2d0)
-void ngiffxCreateSkid(uint32_t handle, uint32_t *params)
+void ngiffxCreateSkid(const void *object, uint32_t *params)
 {
     if (params == NULL) {
         params = (uint32_t *)gFxPosterDefault;
@@ -1015,12 +1016,12 @@ void ngiffxCreateSkid(uint32_t handle, uint32_t *params)
             params[0x12] = gFxRippleTexture;
         }
     }
-    ngiffxSpawn(handle, "poster", 1, 0, params);
+    ngiffxSpawn(object, "poster", 1, NULL, params);
 }
 
 /* A lightning bolt from the origin to a random point (each axis a signed byte). */
 BMX_ADDR(0x0045f340)
-void ngiffxCreateLightning(uint32_t handle)
+void ngiffxCreateLightning(const void *object)
 {
     uint32_t block[12] = {0};
 
@@ -1030,7 +1031,7 @@ void ngiffxCreateLightning(uint32_t handle)
     block[8] = 8;
     storeFloat(&block[9], 5.0f);
     storeFloat(&block[10], 10.0f);
-    ngiffxSpawn(handle, "lightning", 1, 0, block);
+    ngiffxSpawn(object, "lightning", 1, NULL, block);
 }
 
 BMX_ADDR(0x0045f480)
@@ -1140,7 +1141,7 @@ void ngiffxRegisterHandlers(void)
     gFxShard.attach(&gFxShard, "gravity", gFxGravityParams);
     gFxShard.attach(&gFxShard, "floorcoll", NULL);
     gFxCube = zsceneFindModel(0, "SFXCube");
-    zobjSetVisible((int32_t)(intptr_t)gFxCube, 0);
+    zobjSetVisible(gFxCube, 0);
     gFxSparkTexture = gFxTextureByHash(zstrHash("SPARK"), 0);
     gFxSkidTexture = gFxTextureByHash(zstrHash("SKID"), 0);
     gFxRippleTexture = gFxTextureByHash(zstrHash("RIPPLE"), 0);
@@ -1159,7 +1160,7 @@ void ngiffxShutdown(void)
 {
     if (gFxAnimHandle != 0) {
         gZrollerUnregister(gFxAnimHandle);
-        gFxAnimHandle = 0;
+        gFxAnimHandle = NULL;
     }
     gFxSpark.destroy(&gFxSpark);
     gFxDust.destroy(&gFxDust);

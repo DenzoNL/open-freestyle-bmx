@@ -255,9 +255,9 @@ void zobjSetAngles(void *object, const ZAngle3 *angles)
 }
 
 BMX_ADDR(0x00487600)
-void zobjSetVisible(int32_t object, int visible)
+void zobjSetVisible(void *object, int visible)
 {
-    ZObj *obj = (ZObj *)(uintptr_t)(uint32_t)object;
+    ZObj *obj = object;
 
     if (visible == 0) {
         obj->flags &= ~(uint32_t)kZobjActive;

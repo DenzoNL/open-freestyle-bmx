@@ -882,7 +882,7 @@ static void dt_actor_objects(ZActor *a)
 {
     a->skeleton = (dt_u32() & 1) ? 0 : 1;
     *(uint32_t *)(void *)((uint8_t *)a + 0x274) = 0;
-    a->object = (int32_t)(uintptr_t)dt_zobj();
+    a->object = (struct ZObj *)(void *)dt_zobj();
     *(void **)(void *)((uint8_t *)a + 0x1d8) = dt_zobj();
 }
 
@@ -1230,7 +1230,7 @@ static void setup_hud_set(DtCtx *c)
     ZStringSet *set = (ZStringSet *)(void *)blob;
     char *text = (char *)blob + 8 + 2 * kCount;
     const int len = dt_range(0, 40);
-    uint8_t *font = &gPhysHudFont;
+    uint8_t *font = (uint8_t *)&gPhysHudFont;
     int16_t *glyphs = dt_alloc(8 * 26);
     uint16_t *style = dt_alloc(4);
 

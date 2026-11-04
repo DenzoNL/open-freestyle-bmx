@@ -80,7 +80,7 @@ static ZActor *make_actor(void)
 
     dt_fill(a, sizeof *a);
     a->skeleton = (dt_u32() & 1) ? 0 : (int32_t)(dt_u32() | 1);
-    a->object = (int32_t)dt_u32();
+    a->object = (struct ZObj *)(uintptr_t)dt_u32();
     return a;
 }
 
@@ -212,12 +212,12 @@ static void BMX_CDECL stubSetAngles(void *object, const ZAngle3 *angles)
     ngLog((uint16_t)angles->z);
 }
 
-static int32_t make_model_object(void)
+static struct ZObj *make_model_object(void)
 {
     uint8_t *object = dt_alloc(0x40);
 
     dt_fill(object, 0x40);
-    return (int32_t)(uintptr_t)object;
+    return (struct ZObj *)(void *)object;
 }
 
 static void setup_sync_pose(DtCtx *c)

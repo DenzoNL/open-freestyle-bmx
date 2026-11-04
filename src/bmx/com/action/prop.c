@@ -456,7 +456,7 @@ void propLoadState(const void *state)
         } else {
             visible = !(node->tag != NULL && (node->tag->range & 1) == 0);
         }
-        zobjSetVisible((int32_t)(uintptr_t)node->frame, visible);
+        zobjSetVisible(node->frame, visible);
     }
 }
 
@@ -580,9 +580,9 @@ void propHitFace(int player, PhysFace *face)
     if (i == 64 || (gPropNodeStates[i].flags & 1) != 0) {
         return;
     }
-    zobjSetVisible((int32_t)(uintptr_t)node->frame, 0);
+    zobjSetVisible(node->frame, 0);
     if (twin != NULL) {
-        zobjSetVisible((int32_t)(uintptr_t)twin->frame, 1);
+        zobjSetVisible(twin->frame, 1);
         gZobjSetFlags(twin->frame->model, 8, 0);
     }
     {
@@ -941,9 +941,9 @@ void propSetShown(PropRecord *prop, int shown)
         }
         const uint16_t range = node->tag->range;
         if (range == def->id) {
-            zobjSetVisible((int32_t)(uintptr_t)node->frame, shown == 0);
+            zobjSetVisible(node->frame, shown == 0);
         } else if ((uint32_t)range == (uint32_t)def->id + 1) {
-            zobjSetVisible((int32_t)(uintptr_t)node->frame, shown != 0);
+            zobjSetVisible(node->frame, shown != 0);
         }
     }
     prop->mode = (uint32_t)shown;

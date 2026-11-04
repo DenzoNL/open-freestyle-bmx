@@ -40,7 +40,7 @@ typedef ZrwList ZrwUpdateListTable[kZrwUpdateListCount];
 /* Render state snapshot pushed by zrwPushRenderState. */
 typedef struct ZrwStateEntry {
     uint32_t flags;
-    int extra;
+    const void *raster;
 } ZrwStateEntry;
 enum { kZrwStateStackSize = 4 };
 typedef ZrwStateEntry ZrwStateStack[kZrwStateStackSize];
@@ -80,7 +80,7 @@ typedef char ZrwName[0x20];
 #define gZrwScreenW     ORIG_VAR(0x00697770, uint32_t, gZrwScreenW)
 #define gZrwScreenH     ORIG_VAR(0x00697774, uint32_t, gZrwScreenH)
 #define gZrwRenderFlags ORIG_VAR(0x00697778, uint32_t, gZrwRenderFlags)
-#define gZrwRenderExtra ORIG_VAR(0x0069777c, int, gZrwRenderExtra)
+#define gZrwRenderExtra ORIG_VAR(0x0069777c, const void *, gZrwRenderExtra)
 #define gZrwWindow      ORIG_VAR(0x00697780, void *, gZrwWindow)
 #define gZrwFullscreen  ORIG_VAR(0x00697788, int, gZrwFullscreen)
 #define gZrwWantW       ORIG_VAR(0x00697798, int, gZrwWantW)
@@ -118,12 +118,12 @@ void zrwDialogInit(void *dialog);
 void zrwDialogSelectDevice(void *dialog);
 /* stdcall; the label keeps the symbol undecorated for the generated hook table. */
 #if defined(BMX_HOOK)
-int BMX_STDCALL zrwDialogProc(void *dialog, uint32_t message, uint32_t wparam,
+int BMX_STDCALL zrwDialogProc(void *dialog, uint32_t message, uintptr_t wparam,
                               uintptr_t lparam) __asm__("_zrwDialogProc");
-intptr_t BMX_STDCALL zrwMainWndProc(void *window, uint32_t message, uint32_t wparam,
+intptr_t BMX_STDCALL zrwMainWndProc(void *window, uint32_t message, uintptr_t wparam,
                                     uintptr_t lparam) __asm__("_zrwMainWndProc");
 #else
-int BMX_STDCALL zrwDialogProc(void *dialog, uint32_t message, uint32_t wparam, uintptr_t lparam);
+int BMX_STDCALL zrwDialogProc(void *dialog, uint32_t message, uintptr_t wparam, uintptr_t lparam);
 
 #endif
 
@@ -143,7 +143,7 @@ ZrwUpdateNode *zrwRegisterUpdateFunction(int type, ZrwUpdateFn fn, void *arg, in
 int zrwUnregisterUpdateFunction(ZrwUpdateNode *node);
 void zrwRunUpdateList(int type);
 void zrwResetRenderState(void);
-int zrwSetRenderState(uint32_t flags, int extra);
+int zrwSetRenderState(uint32_t flags, const void *raster);
 int zrwPushRenderState(void);
 int zrwPopRenderState(void);
 void zrwConvertMatrix(float *out, const float *in);

@@ -642,7 +642,7 @@ int physEnterGrindIn(PhysRider *r, int from, int to)
                     }
                 } else if (kind == 11) {
                     tmp = f->normal;
-                    if (h->object != 0 || (f->flags & 0x10) ||
+                    if (h->object != NULL || (f->flags & 0x10) ||
                         zmathAcos(__builtin_fabsf(f->normal.y)) <= 0x3555 || zvec3Dot(&tmp, &vel) > 0.0f ||
                         !(h->dist > 0.0f) || (f->flags & 0x30)) {
                         continue;

@@ -62,7 +62,7 @@ typedef uint8_t ActionBytes256[0x100];
 #define gActionLanguage    ORIG_VAR(0x00696218, uint8_t, gActionLanguage)
 #define gActionOptions     ORIG_VAR(0x006955e2, uint8_t, gActionOptions)
 #define gActionReplayLib   ORIG_VAR(0x0068ffa8, int32_t, gActionReplayLib)
-typedef uint32_t ActionMotions[0xee];
+typedef const void *ActionMotions[0xee];
 #define gActionMotions ORIG_VAR(0x00696300, ActionMotions, gActionMotions)
 
 /* Changes the action state: 0 resume, 1 pause, 2 restart, -1 leave the screen overlay running. */

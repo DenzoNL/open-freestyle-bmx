@@ -276,7 +276,7 @@ checking every function):
 - **X2c, the on-disk types and readers** from X2b, one format at a time.
 - **X2d, the 28-bit pointers:** done; the packet links are offsets from an anchor on 64-bit (below).
 - **X2e, the casts:** each `(uint32_t)(uintptr_t)` reviewed: a real 32-bit value, an index, or a pointer that must
-  stay a pointer.
+  stay a pointer (started; below).
 - Then **X3**: the x86_64 build links and runs.
 
 ### X2a (done 2026-11-01): globals out of the blocks
@@ -433,6 +433,60 @@ Decision (2026-11-03, the user agreed): option 2, done. compat/pktlink.h holds b
 files that link or walk packets use it (ngifpsx.c, zoverii.c, frontend.c, frontend_options.c, wide.c). The
 32-bit builds are unchanged: the hook cases pass and the replays stay identical. Should the HUD / UI ever be
 reworked, give it a proper draw list instead of building on the PSX packet chains (PLAN.md, backlog).
+
+### X2e (started 2026-11-04): the casts
+
+148 casts of a pointer to 32 bits (or back) outside src/data at the start. Each is a real 32-bit value (keep), an
+index, or a pointer the types should carry. `tools/width_audit.py` finds the places the compiler cannot see:
+an ORIG_FN declaration or a BMX_FNPTR cast whose parameter is a pointer while the ported function takes a 32-bit
+integer (or the other way round), one original variable declared as a pointer in one file and an integer in
+another, and function pointers kept at one address whose aliases disagree. On 32-bit those calls work; on
+64-bit the integer side keeps half the pointer.
+
+- **First batch:** object handles (`zobjSetVisible`, the actor's object and shadow, the owning prop of the
+  collision faces) are pointers; the ray hit's `object` really is a tree-object index and stays an int. The
+  file layer: the device table's six unused slots were `uint8_t[0x18]`, three pointers on 64-bit, which put
+  open/close/read on the wrong slots; they are `void *[6]` now, with an all-width size assert. Device control
+  takes the attribute keys and values as pointers and returns the file name; seek and tell take the callback
+  and the position as pointers. `zfileOpenRamDisk` takes the block. The name-table-2 handlers (the effect
+  creators) take the object, and their `ngiffxSpawn` declaration matches zrwworldApplyEffect.
+- **The RAM disk's names:** a memory block is opened as the file `rd00:<address>:<size>`, the address written by
+  zramdiskControl and parsed back by zramdiskOpen. 32-bit builds keep `%#10x` (the oracle compares the
+  name). 64-bit builds write the address with `%#18llx` and parse it with strtoull (zstrtoul's unsigned long is
+  32 bits on Windows); the 0x80-byte name buffers have room. The alternative, a separate open-from-memory call,
+  would bypass the device layer the original goes through, for no gain.
+- **Scenes:** the search state (ZsceneQuery) and the handler request (ZsceneRequest) are structs instead of
+  int arrays; the animation table and the action motion table hold pointers.
+- **Render states:** RenderWare's render state value is an `intptr_t` (a number, or the raster, fog density or
+  fog table pointer); the engine's current raster (gZrwRenderExtra, the state stack, the 0x561490 hook) is a
+  pointer. The getter copies the raster and fog table pointers whole.
+- **The audit's first findings:** declarations of the window procedure's wParam, the camera viewport and clear
+  flag setters, zrwCreateWorld's result, the shape-kind query; the update register / unregister hooks
+  (0x561470 / 0x561474: the node is a pointer, and the four globals holding nodes); the parameter-set hook's
+  third argument; the primitive draws' matrix; gFxSceneObject, gZrollerUpdateHandle, the LOD free list.
+- **Left:** the texture handles (below), and the remaining casts (`(uint32_t)(uintptr_t)` down from 148 to
+  about 85; tools/width_audit.py reports 3, all texture handles).
+
+#### The texture handles
+
+A texture (a ZrwMaterial, from the heap) is handed around as a 32-bit word: in the PSX packets' texture words,
+the effect parameter blocks (ZfxParticle and the spark / ripple / skid / splash words), zprim's sprite frames
+(inside file images used in place), the menu and shadow globals. Three engine hooks (0x561024 free, 0x561034 get
+raster, 0x561048 load) are declared with a pointer by some callers and a 32-bit integer by others.
+
+Options:
+1. **Widen the words** to pointers. The packets, parameter blocks and sprite frames change layout (their byte
+   offsets are read with get32 and file images are used in place), so the oracle loses its reference for those
+   functions and the file images need readers. Rejected.
+2. **Handles through compat/slot32** (the table X2c added for the zprim font's page table): where pointers are
+   32 bits the word is the pointer, as now (hook build, tests and replays unchanged). On 64-bit the word is a
+   small handle: the material gets one when it is created, every 32-bit word holds that handle, the hooks'
+   integer callers turn it back into the pointer, and freeing the material drops it.
+3. **Materials from an arena near the program** (as X2d's anchor), the word an offset. Materials come from
+   RenderWare's and the engine's heaps; moving them all into one arena touches the allocators. Rejected.
+
+Recommendation: 2, behind a pair of functions next to the material code (the handle of a material, the material
+of a handle) so the representation is decided in one place.
 
 
 ## Not in scope

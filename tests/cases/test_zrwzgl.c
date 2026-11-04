@@ -811,7 +811,7 @@ static void setup_reset_state(DtCtx *c)
     begin(c, 0);
     dt_stub(0x004db820, NULL, (void *)sRenderState);
     gZrwRenderFlags = dt_u32();
-    gZrwRenderExtra = (int)dt_u32();
+    gZrwRenderExtra = (const void *)(uintptr_t)dt_u32();
 }
 
 static void setup_set_state(DtCtx *c)
@@ -822,7 +822,7 @@ static void setup_set_state(DtCtx *c)
     begin(c, 0);
     dt_stub(0x004db820, NULL, (void *)sRenderState);
     gZrwRenderFlags = dt_u32() & 0xffff;
-    gZrwRenderExtra = dt_range(0, 3);
+    gZrwRenderExtra = (const void *)(uintptr_t)dt_range(0, 3);
     flags = (dt_u32() & 1) ? gZrwRenderFlags ^ (1u << dt_range(0, 15)) : dt_u32() & 0xffff;
     if ((dt_u32() & 3) == 0) {
         flags = gZrwRenderFlags;
@@ -837,7 +837,7 @@ static void setup_push_state(DtCtx *c)
     begin(c, 0);
     gZrwStateDepth = dt_range(0, 4);
     gZrwRenderFlags = dt_u32();
-    gZrwRenderExtra = (int)dt_u32();
+    gZrwRenderExtra = (const void *)(uintptr_t)dt_u32();
     dt_fill(&gZrwStateStack, sizeof(ZrwStateStack));
 }
 
@@ -847,10 +847,10 @@ static void setup_pop_state(DtCtx *c)
     begin(c, 0);
     gZrwStateDepth = dt_range(0, 4);
     gZrwRenderFlags = dt_u32() & 0xff;
-    gZrwRenderExtra = dt_range(0, 2);
+    gZrwRenderExtra = (const void *)(uintptr_t)dt_range(0, 2);
     for (int i = 0; i < kZrwStateStackSize; i++) {
         gZrwStateStack[i].flags = (dt_u32() & 1) ? gZrwRenderFlags : dt_u32() & 0xff;
-        gZrwStateStack[i].extra = (dt_u32() & 1) ? gZrwRenderExtra : dt_range(0, 2);
+        gZrwStateStack[i].raster = (dt_u32() & 1) ? gZrwRenderExtra : (const void *)(uintptr_t)dt_range(0, 2);
     }
     ORIG_VAR(0x00561490, StateHookFn, gStateHook) = sStateHook;
 }

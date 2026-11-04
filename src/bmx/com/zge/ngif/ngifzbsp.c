@@ -220,11 +220,11 @@ void zbspObjectSignal(PhysPropObject *object, int signal)
         object->flags &= (uint16_t)~kZbspObjFlagged;
         break;
     case 4:
-        zobjSetVisible((int32_t)(uintptr_t)frame, 0);
+        zobjSetVisible(frame, 0);
         object->flags |= kZbspObjHidden;
         break;
     case 5:
-        zobjSetVisible((int32_t)(uintptr_t)frame, 1);
+        zobjSetVisible(frame, 1);
         object->flags &= (uint16_t)~kZbspObjHidden;
         break;
     default:
@@ -573,7 +573,7 @@ void zbspBuildFace(ZbspLevelFace *src, const uint16_t *tag, PhysFace *out)
     out->q0[2] = toShort(out->p2.z);
     out->vert[3] = src;
     out->kind = 0;
-    out->object = 0;
+    out->object = NULL;
 }
 
 /*
@@ -621,7 +621,7 @@ void **zbspFindTaggedFaces(int lo, int hi)
             if (lo <= id && id <= hi) {
                 PhysFace *rec = (PhysFace *)&gZbspPropFaces + gZbspPropFaceCount++;
 
-                rec->object = (int32_t)(uintptr_t)node->object;
+                rec->object = node->object;
                 appendHit(gZbspHits, slot, rec);
                 slot++;
             }
@@ -807,7 +807,7 @@ void *zbspFindFaceNear(const ZVec3 *p, float radius, float cosLimit)
     zmemFill(&gZbspFaceQuery, 0, sizeof gZbspFaceQuery);
     for (uint32_t i = gZbspSphere.count; i != 0; i--) {
         const ZrwColHit *src = &gZbspSphere.hits[i - 1];
-        int32_t object = 0;
+        PhysPropObject *object = NULL;
         const ZrwRenderColHit *tri;
         ZVec3 center;
         ZVec3 proj;
@@ -828,7 +828,7 @@ void *zbspFindFaceNear(const ZVec3 *p, float radius, float cosLimit)
                     zbspBuildCollObject(n);
                 }
                 if (n->frame == frame) {
-                    object = (int32_t)(uintptr_t)n->object;
+                    object = n->object;
                     break;
                 }
             }

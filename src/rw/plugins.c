@@ -381,7 +381,7 @@ int RpLODAtomicPluginAttach(void)
     rpLodAtomicOffset = RpAtomicRegisterPlugin(sizeof(RpLodAtomicData *), 0x112, RW_CTOR(0x00506190),
                                                RW_DTOR(0x00506200), RW_COPY(0x005061b0));
     RpAtomicRegisterPluginStream(0x112, RW_READ(0x00505e60), RW_WRITE(0x00506030), RW_GETSIZE(0x00506140));
-    rpLodReserved = 0;
+    rpLodFreeList = NULL;
     rpLodCamera = NULL;
     return rpLodAtomicOffset >= 0;
 }

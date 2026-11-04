@@ -1972,7 +1972,7 @@ uint32_t gZrwScreenH;
 uint32_t gZrwRenderFlags;
 
 /* 0x0069777c */
-int gZrwRenderExtra;
+const void *gZrwRenderExtra;
 
 struct BmxGroup_bmxWinMainGlobals bmxWinMainGlobals __attribute__((aligned(16)));
 

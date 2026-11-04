@@ -5236,7 +5236,7 @@ _Static_assert(offsetof(struct BmxGroup_gNgAssetsDirGroup, pad_0055ba28) +
 struct BmxGroup_gNgRamDiskGroup {
     uint8_t lead_[8];             /* nothing: the members' offsets keep their original alignment */
     uint32_t gNgKeyMaps[40];      /* 0x0055bb98 */
-    uint32_t gNgRamDisk;          /* 0x0055bc38 */
+    intptr_t gNgRamDisk;          /* 0x0055bc38 */
     int gNgLegalPending;          /* 0x0055bc3c */
     const char *gNgWrapName;      /* 0x0055bc40 */
     void *gNgLevelNames[14];      /* 0x0055bc44 */
@@ -5269,21 +5269,21 @@ struct BmxGroup_gNgRamDiskGroup {
                    #member)
 AT(gNgKeyMaps, 0x0055bb98, 0x8);
 AT(gNgRamDisk, 0x0055bc38, 0xa8);
-AT(gNgLegalPending, 0x0055bc3c, 0xac);
-AT(gNgWrapName, 0x0055bc40, 0xb0);
-AT(gNgLevelNames, 0x0055bc44, 0xb8);
-AT(gNgDebugFaceColor, 0x0055bc7c, 0x128);
-AT(gNgDebugEdgeColor, 0x0055bc80, 0x12c);
-AT(gNgDebugTaggedColor, 0x0055bc84, 0x130);
-AT(gNgDebugRollerColor, 0x0055bc88, 0x134);
-AT(gNgMainLightColor, 0x0055bc8c, 0x138);
-AT(d_0055bc8d, 0x0055bc8d, 0x139);
-AT(gNgLightDir, 0x0055bc90, 0x13c);
-AT(gNgLightRef, 0x0055bcc0, 0x16c);
+AT(gNgLegalPending, 0x0055bc3c, 0xb0);
+AT(gNgWrapName, 0x0055bc40, 0xb8);
+AT(gNgLevelNames, 0x0055bc44, 0xc0);
+AT(gNgDebugFaceColor, 0x0055bc7c, 0x130);
+AT(gNgDebugEdgeColor, 0x0055bc80, 0x134);
+AT(gNgDebugTaggedColor, 0x0055bc84, 0x138);
+AT(gNgDebugRollerColor, 0x0055bc88, 0x13c);
+AT(gNgMainLightColor, 0x0055bc8c, 0x140);
+AT(d_0055bc8d, 0x0055bc8d, 0x141);
+AT(gNgLightDir, 0x0055bc90, 0x144);
+AT(gNgLightRef, 0x0055bcc0, 0x174);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gNgRamDiskGroup, gNgLightRef) +
                        sizeof(((struct BmxGroup_gNgRamDiskGroup *)0)->gNgLightRef) ==
-                   BMX_DATA_OFF(0x160, 0x19c),
+                   BMX_DATA_OFF(0x160, 0x1a4),
                "gNgRamDiskGroup");
 
 /* The type is local to bmx/com/zge/ngif/ngapp.c. */
@@ -8103,25 +8103,25 @@ AT(pad_0056c075, 0x0056c075, 0xbb9);
 AT(gPhysTick, 0x0056c07c, 0xbc0);
 AT(pad_0056c080, 0x0056c080, 0xbc4);
 AT(gPhysRay, 0x0056c128, 0xc70);
-AT(gPhysBestEdge, 0x0056c200, 0xd78);
-AT(gPhysAlignEdge, 0x0056c238, 0xdb8);
-AT(pad_0056c270, 0x0056c270, 0xdf8);
-AT(gPhysNearEdge, 0x0056c2c0, 0xe48);
-AT(gPhysEdgeProbe, 0x0056c2f8, 0xe88);
-AT(gPhysGrindEdge, 0x0056c330, 0xec8);
-AT(pad_0056c368, 0x0056c368, 0xf08);
-AT(gPhysLipFace, 0x0056c3b8, 0xf58);
-AT(gPhysForceStep, 0x0056c440, 0xff8);
-AT(gPhysDebugDraw, 0x0056c444, 0xffc);
-AT(gPhysDebugEdges, 0x0056c448, 0x1000);
-AT(gPhysDebugFrame, 0x0056c44c, 0x1008);
-AT(pad_0056c450, 0x0056c450, 0x100c);
-AT(gPropDefaults, 0x0056c4f8, 0x10b4);
-AT(pad_0056d038, 0x0056d038, 0x1f34);
+AT(gPhysBestEdge, 0x0056c200, 0xd80);
+AT(gPhysAlignEdge, 0x0056c238, 0xdc0);
+AT(pad_0056c270, 0x0056c270, 0xe00);
+AT(gPhysNearEdge, 0x0056c2c0, 0xe50);
+AT(gPhysEdgeProbe, 0x0056c2f8, 0xe90);
+AT(gPhysGrindEdge, 0x0056c330, 0xed0);
+AT(pad_0056c368, 0x0056c368, 0xf10);
+AT(gPhysLipFace, 0x0056c3b8, 0xf60);
+AT(gPhysForceStep, 0x0056c440, 0x1008);
+AT(gPhysDebugDraw, 0x0056c444, 0x100c);
+AT(gPhysDebugEdges, 0x0056c448, 0x1010);
+AT(gPhysDebugFrame, 0x0056c44c, 0x1018);
+AT(pad_0056c450, 0x0056c450, 0x101c);
+AT(gPropDefaults, 0x0056c4f8, 0x10c4);
+AT(pad_0056d038, 0x0056d038, 0x1f44);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gGameRoundStatesGroup, pad_0056d038) +
                        sizeof(((struct BmxGroup_gGameRoundStatesGroup *)0)->pad_0056d038) ==
-                   BMX_DATA_OFF(0x1b78, 0x2174),
+                   BMX_DATA_OFF(0x1b78, 0x2184),
                "gGameRoundStatesGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00573260..0x00574584.
@@ -8368,12 +8368,12 @@ struct BmxGroup_gZbspPropFacesGroup {
                        BMX_DATA_OFF((addr) - 0x005e7fe0, off64),                                             \
                    #member)
 AT(gZbspPropFaces, 0x005e7fe0, 0x0);
-AT(pad_005e8068, 0x005e8068, 0xa0);
-AT(gZbspNearFaces, 0x005e8420, 0x458);
+AT(pad_005e8068, 0x005e8068, 0xa8);
+AT(gZbspNearFaces, 0x005e8420, 0x460);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZbspPropFacesGroup, gZbspNearFaces) +
                        sizeof(((struct BmxGroup_gZbspPropFacesGroup *)0)->gZbspNearFaces) ==
-                   BMX_DATA_OFF(0x8bb8, 0xa3b8),
+                   BMX_DATA_OFF(0x8bb8, 0xabb8),
                "gZbspPropFacesGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005f10a8..0x005f34ac.
@@ -9416,11 +9416,11 @@ struct BmxGroup_gPhysMotionsGroup {
                    #member)
 AT(gPhysMotions, 0x006962fc, 0x10);
 AT(gActionMotions, 0x00696300, 0x18);
-AT(pad_006966b8, 0x006966b8, 0x3d0);
+AT(pad_006966b8, 0x006966b8, 0x788);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gPhysMotionsGroup, pad_006966b8) +
                        sizeof(((struct BmxGroup_gPhysMotionsGroup *)0)->pad_006966b8) ==
-                   BMX_DATA_OFF(0x3ec, 0x3f4),
+                   BMX_DATA_OFF(0x3ec, 0x7ac),
                "gPhysMotionsGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00696720..0x00696740.
@@ -12875,9 +12875,9 @@ extern uint32_t gFxSplashTexture;                               /* 0x005ab4ec */
 extern const int8_t *gNgifScript;                               /* 0x005ab4f0 */
 extern void *gFxCube;                                           /* 0x005ab4f4 */
 extern struct BmxGroup_gNgifPrimBufferGroup gNgifPrimBufferGroup;   /* 0x005ab4fc */
-extern int gNgifFlushNode;                                          /* 0x005d2500 */
+extern void *gNgifFlushNode;                                        /* 0x005d2500 */
 extern int gNgifFlushPending2;                                      /* 0x005d2504, also gZprimFrameEnded */
-extern int gNgifFlushNode2;                                         /* 0x005d2508 */
+extern void *gNgifFlushNode2;                                       /* 0x005d2508 */
 extern uint32_t *gNgifPrimStart;                                    /* 0x005d250c */
 extern struct BmxGroup_gPrimCursorGroup gPrimCursorGroup;           /* 0x005d2510 */
 extern ZactorPoseTables gZactorPose;                                /* 0x005da1e8 */
@@ -13451,8 +13451,8 @@ extern unsigned char d_0068ebf0[16];   /* 0x0068ebf0 */
 extern unsigned char d_0068ec00[4096]; /* 0x0068ec00 */
 extern struct BmxGroup_gNgifColorGroup gNgifColorGroup;           /* 0x0068fc00 */
 extern struct BmxGroup_gFxDustTexturesGroup gFxDustTexturesGroup; /* 0x0068fc20 */
-extern int gFxAnimHandle;                                         /* 0x0068fcf8 */
-extern int gNgifScriptNode;                                       /* 0x0068fcfc */
+extern void *gFxAnimHandle;                                       /* 0x0068fcf8 */
+extern void *gNgifScriptNode;                                     /* 0x0068fcfc */
 extern ZfxSkidTable gFxSkids;                                     /* 0x0068fd00 */
 extern uint8_t *gFxWorldObject;                                   /* 0x0068ff80 */
 extern uint32_t gNgWord68ff84;                                    /* 0x0068ff84 */
@@ -13747,7 +13747,7 @@ extern struct BmxGroup_gZrwFramesGroup gZrwFramesGroup;                 /* 0x006
 extern uint32_t gZrwScreenW;                                            /* 0x00697770, also gZrwCamWidth */
 extern uint32_t gZrwScreenH;                                            /* 0x00697774, also gZrwCamHeight */
 extern uint32_t gZrwRenderFlags;                                        /* 0x00697778 */
-extern int gZrwRenderExtra;                                             /* 0x0069777c */
+extern const void *gZrwRenderExtra;                                     /* 0x0069777c */
 extern struct BmxGroup_bmxWinMainGlobals bmxWinMainGlobals;             /* 0x00697780 */
 extern struct BmxGroup_gGdiSurfaceGroup gGdiSurfaceGroup;               /* 0x006977cc */
 extern unsigned char d_006977f0[128];                                   /* 0x006977f0 */

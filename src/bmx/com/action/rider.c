@@ -411,7 +411,7 @@ void riderUpdateAll(void)
             }
             r->fieldBA4 &= 0xffffff7fu;
             zactorSyncPose(r->actor);
-            zrwmatUpdate((void *)(uintptr_t)((const ZActor *)r->actor)->object);
+            zrwmatUpdate(((const ZActor *)r->actor)->object);
         }
         if (r->soundCooldown != 0) {
             r->soundCooldown--;

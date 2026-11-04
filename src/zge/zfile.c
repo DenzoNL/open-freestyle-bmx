@@ -99,13 +99,14 @@ const char *zfileDeviceName(ZfileDevice *device)
 }
 
 BMX_ADDR(0x00483d30)
-uint32_t zfileDeviceControl(ZfileDevice *device, uint32_t command, uint32_t a, uint32_t b)
+const char *zfileDeviceControl(ZfileDevice *device, uint32_t command, const char *const *keys,
+                               const void *values)
 {
     requireInitialized(333);
     if (device == 0) {
         zdebugFail(kInvalidDevice, zfileFile, 334, 0);
     }
-    return device->control(device, command, a, b);
+    return device->control(device, command, keys, values);
 }
 
 /*
@@ -240,19 +241,19 @@ int zfileWrite(ZfileHandle *file, const void *buffer, int count, int flags)
 }
 
 BMX_ADDR(0x00484c00)
-uint32_t zfileOp30(ZfileHandle *file, uint32_t a, uint32_t b, uint32_t c)
+uint32_t zfileOp30(ZfileHandle *file, uint32_t offset, uint32_t whence, const void *callback)
 {
     requireInitialized(703);
     requireDevice(file, 704);
-    return file->device->op30(file, a, b, c);
+    return file->device->op30(file, offset, whence, callback);
 }
 
 BMX_ADDR(0x00484c70)
-uint32_t zfileOp34(ZfileHandle *file, uint32_t a, uint32_t b)
+uint32_t zfileOp34(ZfileHandle *file, uint32_t *position, const void *callback)
 {
     requireInitialized(719);
     requireDevice(file, 720);
-    return file->device->op34(file, a, b);
+    return file->device->op34(file, position, callback);
 }
 
 BMX_ADDR(0x00484cd0)
@@ -408,12 +409,12 @@ char *zfileGetExtension(const char *path, char *out)
 }
 
 BMX_ADDR(0x00485580)
-ZfileHandle *zfileOpenRamDisk(uint32_t address, uint32_t size)
+ZfileHandle *zfileOpenRamDisk(const void *data, uint32_t size)
 {
     ZfileDeviceTable *table;
     uint32_t i;
     const char *keys[2];
-    uint32_t values[2];
+    uintptr_t values[2];
     const char *name;
     ZfileDevice *ramDisk;
 
@@ -429,12 +430,11 @@ ZfileHandle *zfileOpenRamDisk(uint32_t address, uint32_t size)
         zdebugFail("Could not locate a RAM disk device on this system!", zfileFile, 1102, 0);
     }
     ramDisk = (ZfileDevice *)gZfileRamDisk;
-    values[0] = address;
+    values[0] = (uintptr_t)data;
     values[1] = size;
     keys[0] = "ADDRESS";
     keys[1] = "SIZE";
-    name = (const char *)(uintptr_t)zfileDeviceControl(ramDisk, 2, (uint32_t)(uintptr_t)keys,
-                                                       (uint32_t)(uintptr_t)values);
+    name = zfileDeviceControl(ramDisk, 2, keys, values);
     if (name == 0) {
         zdebugFail("Could not generate file name for RAM disk", zfileFile, 1113, 0);
         return 0;

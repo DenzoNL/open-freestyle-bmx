@@ -12,7 +12,7 @@
 
 /* The memory block to open (set by zrwFileRamDiskSetInf) and the file extension the hook accepts. */
 typedef struct ZrwRamDiskInfo {
-    uint32_t address;
+    const void *address;
     uint32_t size;
     const char *extension; /* NULL accepts every path */
 } ZrwRamDiskInfo;

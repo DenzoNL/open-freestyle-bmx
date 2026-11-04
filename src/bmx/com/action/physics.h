@@ -80,7 +80,7 @@ typedef PhysRider PhysRiderArray[4];
 
 /* Debug and HUD state. */
 #define gPhysHudHandle    ORIG_VAR(0x0056be94, uint16_t, gPhysHudHandle)
-#define gPhysHudFont      ORIG_VAR(0x0056bf38, uint8_t, gPhysHudFont)
+#define gPhysHudFont      ORIG_VAR(0x0056bf38, struct OvlFont, gPhysHudFont)
 #define gPhysTick         ORIG_VAR(0x0056c07c, uint32_t, gPhysTick)
 #define gPhysDebugContact ORIG_VAR(0x0056c444, int32_t, gPhysDebugContact)
 #define gPhysDebugEdges   ORIG_VAR(0x0056c448, PhysEdge **, gPhysDebugEdges)

@@ -83,7 +83,8 @@ enum {
 };
 
 typedef int(BMX_CDECL *RwSystemFunc)(int32_t request, void *out, void *inOut, int32_t in);
-typedef int(BMX_CDECL *RwRenderStateSetFunc)(int32_t state, int32_t value);
+/* value: a number, or a pointer for the texture raster (1), fog density (15) and fog table (16). */
+typedef int(BMX_CDECL *RwRenderStateSetFunc)(int32_t state, intptr_t value);
 typedef int(BMX_CDECL *RwRenderStateGetFunc)(int32_t state, void *value);
 typedef int(BMX_CDECL *RwIm2DRenderPrimitiveFunc)(int32_t primType, void *vertices, int32_t numVertices);
 typedef int(BMX_CDECL *RwIm3DRenderLineFunc)(int32_t from, int32_t to);
@@ -457,7 +458,7 @@ RwMatrix *RwMatrixUpdate(RwMatrix *matrix);
 RwMatrix *RwMatrixMultiply(RwMatrix *out, const RwMatrix *a, const RwMatrix *b);
 
 float RwIm2DGetNearScreenZ(void);
-int RwRenderStateSet(int32_t state, int32_t value);
+int RwRenderStateSet(int32_t state, intptr_t value);
 int RwRenderStateGet(int32_t state, void *value);
 int RwIm2DRenderPrimitive(int32_t primType, void *vertices, int32_t numVertices);
 

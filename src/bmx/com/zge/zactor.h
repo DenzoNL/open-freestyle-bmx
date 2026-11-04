@@ -57,8 +57,8 @@ typedef struct ZActor {
     uint8_t pad190[4];          /* 0x190 */
     uint8_t lod[0x1d0 - 0x194]; /* uint16 model every 0x10 bytes, up to four levels of detail */
     float radius;               /* 0x1d0 */
-    int32_t object;             /* 0x1d4 handle passed to the object module */
-    int32_t shadow;             /* 0x1d8 shadow object, posed like `object` (see zactorSyncPose) */
+    struct ZObj *object;        /* 0x1d4 the actor's model object */
+    struct ZObj *shadow;        /* 0x1d8 shadow object, posed like `object` (see zactorSyncPose) */
     uint32_t partHash[15];      /* 0x1dc name hash of each part (riders use 15, bikes 10), see ngifzactor.c */
     uint8_t pad218[0x228 - 0x218];
     uint32_t partOrder[15]; /* 0x228 part indices in drawing order */

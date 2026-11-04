@@ -241,16 +241,17 @@ static int setFilter(int32_t filter)
  * update, for unknown states and for values the device cannot do.
  */
 BMX_ADDR(0x004d7328)
-__attribute__((regparm(2))) int rwD3DSetRenderState(int32_t state, int32_t value)
+__attribute__((regparm(2))) int rwD3DSetRenderState(int32_t state, intptr_t arg)
 {
     RwD3DStateCache *s = &rwD3DState;
+    const int32_t value = (int32_t)arg; /* the number of the states that take one */
 
     if (rwD3DContext == NULL) {
         return 0;
     }
     switch (state) {
     case 1:
-        rwD3DSetTextureRaster((RwRaster *)(uintptr_t)value);
+        rwD3DSetTextureRaster((RwRaster *)arg);
         return 1;
     case 2: { /* texture address: wrap, mirror, clamp, border */
         static const uint32_t kCaps[5] = {0, 1, 2, 4, 8};
@@ -330,9 +331,9 @@ __attribute__((regparm(2))) int rwD3DSetRenderState(int32_t state, int32_t value
     case 14:
         return rwD3DSetFogType(value);
     case 15:
-        return rwD3DSetFogDensity((const float *)(uintptr_t)value);
+        return rwD3DSetFogDensity((const float *)arg);
     case 16:
-        return rwD3DSetFogTable((const uint32_t *)(uintptr_t)value);
+        return rwD3DSetFogTable((const uint32_t *)arg);
     case 17:
         if (s->alphaSort == 0) {
             if (value != 0) {
@@ -350,7 +351,7 @@ __attribute__((regparm(2))) int rwD3DSetRenderState(int32_t state, int32_t value
 
 /* 0x4d7320: RwDevice.fpRenderStateSet, the stack entry of 0x4d7328. */
 BMX_ADDR(0x004d7320)
-int rwD3DRenderStateSet(int32_t state, int32_t value)
+int rwD3DRenderStateSet(int32_t state, intptr_t value)
 {
     return rwD3DSetRenderState(state, value);
 }
@@ -364,7 +365,7 @@ int rwD3DRenderStateGet(int32_t state, void *value)
 
     switch (state) {
     case 1:
-        *out = (int32_t)(uintptr_t)s->textureRaster;
+        *(RwRaster **)value = s->textureRaster; /* a pointer */
         return 1;
     case 2:
         if (s->address < 1 || s->address > 4) {
@@ -422,7 +423,7 @@ int rwD3DRenderStateGet(int32_t state, void *value)
         __builtin_memcpy(out, &s->fogDensity, 4);
         return 1;
     case 16:
-        *out = (int32_t)(uintptr_t)s->fogTable;
+        *(const uint8_t **)value = s->fogTable; /* the table's address */
         return 1;
     case 17:
         *out = s->alphaSort;

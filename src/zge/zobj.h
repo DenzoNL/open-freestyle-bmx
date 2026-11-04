@@ -85,8 +85,8 @@ void *zobjInit(void *object, uint32_t type);
 /* Calls the destroy hook of the object's type, detaches it from its hierarchy, then frees it. */
 int zobjFree(void *object);
 
-/* Shows or hides an object handle and notifies its owner. */
-void zobjSetVisible(int32_t object, int visible);
+/* Shows or hides an object and notifies its owner. */
+void zobjSetVisible(void *object, int visible);
 
 /* Model handle of a scene object (+0x2c). */
 void *zobjGetModel(const void *object);

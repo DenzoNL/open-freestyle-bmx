@@ -26,9 +26,9 @@ static const char kUnknownParameter[] = "Unknown parameter:%d";
 
 /* Statically linked RenderWare and engine routines this module calls (not ported). */
 ORIG_FN(0x004929f0, void, zrwSetClipPlane, (const void *plane, int zero, float value));
-ORIG_FN(0x004930a0, void, zrwSetViewport, (const void *a, const void *b));
+ORIG_FN(0x004930a0, void, zrwSetViewport, (const void *camera, uint32_t value));
 ORIG_FN(0x004930b0, void, zrwSetViewWindow, (const void *a, const void *b));
-ORIG_FN(0x004930c0, void, zrwSetCameraPlane, (const void *a, const void *b));
+ORIG_FN(0x004930c0, void, zrwSetCameraPlane, (const void *camera, uint32_t flag));
 ORIG_FN(0x004930e0, void, zrwSetCameraOffset, (const void *a, const void *b));
 ORIG_FN(0x00493100, void, zrwSetCameraFlags, (const void *a, int flags));
 /* Ported in zrwtxr.c (its header cannot be included here: it clashes with the macros of zrwzgl.h). */
@@ -38,7 +38,7 @@ int zrwMatRegisterPlugin(void);
 
 ORIG_FN(0x0049ea10, int, zrwFileInitialize, (void));
 ORIG_FN(0x0049ea60, void, zrwFileShutdown, (void));
-ORIG_FN(0x00496c40, void *, zrwCreateWorld, (void));
+ORIG_FN(0x00496c40, int, zrwCreateWorld, (void));
 ORIG_FN(0x00496de0, int, zrwWorldShutdown, (void));
 
 ORIG_FN(0x00488890, int, zrwMdlRegisterPlugin, (void));
@@ -158,7 +158,7 @@ typedef struct DdVtbl {
 
 /* Subsystem hooks the original keeps as function pointers in data; they return 0 on failure. */
 typedef int(BMX_CDECL *ZglInitFn)(void);
-typedef void(BMX_CDECL *ZglRenderStateFn)(uint32_t flags, int extra);
+typedef void(BMX_CDECL *ZglRenderStateFn)(uint32_t flags, const void *raster);
 typedef void(BMX_CDECL *ZglNopFn)(void);
 #define gZglInitTexture     ORIG_VAR(0x005623f0, ZglInitFn, gZglInitTexture)
 #define gZglInitMaterial    ORIG_VAR(0x00561018, ZglInitFn, gZglInitMaterial)
@@ -303,7 +303,7 @@ int zrwSetParameter(int id, const void *value, const void *extra)
         zmemCopy(gZrwName, value, 0x20);
         return 1;
     case 3:
-        zrwSetViewport(value, extra);
+        zrwSetViewport(value, (uint32_t)(uintptr_t)extra); /* a number passed as the pointer */
         return 1;
     case 4:
         zrwSetViewWindow(value, extra);
@@ -312,7 +312,7 @@ int zrwSetParameter(int id, const void *value, const void *extra)
         zrwSetClipPlane(value, 0, *(const float *)extra);
         return 1;
     case 7:
-        zrwSetCameraPlane(value, extra);
+        zrwSetCameraPlane(value, (uint32_t)(uintptr_t)extra); /* a number passed as the pointer */
         return 1;
     case 8:
         zrwSetCameraOffset(value, extra);
@@ -429,7 +429,7 @@ int zrwGraphicLibraryInitialize(void)
         gZglInitCol() == 0 || gZglInitPrim() == 0) {
         return 0;
     }
-    if (zrwCreateWorld() == NULL) {
+    if (zrwCreateWorld() == 0) {
         zrwApplicationError("Cannot create world.");
         return 0;
     }
@@ -877,7 +877,7 @@ void zrwResetRenderState(void)
 
 /* Applies only the render states whose flag bits differ from the current ones. */
 BMX_ADDR(0x0048bc60)
-int zrwSetRenderState(uint32_t flags, int extra)
+int zrwSetRenderState(uint32_t flags, const void *raster)
 {
     uint32_t diff = gZrwRenderFlags ^ flags;
 
@@ -913,9 +913,9 @@ int zrwSetRenderState(uint32_t flags, int extra)
         }
         gZrwRenderFlags = flags;
     }
-    if (extra != gZrwRenderExtra) {
-        RwRenderStateSet(1, extra);
-        gZrwRenderExtra = extra;
+    if (raster != gZrwRenderExtra) {
+        RwRenderStateSet(1, (intptr_t)raster);
+        gZrwRenderExtra = raster;
     }
     return 1;
 }
@@ -923,14 +923,14 @@ int zrwSetRenderState(uint32_t flags, int extra)
 BMX_ADDR(0x0048bd80)
 int zrwPushRenderState(void)
 {
-    const int extra = gZrwRenderExtra;
+    const void *raster = gZrwRenderExtra;
 
     if (gZrwStateDepth == kZrwStateStackSize) {
         gZdebugPrint("Render state stack is full");
         return 0;
     }
     gZrwStateStack[gZrwStateDepth].flags = gZrwRenderFlags;
-    gZrwStateStack[gZrwStateDepth].extra = extra;
+    gZrwStateStack[gZrwStateDepth].raster = raster;
     gZrwStateDepth++;
     return 1;
 }
@@ -946,8 +946,8 @@ int zrwPopRenderState(void)
     }
     gZrwStateDepth--;
     entry = gZrwStateStack[gZrwStateDepth];
-    if (entry.flags != gZrwRenderFlags || entry.extra != gZrwRenderExtra) {
-        gZglRenderStateHook(entry.flags, entry.extra);
+    if (entry.flags != gZrwRenderFlags || entry.raster != gZrwRenderExtra) {
+        gZglRenderStateHook(entry.flags, entry.raster);
     }
     return 1;
 }
@@ -1210,7 +1210,7 @@ void zrwDialogSelectDevice(void *dialog)
 
 /* Device dialog: 0x3e8 sub system list, 0x3e9 video mode list, 1 OK, 0x3ea cancel. */
 BMX_ADDR(0x0048a330)
-int BMX_STDCALL zrwDialogProc(void *dialog, uint32_t message, uint32_t wparam, uintptr_t lparam)
+int BMX_STDCALL zrwDialogProc(void *dialog, uint32_t message, uintptr_t wparam, uintptr_t lparam)
 {
     switch (message) {
     case 0x10:
@@ -1251,7 +1251,7 @@ int BMX_STDCALL zrwDialogProc(void *dialog, uint32_t message, uint32_t wparam, u
 
 /* Main window procedure: activation, destruction, size limits and the quit key. */
 BMX_ADDR(0x0048a800)
-intptr_t BMX_STDCALL zrwMainWndProc(void *window, uint32_t message, uint32_t wparam, uintptr_t lparam)
+intptr_t BMX_STDCALL zrwMainWndProc(void *window, uint32_t message, uintptr_t wparam, uintptr_t lparam)
 {
     switch (message) {
     case 6:

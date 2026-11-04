@@ -92,10 +92,32 @@ typedef struct ZscnptsState {
 int zsceneParseNode(ZsceneNode *node);
 /* Reads Scene.Txt (or another database): SCENE_COMMON, then SCENE blocks up to END. */
 int zsceneLoadDatabase(const char *path);
-/* Depth first search below node for query {type, name hash (0: first of type; set to -1), -, result}. */
-int zsceneFindNode(ZsceneNode *node, int32_t *query);
-/* Free list callback: entry matches query {type, id, result}; returns 0 when it does (stops the scan). */
-int zsceneEntryMatch(ZsceneEntry *entry, int32_t *query);
+/*
+ * What zsceneFindNode and zsceneEntryMatch look for and what they found. The original keeps it in four
+ * stack words; zsceneEntryMatch uses the first three.
+ */
+typedef struct ZsceneQuery {
+    int32_t kind;       /* node type, or the entry's kind byte */
+    int32_t key;        /* node name hash (0: the first of the type; set to -1 when taken) or entry id */
+    ZsceneEntry *entry; /* zsceneEntryMatch's result */
+    ZsceneNode *node;   /* zsceneFindNode's result */
+} ZsceneQuery;
+
+BMX_LAYOUT32_ASSERT(sizeof(ZsceneQuery) == 0x10, "ZsceneQuery size");
+
+/* A file load through an extension handler: the file in, the loaded animation list or model out. */
+typedef struct ZsceneRequest {
+    const char *file;
+    void *anims; /* zsceneLoadAnimFile, zsceneLoadAnimLibrary: the ZsceneAnim list */
+    void *model; /* zsceneLoadModelFile */
+} ZsceneRequest;
+
+BMX_LAYOUT32_ASSERT(sizeof(ZsceneRequest) == 0xc, "ZsceneRequest size");
+
+/* Depth first search below node for the query's node; 0 when found (the original returns the node else). */
+int zsceneFindNode(ZsceneNode *node, ZsceneQuery *query);
+/* Free list callback: entry matches the query's kind and id; returns 0 when it does (stops the scan). */
+int zsceneEntryMatch(ZsceneEntry *entry, ZsceneQuery *query);
 /* Registers an object in the open scene (asserts when none is open). */
 ZsceneEntry *zsceneAddEntry(ZsceneNode *node, uint32_t id, uint32_t type, uint8_t kind, void *object);
 /* Loads the chunks of the scene component `kind` of a file image through a table of {chunk id, handler}. */
@@ -103,9 +125,9 @@ int zsceneLoadChunks(void *data, uint32_t size, const char *directory, int kind,
                      const void *table);
 void zsceneReleaseEntries(int all);
 int zsceneForgetEntry(int type, int kind, void *object, ZsceneEntry *entry);
-int zsceneLoadModelFile(uint32_t *request);
-int zsceneLoadAnimFile(uint32_t *request);
-int zsceneLoadAnimLibrary(uint32_t *request);
+int zsceneLoadModelFile(ZsceneRequest *request);
+int zsceneLoadAnimFile(ZsceneRequest *request);
+int zsceneLoadAnimLibrary(ZsceneRequest *request);
 /* Creates the databases; path NULL means "Scene.Txt". */
 int zsceneInitialize(const char *path);
 /* Opens the scene of that name: loads its component files. Asserts when one is already open. */
@@ -115,7 +137,7 @@ int zsceneClose(void);
 void *zsceneFindModel(int flags, const char *name);
 void *zsceneFindAnim(int flags, const char *name);
 /* Copies the animations of a library into a table of `size` entries (padding with the first). */
-int zsceneAnimTable(void *library, uint32_t *table, int size);
+int zsceneAnimTable(void *library, void **table, int size);
 void *zsceneAddLight(int flags, int type, int param);
 void *zsceneAddWorldObject(int flags);
 

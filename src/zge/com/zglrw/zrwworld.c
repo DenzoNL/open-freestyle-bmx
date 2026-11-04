@@ -38,7 +38,7 @@ ORIG_FN(0x00492fe0, int, zrwcamEnd, (void));
 ORIG_FN(0x00493060, void *, zrwCameraGetRwCamera, (const ZrwCamera *camera));
 
 /* Interface pointers in the exe's data. */
-typedef void(BMX_CDECL *ZrwSetBoundsFn)(int mode, const float *bounds, int flags);
+typedef void(BMX_CDECL *ZrwSetBoundsFn)(int mode, const float *bounds, const void *extra);
 typedef void *(BMX_CDECL *ZrwSetHookFn)(void *hook);
 typedef void(BMX_CDECL *ZrwReleaseFn)(void *object);
 typedef const char *(BMX_CDECL *ZrwTextureNameFn)(void *texture);
@@ -258,7 +258,7 @@ void *zrwworldLogLight(void *light)
 BMX_ADDR(0x004962e0)
 ZrwWorldRecord *zrwworldFindRecord(void *image, char kind, uint32_t *size)
 {
-    ZfileHandle *file = zfileOpenRamDisk((uint32_t)(uintptr_t)image, ((uint32_t *)image)[1]);
+    ZfileHandle *file = zfileOpenRamDisk(image, ((uint32_t *)image)[1]);
     void *iff;
 
     if (file != NULL) {
@@ -338,7 +338,7 @@ static void setWorldBounds(void *world)
     bounds[4] = (float)(((double)extent[0] - gZrwWorldCenter.x) * gZrwInvScale);
     bounds[5] = (float)-(((double)extent[4] - gZrwWorldCenter.y) * gZrwInvScale);
     bounds[6] = (float)-(((double)extent[5] - gZrwWorldCenter.z) * gZrwInvScale);
-    gZrwWorldSetBounds(2, bounds, 0);
+    gZrwWorldSetBounds(2, bounds, NULL);
 }
 
 BMX_ADDR(0x004966e0)
@@ -356,8 +356,8 @@ int zrwworldReadStream(void *image, const char *name)
     }
     zstrFormat(path, "%s%s", name, record + 8);
     argument = path;
-    resolved = (const char *)(uintptr_t)zfileDeviceControl(
-        zfileDefaultDevice(), 1, (uint32_t)(uintptr_t)&gZrwWorldPathArgs, (uint32_t)(uintptr_t)&argument);
+    resolved = zfileDeviceControl(zfileDefaultDevice(), 1, (const char *const *)&gZrwWorldPathArgs,
+                                  (const void *)&argument);
     if (resolved == NULL) {
         return 0;
     }
@@ -562,7 +562,7 @@ int zrwWorldReset(void)
     bounds[4] = (float)(((double)extent[0] - gZrwWorldCenter.x) * gZrwInvScale);
     bounds[5] = (float)-(((double)extent[4] - gZrwWorldCenter.y) * gZrwInvScale);
     bounds[6] = (float)-(((double)extent[5] - gZrwWorldCenter.z) * gZrwInvScale);
-    gZrwSetBounds(2, bounds, 0);
+    gZrwSetBounds(2, bounds, NULL);
     if (gZrwWorldMaterials != NULL) {
         for (void *material = zlistFirst(gZrwWorldMaterials); material != NULL;
              material = zlistFirst(gZrwWorldMaterials)) {
@@ -658,15 +658,15 @@ BMX_ADDR(0x004975b0)
 int zrwWorldLoadPvs(void)
 {
     uint8_t *values[1] = {&gZrwPvsBuffer};
-    uint32_t data = zfileDeviceControl(zfileDefaultDevice(), 1, (uint32_t)(uintptr_t)&gZrwPvsKeys,
-                                       (uint32_t)(uintptr_t)values);
+    const char *data =
+        zfileDeviceControl(zfileDefaultDevice(), 1, (const char *const *)&gZrwPvsKeys, (const void *)values);
     void *stream;
     int ok;
 
-    if (data == 0) {
+    if (data == NULL) {
         return 0;
     }
-    stream = RwStreamOpen(2, 2, (void *)(uintptr_t)data);
+    stream = RwStreamOpen(2, 2, data);
     if (stream == NULL) {
         return 0;
     }

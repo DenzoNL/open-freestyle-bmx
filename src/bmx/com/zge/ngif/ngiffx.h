@@ -136,7 +136,7 @@ typedef ZfxSkid ZfxSkidTable[kFxSkidEntries];
 #define gFxSkids ORIG_VAR(0x0068fd00, ZfxSkidTable, gFxSkids)
 
 /* Looks an animation library up by name and fills `table` from it (the first item sits at the library). */
-void ngiffxLoadAnimTable(const char *name, uint32_t *table, int size);
+void ngiffxLoadAnimTable(const char *name, void **table, int size);
 /* Debug value at 0x5ab454. */
 float ngiffxGetDebugFloat(void);
 void ngiffxNop(void);
@@ -173,14 +173,14 @@ int ngiffxUpdateEmitter(ZfxEffect *effect, ZfxEmitter *emitter);
 ZfxEmitter *ngiffxPosterCreate(ZfxEffect *effect, uint16_t capacity);
 
 /* Effect creators registered under the effect names: (handle, params or NULL). */
-void ngiffxCreateSpark(uint32_t handle, float *params);
-void ngiffxCreateShard(uint32_t handle, const void *params);
-void ngiffxCreateSplash(uint32_t handle, float *params);
-void ngiffxCreateDust(uint32_t handle, const void *params);
-void ngiffxCreatePoster(uint32_t handle, const void *params);
-void ngiffxCreateRipple(uint32_t handle, uint32_t *params);
-void ngiffxCreateSkid(uint32_t handle, uint32_t *params);
-void ngiffxCreateLightning(uint32_t handle);
+void ngiffxCreateSpark(const void *object, float *params);
+void ngiffxCreateShard(const void *object, const void *params);
+void ngiffxCreateSplash(const void *object, float *params);
+void ngiffxCreateDust(const void *object, const void *params);
+void ngiffxCreatePoster(const void *object, const void *params);
+void ngiffxCreateRipple(const void *object, uint32_t *params);
+void ngiffxCreateSkid(const void *object, uint32_t *params);
+void ngiffxCreateLightning(const void *object);
 
 /* The effect scene object (0x68ff80); the arguments are ignored. */
 const uint8_t *ngiffxGetNode(const void *obj, int index);

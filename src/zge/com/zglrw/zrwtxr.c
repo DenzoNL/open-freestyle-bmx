@@ -30,7 +30,7 @@ ORIG_FN(0x00489be0, void, zrwmatTextureLoaded, (ZrwTexture * texture));
 
 /* Renderer interface and helpers the exe's data points at. */
 typedef uint32_t(BMX_CDECL *ZrwTimeFn)(void);
-typedef void(BMX_CDECL *ZrwSetBoundsFn)(int mode, const float *bounds, int flags);
+typedef void(BMX_CDECL *ZrwSetBoundsFn)(int mode, const float *bounds, const void *extra);
 typedef void(BMX_CDECL *ZrwReleaseFn)(void *object);
 #define gZrwTimeGetTime     ORIG_VAR(0x00561480, ZrwTimeFn, gZrwTimeGetTime)
 #define gZrwSetBounds       ORIG_VAR(0x00561484, ZrwSetBoundsFn, gZrwSetBounds)
