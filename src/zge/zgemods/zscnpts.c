@@ -9,7 +9,7 @@
 
 static const char kZscnptsFile[] = "C:\\NgEngine\\Zge\\ZgeMods\\zscnpts.c";
 
-typedef void(BMX_CDECL *ZscnptsQueryFn)(int what, float *out, int arg);
+typedef void(BMX_CDECL *ZscnptsQueryFn)(int what, float *out, const void *extra);
 #define gZscnptsQuery ORIG_VAR(0x00561488, ZscnptsQueryFn, gZscnptsQuery)
 
 BMX_ADDR(0x00491f10)

@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "compat/orig.h"
+#include "compat/slot32.h"
 #include "zge/zmem.h"
 
 /* One of the texture slots of a material: the texture handle and two words nothing uses. */
@@ -40,6 +41,9 @@ typedef struct ZrwMaterial {
             void *rwMaterial;    /* 0x70 RpMaterial that follows the first texture */
         };
     };
+#if !BMX_LAYOUT32
+    uint32_t handle; /* its 32-bit handle (zrwmatHandle), 0 until one is asked for */
+#endif
 } ZrwMaterial;
 
 BMX_LAYOUT32_ASSERT(sizeof(ZrwMatSlot) == 12, "zrw material slot");
@@ -48,6 +52,33 @@ _Static_assert(offsetof(ZrwMaterial, refCount) == 0x26, "zrw material");
 BMX_LAYOUT32_ASSERT(offsetof(ZrwMaterial, slots) == 0x2c, "zrw material");
 
 BMX_LAYOUT32_ASSERT(sizeof(ZrwMaterial) == 0x74, "zrw material");
+
+/*
+ * A material as a 32-bit word. The PSX packets, the effect parameter blocks, zprim's sprite frames, the
+ * shared texture table at 0x68c3e0 and the globals beside them keep materials in 32-bit words
+ * (docs/PORTING.md "The texture handles"). Where pointers are 32 bits the word is the material's address, as
+ * in the original; with 64-bit pointers it is a compat/slot32 handle, made when first asked for and dropped
+ * when the material is freed. 0 stands for NULL either way.
+ */
+static inline uint32_t zrwmatHandle(const ZrwMaterial *material)
+{
+#if BMX_LAYOUT32
+    return bmxSlot32Put(material);
+#else
+    if (material == NULL) {
+        return 0;
+    }
+    if (material->handle == 0) {
+        ((ZrwMaterial *)material)->handle = bmxSlot32Put(material);
+    }
+    return material->handle;
+#endif
+}
+
+static inline ZrwMaterial *zrwmatFromHandle(uint32_t handle)
+{
+    return bmxSlot32Get(handle);
+}
 BMX_LAYOUT32_ASSERT(offsetof(ZrwMaterial, rwMaterial) == 0x70, "zrw material");
 _Static_assert(offsetof(ZrwMaterial, rwMaterial) >= offsetof(ZrwMaterial, slots[5].texture) + sizeof(void *),
                "zrw material: the RpMaterial is clear of every texture handle");
@@ -108,15 +139,15 @@ void *zrwmatModelFromObject(void *model);
 int zrwmatNodeCount(void *object);
 void zrwmatGetNodeHashes(void *object, uint32_t *hashes);
 /* Node of the object with the given name hash (0 when there is none). */
-uint32_t zrwmatFindNode(void *object, uint32_t hash);
+void *zrwmatFindNode(void *object, uint32_t hash);
 /* World position of a point given in the frame of a node (the flag selects the pose used). */
-void zrwmatNodeToWorld(void *object, uint32_t node, const float *local, float *out, int flag);
+void zrwmatNodeToWorld(void *object, void *node, const float *local, float *out, int flag);
 /* Vector stored in a node's frame. */
-void zrwmatNodeVector(void *object, uint32_t node, float *out, int flag);
+void zrwmatNodeVector(void *object, void *node, float *out, int flag);
 /* Stores the skeleton in the object's word at +0x30 and hands it to the renderer. */
 void zrwmatSetSkeleton(void *object, void *skeleton);
 /* Matrix of a node of the object (the parent frame of an attached scene object). */
-void zrwmatNodeMatrix(void *object, uint32_t node, void *out, int flag);
+void zrwmatNodeMatrix(void *object, void *node, void *out, int flag);
 /* Refreshes the world matrices of an object. */
 void zrwmatUpdate(void *object);
 

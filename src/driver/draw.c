@@ -141,7 +141,7 @@ int rwD3DDevSetTextureStageState(uint32_t stage, uint32_t type, uint32_t value)
 /* The texture is the handle rwD3DRasterHandle reads: the raster itself (texture.c). */
 int rwD3DDevSetTexture(uint32_t stage, void *texture)
 {
-    DRV_TRACE("rwD3DDevSetTexture", stage, (uint32_t)(uintptr_t)texture, 0);
+    DRV_TRACE("rwD3DDevSetTexture", stage, (uintptr_t)texture, 0);
     if (stage == 0) {
         boundTexture = texture;
     }

@@ -47,8 +47,7 @@ static uint8_t *rasterCpu(RwRaster *raster)
  */
 int drvRasterLock(void *out, void *raster, int32_t in)
 {
-    DRV_TRACE("drvRasterLock", (uint32_t)(uintptr_t)out, (uint32_t)(uintptr_t)raster,
-              (uint32_t)(uintptr_t)in);
+    DRV_TRACE("drvRasterLock", (uintptr_t)out, (uintptr_t)raster, (uintptr_t)in);
     RwRaster *const r = raster;
     uint8_t *const cpu = rasterCpu(r);
     const int32_t level = (in >> 8) & 0xff;
@@ -81,8 +80,7 @@ int drvRasterLock(void *out, void *raster, int32_t in)
 /* 0x4d5300 (standard 16): restores the level 0 size and stride. */
 int drvRasterUnlock(void *out, void *raster, int32_t in)
 {
-    DRV_TRACE("drvRasterUnlock", (uint32_t)(uintptr_t)out, (uint32_t)(uintptr_t)raster,
-              (uint32_t)(uintptr_t)in);
+    DRV_TRACE("drvRasterUnlock", (uintptr_t)out, (uintptr_t)raster, (uintptr_t)in);
     RwRaster *const r = raster;
 
     if (rasterCpu(r) == NULL) {
@@ -143,8 +141,7 @@ static int imageAlphaClass(const RwImage *image)
  */
 int drvImageFindRasterFormat(void *out, void *image, int32_t flags)
 {
-    DRV_TRACE("drvImageFindRasterFormat", (uint32_t)(uintptr_t)out, (uint32_t)(uintptr_t)image,
-              (uint32_t)(uintptr_t)flags);
+    DRV_TRACE("drvImageFindRasterFormat", (uintptr_t)out, (uintptr_t)image, (uintptr_t)flags);
     static const int32_t kByAlpha[4] = {0, kDrvFormat565, kDrvFormat1555, kDrvFormat4444};
     RwRaster *const r = out;
     const RwImage *const img = image;
@@ -206,8 +203,7 @@ static void storePixel(uint8_t *dst, int32_t depth, uint32_t pixel)
  */
 int drvRasterSetFromImage(void *raster, void *image, int32_t in)
 {
-    DRV_TRACE("drvRasterSetFromImage", (uint32_t)(uintptr_t)raster, (uint32_t)(uintptr_t)image,
-              (uint32_t)(uintptr_t)in);
+    DRV_TRACE("drvRasterSetFromImage", (uintptr_t)raster, (uintptr_t)image, (uintptr_t)in);
     RwRaster *const r = raster;
     const RwImage *const img = image;
     const int wasLocked = (r->privateFlags & 4) != 0;
@@ -242,8 +238,7 @@ int drvRasterSetFromImage(void *raster, void *image, int32_t in)
 /* 0x4d6490 (standard 8): out the texture, inOut the raster. */
 int drvTextureSetRaster(void *texture, void *raster, int32_t in)
 {
-    DRV_TRACE("drvTextureSetRaster", (uint32_t)(uintptr_t)texture, (uint32_t)(uintptr_t)raster,
-              (uint32_t)(uintptr_t)in);
+    DRV_TRACE("drvTextureSetRaster", (uintptr_t)texture, (uintptr_t)raster, (uintptr_t)in);
     ((RwTexture *)texture)->raster = raster;
     return 1;
 }
@@ -255,8 +250,7 @@ int drvTextureSetRaster(void *texture, void *raster, int32_t in)
  */
 int drvRasterSubRaster(void *subRaster, void *raster, int32_t in)
 {
-    DRV_TRACE("drvRasterSubRaster", (uint32_t)(uintptr_t)subRaster, (uint32_t)(uintptr_t)raster,
-              (uint32_t)(uintptr_t)in);
+    DRV_TRACE("drvRasterSubRaster", (uintptr_t)subRaster, (uintptr_t)raster, (uintptr_t)in);
     RwRaster *const sub = subRaster;
     const RwRaster *const parent = raster;
 

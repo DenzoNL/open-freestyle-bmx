@@ -975,7 +975,7 @@ void selLeaveStep(void)
 }
 
 BMX_ADDR(0x00447bf0)
-int BMX_CDECL selScreenHook(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL selScreenHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     if ((msg == kGuiMsgButton25 || msg == kGuiMsgIdle) && gGuiIdleMode != 0) {
         gSelStage = -1;
@@ -1461,7 +1461,7 @@ static void selDrawCallouts(const int16_t *layers)
  * typewriter caption (0x17) and the stat bars (0x1e). Other ids draw as plain labels.
  */
 BMX_ADDR(0x00448a80)
-int BMX_CDECL selScreenDraw(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL selScreenDraw(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     if (msg != kGuiMsgDraw) {
         return 0;

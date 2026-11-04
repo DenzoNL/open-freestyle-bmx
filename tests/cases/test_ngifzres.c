@@ -10,7 +10,7 @@
 #include "zge/zasset.h"
 #include "zge/ziff.h"
 
-typedef int(BMX_CDECL *OpenFn)(const char *);
+typedef struct ZassetLibrary *(BMX_CDECL *OpenFn)(const char *);
 typedef int(BMX_CDECL *VoidIntFn)(void);
 typedef void(BMX_CDECL *VoidFn)(void);
 typedef struct ZMemFreeList *(BMX_CDECL *ListCreateFn)(uint32_t, uint32_t, void *);
@@ -89,9 +89,9 @@ static void install_renderer(void)
 
 /* ---- setups --------------------------------------------------------------------------------------- */
 
-static int random_lib(void)
+static struct ZassetLibrary *random_lib(void)
 {
-    const int libs[4] = {gZresMiscLib, gZresTablesLib, gZresReplayLib, gZresMaterialLib};
+    struct ZassetLibrary *const libs[4] = {gZresMiscLib, gZresTablesLib, gZresReplayLib, gZresMaterialLib};
 
     return libs[dt_u32() % 4];
 }
@@ -100,11 +100,11 @@ static void setup_load_asset(DtCtx *c)
 {
     static const uint32_t kMiscGroups[] = {1, 30001, 30002, 30004, 30005, 0, 7, 99999};
     static const uint32_t kPlain[] = {0, 1, 2, 3, 5, 9, 11, 23, 24, 100, 1261, 1262, 5000};
-    int lib;
+    struct ZassetLibrary *lib;
 
     begin(c, 0);
     lib = random_lib();
-    DT_ARG_INT(c, 0, lib);
+    DT_ARG_PTR(c, 0, lib);
     DT_ARG_INT(c, 1, lib == gZresMiscLib ? kMiscGroups[dt_u32() % 8] : kPlain[dt_u32() % 13]);
     DT_ARG_INT(c, 2,
                dt_u32() & 0xffff0000u); /* asset 0 (the only one; the loader masks the index to 16 bits) */
@@ -218,8 +218,8 @@ static void setup_unload(DtCtx *c)
 static void setup_reset(DtCtx *c)
 {
     dt_real_env(c, 0);
-    gZresMaterialLib = (int)dt_u32();
-    gZresMiscLib = (int)dt_u32();
+    gZresMaterialLib = (struct ZassetLibrary *)(uintptr_t)dt_u32();
+    gZresMiscLib = (struct ZassetLibrary *)(uintptr_t)dt_u32();
     dt_fill(&gZres, sizeof gZres);
 }
 
@@ -237,7 +237,7 @@ static void setup_register(DtCtx *c)
     if (gZres.overlayInit) {
         /* some slots already loaded */
         for (int i = 0; i < kZresOverlaySlots; i++) {
-            gZresOverlaySlots[i].texture = (dt_u32() % 3 == 0) ? (void *)(uintptr_t)dt_u32() : NULL;
+            gZresOverlaySlots[i].texture = (dt_u32() % 3 == 0) ? dt_u32() : 0;
         }
     }
     if (dt_u32() % 7 == 0) {

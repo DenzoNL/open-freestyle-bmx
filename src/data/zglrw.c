@@ -582,7 +582,7 @@ BmxType_gZrwVtNodeMatrix gZrwVtNodeMatrix = zrwModelPartMatrix;
 void *p_00560ebc = zrwModelPartParent;
 
 /* 0x00560ec0 */
-ZrwModelLookup gZrwVtKey = (ZrwModelLookup)zrwModelEntryKey;
+ZrwModelKeyFn gZrwVtKey = (ZrwModelKeyFn)zrwModelEntryKey;
 
 /* 0x00560ec4 */
 ZrwModelLookup gZrwVtEntry = (ZrwModelLookup)zrwModelEntryLookup;
@@ -605,7 +605,7 @@ ZrwModelFlagsFn gZrwVtSetFlags = (ZrwModelFlagsFn)zrwModelSetFlags;
 BmxType_gZrwVtOwner gZrwVtOwner = zrwModelSetUserValue;
 
 /* 0x00560ee4 */
-ZrwModelCall gZrwVtClump = (ZrwModelCall)zrwModelCollisionClump;
+ZrwModelClumpFn gZrwVtClump = (ZrwModelClumpFn)zrwModelCollisionClump;
 
 struct BmxGroup_gZrwVtMatCountGroup gZrwVtMatCountGroup __attribute__((aligned(16))) = {
     .gZrwVtMatCount = (ZrwModelCall)zrwModelMaterialCount,
@@ -736,7 +736,7 @@ BmxType_gZrwBeginHook gZrwBeginHook = zrwPushRenderState;
 BmxType_gZrwEndHook gZrwEndHook = zrwPopRenderState;
 
 /* 0x005614a8 */
-uint32_t gZglMemoryFuncs;
+void *gZglMemoryFuncs;
 
 /* 0x005614ac */
 BmxType_gZglAllocHookNop gZglAllocHookNop;
@@ -1693,7 +1693,7 @@ ZMemFreeList *gZrwNodePool;
 int gZrwSkipDevice;
 
 /* 0x00672800 */
-uint32_t gZrwEngineOpen;
+void *gZrwEngineOpen;
 
 /* 0x00672804 */
 uint32_t gZrwEngineInit;

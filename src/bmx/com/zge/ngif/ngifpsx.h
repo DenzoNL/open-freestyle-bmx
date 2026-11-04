@@ -63,7 +63,7 @@ typedef struct NgifTexture {
     uint8_t pad08[4];
     uint8_t width, height; /* 0x0c */
     uint8_t pad0e[2];
-    uint32_t material; /* 0x10 ZrwMaterial pointer; 0 = unused */
+    uint32_t material; /* 0x10 the material's handle (zrwmatHandle); 0 = unused */
 } NgifTexture;
 
 _Static_assert(sizeof(NgifTexture) == 0x14, "NgifTexture size");

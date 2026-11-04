@@ -61,7 +61,7 @@ typedef uint8_t ActionBytes256[0x100];
 #define gActionSubMode     ORIG_VAR(0x0056b616, uint8_t, gActionSubMode)
 #define gActionLanguage    ORIG_VAR(0x00696218, uint8_t, gActionLanguage)
 #define gActionOptions     ORIG_VAR(0x006955e2, uint8_t, gActionOptions)
-#define gActionReplayLib   ORIG_VAR(0x0068ffa8, int32_t, gActionReplayLib)
+#define gActionReplayLib   ORIG_VAR(0x0068ffa8, struct ZassetLibrary *, gActionReplayLib)
 typedef const void *ActionMotions[0xee];
 #define gActionMotions ORIG_VAR(0x00696300, ActionMotions, gActionMotions)
 

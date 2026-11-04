@@ -28,8 +28,8 @@ typedef struct GuiToggleData {
 BMX_LAYOUT32_ASSERT(sizeof(GuiToggleData) == 0x24, "GuiToggleData layout");
 
 /* Type handlers: vertical (up/down move focus, left/right change) and horizontal. */
-int BMX_CDECL guiToggleProc(int msg, GuiElement *el, int arg3, int arg4);
-int BMX_CDECL guiToggleProcHoriz(int msg, GuiElement *el, int arg3, int arg4);
+int BMX_CDECL guiToggleProc(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4);
+int BMX_CDECL guiToggleProcHoriz(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4);
 
 void guiToggleSetTextFlags(GuiElement *el, uint16_t flags);
 void guiToggleSetTextPos(GuiElement *el, int16_t x, int16_t y);

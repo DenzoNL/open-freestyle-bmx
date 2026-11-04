@@ -16,9 +16,10 @@ static const char kColFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwCol.c";
 
 /* The two queries the platform layer exposes through the pointers at 0x562068 (line) and 0x56206c (sphere).
  */
-typedef int(BMX_CDECL *ZrwColLineFn)(const float *a, const float *b, int mode, int flags, float *out);
-typedef int(BMX_CDECL *ZrwColSphereFn)(const float *center, float radius, uint32_t flags, const int *excluded,
-                                       uint32_t *out);
+typedef int(BMX_CDECL *ZrwColLineFn)(const float *a, const float *b, int mode, void *const *excluded,
+                                     float *out);
+typedef int(BMX_CDECL *ZrwColSphereFn)(const float *center, float radius, uint32_t flags,
+                                       void *const *excluded, ZrwColSphereResult *out);
 #define gZrwColLineFn   ORIG_VAR(0x00562068, ZrwColLineFn, gZrwColLineFn)
 #define gZrwColSphereFn ORIG_VAR(0x0056206c, ZrwColSphereFn, gZrwColSphereFn)
 
@@ -82,7 +83,7 @@ ZrwColTriangle *zrwcolKeepNearest(void *arg, ZrwColTriangle *triangle, float dis
  * takes everything), bit 3 turns on the list of ids to skip (ended by 0). An id is the atomic's clump
  * pointer.
  */
-static int objectWanted(const RpAtomic *atomic, const int *excluded)
+static int objectWanted(const RpAtomic *atomic, void *const *excluded)
 {
     const uint32_t flags = gZrwCol.flags;
 
@@ -93,9 +94,9 @@ static int objectWanted(const RpAtomic *atomic, const int *excluded)
             return 0;
         }
     }
-    if ((flags & 8) != 0 && excluded != NULL && *excluded != 0) {
-        for (const int *id = excluded; *id != 0; id++) {
-            if (*id == (int)(uintptr_t)atomic->clump) {
+    if ((flags & 8) != 0 && excluded != NULL && *excluded != NULL) {
+        for (void *const *clump = excluded; *clump != NULL; clump++) {
+            if (*clump == atomic->clump) {
                 return 0;
             }
         }
@@ -104,7 +105,7 @@ static int objectWanted(const RpAtomic *atomic, const int *excluded)
 }
 
 BMX_ADDR(0x004942a0)
-RpAtomic *zrwcolFilterNearest(void *arg, void *unused, RpAtomic *atomic, void *unused2, const int *excluded)
+RpAtomic *zrwcolFilterNearest(void *arg, void *unused, RpAtomic *atomic, void *unused2, void *const *excluded)
 {
     (void)unused;
     (void)unused2;
@@ -117,7 +118,7 @@ RpAtomic *zrwcolFilterNearest(void *arg, void *unused, RpAtomic *atomic, void *u
 }
 
 BMX_ADDR(0x00494750)
-RpAtomic *zrwcolFilterRecord(void *arg, void *unused, RpAtomic *atomic, void *unused2, const int *excluded)
+RpAtomic *zrwcolFilterRecord(void *arg, void *unused, RpAtomic *atomic, void *unused2, void *const *excluded)
 {
     (void)unused;
     (void)unused2;
@@ -236,7 +237,7 @@ static void worldPoint(float *out, const float *p)
  * growing. Without a nearest object or sector it asserts and still fills in the distance and the point.
  */
 BMX_ADDR(0x00493e20)
-int zrwcolQueryLine(float *from, float *to, uint32_t flags, const int *excluded, ZrwColLineHit *out)
+int zrwcolQueryLine(float *from, float *to, uint32_t flags, void *const *excluded, ZrwColLineHit *out)
 {
     ZrwColLineVolume line;
     const ZrwColTriangle *best = &gZrwCol.best;
@@ -433,7 +434,8 @@ uint8_t *zrwcolHitColor(ZrwColLineHit *hit)
 }
 
 BMX_ADDR(0x00494370)
-int zrwcolQuerySphere(const float *center, float radius, uint32_t flags, const int *excluded, uint32_t *out)
+int zrwcolQuerySphere(const float *center, float radius, uint32_t flags, void *const *excluded,
+                      ZrwColSphereResult *out)
 {
     ZrwColIntersection volume = {0};
 
@@ -461,8 +463,8 @@ int zrwcolQuerySphere(const float *center, float radius, uint32_t flags, const i
                                 (void *)excluded);
     }
     if (gZrwCol.found != 0) {
-        out[0] = (uint32_t)(uintptr_t)gZrwCol.hits;
-        out[1] = gZrwCol.count;
+        out->hits = gZrwCol.hits;
+        out->count = gZrwCol.count;
         return 1;
     }
     return 0;
@@ -479,13 +481,14 @@ int zrwcolEnableIfTagInfo(void)
 }
 
 BMX_ADDR(0x00494c70)
-int zrwcolLineTest(const float *a, const float *b, int mode, int flags, float *out)
+int zrwcolLineTest(const float *a, const float *b, int mode, void *const *excluded, float *out)
 {
-    return gZrwColLineFn(a, b, mode, flags, out) != 0;
+    return gZrwColLineFn(a, b, mode, excluded, out) != 0;
 }
 
 BMX_ADDR(0x00494ca0)
-int zrwcolSphereTest(const float *center, float radius, uint32_t flags, const int *excluded, uint32_t *out)
+int zrwcolSphereTest(const float *center, float radius, uint32_t flags, void *const *excluded,
+                     ZrwColSphereResult *out)
 {
     return gZrwColSphereFn(center, radius, flags, excluded, out) != 0;
 }

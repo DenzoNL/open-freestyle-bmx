@@ -126,9 +126,9 @@ struct ZfxSkid {
     uint8_t count; /* 0x05 frames */
     uint8_t fps;   /* 0x06 */
     uint8_t pad07;
-    uint32_t base;        /* 0x08 */
-    uint32_t texture[16]; /* 0x0c one per frame */
-    uint32_t lastTime;    /* 0x4c */
+    struct ZrwMaterial *base;        /* 0x08 */
+    struct ZrwMaterial *texture[16]; /* 0x0c one per frame */
+    uint32_t lastTime;               /* 0x4c */
 };
 BMX_LAYOUT32_ASSERT(sizeof(ZfxSkid) == 0x50, "skid layout");
 enum { kFxSkidEntries = 8 };

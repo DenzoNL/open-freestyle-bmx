@@ -169,7 +169,7 @@ void guiToggleSetChoices(GuiElement *el, const char *choices)
         zmemdmmUnlock(el->dataHandle);
         guiToggleSetIndex(el, index);
     }
-    guiSend(kGuiMsgTextChanged, el, (int)(intptr_t)text, 0);
+    guiSend(kGuiMsgTextChanged, el, (intptr_t)text, 0);
 }
 
 /*
@@ -227,7 +227,7 @@ void guiToggleSetIndex(GuiElement *el, uint16_t index)
         zmemdmmUnlock(data->textHandle);
         zmemdmmUnlock(el->dataHandle);
     }
-    guiSend(kGuiMsgTextChanged, el, (int)(intptr_t)buf, 0);
+    guiSend(kGuiMsgTextChanged, el, (intptr_t)buf, 0);
 }
 
 /* ---- element handler -------------------------------------------------------------------------- */
@@ -361,7 +361,7 @@ static void guiToggleNext(GuiElement *el)
  * and the jump table at 0x43ad3c.
  */
 BMX_ADDR(0x0043a840)
-int BMX_CDECL guiToggleProc(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL guiToggleProc(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     static const GuiToggleVariant variant = {0x85, 0x8a, 1};
     switch (msg) {
@@ -401,7 +401,7 @@ int BMX_CDECL guiToggleProc(int msg, GuiElement *el, int arg3, int arg4)
  * 0x43b4e8.
  */
 BMX_ADDR(0x0043aed0)
-int BMX_CDECL guiToggleProcHoriz(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL guiToggleProcHoriz(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     static const GuiToggleVariant variant = {0x170, 0x175, 0};
     switch (msg) {

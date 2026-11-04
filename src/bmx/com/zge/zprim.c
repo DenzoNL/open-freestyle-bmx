@@ -4,12 +4,24 @@
 #include "bmx/com/zge/ngif/ngifpsx.h"
 #include "bmx/com/zge/ngif/ngifzmemdmm.h"
 #include "compat/crt.h"
+#include "zge/com/zglrw/zrwmat.h"
 #include "zge/zasset.h"
 #include "zge/zdebug.h"
 #include "zge/zmem.h"
 #include "zge/zstring.h"
 
 static const char zprimFile[] = "C:\\zaxis\\Bmx\\src\\com\\zge\\zprim.c";
+
+/* The renderer's free and clone of a frame's material, the frame keeping the material's handle. */
+static void textureFree(int32_t texture)
+{
+    gRwTextureFree(zrwmatFromHandle((uint32_t)texture));
+}
+
+static int32_t textureClone(int32_t texture)
+{
+    return (int32_t)zrwmatHandle(gRwTextureClone(zrwmatFromHandle((uint32_t)texture)));
+}
 
 /* The state stack (zprimStatePush lets the depth reach 10, one past it: an original quirk) and the asset
  * table. */
@@ -219,22 +231,23 @@ void zprimStatePop(void)
 
 /* Sets one property of the current state; unknown ids are ignored. */
 BMX_ADDR(0x00478050)
-void zprimSet(uint16_t prop, int value)
+void zprimSet(uint16_t prop, intptr_t arg)
 {
+    const int value = (int)arg; /* the number of the properties that take one */
     int took;
     ZPrimState *st = zprimOpen(&took);
     switch (prop) {
     case kZprimScreen:
         st->kind = 1;
-        st->asset = (ZPrimAsset *)(intptr_t)value;
+        st->asset = (ZPrimAsset *)arg;
         break;
     case kZprimPicture:
         st->kind = 2;
-        st->asset = (ZPrimAsset *)(intptr_t)value;
+        st->asset = (ZPrimAsset *)arg;
         break;
     case kZprimSprite:
         st->kind = 3;
-        st->asset = (ZPrimAsset *)(intptr_t)value;
+        st->asset = (ZPrimAsset *)arg;
         break;
     case kZprimColorOnly:
         st->kind = 4;
@@ -310,17 +323,17 @@ void zprimSet(uint16_t prop, int value)
  * unknown ids (and 4, 6) return 0.
  */
 BMX_ADDR(0x00478370)
-uint32_t zprimGet(uint16_t prop)
+uintptr_t zprimGet(uint16_t prop)
 {
     int took;
     ZPrimState *st = zprimOpen(&took);
-    uint32_t r = 0;
+    uintptr_t r = 0;
     switch (prop) {
     case kZprimScreen:
     case kZprimPicture:
     case kZprimSprite:
         if (st->kind == prop) {
-            r = (uint32_t)(uintptr_t)st->asset;
+            r = (uintptr_t)st->asset;
         }
         break;
     case kZprimColor:
@@ -816,7 +829,7 @@ int zprimCreateTexture(uint32_t w, uint32_t h, uint32_t bpp, const uint8_t *pixe
             bmp[0x76 + i] = (uint8_t)(b * 16 + (b >> 4));
         }
     }
-    const int texture = gRwTextureLoad(bmp, size, name, 0, 0);
+    const int texture = (int)zrwmatHandle(gRwTextureLoad(bmp, size, name, 0, 0));
     if (texture == 0) {
         zdebugFail("Invalid material handle", zprimFile, 0x16a5, 0);
     }
@@ -922,10 +935,10 @@ void zprimCopyTexture(const ZPrimAsset *src, const ZPrimAsset *dst)
     ZPrimSet *s = zprimAssetData(src);
     ZPrimSet *d = zprimAssetData(dst);
     if (d->frames[0].texture != 0) {
-        gRwTextureFree(d->frames[0].texture);
+        textureFree(d->frames[0].texture);
         d->frames[0].texture = 0;
     }
-    d->frames[0].texture = gRwTextureClone(s->frames[0].texture);
+    d->frames[0].texture = textureClone(s->frames[0].texture);
     zprimAssetRelease(src);
     zprimAssetRelease(dst);
 }
@@ -958,7 +971,7 @@ void zprimReplaceVramGrey(const ZPrimAsset *src, const ZPrimAsset *dst, int unus
         }
     }
     if (d->frames[0].texture != 0) {
-        gRwTextureFree(d->frames[0].texture);
+        textureFree(d->frames[0].texture);
         d->frames[0].texture = 0;
     }
     /* Reads the pixels through frame 0 (the picture loader uses the header's offset, the same value). */
@@ -988,7 +1001,7 @@ void zprimReplaceVramPalette(const ZPrimAsset *src, const ZPrimAsset *dst, int u
         entries[i] = slice[i];
     }
     if (d->frames[0].texture != 0) {
-        gRwTextureFree(d->frames[0].texture);
+        textureFree(d->frames[0].texture);
         d->frames[0].texture = 0;
     }
     /* Reads the pixels through frame 0 (the picture loader uses the header's offset, the same value). */
@@ -1156,7 +1169,7 @@ void zprimSpriteReset(const ZPrimAsset *a, uint16_t w, uint16_t h, uint16_t bpp,
     set->frames[0].originX = 0;
     set->frames[0].originY = 0;
     if (set->frames[0].texture != 0) {
-        gRwTextureFree(set->frames[0].texture);
+        textureFree(set->frames[0].texture);
         set->frames[0].texture = 0;
     }
     palette[0] = 0;
@@ -1376,13 +1389,13 @@ void zprimDecompress(const ZPrimAsset *src, uint16_t srcFrame, const ZPrimAsset 
 
 /* Address of the pixel data of frame `frame` inside a sprite set, or 0. */
 BMX_ADDR(0x0047a300)
-int zprimSpriteFrameData(const uint16_t *set, uint16_t frame)
+const uint8_t *zprimSpriteFrameData(const uint16_t *set, uint16_t frame)
 {
     const ZPrimSet *s = (const ZPrimSet *)set;
     if (s->frameCount <= frame) {
-        return 0;
+        return NULL;
     }
-    return s->frames[frame].pixelOffset + (int)(intptr_t)set;
+    return (const uint8_t *)set + s->frames[frame].pixelOffset;
 }
 
 /*
@@ -1902,14 +1915,14 @@ void zprimAssetFree(ZPrimAsset *a)
     if (type == 0) {
         ZPrimSet *data = zprimAssetData(a);
         if (data->frames[0].texture != 0) {
-            gRwTextureFree(data->frames[0].texture);
+            textureFree(data->frames[0].texture);
         }
     } else if (type == 0x4000 || type == 0x6000 || type == 0xc000) {
         ZPrimSet *data = zprimAssetData(a);
         for (int32_t i = (int32_t)data->frameCount - 1; i >= 0; i--) {
             int32_t *tex = &data->frames[i].texture;
             if (*tex != 0) {
-                gRwTextureFree(*tex);
+                textureFree(*tex);
             }
             *tex = 0;
         }
@@ -1920,7 +1933,7 @@ void zprimAssetFree(ZPrimAsset *a)
             for (int i = 0; i < 32; i++) {
                 int32_t tex = pages[i];
                 if (tex != 0) {
-                    gRwTextureFree(tex);
+                    textureFree(tex);
                     pages[i] = 0;
                 }
             }

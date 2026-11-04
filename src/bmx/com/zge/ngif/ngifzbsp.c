@@ -801,7 +801,8 @@ void *zbspFindFaceNear(const ZVec3 *p, float radius, float cosLimit)
     ZbspFaceHit *out = gZbspNearHits;
     uint32_t count = 0;
 
-    if (!zrwcolSphereTest(&p->x, (float)((double)radius + 1.0), 3, NULL, (uint32_t *)&gZbspSphere)) {
+    if (!zrwcolSphereTest(&p->x, (float)((double)radius + 1.0), 3, NULL,
+                          (ZrwColSphereResult *)(void *)&gZbspSphere)) {
         return NULL;
     }
     zmemFill(&gZbspFaceQuery, 0, sizeof gZbspFaceQuery);

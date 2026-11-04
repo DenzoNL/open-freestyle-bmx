@@ -45,7 +45,7 @@ void languageScreenDone(void)
 }
 
 BMX_ADDR(0x0043cf40)
-int BMX_CDECL languageScreenHook(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL languageScreenHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     int next;
     switch (msg) {

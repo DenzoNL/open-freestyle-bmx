@@ -104,7 +104,7 @@ static inline int bmxSoundPlayEvent(int id, int arg1, int arg2, int arg3, int ar
 
 /* Not ported (other owners). */
 /* Platform object lookup in the exe (function pointer at 0x00561488): kind 0x15 is the window holder. */
-typedef int(BMX_CDECL *ZsystemGetObjectFn)(int kind, void **object, int flags);
+typedef int(BMX_CDECL *ZsystemGetObjectFn)(int kind, void **object, const void *extra);
 #define gZsystemGetObject ORIG_VAR(0x00561488, ZsystemGetObjectFn, gZsystemGetObject)
 
 /* Menu application hooks: logs, stops the sounds and shuts the GUI down. */

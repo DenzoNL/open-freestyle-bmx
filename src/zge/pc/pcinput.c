@@ -9,15 +9,15 @@
 BMX_ADDR(0x00480370)
 struct GuiPadDevice *zpadCreateDevice(int kind)
 {
-    uint32_t *device = zmemFreeListAlloc(gZpadDevices);
+    ZpadDevice *device = zmemFreeListAlloc(gZpadDevices);
 
-    zmemFill(device, 0, kZpadDeviceBytes);
-    device[kZpadDirectInputSlot / 4] = (uint32_t)(uintptr_t)zpadSetupDirectInput(kind, (ZpadDevice *)device);
-    if (device[kZpadDirectInputSlot / 4] == 0) {
+    zmemFill(device, 0, sizeof *device);
+    device->record = zpadSetupDirectInput(kind, device);
+    if (device->record == NULL) {
         zmemFreeListFree(gZpadDevices, device);
         return NULL;
     }
-    device[0] = (uint32_t)kind;
+    device->kind = (uint32_t)kind;
     return (struct GuiPadDevice *)device;
 }
 
@@ -231,7 +231,7 @@ int zpadSetKeyMap(void *device, const uint8_t *map)
 
 static const char kPcInputFile[] = "C:\\NgEngine\\Zge\\Pc\\pcinput.c";
 
-typedef int(BMX_CDECL *ZpadQueryFn)(int kind, void **object, int flags);
+typedef int(BMX_CDECL *ZpadQueryFn)(int kind, void **object, const void *extra);
 typedef intptr_t(BMX_STDCALL *ZpadGetWindowLongFn)(void *window, int index);
 #define gZpadQuery          ORIG_VAR(0x00561488, ZpadQueryFn, gZpadQuery)
 #define gZpadGetWindowLong  ORIG_VAR(0x00699794, ZpadGetWindowLongFn, gZpadGetWindowLong)

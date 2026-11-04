@@ -61,7 +61,7 @@ static void setup_free_models(DtCtx *c)
             MODELS[i * 5 + 4] = 0;
         }
     }
-    gZrollerFreeHandle = stubFreeHandle;
+    gZrollerFreeHandle = (ZrollerFreeHandleFn)(void *)stubFreeHandle; /* logs the handle word */
 }
 
 static int BMX_CDECL stubResInit(void)
@@ -384,7 +384,7 @@ static void setup_bounds(DtCtx *c)
 {
     ngBegin(c, 0);
     dt_fill(&gZrollerBounds, sizeof gZrollerBounds);
-    gZrollerQuery = stubQuery;
+    gZrollerQuery = (ZrollerQueryFn)(void *)stubQuery;
 }
 
 /* ---- player start -------------------------------------------------------------------------------- */

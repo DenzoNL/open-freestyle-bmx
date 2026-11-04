@@ -2,6 +2,7 @@
 #include "bmx/com/zge/ngif/ngifzres.h"
 
 #include "compat/crt.h"
+#include "zge/com/zglrw/zrwmat.h"
 #include "zge/zasset.h"
 #include "zge/zdebug.h"
 #include "zge/zfile.h"
@@ -21,7 +22,8 @@ enum {
 };
 
 BMX_ADDR(0x0046b8b0)
-uint8_t *ngifzresLoadAsset(int lib, uint32_t group, uint32_t asset, uint32_t *sizeOut, int alternate)
+uint8_t *ngifzresLoadAsset(ZassetLibrary *lib, uint32_t group, uint32_t asset, uint32_t *sizeOut,
+                           int alternate)
 {
     uint32_t size;
     uint8_t *buffer;
@@ -173,11 +175,11 @@ void ngifzresCloseLibraries(void)
 }
 
 /* Opens one library; prints and fails when it cannot be opened. */
-static int openLibrary(const char *path, int line)
+static ZassetLibrary *openLibrary(const char *path, int line)
 {
-    const int lib = zassetOpenLibrary(path);
+    ZassetLibrary *const lib = zassetOpenLibrary(path);
 
-    if (lib == 0) {
+    if (lib == NULL) {
         gZdebugPrint("ZRES: Failed to open:%s\n", path);
         zdebugFail("Could not open ZAL", kResFile, line, 0);
     }
@@ -262,7 +264,7 @@ void ngifzresRegister(int id, uint32_t a, uint32_t slotIndex)
     const ZresOverlaySource *source = gZresOverlaySources;
     uint32_t sourceIndex = 0;
     char name[32];
-    int lib;
+    ZassetLibrary *lib;
     ZresOverlaySlot *slot;
     uint32_t *mark;
     uint32_t size;
@@ -286,7 +288,7 @@ void ngifzresRegister(int id, uint32_t a, uint32_t slotIndex)
         return;
     }
     slot = &gZresOverlaySlots[slotIndex & 0xffff];
-    if (slot->texture != NULL) {
+    if (slot->texture != 0) {
         return;
     }
     mark = zmemStaticMark();
@@ -302,7 +304,7 @@ void ngifzresRegister(int id, uint32_t a, uint32_t slotIndex)
     }
     gZres.overlayCounter++;
     zmemFill(slot, 0, sizeof *slot);
-    slot->texture = material;
+    slot->texture = zrwmatHandle(material);
     slot->width = textureByte(gZresTextureWidth, material);
     slot->height = textureByte(gZresTextureHeight, material);
     slot->u0 = 0;

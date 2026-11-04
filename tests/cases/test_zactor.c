@@ -384,7 +384,7 @@ static void setup_load_bank(DtCtx *c)
     dt_seed(c);
     const uint32_t id = (uint32_t)dt_range(0, 0xffff);
     gMotionLoadedBank = id; /* same id: "Not reloading motion library" */
-    gMotionLibrary = 1;
+    gMotionLibrary = (struct ZassetLibrary *)(uintptr_t)1;
     DT_ARG_INT(c, 0, (int32_t)(id | (dt_u32() & 0xffff0000u)));
 }
 
@@ -401,7 +401,8 @@ static void setup_open_missing(DtCtx *c)
     dt_seed(c);
     dt_zmem_env();
     gMotionLibrary =
-        c->seed % 2; /* odd: already open, asserts; even: tries (and fails) to open a missing file */
+        (struct ZassetLibrary *)(uintptr_t)(c->seed % 2); /* odd: already open, asserts; even: tries (and
+                                                             fails) to open a missing file */
     DT_ARG_PTR(c, 0, "missing-motions.lib");
 }
 
@@ -1076,7 +1077,7 @@ static void fake_motion_library(DtCtx *c, DtFakeLib *lib)
         }
         dt_fake_lib_add(lib, id, blob, (uint32_t)dt_range(0x20, 0x80));
     }
-    gMotionLibrary = (int32_t)(uintptr_t)lib->lib;
+    gMotionLibrary = (struct ZassetLibrary *)lib->lib;
     gMotionBuffer = gMotionStaging;
     gMotionBankCount = dt_range(0, 1);
     gMotionLoadedBank = (uint32_t)dt_range(10, 20);

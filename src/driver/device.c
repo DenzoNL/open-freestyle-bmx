@@ -41,7 +41,7 @@ DrvRasterExt *drvRasterExt(const RwRaster *raster)
     return (DrvRasterExt *)((uint8_t *)raster + drvRasterOffset);
 }
 
-void drvTrace(const char *name, uint32_t a, uint32_t b, uint32_t c)
+void drvTrace(const char *name, uintptr_t a, uintptr_t b, uintptr_t c)
 {
     static int enabled = -1;
 
@@ -51,7 +51,7 @@ void drvTrace(const char *name, uint32_t a, uint32_t b, uint32_t c)
         enabled = env != NULL && *env != '0';
     }
     if (enabled) {
-        bmxLog("driver: %s(%08x, %08x, %08x)\n", name, (unsigned)a, (unsigned)b, (unsigned)c);
+        bmxLog("driver: %s(%p, %p, %p)\n", name, (void *)a, (void *)b, (void *)c);
     }
 }
 
@@ -402,19 +402,27 @@ static int systemSetSubSystem(int32_t index)
 
 int drvNullStandard(void *out, void *inOut, int32_t in);
 
+/* One of the original's standards (src/data, 0x56701c): the slot and the function. */
+typedef struct DrvStandard {
+    int32_t id;
+    void *fn;
+} DrvStandard;
+
+BMX_LAYOUT32_ASSERT(sizeof(DrvStandard) == 8, "standard pair");
+
 /* rwDEVICESYSTEMSTANDARDS (0x4ede90): the null standard everywhere, then the original's (id, fn) pairs. */
-static void systemStandards(uint32_t *out, int32_t count)
+static void systemStandards(void **out, int32_t count)
 {
-    const uint32_t *table = (const uint32_t *)BMX_ORIG(0x0056701c);
+    const DrvStandard *table = (const DrvStandard *)BMX_ORIG(0x0056701c);
 
     for (int32_t i = 0; i < count; i++) {
-        out[i] = (uint32_t)(uintptr_t)BMX_FNPTR(void *, 0x004ebfc0, drvNullStandard); /* D3D3NullStandard */
+        out[i] = BMX_FNPTR(void *, 0x004ebfc0, drvNullStandard); /* D3D3NullStandard */
     }
     for (int i = 0; i < 0x1b; i++) {
-        const int32_t id = (int32_t)table[i * 2];
+        const int32_t id = table[i].id;
 
         if (id < count && id >= 0) {
-            out[id] = table[i * 2 + 1];
+            out[id] = table[i].fn;
         }
     }
 }
@@ -438,7 +446,7 @@ int drvIm2DNothing(void)
 /* 0x4ee010: RwDevice.fpSystem. Requests the original does not handle return 0. */
 int drvSystem(int32_t request, void *out, void *inOut, int32_t in)
 {
-    DRV_TRACE("drvSystem", (uint32_t)request, (uint32_t)(uintptr_t)out, (uint32_t)in);
+    DRV_TRACE("drvSystem", (uintptr_t)request, (uintptr_t)out, (uintptr_t)in);
     switch (request) {
     case rwDEVICESYSTEMOPEN:
         return systemOpen((void *const *)inOut);
@@ -462,7 +470,8 @@ int drvSystem(int32_t request, void *out, void *inOut, int32_t in)
     case 8: /* switch between exclusive and windowed (0x4ecab0): needs a started device */
         return drvState.started;
     case rwDEVICESYSTEMPIPELINE: /* 0x4ee150: the pipeline's render stage */
-        ((uint32_t *)inOut)[1] = (uint32_t)(uintptr_t)BMX_FNPTR(void *, 0x004f97c0, rwD3DIm3DTransform);
+        ((RwIm3DPipeline *)inOut)->stage1 =
+            BMX_FNPTR(void(BMX_CDECL *)(void *), 0x004f97c0, rwD3DIm3DTransform);
         return 1;
     case rwDEVICESYSTEMGETMODE:
         *(int32_t *)out = drvState.currentMode;

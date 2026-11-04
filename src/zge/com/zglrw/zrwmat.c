@@ -12,23 +12,35 @@
 
 static const char kZrwMatFile[] = "C:\\NgEngine\\Zge\\Com\\ZglRw\\zrwMat.c";
 
-/* The renderer's model table (pointers in the exe's data, targets in zrwmodel.c / zrwmodelcreate.c). */
-typedef void *(BMX_CDECL *ZrwMatCallFn)(void *a);
-typedef void *(BMX_CDECL *ZrwMatCall2Fn)(void *a, void *b);
-typedef void *(BMX_CDECL *ZrwMatCall4Fn)(void *a, void *b, void *c, void *d);
-typedef void *(BMX_CDECL *ZrwMatCall5Fn)(void *a, void *b, void *c, void *d, void *e);
-typedef uint32_t(BMX_CDECL *ZrwMatCountFn)(void *model);
-#define gZrwVtLoadModel   ORIG_VAR(0x00560e84, ZrwMatCall2Fn, gZrwVtLoadModel)
-#define gZrwVtLoadChunk   ORIG_VAR(0x00560e8c, ZrwMatCall2Fn, gZrwVtLoadChunk)
-#define gZrwVtInstance    ORIG_VAR(0x00560e90, ZrwMatCallFn, gZrwVtInstance)
-#define gZrwVtPartCount   ORIG_VAR(0x00560ea8, ZrwMatCountFn, gZrwVtPartCount)
-#define gZrwVtOwner       ORIG_VAR(0x00560edc, ZrwMatCall2Fn, gZrwVtOwner)
-#define gZrwVtNodeHashes  ORIG_VAR(0x00560ec8, ZrwMatCall2Fn, gZrwVtNodeHashes)
-#define gZrwVtFindNode    ORIG_VAR(0x00560eac, ZrwMatCall2Fn, gZrwVtFindNode)
-#define gZrwVtNodeToWorld ORIG_VAR(0x00560eb0, ZrwMatCall5Fn, gZrwVtNodeToWorld)
-#define gZrwVtNodeVector  ORIG_VAR(0x00560eb4, ZrwMatCall4Fn, gZrwVtNodeVector)
-#define gZrwVtNodeMatrix  ORIG_VAR(0x00560eb8, ZrwMatCall4Fn, gZrwVtNodeMatrix)
-#define gZrwVtSkeleton    ORIG_VAR(0x00560ecc, ZrwMatCall2Fn, gZrwVtSkeleton)
+/*
+ * The renderer's model table (pointers in the exe's data, targets in zrwmodel.c / zrwmodelcreate.c), each
+ * slot typed as its target. The loaders' NULL second argument, which the targets do not take, is left out.
+ * The part calls pass the flag as the int word the original pushes (the oracle compares the pushed words; the
+ * targets read its low byte), the part offset included, though zrwModelPartOffset takes no flag.
+ */
+typedef void *(BMX_CDECL *ZrwVtLoadFn)(void *source);                   /* zrwModelLoadFromFile / FromChunk */
+typedef void *(BMX_CDECL *ZrwVtInstanceFn)(void *model);                /* zrwModelCreateInstance */
+typedef int(BMX_CDECL *ZrwVtCountFn)(void *model);                      /* zrwModelPartCount */
+typedef void(BMX_CDECL *ZrwVtHashesFn)(void *model, uint32_t *out);     /* zrwModelGetPartHashes */
+typedef void *(BMX_CDECL *ZrwVtFindPartFn)(void *model, uint32_t hash); /* zrwModelFindPart */
+typedef void(BMX_CDECL *ZrwVtPartToWorldFn)(void *model, void *part, const float *local, float *out,
+                                            int flag); /* zrwModelPartToWorld */
+typedef void(BMX_CDECL *ZrwVtPartOffsetFn)(void *model, void *part, float *out,
+                                           int flag); /* zrwModelPartOffset */
+typedef void(BMX_CDECL *ZrwVtPartMatrixFn)(void *model, void *part, void *out,
+                                           int flag);          /* zrwModelPartMatrix */
+typedef void(BMX_CDECL *ZrwVtSetFn)(void *model, void *value); /* zrwModelMatchParts, zrwModelSetUserValue */
+#define gZrwVtLoadModel   ORIG_VAR(0x00560e84, ZrwVtLoadFn, gZrwVtLoadModel)
+#define gZrwVtLoadChunk   ORIG_VAR(0x00560e8c, ZrwVtLoadFn, gZrwVtLoadChunk)
+#define gZrwVtInstance    ORIG_VAR(0x00560e90, ZrwVtInstanceFn, gZrwVtInstance)
+#define gZrwVtPartCount   ORIG_VAR(0x00560ea8, ZrwVtCountFn, gZrwVtPartCount)
+#define gZrwVtOwner       ORIG_VAR(0x00560edc, ZrwVtSetFn, gZrwVtOwner)
+#define gZrwVtNodeHashes  ORIG_VAR(0x00560ec8, ZrwVtHashesFn, gZrwVtNodeHashes)
+#define gZrwVtFindNode    ORIG_VAR(0x00560eac, ZrwVtFindPartFn, gZrwVtFindNode)
+#define gZrwVtNodeToWorld ORIG_VAR(0x00560eb0, ZrwVtPartToWorldFn, gZrwVtNodeToWorld)
+#define gZrwVtNodeVector  ORIG_VAR(0x00560eb4, ZrwVtPartOffsetFn, gZrwVtNodeVector)
+#define gZrwVtNodeMatrix  ORIG_VAR(0x00560eb8, ZrwVtPartMatrixFn, gZrwVtNodeMatrix)
+#define gZrwVtSkeleton    ORIG_VAR(0x00560ecc, ZrwVtSetFn, gZrwVtSkeleton)
 /* Object types of the two kinds of model (a single clump, or a skinned one). */
 #define gZrwOpsSimple  ORIG_VAR(0x00560fd0, void *, gZrwOpsSimple)
 #define gZrwOpsSkinned ORIG_VAR(0x00560fa8, void *, gZrwOpsSkinned)
@@ -84,13 +96,13 @@ void *zrwmatCreateObject(void *model)
 BMX_ADDR(0x00489070)
 void *zrwmatLoadModel(void *source)
 {
-    return gZrwVtLoadModel(source, NULL);
+    return gZrwVtLoadModel(source);
 }
 
 BMX_ADDR(0x00489090)
 void *zrwmatLoadChunk(void *iff)
 {
-    return gZrwVtLoadChunk(iff, NULL);
+    return gZrwVtLoadChunk(iff);
 }
 
 BMX_ADDR(0x004890b0)
@@ -118,28 +130,27 @@ void zrwmatGetNodeHashes(void *object, uint32_t *hashes)
 }
 
 BMX_ADDR(0x00489110)
-uint32_t zrwmatFindNode(void *object, uint32_t hash)
+void *zrwmatFindNode(void *object, uint32_t hash)
 {
-    return (uint32_t)(uintptr_t)gZrwVtFindNode(((ZObj *)object)->model, (void *)(uintptr_t)hash);
+    return gZrwVtFindNode(((ZObj *)object)->model, hash);
 }
 
 BMX_ADDR(0x00489150)
-void zrwmatNodeToWorld(void *object, uint32_t node, const float *local, float *out, int flag)
+void zrwmatNodeToWorld(void *object, void *node, const float *local, float *out, int flag)
 {
-    gZrwVtNodeToWorld(((ZObj *)object)->model, (void *)(uintptr_t)node, (void *)local, out,
-                      (void *)(uintptr_t)flag);
+    gZrwVtNodeToWorld(((ZObj *)object)->model, node, local, out, flag);
 }
 
 BMX_ADDR(0x00489180)
-void zrwmatNodeVector(void *object, uint32_t node, float *out, int flag)
+void zrwmatNodeVector(void *object, void *node, float *out, int flag)
 {
-    gZrwVtNodeVector(((ZObj *)object)->model, (void *)(uintptr_t)node, out, (void *)(uintptr_t)flag);
+    gZrwVtNodeVector(((ZObj *)object)->model, node, out, flag);
 }
 
 BMX_ADDR(0x004891b0)
-void zrwmatNodeMatrix(void *object, uint32_t node, void *out, int flag)
+void zrwmatNodeMatrix(void *object, void *node, void *out, int flag)
 {
-    gZrwVtNodeMatrix(((ZObj *)object)->model, (void *)(uintptr_t)node, out, (void *)(uintptr_t)flag);
+    gZrwVtNodeMatrix(((ZObj *)object)->model, node, out, flag);
 }
 
 BMX_ADDR(0x00489210)
@@ -185,7 +196,7 @@ int zrwmatReadMATI(void *iff, void *arg)
     if (gZrwMat.hook != NULL) {
         ((ZrwMatHookFn)gZrwMat.hook)(material, arg);
     }
-    return (int)(uintptr_t)material;
+    return bmxPtrResult(material);
 }
 
 /* "MADF" chunk: the definition (at most 0x8f bytes, starting with 0x48) of the material being read. */
@@ -284,6 +295,10 @@ void zrwmatReleaseTexture(ZrwMaterial *material)
     }
     material->refCount--;
     if (material->refCount == 0) {
+#if !BMX_LAYOUT32
+        bmxSlot32Drop(material->handle);
+        material->handle = 0;
+#endif
         material->textureCount = 0;
         zmemFreeListFree(gZrwMat.pool, material);
     }

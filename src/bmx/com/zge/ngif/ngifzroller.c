@@ -7,6 +7,7 @@
 #include "bmx/com/zge/ngif/ngifzres.h"
 #include "compat/crt.h"
 #include "zge/com/zglrw/zrwcam.h"
+#include "zge/com/zglrw/zrwmat.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zobjcamera.h"
 #include "zge/zlist.h"
@@ -47,7 +48,7 @@ void zrollerFreeModelTable(void)
 {
     for (int i = 0; i < 512; i++) {
         if (gZrollerModels[i].handle != 0) {
-            gZrollerFreeHandle(gZrollerModels[i].handle);
+            gZrollerFreeHandle(zrwmatFromHandle((uint32_t)gZrollerModels[i].handle));
         }
     }
     zmemFill(&gZrollerModels, 0, sizeof gZrollerModels);

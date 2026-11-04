@@ -376,12 +376,12 @@ void ngappResetPropColors(void)
 BMX_ADDR(0x0045ace0)
 void ngappInitLights(void)
 {
-    gNgMainLight = zsceneAddLight(0, 1, (int)(uintptr_t)&gNgMainLightColor);
+    gNgMainLight = zsceneAddLight(0, 1, (const uint8_t *)&gNgMainLightColor);
     zobjLightSetFlags(gNgMainLight, 1);
     for (int i = 0; i < 3; i++) {
         ZVec3 direction;
 
-        gNgLights[i] = zsceneAddLight(0, 0, (int)(uintptr_t)gNgLightColors[i]);
+        gNgLights[i] = zsceneAddLight(0, 0, (const uint8_t *)gNgLightColors[i]);
         direction = gNgLightDir[i].v;
         zvec3Sub(&direction, &direction, &gNgLightRef[i].v);
         zvec3NormalizeScaled(&direction, &direction);
@@ -392,18 +392,18 @@ void ngappInitLights(void)
 BMX_ADDR(0x0045adc0)
 void ngappInitSpotLights(void)
 {
-    gNgMainLight = zsceneAddLight(0, 1, (int)(uintptr_t)&gNgSpotMainColor);
+    gNgMainLight = zsceneAddLight(0, 1, (const uint8_t *)&gNgSpotMainColor);
     zobjLightSetFlags(gNgMainLight, 1);
     for (int i = 1; i <= 3; i++) {
         ZrwMarker *marker = zrwcamFindMarker(zstrHash("SpotLight"), i);
         ZrwMarker *target = zrwcamFindMarker(zstrHash("SpotLightT"), i);
-        int param;
+        const uint8_t *rgba;
 
         if (marker == NULL) {
             continue;
         }
-        param = (int)(intptr_t)marker->data; /* the light's colour block */
-        if (param == 0) {
+        rgba = marker->data; /* the light's colour block */
+        if (rgba == NULL) {
             continue;
         }
         if (target == NULL) {
@@ -412,7 +412,7 @@ void ngappInitSpotLights(void)
             direction.x = marker->matrix.right.x;
             direction.y = marker->matrix.right.y;
             direction.z = marker->matrix.right.z;
-            gNgSpotLights[i - 1] = zsceneAddLight(0, 0, param);
+            gNgSpotLights[i - 1] = zsceneAddLight(0, 0, rgba);
             zvec3NormalizeScaled(&direction, &direction);
             zobjLightSetDirection(gNgSpotLights[i - 1], &direction);
         } else {
@@ -422,7 +422,7 @@ void ngappInitSpotLights(void)
             direction.y = (float)((double)target->matrix.pos.y - (double)marker->matrix.pos.y);
             direction.z = (float)((double)target->matrix.pos.z - (double)marker->matrix.pos.z);
             zvec3NormalizeScaled(&direction, &direction);
-            gNgSpotLights[i - 1] = zsceneAddLight(0, 0, (int)(intptr_t)marker->data);
+            gNgSpotLights[i - 1] = zsceneAddLight(0, 0, marker->data);
             zobjLightSetDirection(gNgSpotLights[i - 1], &direction);
             zobjLightSetFlags(gNgSpotLights[i - 1], 1);
         }
@@ -465,7 +465,7 @@ void ngappLinkFaces(void)
 BMX_ADDR(0x0045b020)
 void ngappLoadInterfaceArt(void)
 {
-    int library;
+    ZassetLibrary *library;
     uint32_t size;
     ZfileDeviceTable *devices;
     const char *names[2];
@@ -611,7 +611,7 @@ int ngappShutdown(void)
 BMX_ADDR(0x0045b5c0)
 void ngappShowLoading(void)
 {
-    int library = zassetOpenLibrary(zfileBuildFileName(gNgAssetsDir, gNgWrapName));
+    ZassetLibrary *library = zassetOpenLibrary(zfileBuildFileName(gNgAssetsDir, gNgWrapName));
 
     if (library != 0) {
         uint32_t *mark = zmemStaticMark();
@@ -674,7 +674,7 @@ int ngappDrawSprite(void *sprite)
         bottomLeft.color[i] = 0xff;
         topLeft.color[i] = 0xff;
     }
-    quad.texture = (uint32_t)(uintptr_t)sprite;
+    quad.texture = zrwmatHandle(sprite);
     quad.vertices[0] = &bottomLeft;
     quad.vertices[1] = &bottomRight;
     quad.vertices[2] = &topRight;
@@ -684,7 +684,7 @@ int ngappDrawSprite(void *sprite)
 }
 
 /* Renderer queries (10: horizontal, 11: vertical screen scale) and the quad hook, called through pointers. */
-typedef void(BMX_CDECL *NgQueryFn)(int what, void *out, int arg);
+typedef void(BMX_CDECL *NgQueryFn)(int what, void *out, const void *extra);
 #define gNgQuery     ORIG_VAR(0x00561488, NgQueryFn, gNgQuery)
 #define gNgDrawQuads ORIG_VAR(0x00561738, ZrwDrawFn, gNgDrawQuads)
 
@@ -773,7 +773,7 @@ int ngifRunFrame(float dt)
     gNgElapsed = (float)((double)gNgElapsed + (double)dt);
     if (gNgLegalPending == 1) {
         uint32_t *mark = zmemStaticMark();
-        int library = zassetOpenLibrary(zfileBuildFileName(gNgAssetsDir, gNgWrapName));
+        ZassetLibrary *library = zassetOpenLibrary(zfileBuildFileName(gNgAssetsDir, gNgWrapName));
         uint32_t size;
         uint32_t size2;
         void *data;
@@ -881,7 +881,7 @@ dispatch:
         ngifUnk463820();
         ngappFreeInterfaceArt();
         {
-            int library = zassetOpenLibrary(zfileBuildFileName(gNgAssetsDir, gNgWrapName));
+            ZassetLibrary *library = zassetOpenLibrary(zfileBuildFileName(gNgAssetsDir, gNgWrapName));
 
             if (library != 0) {
                 uint32_t *mark = zmemStaticMark();

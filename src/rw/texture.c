@@ -1772,14 +1772,14 @@ static uint8_t bmpByte(const uint8_t *pixel, int i)
  */
 static const uint8_t *bmpPixel(const RwImage *image, int32_t y, uint32_t x)
 {
+    /* the offsets wrap at 32 bits as the original's address arithmetic does */
     if (image->depth == 0x20) {
-        return (const uint8_t *)(uintptr_t)((uint32_t)y * (uint32_t)image->stride + x * 4u +
-                                            (uint32_t)(uintptr_t)image->pixels);
+        return image->pixels + (int32_t)((uint32_t)y * (uint32_t)image->stride + x * 4u);
     }
     if (image->depth == 8 || image->depth == 4) {
-        const uint32_t row = (uint32_t)y * (uint32_t)image->stride + (uint32_t)(uintptr_t)image->pixels;
-        const uint32_t index = *(const uint8_t *)(uintptr_t)(row + x);
-        return (const uint8_t *)(uintptr_t)((uint32_t)(uintptr_t)image->palette + index * 4u);
+        const uint8_t *row = image->pixels + (int32_t)((uint32_t)y * (uint32_t)image->stride);
+        const uint32_t index = row[x];
+        return image->palette + index * 4u;
     }
     return NULL;
 }

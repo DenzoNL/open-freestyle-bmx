@@ -3,6 +3,7 @@
 
 #include "compat/crt.h"
 #include "zge/com/zglrw/zrwcol.h"
+#include "zge/com/zglrw/zrwmat.h"
 #include "zge/com/zglrw/zrwprim.h"
 #include "zge/zdebug.h"
 #include "zge/zfile.h"
@@ -23,7 +24,8 @@ _Static_assert(sizeof(ZrwShadowVertex) == sizeof(ZrwPrimVertex),
                "shadow vertices are drawn as prim vertices");
 
 /* The exe's texture loader (zrwmatLoadSpriteTexture), called with a spare fifth argument. */
-typedef uint32_t(BMX_CDECL *ZrwShadowLoadFn)(void *data, int size, const char *name, int type, int zero);
+typedef struct ZrwMaterial *(BMX_CDECL *ZrwShadowLoadFn)(void *data, int size, const char *name, int type,
+                                                         int zero);
 #define gZrwShadowLoad ORIG_VAR(0x00561048, ZrwShadowLoadFn, gZrwShadowLoad)
 
 BMX_ADDR(0x0049b330)
@@ -40,7 +42,7 @@ int zrollerShadowStart(void)
     if (image == NULL) {
         gZrwShadowTexture = 0;
     } else {
-        gZrwShadowTexture = gZrwShadowLoad(image, size, "ShadowMap", 0, 0);
+        gZrwShadowTexture = zrwmatHandle(gZrwShadowLoad(image, size, "ShadowMap", 0, 0));
         zfileFreeBuffer(image);
     }
     gZrwShadowReady = 0;

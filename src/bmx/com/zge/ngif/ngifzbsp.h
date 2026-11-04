@@ -145,7 +145,7 @@ BMX_LAYOUT32_ASSERT(sizeof(ZbspFaceHit) == 0x1c, "ZbspFaceHit size");
 BMX_LAYOUT32_ASSERT(sizeof(ZbspFaceQuery) == 0x40, "ZbspFaceQuery size");
 
 /* zbspFindFaceNear's buffers: the renderer's sphere test result, face records and their int16 corners. */
-typedef struct ZbspSphereResult {
+typedef struct ZbspSphereResult { /* ZrwColSphereResult's layout */
     struct ZrwColHit *hits;
     uint32_t count;
 } ZbspSphereResult;

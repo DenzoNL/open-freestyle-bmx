@@ -120,7 +120,7 @@ static void mcAnswerYes(uint16_t title, uint16_t next)
 }
 
 BMX_ADDR(0x0043d4a0)
-int BMX_CDECL mcDialogHook(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL mcDialogHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     switch (msg) {
     case kGuiMsgTickAll:

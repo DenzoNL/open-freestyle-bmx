@@ -78,9 +78,9 @@ static inline void dt_zprim_env(void)
     gFileSystemReady = 1;
     DT_DMM_INIT(0, 0x40000);
     gZprimFontPageList = DT_ORIG(0x00485e80, DtFreeListCreateFn)(0x80, 4, NULL);
-    gRwTextureFree = dt_rw_free;
-    gRwTextureClone = dt_rw_clone;
-    gRwTextureLoad = dt_rw_load;
+    gRwTextureFree = (ZRwTextureFreeFn)(void *)dt_rw_free; /* the stubs work on the 32-bit handle words */
+    gRwTextureClone = (ZRwTextureCloneFn)(void *)dt_rw_clone;
+    gRwTextureLoad = (ZRwTextureLoadFn)(void *)dt_rw_load;
     DT_ZPRIM_INIT();
     DT_NGIF_BEGIN();
 }

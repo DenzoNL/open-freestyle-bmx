@@ -46,7 +46,7 @@ static void zobjApplyParent(ZObj *object)
     ZQuat rotation;
     const ZObjLinks *links = object->links;
 
-    if (links->partId == 0) {
+    if (links->partId == NULL) {
         zquatToMatrix(&parent, &links->parent->rot);
         parent.pos = links->parent->pos;
     } else {
@@ -70,7 +70,7 @@ static void zobjApplyParent(ZObj *object)
 }
 
 BMX_ADDR(0x004879c0)
-int zobjForEachChild(ZObj *object, ZObjChildFn fn, int arg)
+int zobjForEachChild(ZObj *object, ZObjChildFn fn, void *arg)
 {
     if (object->links != NULL) {
         for (ZObj *child = object->links->firstChild; child != NULL; child = child->links->next) {
@@ -84,7 +84,7 @@ int zobjForEachChild(ZObj *object, ZObjChildFn fn, int arg)
 }
 
 BMX_ADDR(0x00486ee0)
-int zobjRefresh(ZObj *object, int arg)
+int zobjRefresh(ZObj *object, void *arg)
 {
     if ((object->flags & kZobjActive) != 0) {
         zobjApplyParent(object);
@@ -119,7 +119,7 @@ int zobjUpdateAll(void *arg)
         for (ZObj *child = object->links->firstChild; child != NULL;) {
             if ((child->flags & kZobjActive) != 0) {
                 zobjApplyParent(child);
-                zobjForEachChild(child, zobjRefresh, (int)(intptr_t)arg);
+                zobjForEachChild(child, zobjRefresh, arg);
             }
             if (child->links == NULL) {
                 break;
@@ -290,7 +290,7 @@ void zobjDetach(ZObj *object)
             parentLinks->firstChild = links->next;
             object->flags &= ~(uint32_t)kZobjAttached;
             object->links->parent = NULL;
-            object->links->partId = 0;
+            object->links->partId = NULL;
             object->links->next = NULL;
             if (object->ops->moved != NULL) {
                 object->ops->moved(object, &object->pos);
@@ -305,7 +305,7 @@ void zobjDetach(ZObj *object)
                 sibling->links->next = links->next;
                 sibling->flags &= ~(uint32_t)kZobjAttached;
                 sibling->links->parent = NULL;
-                sibling->links->partId = 0;
+                sibling->links->partId = NULL;
                 sibling->links->next = NULL;
                 if (sibling->ops->moved != NULL) {
                     sibling->ops->moved(sibling, &object->pos);
@@ -331,7 +331,7 @@ void zobjDetach(ZObj *object)
                     break; /* the original crashes here */
                 }
                 childLinks->parent = NULL;
-                child->links->partId = 0;
+                child->links->partId = NULL;
                 child->links->next = NULL;
                 child = next;
             } while (child != NULL);

@@ -227,7 +227,7 @@ typedef ZMotionBank ZMotionBankTable[2];
 /* Added to (or, when gActorAngleFlip is set, subtracted from) angles that cross the motion boundary. */
 #define gActorAngleBase ORIG_VAR(0x00641e24, int32_t, gActorAngleBase)
 #define gActorAngleFlip ORIG_VAR(0x00641e28, int32_t, gActorAngleFlip)
-#define gMotionLibrary  ORIG_VAR(0x00641e2c, int32_t, gMotionLibrary)
+#define gMotionLibrary  ORIG_VAR(0x00641e2c, struct ZassetLibrary *, gMotionLibrary)
 #define gMotionBuffer   ORIG_VAR(0x00641e30, void *, gMotionBuffer)
 #define gMotionBanks    ORIG_VAR(0x00601dc8, ZMotionBankTable, gMotionBanks)
 /* Data of the first bank loaded, and the id of the bank loaded by zmotionLoadBank. */

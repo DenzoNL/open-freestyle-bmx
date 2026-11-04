@@ -1129,22 +1129,35 @@ uint32_t rpAnimSequenceType(const uint32_t *sequence)
 
 /* Frame-sequence chunk size: the name (with its length word and terminator), the 0x11 byte header, the
  * keys of the type's size and 12 bytes per further entry (EAX = sequence). */
+/* The head of an animation sequence, as far as its stream size needs it. */
+typedef struct RpAnimSequenceHead {
+    uint32_t pad00;
+    const char *name; /* 0x04 */
+    int32_t type;     /* 0x08 */
+    int32_t keyCount; /* 0x0c */
+    uint32_t pad10;
+    int32_t entryCount; /* 0x14 */
+} RpAnimSequenceHead;
+
+BMX_LAYOUT32_ASSERT(offsetof(RpAnimSequenceHead, entryCount) == 0x14, "sequence head");
+
 BMX_ADDR(0x004fd710)
-__attribute__((regparm(1))) int32_t rpAnimSequenceSize(const uint32_t *sequence)
+__attribute__((regparm(1))) int32_t rpAnimSequenceSize(const uint32_t *words)
 {
+    const RpAnimSequenceHead *sequence = (const void *)words;
     BMX_LAYOUT32_ASSERT(offsetof(RwGlobals, stringFuncs) + offsetof(RwStringFunctions, rwstrlen) == 0x114,
                         "rwstrlen offset");
-    const int32_t length = ((int32_t(BMX_CDECL *)(const char *))RwEngineInstance->stringFuncs.rwstrlen)(
-        (const char *)(uintptr_t)sequence[1]);
-    const int32_t type = (int32_t)sequence[2];
-    const int32_t count = (int32_t)sequence[3];
+    const int32_t length =
+        ((int32_t(BMX_CDECL *)(const char *))RwEngineInstance->stringFuncs.rwstrlen)(sequence->name);
+    const int32_t type = sequence->type;
+    const int32_t count = sequence->keyCount;
     int32_t size = length + 0x11;
     if (type == 1) {
         size = count * 12 + 0x11 + length;
     } else if (type == 2) {
         size = count * 16 + 0x11 + length;
     }
-    return (int32_t)sequence[5] * 12 + size;
+    return sequence->entryCount * 12 + size;
 }
 
 /* Stream size of a frame's animation chunk: 8 without data, else 0x14 and the sizes of all its sequences

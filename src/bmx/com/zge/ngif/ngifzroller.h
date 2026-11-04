@@ -48,8 +48,9 @@ typedef void *ZrollerShadowSlots[2];
 #define gZrollerUpdateHandle ORIG_VAR(0x005fb740, void *, gZrollerUpdateHandle)
 
 /* Renderer hooks: free a model table handle, query world data, (un)register update callbacks. */
-typedef void(BMX_CDECL *ZrollerFreeHandleFn)(int handle);
-typedef void(BMX_CDECL *ZrollerQueryFn)(int what, float *out, int arg);
+struct ZrwMaterial;
+typedef void(BMX_CDECL *ZrollerFreeHandleFn)(struct ZrwMaterial *material);
+typedef void(BMX_CDECL *ZrollerQueryFn)(int what, float *out, const void *extra);
 typedef void *(BMX_CDECL *ZrollerRegisterFn)(int priority, void *callback, void *arg, int flag);
 typedef void(BMX_CDECL *ZrollerUnregisterFn)(void *node);
 #define gZrollerFreeHandle ORIG_VAR(0x00561024, ZrollerFreeHandleFn, gZrollerFreeHandle)
@@ -72,7 +73,7 @@ typedef const char *ZrollerNameTable[1];
 /* Table of the renderer models the roller loaded: 512 entries of 0x14 bytes, the handle at +0x10. */
 typedef struct ZrollerModelEntry {
     uint8_t pad00[0x10];
-    int32_t handle;
+    int32_t handle; /* a material handle (zrwmatHandle) */
 } ZrollerModelEntry;
 typedef ZrollerModelEntry ZrollerModelTable[512];
 #define gZrollerModels ORIG_VAR(0x0068c3e0, ZrollerModelTable, gZrollerModels)

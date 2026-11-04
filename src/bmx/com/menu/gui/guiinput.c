@@ -325,7 +325,7 @@ static void guiApplyTextColor(GuiElement *el, void (*getRgb)(uint8_t *, uint8_t 
  * (focus), 0x436621 (blur), 0x436689, 0x4366b8 (navigation) and 0x4366e7 (default).
  */
 BMX_ADDR(0x00436520)
-int BMX_CDECL guiButtonProc(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL guiButtonProc(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     switch (msg) {
     case kGuiMsgTick:

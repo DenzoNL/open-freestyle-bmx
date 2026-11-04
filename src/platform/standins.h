@@ -69,15 +69,15 @@ int32_t BMX_WINAPI bmxStandAVIStreamGetFrameClose(void *getFrame);
 int32_t BMX_WINAPI bmxStandAVISaveOptionsFree(int count, void **options);
 
 /* waveout.c: WINMM waveOut on SDL3 audio (HWAVEOUT is our record; headers are WAVEHDR). */
-uint32_t BMX_WINAPI bmxStandWaveOutOpen(uint32_t *out, int32_t device, const void *format, uint32_t callback,
-                                        uint32_t instance, uint32_t flags);
-uint32_t BMX_WINAPI bmxStandWaveOutPrepareHeader(uint32_t handle, void *header, uint32_t size);
-uint32_t BMX_WINAPI bmxStandWaveOutUnprepareHeader(uint32_t handle, void *header, uint32_t size);
-uint32_t BMX_WINAPI bmxStandWaveOutWrite(uint32_t handle, void *header, uint32_t size);
-uint32_t BMX_WINAPI bmxStandWaveOutPause(uint32_t handle);
-uint32_t BMX_WINAPI bmxStandWaveOutRestart(uint32_t handle);
-uint32_t BMX_WINAPI bmxStandWaveOutReset(uint32_t handle);
-uint32_t BMX_WINAPI bmxStandWaveOutClose(uint32_t handle);
+uint32_t BMX_WINAPI bmxStandWaveOutOpen(uintptr_t *out, int32_t device, const void *format,
+                                        uintptr_t callback, uintptr_t instance, uint32_t flags);
+uint32_t BMX_WINAPI bmxStandWaveOutPrepareHeader(uintptr_t handle, void *header, uint32_t size);
+uint32_t BMX_WINAPI bmxStandWaveOutUnprepareHeader(uintptr_t handle, void *header, uint32_t size);
+uint32_t BMX_WINAPI bmxStandWaveOutWrite(uintptr_t handle, void *header, uint32_t size);
+uint32_t BMX_WINAPI bmxStandWaveOutPause(uintptr_t handle);
+uint32_t BMX_WINAPI bmxStandWaveOutRestart(uintptr_t handle);
+uint32_t BMX_WINAPI bmxStandWaveOutReset(uintptr_t handle);
+uint32_t BMX_WINAPI bmxStandWaveOutClose(uintptr_t handle);
 int32_t BMX_WINAPI bmxStandSndPlaySoundA(const char *sound, uint32_t flags);
 
 /* src/driver/movie.c: MSVFW32 DrawDib and the window DC on the SDL3 driver (native exe only). */

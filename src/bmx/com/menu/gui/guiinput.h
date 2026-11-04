@@ -77,7 +77,7 @@ struct ZRigHit;
 void guiPlayVelocitySound(struct ZRig *rig, uint32_t kind, float speed, struct ZRigHit *hit);
 
 /* Button element handler (type 2). */
-int BMX_CDECL guiButtonProc(int msg, GuiElement *el, int arg3, int arg4);
+int BMX_CDECL guiButtonProc(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4);
 
 /* Leftovers of the console port: empty or constant functions kept for their addresses. */
 int guiHelpInit(void);

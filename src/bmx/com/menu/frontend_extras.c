@@ -237,7 +237,7 @@ void extrasSlideOut(void)
 
 /* Draws the movie list (the list element's own handler): every title as a row, the selected one lit. */
 BMX_ADDR(0x0044a950)
-int BMX_CDECL extrasListDraw(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL extrasListDraw(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     if (msg == 0xc && el->id == kMovieList && gExtrasCount != 0) {
         for (int i = 0; i < (int)gExtrasCount; i++) {
@@ -252,7 +252,7 @@ int BMX_CDECL extrasListDraw(int msg, GuiElement *el, int arg3, int arg4)
 
 /* Hook of the movie list screen. */
 BMX_ADDR(0x0044aa30)
-int BMX_CDECL extrasHook(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL extrasHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     switch (msg) {
     case 0x16:
@@ -541,7 +541,7 @@ static uint32_t litStyle(void)
 }
 
 /* Draws the title and sprite of the table (element 3) or the best score and the table's cells (element 4). */
-static void hiscoreDraw(int msg, GuiElement *el, int arg3, int arg4)
+static void hiscoreDraw(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     if (el->id == 0xa00d0003) {
         guiSetText(el, zstringGet(0x1094));
@@ -602,7 +602,7 @@ static void hiscoreDraw(int msg, GuiElement *el, int arg3, int arg4)
 
 /* Hook (and drawing handler of elements 3 and 4) of the high score screen. */
 BMX_ADDR(0x0044b580)
-int BMX_CDECL hiscoreHook(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL hiscoreHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     switch (msg) {
     case 0xc:
@@ -797,7 +797,7 @@ static void infoLine(char *line, int index)
 
 /* Hook (and drawing handler of elements 1 and 2) of the information screen. */
 BMX_ADDR(0x0044c390)
-int BMX_CDECL infoHook(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL infoHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     switch (msg) {
     case 0xc:
@@ -904,7 +904,7 @@ int extrasMenuInit(void)
 
 /* Hook of the hub: the pulsing selection frame, up/down to choose, confirm to open, back to leave. */
 BMX_ADDR(0x0044ca40)
-int BMX_CDECL extrasMenuHook(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL extrasMenuHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     switch (msg) {
     case 0x16:

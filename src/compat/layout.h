@@ -32,4 +32,14 @@
 #define BMX_DATA_OFF(o32, o64) (o64)
 #endif
 
+/*
+ * A pointer the original returns as its int result, which every caller only tests against 0: the pointer's
+ * bits where they fit (the oracle compares the result), else 1 for a pointer that is set (docs/PORTING.md
+ * "X2e").
+ */
+static inline int bmxPtrResult(const void *p)
+{
+    return BMX_LAYOUT32 ? (int)(intptr_t)p : p != (const void *)0;
+}
+
 #endif

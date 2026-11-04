@@ -68,7 +68,7 @@ typedef struct WaveOut {
     uint32_t magic;
     SDL_AudioStream *stream;
     SDL_Mutex *mutex;
-    uint32_t window;
+    uintptr_t window;             /* HWND, 0 for none */
     WaveHeader *queue[kMaxQueue]; /* written, not yet done; [0] is playing */
     int queued;
     uint32_t offset; /* bytes of queue[0] already handed to SDL */
@@ -91,16 +91,16 @@ static uint64_t fnv(uint64_t hash, const uint8_t *p, uint32_t n)
 }
 
 /* The window callback (CALLBACK_WINDOW): a posted message, as winmm's, into the game's queue (window.c). */
-static void postMessage(const WaveOut *w, uint32_t message, uint32_t lParam)
+static void postMessage(const WaveOut *w, uint32_t message, uintptr_t lParam)
 {
     if (w->window != 0) {
         bmxWindowPost((void *)(uintptr_t)w->window, message, (uintptr_t)w, lParam);
     }
 }
 
-static WaveOut *asWave(uint32_t handle)
+static WaveOut *asWave(uintptr_t handle)
 {
-    WaveOut *const w = (WaveOut *)(uintptr_t)handle;
+    WaveOut *const w = (WaveOut *)handle;
 
     return w != NULL && w->magic == kWaveMagic ? w : NULL;
 }
@@ -116,7 +116,7 @@ static void finishFirst(WaveOut *w)
     }
     w->offset = 0;
     h->flags = (h->flags & ~(uint32_t)kWhdrInQueue) | kWhdrDone;
-    postMessage(w, kMmWomDone, (uint32_t)(uintptr_t)h);
+    postMessage(w, kMmWomDone, (uintptr_t)h);
 }
 
 /* SDL's audio thread: hand over queued bytes until SDL has what it asked for. */
@@ -171,8 +171,8 @@ static int formatSupported(const WaveFormat *f, SDL_AudioSpec *spec)
     return 1;
 }
 
-uint32_t BMX_WINAPI bmxStandWaveOutOpen(uint32_t *out, int32_t device, const void *format, uint32_t callback,
-                                        uint32_t instance, uint32_t flags)
+uint32_t BMX_WINAPI bmxStandWaveOutOpen(uintptr_t *out, int32_t device, const void *format,
+                                        uintptr_t callback, uintptr_t instance, uint32_t flags)
 {
     const WaveFormat *const f = format;
     const char *mute = SDL_getenv("BMX_MUTE");
@@ -226,13 +226,13 @@ uint32_t BMX_WINAPI bmxStandWaveOutOpen(uint32_t *out, int32_t device, const voi
     bmxLog("waveout: open %u Hz, %u channels, %u bits on SDL \"%s\"%s\n", f->samplesPerSec, f->channels,
            f->bitsPerSample, SDL_GetCurrentAudioDriver(), w->mute ? "; BMX_MUTE: output silent" : "");
     w->openTime = bmxTimeGetTime();
-    *out = (uint32_t)(uintptr_t)w;
+    *out = (uintptr_t)w;
     SDL_ResumeAudioStreamDevice(w->stream); /* a wave device plays as soon as it has buffers */
     postMessage(w, kMmWomOpen, 0);
     return 0;
 }
 
-uint32_t BMX_WINAPI bmxStandWaveOutPrepareHeader(uint32_t handle, void *header, uint32_t size)
+uint32_t BMX_WINAPI bmxStandWaveOutPrepareHeader(uintptr_t handle, void *header, uint32_t size)
 {
     WaveHeader *const h = header;
 
@@ -246,7 +246,7 @@ uint32_t BMX_WINAPI bmxStandWaveOutPrepareHeader(uint32_t handle, void *header, 
     return 0;
 }
 
-uint32_t BMX_WINAPI bmxStandWaveOutUnprepareHeader(uint32_t handle, void *header, uint32_t size)
+uint32_t BMX_WINAPI bmxStandWaveOutUnprepareHeader(uintptr_t handle, void *header, uint32_t size)
 {
     WaveHeader *const h = header;
 
@@ -263,7 +263,7 @@ uint32_t BMX_WINAPI bmxStandWaveOutUnprepareHeader(uint32_t handle, void *header
     return 0;
 }
 
-uint32_t BMX_WINAPI bmxStandWaveOutWrite(uint32_t handle, void *header, uint32_t size)
+uint32_t BMX_WINAPI bmxStandWaveOutWrite(uintptr_t handle, void *header, uint32_t size)
 {
     WaveOut *const w = asWave(handle);
     WaveHeader *const h = header;
@@ -294,7 +294,7 @@ uint32_t BMX_WINAPI bmxStandWaveOutWrite(uint32_t handle, void *header, uint32_t
     return result;
 }
 
-uint32_t BMX_WINAPI bmxStandWaveOutPause(uint32_t handle)
+uint32_t BMX_WINAPI bmxStandWaveOutPause(uintptr_t handle)
 {
     WaveOut *const w = asWave(handle);
 
@@ -308,7 +308,7 @@ uint32_t BMX_WINAPI bmxStandWaveOutPause(uint32_t handle)
     return 0;
 }
 
-uint32_t BMX_WINAPI bmxStandWaveOutRestart(uint32_t handle)
+uint32_t BMX_WINAPI bmxStandWaveOutRestart(uintptr_t handle)
 {
     WaveOut *const w = asWave(handle);
 
@@ -323,7 +323,7 @@ uint32_t BMX_WINAPI bmxStandWaveOutRestart(uint32_t handle)
 }
 
 /* Stops at once: the queued buffers come back done (MM_WOM_DONE each), what SDL still holds is dropped. */
-uint32_t BMX_WINAPI bmxStandWaveOutReset(uint32_t handle)
+uint32_t BMX_WINAPI bmxStandWaveOutReset(uintptr_t handle)
 {
     WaveOut *const w = asWave(handle);
 
@@ -342,7 +342,7 @@ uint32_t BMX_WINAPI bmxStandWaveOutReset(uint32_t handle)
     return 0;
 }
 
-uint32_t BMX_WINAPI bmxStandWaveOutClose(uint32_t handle)
+uint32_t BMX_WINAPI bmxStandWaveOutClose(uintptr_t handle)
 {
     WaveOut *const w = asWave(handle);
     int queued;

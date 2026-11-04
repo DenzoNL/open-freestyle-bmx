@@ -109,8 +109,8 @@ ORIG_FN(0x00497620, int, zrwtxrFlush, (void));
 /* Update list nodes the extra draws treat specially (node->fn, HF0 findings Q2), as their registrations store
  * them. ngifpsxUpdate: the screen shake script advances per call; zrollerUpdateShadow: 36 line probes
  * (gZrwColBox, gZrwCol, lightFrame). */
-#define kShakeNode   ((uint32_t)(uintptr_t)BMX_FNPTR(void *, 0x00401a4b, ngifpsxUpdate))
-#define kShadowProbe ((uint32_t)(uintptr_t)BMX_FNPTR(void *, 0x0049b520, zrollerUpdateShadow))
+#define kShakeNode   ((uintptr_t)BMX_FNPTR(void *, 0x00401a4b, ngifpsxUpdate))
+#define kShadowProbe ((uintptr_t)BMX_FNPTR(void *, 0x0049b520, zrollerUpdateShadow))
 /* The effect objects' ops (zrwworldCreateObject): their host lists the emitters (HF5). */
 #define kEffectOps ((const ZObjOps *)BMX_ORIG(0x00562098))
 /* Remaining life (ms) an expired particle is drawn with in an extra draw (hfParticleLife). */
@@ -930,7 +930,7 @@ static void runList(int index)
 {
     for (HfNode *node = gLists[index].head; node != NULL;) {
         HfNode *const next = node->next;
-        const uint32_t fn = (uint32_t)(uintptr_t)node->fn;
+        const uintptr_t fn = (uintptr_t)node->fn;
         int ok;
 
         if (fn == kShakeNode) {

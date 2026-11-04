@@ -45,8 +45,7 @@ static DrvCameraExt *cameraExt(const RwCamera *camera)
 /* 0x4d4ea0: camera plugin constructor. */
 void *drvCameraCtor(void *camera, int32_t offset, int32_t size)
 {
-    DRV_TRACE("drvCameraCtor", (uint32_t)(uintptr_t)camera, (uint32_t)(uintptr_t)offset,
-              (uint32_t)(uintptr_t)size);
+    DRV_TRACE("drvCameraCtor", (uintptr_t)camera, (uintptr_t)offset, (uintptr_t)size);
     memset(cameraExt(camera), 0, sizeof(DrvCameraExt));
     return camera;
 }
@@ -54,8 +53,7 @@ void *drvCameraCtor(void *camera, int32_t offset, int32_t size)
 /* 0x4d4f80: camera plugin destructor. */
 void *drvCameraDtor(void *camera, int32_t offset, int32_t size)
 {
-    DRV_TRACE("drvCameraDtor", (uint32_t)(uintptr_t)camera, (uint32_t)(uintptr_t)offset,
-              (uint32_t)(uintptr_t)size);
+    DRV_TRACE("drvCameraDtor", (uintptr_t)camera, (uintptr_t)offset, (uintptr_t)size);
     if (drvCurrentCamera == camera) {
         drvCurrentCamera = NULL;
     }
@@ -114,8 +112,7 @@ static void fpuRestore(void)
  */
 int drvCameraBeginUpdate(void *out, void *camera, int32_t in)
 {
-    DRV_TRACE("drvCameraBeginUpdate", (uint32_t)(uintptr_t)out, (uint32_t)(uintptr_t)camera,
-              (uint32_t)(uintptr_t)in);
+    DRV_TRACE("drvCameraBeginUpdate", (uintptr_t)out, (uintptr_t)camera, (uintptr_t)in);
     RwCamera *const cam = camera;
     struct SDL_GPUTexture *color, *depth;
     RwRaster *top;
@@ -155,8 +152,7 @@ int drvCameraBeginUpdate(void *out, void *camera, int32_t in)
  */
 int drvCameraEndUpdate(void *out, void *camera, int32_t in)
 {
-    DRV_TRACE("drvCameraEndUpdate", (uint32_t)(uintptr_t)out, (uint32_t)(uintptr_t)camera,
-              (uint32_t)(uintptr_t)in);
+    DRV_TRACE("drvCameraEndUpdate", (uintptr_t)out, (uintptr_t)camera, (uintptr_t)in);
     rwD3DDeferFlush();
     if (rwCameraFpuSet != 0) {
         fpuRestore();
@@ -172,7 +168,7 @@ int drvCameraEndUpdate(void *out, void *camera, int32_t in)
 /* 0x4d4c10 (standard 0x15): flags 1 clears the frame buffer to *color (RwRGBA), 2 the z buffer. */
 int drvCameraClear(void *camera, void *color, int32_t flags)
 {
-    DRV_TRACE("drvCameraClear", (uint32_t)(uintptr_t)camera, *(const uint32_t *)color, (uint32_t)flags);
+    DRV_TRACE("drvCameraClear", (uintptr_t)camera, *(const uint32_t *)color, (uint32_t)flags);
     RwCamera *const cam = camera;
     const uint8_t *rgba = color;
     struct SDL_GPUTexture *frame = rasterTexture(cam->frameBuffer);
@@ -190,8 +186,7 @@ int drvCameraClear(void *camera, void *color, int32_t flags)
 /* 0x4d4ae0 (standard 0x14): shows a camera raster in the window (flags bit 0: wait for vsync). */
 int drvRasterShowRaster(void *raster, void *window, int32_t flags)
 {
-    DRV_TRACE("drvRasterShowRaster", (uint32_t)(uintptr_t)raster, (uint32_t)(uintptr_t)window,
-              (uint32_t)(uintptr_t)flags);
+    DRV_TRACE("drvRasterShowRaster", (uintptr_t)raster, (uintptr_t)window, (uintptr_t)flags);
     RwRaster *const r = raster;
     struct SDL_GPUTexture *texture = rasterTexture(r);
 
@@ -204,8 +199,7 @@ int drvRasterShowRaster(void *raster, void *window, int32_t flags)
 /* 0x4d4570 (standard 0x16): render order hint, in = 0 front to back. */
 int drvHintRenderFront2Back(void *out, void *inOut, int32_t in)
 {
-    DRV_TRACE("drvHintRenderFront2Back", (uint32_t)(uintptr_t)out, (uint32_t)(uintptr_t)inOut,
-              (uint32_t)(uintptr_t)in);
+    DRV_TRACE("drvHintRenderFront2Back", (uintptr_t)out, (uintptr_t)inOut, (uintptr_t)in);
     drvRenderOrderHint = in == 0 ? 1 : 2;
     rwD3DRenderOrder = drvRenderOrderHint;
     return 1;
@@ -221,7 +215,7 @@ int drvSetRasterContext(void *out, void *raster, int32_t in)
 {
     RwRaster *const r = raster;
 
-    DRV_TRACE("drvSetRasterContext", (uint32_t)(uintptr_t)out, (uint32_t)(uintptr_t)raster, (uint32_t)in);
+    DRV_TRACE("drvSetRasterContext", (uintptr_t)out, (uintptr_t)raster, (uint32_t)in);
     if ((drvTopRaster(r)->flags & rwRASTERDONTALLOCATE) != 0) {
         return 0;
     }
@@ -334,8 +328,7 @@ static int setRasterFormat(RwRaster *raster, int32_t flags)
  */
 int drvRasterCreate(void *out, void *raster, int32_t flags)
 {
-    DRV_TRACE("drvRasterCreate", (uint32_t)(uintptr_t)out, (uint32_t)(uintptr_t)raster,
-              (uint32_t)(uintptr_t)flags);
+    DRV_TRACE("drvRasterCreate", (uintptr_t)out, (uintptr_t)raster, (uintptr_t)flags);
     RwRaster *const r = raster;
 
     r->pixels = NULL;
@@ -372,8 +365,7 @@ int drvRasterCreate(void *out, void *raster, int32_t flags)
 /* 0x4d5660 (standard 5). */
 int drvRasterDestroy(void *out, void *raster, int32_t in)
 {
-    DRV_TRACE("drvRasterDestroy", (uint32_t)(uintptr_t)out, (uint32_t)(uintptr_t)raster,
-              (uint32_t)(uintptr_t)in);
+    DRV_TRACE("drvRasterDestroy", (uintptr_t)out, (uintptr_t)raster, (uintptr_t)in);
     RwRaster *const r = raster;
     DrvRasterExt *const ext = drvRasterExt(r);
 

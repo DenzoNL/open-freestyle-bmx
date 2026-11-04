@@ -10,7 +10,7 @@
 #include "zge/zquat.h"
 
 /* The renderer's light interface: function pointers in the exe's data (0x563420 table). */
-typedef void *(BMX_CDECL *ZrwLightCreateFn)(int type, int param);
+typedef void *(BMX_CDECL *ZrwLightCreateFn)(int type, const uint8_t *rgba);
 typedef void *(BMX_CDECL *ZrwLightColorFn)(void *light, const uint8_t *rgba);
 typedef void *(BMX_CDECL *ZrwLightFlagsFn)(void *light, uint8_t flags);
 typedef void *(BMX_CDECL *ZrwLightDirectionFn)(void *light, const ZVec3 *direction);
@@ -20,7 +20,7 @@ typedef void *(BMX_CDECL *ZrwLightDirectionFn)(void *light, const ZVec3 *directi
 #define gZrwLightDirection ORIG_VAR(0x0056343c, ZrwLightDirectionFn, gZrwLightDirection)
 
 typedef void(BMX_CDECL *ZrwLightDestroyFn)(void *light);
-typedef void(BMX_CDECL *ZrwLightParamFn)(void *light, uint32_t param);
+typedef void(BMX_CDECL *ZrwLightParamFn)(void *light, const ZVec3 *position);
 #define gZrwLightDestroy  ORIG_VAR(0x0056342c, ZrwLightDestroyFn, gZrwLightDestroy)
 #define gZrwLightSetParam ORIG_VAR(0x00563438, ZrwLightParamFn, gZrwLightSetParam)
 
@@ -42,10 +42,10 @@ _Static_assert(__builtin_offsetof(ZObjLight, ops) == __builtin_offsetof(ZObj, op
                "ZObjLight is a ZObj");
 
 /* Creates a light object of renderer type 0..3; NULL on failure. */
-void *zobjLightCreate(int type, int param);
+void *zobjLightCreate(int type, const uint8_t *rgba);
 /* Object operations (the ops table at 0x561858). They forward to the renderer and return 1. */
 int zobjLightDestroy(ZObjLight *light);
-int zobjLightSetParam(ZObjLight *light, uint32_t param);
+int zobjLightSetParam(ZObjLight *light, const ZVec3 *position);
 /* Points the light along the axis of a rotation quaternion. */
 int zobjLightSetRotation(ZObjLight *light, const ZQuat *rotation);
 /* Fatal when called twice. */

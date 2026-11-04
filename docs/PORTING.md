@@ -276,7 +276,7 @@ checking every function):
 - **X2c, the on-disk types and readers** from X2b, one format at a time.
 - **X2d, the 28-bit pointers:** done; the packet links are offsets from an anchor on 64-bit (below).
 - **X2e, the casts:** each `(uint32_t)(uintptr_t)` reviewed: a real 32-bit value, an index, or a pointer that must
-  stay a pointer (started; below).
+  stay a pointer (done; below).
 - Then **X3**: the x86_64 build links and runs.
 
 ### X2a (done 2026-11-01): globals out of the blocks
@@ -434,7 +434,7 @@ files that link or walk packets use it (ngifpsx.c, zoverii.c, frontend.c, fronte
 32-bit builds are unchanged: the hook cases pass and the replays stay identical. Should the HUD / UI ever be
 reworked, give it a proper draw list instead of building on the PSX packet chains (PLAN.md, backlog).
 
-### X2e (started 2026-11-04): the casts
+### X2e (done 2026-11-04): the casts
 
 148 casts of a pointer to 32 bits (or back) outside src/data at the start. Each is a real 32-bit value (keep), an
 index, or a pointer the types should carry. `tools/width_audit.py` finds the places the compiler cannot see:
@@ -464,8 +464,30 @@ another, and function pointers kept at one address whose aliases disagree. On 32
   flag setters, zrwCreateWorld's result, the shape-kind query; the update register / unregister hooks
   (0x561470 / 0x561474: the node is a pointer, and the four globals holding nodes); the parameter-set hook's
   third argument; the primitive draws' matrix; gFxSceneObject, gZrollerUpdateHandle, the LOD free list.
-- **Left:** the texture handles (below), and the remaining casts (`(uint32_t)(uintptr_t)` down from 148 to
-  about 85; tools/width_audit.py reports 3, all texture handles).
+- **Second round:** the audit also compares each function pointer variable with the function src/data stores
+  in it. That found the model table (0x560e84..: generic `void *(void *, void *)` slots for functions taking
+  hashes and flag bytes; each slot now has its target's type, and the clump query no longer comes back through
+  an `int`), the parameter queries' third argument, the assert handler's function name, the light's position
+  op, the line query's exclusion list. Other pointers given their types: asset libraries (`ZassetLibrary *`
+  instead of an int handle), GUI message arguments (`intptr_t`, like WPARAM / LPARAM), zprimSet / zprimGet
+  values, light colour blocks, the child walk's argument, skeleton nodes (the actor's part rows, ZObjLinks),
+  the sphere query's result, the excluded-clump list, the engine's file device table, window and calloc slots,
+  the waveOut handles and callback (pointer-sized, as in WinMM's 64-bit API), the pad device's DirectInput
+  record, zprim's frame data address, the Im3D pipeline's stages, the world sector streams' world argument,
+  the image pixel addresses (offsets from the pixel pointer, wrapping at 32 bits as the original's do), the
+  jumps over our own functions (BmxHook.orig; the rel32 is range-checked), the frame-pacing tools' node ids,
+  printf's `%p`, the driver's trace arguments.
+- **Two real 64-bit bugs on the way:** the driver read the original's standards table (`{id, function}`
+  pairs, which src/data lays out with a pointer-sized function) as 32-bit word pairs, now a typed pair; and the
+  model table's clump query returned the clump through an `int`.
+- **Kept (a 32-bit value on purpose):** numbers passed in pointer parameters (render flags, the viewport word,
+  the mipmap switch, a sound's argument), the original's quirks that use a pointer's low bits as data (zrwColSearch's
+  split key, zsndseq's default argument bytes, the palette read's first value), debug prints of an address,
+  compat/pktlink.h and compat/slot32.h themselves, the RAM disk's 32-bit name, crash.c and trap.c (32-bit hook
+  build; trap.c's context fields are X3).
+- **Integers back into pointers:** the sweep the other way (a 32-bit word cast to a pointer) found the scene's
+  animation list freed through word offsets, the scene point's data word, the animation sequence's name; all read
+  through their types now. The texture handles: below.
 
 #### The texture handles
 
@@ -487,6 +509,18 @@ Options:
 
 Recommendation: 2, behind a pair of functions next to the material code (the handle of a material, the material
 of a handle) so the representation is decided in one place.
+
+Decision (2026-11-04, the user agreed): option 2, done. `zrwmatHandle` / `zrwmatFromHandle` (zrwmat.h) are the
+pair; on 64-bit the material remembers its handle in a field only that build has, and zrwmatReleaseTexture drops
+it with the last reference. The texture hooks (0x561024 free, 0x56103c clone, 0x561034 get raster, 0x561048
+load, the find / load by hash ones) take and return materials in every declaration; the words that hold them
+(zprim's frames, the shared table at 0x68c3e0 in all four of its views, the effect globals and parameter
+blocks, the 3D list's packets, the primitives, the shadow quads) hold handles, converted where they are made
+and where they are used. The skid animation's table is ours alone and holds materials. Found on the way: the
+overlay view of the 0x68c3e0 table kept a `void *` at +0x10, which made its entries 24 bytes on 64-bit inside
+a table of 20-byte entries; the effect skid search walked the prop definitions as 32-bit words.
+
+tools/width_audit.py reports nothing now, and the gate runs it (tools/check.sh, "pointer widths").
 
 
 ## Not in scope

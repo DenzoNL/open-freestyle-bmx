@@ -275,7 +275,7 @@ void *rpAnimInterpolatorInit(void *interpolator);
 void *rpAnimFrameInit(void *frame);
 __attribute__((regparm(1))) const char *rpAnimSequenceName(const void *sequence);
 uint32_t rpAnimSequenceType(const uint32_t *sequence);
-__attribute__((regparm(1))) int32_t rpAnimSequenceSize(const uint32_t *sequence);
+__attribute__((regparm(1))) int32_t rpAnimSequenceSize(const uint32_t *words);
 int32_t rpAnimFrameChunkSize(const void *frame);
 void *rpAnimClumpAddFrameSequence(void *sequence, void *clump);
 __attribute__((regparm(2))) void *rpAnimClumpAddFrameSequences(void *frame, void *clump);

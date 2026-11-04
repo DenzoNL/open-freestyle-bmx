@@ -15,11 +15,6 @@ enum {
     kDirectoryOffsetOld = 0xc,  /* header of 0x14 bytes without it */
 };
 
-static ZassetLibrary *libraryOf(int lib)
-{
-    return (ZassetLibrary *)(uintptr_t)lib;
-}
-
 /* Little endian fields of a directory entry. */
 static uint32_t entryField(const uint8_t *entry, unsigned index)
 {
@@ -33,7 +28,7 @@ static void failEmpty(int line)
 }
 
 BMX_ADDR(0x004804d0)
-int zassetOpenLibrary(const char *name)
+ZassetLibrary *zassetOpenLibrary(const char *name)
 {
     ZassetLibrary *lib;
     ZfileHandle *file;
@@ -83,7 +78,7 @@ int zassetOpenLibrary(const char *name)
         zfileOp30(file, headerOffset, 0, 0);
         if (zfileRead(file, lib->directory, (int)lib->directoryBytes, 0) == (int)lib->directoryBytes) {
             lib->cursor = lib->directory + 4;
-            return (int)(uintptr_t)lib;
+            return lib;
         }
         failure = "FAILED to load library directory\n";
     }
@@ -93,9 +88,8 @@ int zassetOpenLibrary(const char *name)
 }
 
 BMX_ADDR(0x004806c0)
-void zassetCloseLibrary(int libHandle)
+void zassetCloseLibrary(ZassetLibrary *lib)
 {
-    ZassetLibrary *lib = libraryOf(libHandle);
 
     gZdebugPrint("CLOSE LIBRARY: ");
     zfileClose(lib->file, 0);
@@ -108,15 +102,14 @@ void zassetCloseLibrary(int libHandle)
 }
 
 BMX_ADDR(0x00480720)
-int zassetCount(int lib)
+int zassetCount(ZassetLibrary *lib)
 {
-    return libraryOf(lib)->groups;
+    return lib->groups;
 }
 
 BMX_ADDR(0x00480730)
-int zassetNext(int libHandle)
+int zassetNext(ZassetLibrary *lib)
 {
-    ZassetLibrary *lib = libraryOf(libHandle);
     const uint32_t stride = (uint32_t)lib->entryBytes * lib->perGroup + 4;
     const int32_t group = (int32_t)(((uint32_t)(lib->cursor - lib->directory) - 4u) / stride) + 1;
 
@@ -128,9 +121,8 @@ int zassetNext(int libHandle)
 }
 
 BMX_ADDR(0x00480780)
-int zassetFind(int libHandle, int group, int asset)
+int zassetFind(ZassetLibrary *lib, int group, int asset)
 {
-    ZassetLibrary *lib = libraryOf(libHandle);
     uint32_t entryBytes, stride, left;
     const uint8_t *p;
 
@@ -161,9 +153,8 @@ int zassetFind(int libHandle, int group, int asset)
 }
 
 BMX_ADDR(0x00480450)
-void zassetDump(int libHandle)
+void zassetDump(ZassetLibrary *lib)
 {
-    ZassetLibrary *lib = libraryOf(libHandle);
     const uint8_t *p = lib->directory;
     const uint32_t stride = (uint32_t)lib->perGroup * (lib->stored != 0 ? 0xc : 8) + 4;
 
@@ -177,9 +168,8 @@ void zassetDump(int libHandle)
 }
 
 BMX_ADDR(0x00480850)
-uint32_t zassetSize(int libHandle)
+uint32_t zassetSize(ZassetLibrary *lib)
 {
-    ZassetLibrary *lib = libraryOf(libHandle);
     const uint8_t *entry = lib->cursor;
     int size = (int)(entryField(entry, 1) & 0xffffff);
 
@@ -204,9 +194,8 @@ uint32_t zassetSize(int libHandle)
 }
 
 BMX_ADDR(0x00480930)
-int zassetRead(int libHandle, void *dst)
+int zassetRead(ZassetLibrary *lib, void *dst)
 {
-    ZassetLibrary *lib = libraryOf(libHandle);
     const uint8_t *entry = lib->cursor;
     int ok = 1;
     int size;

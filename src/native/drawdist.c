@@ -30,7 +30,7 @@ const BmxHook *bmxDrawDistJumps(uint32_t *count)
 {
     const int on = bmxConfigOption("video.full_draw_distance", 1, 0) == 1;
 
-    gJumps[0].orig = (uint32_t)(uintptr_t)ngiffxAdaptQuality;
+    gJumps[0].orig = (uintptr_t)ngiffxAdaptQuality;
     gJumps[0].impl = (void *)fullDrawDistance;
     *count = on ? 1u : 0u;
     if (on) {

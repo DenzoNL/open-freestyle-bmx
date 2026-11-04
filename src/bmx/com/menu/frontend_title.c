@@ -39,7 +39,7 @@ static void autoloadSetSlotText(uint32_t id, int slot)
 }
 
 BMX_ADDR(0x0043f0c0)
-int BMX_CDECL autoloadScreenHook(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL autoloadScreenHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     if (msg != kGuiMsgTickAll) {
         return guiDefaultHookProc(msg, el, arg3, arg4);
@@ -150,7 +150,7 @@ void autoloadScreenInit(void)
 /* The "press start" screen: blinks the prompt; start moves on to the main menu, long idling to the attract
  * mode. */
 BMX_ADDR(0x0043f7a0)
-int BMX_CDECL pressStartHook(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL pressStartHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     if (msg == kGuiMsgTickAll) {
         gTitleIdle++;
@@ -268,7 +268,7 @@ static void mainMenuHideEntries(void)
 }
 
 BMX_ADDR(0x0043fb80)
-int BMX_CDECL mainMenuHook(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL mainMenuHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     switch (msg) {
     case kGuiMsgTickAll:
@@ -476,7 +476,7 @@ int mainMenuIdleExit(void)
 
 /* Hook of the blank screen: after a few frames asks for the transition with code 0. */
 BMX_ADDR(0x00440d80)
-int BMX_CDECL blankScreenHook(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL blankScreenHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     if (msg == kGuiMsgTickAll) {
         const int waited = gTitleDelay++;

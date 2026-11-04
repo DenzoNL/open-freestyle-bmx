@@ -436,7 +436,7 @@ static void setup_attach(DtCtx *c)
     begin(c, 0);
     gZrwSkipDevice = (int)(dt_u32() & 1);
     gZrwEngineInit = dt_u32();
-    gZrwEngineOpen = dt_u32();
+    gZrwEngineOpen = (void *)(uintptr_t)dt_u32();
     dt_stub(0x004d01f0, NULL, (void *)sEngineInit);
     dt_stub(0x004bc1c0, NULL, (void *)sWorldPlugin);
     dt_stub(0x00500250, NULL, (void *)sAnimPlugin);

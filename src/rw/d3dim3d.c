@@ -570,15 +570,15 @@ void rwD3DIm3DTransform(RwD3DIm3DWork *work)
 
 /* 0x4f6b80 (core extension entry 3): the driver's stages of a new Im3D pipeline. */
 BMX_ADDR(0x004f6b80)
-int rwD3DIm3DPipeline(uint32_t *pipeline)
+int rwD3DIm3DPipeline(RwIm3DPipeline *pipeline)
 {
     if (pipeline == NULL) {
         return 0;
     }
-    pipeline[0] = (uint32_t)(uintptr_t)D3D_FN(void *, 0x004f6a50, rwD3DIm3DInstance);
-    pipeline[2] = (uint32_t)(uintptr_t)D3D_FN(void *, 0x004f6b00, rwD3DIm3DNothing);
-    pipeline[5] = (uint32_t)(uintptr_t)D3D_FN(void *, 0x004f6b10, rwD3DIm3DColors);
-    pipeline[6] = (uint32_t)(uintptr_t)D3D_FN(void *, 0x004f6b70, rwD3DIm3DNothing6);
+    pipeline->instance = D3D_FN(void *(BMX_CDECL *)(RwIm3DTransformInfo *), 0x004f6a50, rwD3DIm3DInstance);
+    pipeline->stage2 = D3D_FN(void(BMX_CDECL *)(void *), 0x004f6b00, rwD3DIm3DNothing);
+    pipeline->stage5 = D3D_FN(void(BMX_CDECL *)(void *), 0x004f6b10, rwD3DIm3DColors);
+    pipeline->stage6 = D3D_FN(void(BMX_CDECL *)(void *), 0x004f6b70, rwD3DIm3DNothing6);
     return 1;
 }
 

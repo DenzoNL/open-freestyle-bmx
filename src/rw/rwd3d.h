@@ -456,7 +456,7 @@ void rwD3DIm3DNothing(RwD3DIm3DWork *work);
 void rwD3DIm3DNothing6(RwD3DIm3DWork *work);
 void rwD3DIm3DColors(RwD3DIm3DWork *work);
 void rwD3DIm3DTransform(RwD3DIm3DWork *work);
-int rwD3DIm3DPipeline(uint32_t *pipeline);
+int rwD3DIm3DPipeline(RwIm3DPipeline *pipeline);
 int rwD3DTriCullPersp(int32_t a, int32_t b, int32_t c);
 int rwD3DClipTriCullPersp(int32_t a, int32_t b, int32_t c);
 int rwD3DTriCullParallel(int32_t a, int32_t b, int32_t c);

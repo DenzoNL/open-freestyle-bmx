@@ -174,7 +174,7 @@ typedef void(BMX_CDECL *ZglNopFn)(void);
 #define gZglExitTexture     ORIG_VAR(0x005623f4, ZglInitFn, gZglExitTexture)
 #define gZglRenderStateHook ORIG_VAR(0x00561490, ZglRenderStateFn, gZglRenderStateHook)
 #define gZglAllocHookNop    ORIG_VAR(0x005614ac, ZglNopFn, gZglAllocHookNop)
-#define gZglMemoryFuncs     ORIG_VAR(0x005614a8, uint32_t, gZglMemoryFuncs)
+#define gZglMemoryFuncs     ORIG_VAR(0x005614a8, void *, gZglMemoryFuncs)
 
 BMX_ADDR(0x0048c110)
 void zrwListInit(ZrwList *list)
@@ -260,18 +260,16 @@ void zrwDebugOutput(const char *text)
 }
 
 BMX_ADDR(0x0048a940)
-int zrwFileSystemsInitialize(void *table)
+int zrwFileSystemsInitialize(ZfileDeviceTable *table)
 {
-    uint32_t *words = table;
-
     if (zrwFileInitialize() == 1) {
         if (zramdiskInitialize() != 1) {
             zrwFileShutdown();
             return 0;
         }
-        words[0] = 2;
-        words[1] = (uint32_t)(uintptr_t)&gZglFileDeviceRw;
-        words[2] = (uint32_t)(uintptr_t)&gZglFileDeviceRam;
+        table->count = 2;
+        table->device[0] = (ZfileDevice *)&gZglFileDeviceRw;
+        table->device[1] = (ZfileDevice *)&gZglFileDeviceRam;
     }
     return 1;
 }
@@ -399,7 +397,7 @@ int zrwGetParameter(int id, void *out, const void *extra)
         *f = (float)((double)gZrwScale * *(const float *)extra);
         return 1;
     case 0x15:
-        *(uint32_t *)out = (uint32_t)(uintptr_t)&gZrwWindow;
+        *(void **)out = (void *)&gZrwWindow;
         return 1;
     default:
         zdebugFail(zstrFormatTemp(kUnknownParameter, id), kZglFile, 0x171, 0);
@@ -563,8 +561,8 @@ int zrwAttachPlugins(void *window)
         zrwApplicationError("zrwMdlRegisterPlugin failed");
         return 0;
     }
-    gZrwEngineOpen = (uint32_t)(uintptr_t)window;
-    RwEngineOpen(&gZrwEngineOpen);
+    gZrwEngineOpen = window;
+    RwEngineOpen((void *)&gZrwEngineOpen);
     if (gZrwSkipDevice == 0) {
         if (zrwSelectDevice() == 0) {
             return 0;
@@ -625,7 +623,7 @@ int zrwInitApp(const char *commandLine)
     gRwMalloc = (ZMemAllocFn)(uintptr_t)RwOsGetMemoryInterface()->rwmalloc;
     gRwFree = (ZMemFreeFn)(uintptr_t)RwOsGetMemoryInterface()->rwfree;
     gRwRealloc = (ZMemReallocFn)(uintptr_t)RwOsGetMemoryInterface()->rwrealloc;
-    gZglMemoryFuncs = (uint32_t)(uintptr_t)RwOsGetMemoryInterface()->rwcalloc;
+    gZglMemoryFuncs = (void *)(uintptr_t)RwOsGetMemoryInterface()->rwcalloc; /* a function */
     gZglAllocHookNop = BMX_FNPTR(ZglNopFn, 0x0048af80, zrwNop);
     if (commandLine != NULL) {
         while (*commandLine != '\0') {

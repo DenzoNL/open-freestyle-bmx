@@ -188,17 +188,19 @@ typedef struct ZrwModelState {
 /* Entry points the model object dispatches through (0x560e94..). Their original targets are in this file. */
 typedef int(BMX_CDECL *ZrwModelCall)(void *model);
 typedef int(BMX_CDECL *ZrwModelCall2)(void *model, const void *arg);
-typedef void *(BMX_CDECL *ZrwModelLookup)(void *model, const void *key);
+typedef void *(BMX_CDECL *ZrwModelLookup)(void *model, const uint32_t *key);
+typedef uint32_t(BMX_CDECL *ZrwModelKeyFn)(void *model, const uint32_t *key);
+typedef void *(BMX_CDECL *ZrwModelClumpFn)(void *model);
 typedef int(BMX_CDECL *ZrwModelFlagsFn)(void *model, int clear, int set);
 #define gZrwVtDestroy  ORIG_VAR(0x00560e94, ZrwModelCall, gZrwVtDestroy)
 #define gZrwVtUpdate   ORIG_VAR(0x00560e98, ZrwModelCall, gZrwVtUpdate)
 #define gZrwVtSetPos   ORIG_VAR(0x00560e9c, ZrwModelCall2, gZrwVtSetPos)
 #define gZrwVtSetRot   ORIG_VAR(0x00560ea0, ZrwModelCall2, gZrwVtSetRot)
 #define gZrwVtSetScale ORIG_VAR(0x00560ea4, ZrwModelCall2, gZrwVtSetScale)
-#define gZrwVtKey      ORIG_VAR(0x00560ec0, ZrwModelLookup, gZrwVtKey)
+#define gZrwVtKey      ORIG_VAR(0x00560ec0, ZrwModelKeyFn, gZrwVtKey)
 #define gZrwVtEntry    ORIG_VAR(0x00560ec4, ZrwModelLookup, gZrwVtEntry)
 #define gZrwVtSetFlags ORIG_VAR(0x00560ed8, ZrwModelFlagsFn, gZrwVtSetFlags)
-#define gZrwVtClump    ORIG_VAR(0x00560ee4, ZrwModelCall, gZrwVtClump)
+#define gZrwVtClump    ORIG_VAR(0x00560ee4, ZrwModelClumpFn, gZrwVtClump)
 #define gZrwVtMatCount ORIG_VAR(0x00560eec, ZrwModelCall, gZrwVtMatCount)
 
 /* Material and texture accessors of the renderer (zrwmat.c, zrwtxr.c), called through pointers in the exe's

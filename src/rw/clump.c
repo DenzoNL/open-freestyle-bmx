@@ -1258,8 +1258,10 @@ RpGeometry *RpGeometryStreamRead(RwStream *stream)
         const int32_t hasVerts = ((const int32_t *)raw)[4];
         const int32_t hasNormals = ((const int32_t *)raw)[5];
         const uint32_t numVerts = (uint32_t)geometry->numVertices;
+        /* bytes from the vertices to the normals, modulo 2^32 as the original computes it (normals may be
+         * NULL) */
         const int32_t span =
-            (int32_t)((uint32_t)(uintptr_t)morphTarget->normals - (uint32_t)(uintptr_t)morphTarget->verts);
+            (int32_t)(uint32_t)((uintptr_t)morphTarget->normals - (uintptr_t)morphTarget->verts);
         if (hasVerts != 0 && hasNormals != 0 && span / 12 == (int32_t)numVerts) {
             if (RwStreamReadReal(stream, morphTarget->verts, numVerts * 24) == NULL) {
                 RpGeometryDestroy(geometry);
@@ -2407,7 +2409,7 @@ RpWorld *_rpWorldGenerateSectorMeshes(RpWorld *world)
 
 /* Bytes of a sector's vertex and triangle data for the given format flags. */
 BMX_ADDR(0x004c2c50)
-__attribute__((regparm(3))) int32_t rpSectorDataSize(const RpWorldSector *sector, int32_t unused,
+__attribute__((regparm(3))) int32_t rpSectorDataSize(const RpWorldSector *sector, const void *unused,
                                                      uint32_t flags)
 {
     (void)unused;
@@ -2432,7 +2434,7 @@ __attribute__((regparm(3))) int32_t rpSectorDataSize(const RpWorldSector *sector
 
 /* Bytes of a sector chunk: its data plus its plugin data. */
 BMX_ADDR(0x004c2ca0)
-__attribute__((regparm(3))) int32_t rpSectorStreamGetSize(const RpWorldSector *sector, int32_t unused,
+__attribute__((regparm(3))) int32_t rpSectorStreamGetSize(const RpWorldSector *sector, const void *unused,
                                                           uint32_t flags)
 {
     const int32_t data = rpSectorDataSize(sector, unused, flags);
@@ -2441,7 +2443,7 @@ __attribute__((regparm(3))) int32_t rpSectorStreamGetSize(const RpWorldSector *s
 
 /* Bytes of the tree of plane and sector chunks below a plane node. */
 BMX_ADDR(0x004c3490)
-__attribute__((regparm(3))) int32_t rpBspStreamGetSize(const RpPlaneSector *node, int32_t unused,
+__attribute__((regparm(3))) int32_t rpBspStreamGetSize(const RpPlaneSector *node, const void *unused,
                                                        uint32_t flags)
 {
     int32_t size;
@@ -2460,7 +2462,7 @@ __attribute__((regparm(3))) int32_t rpBspStreamGetSize(const RpPlaneSector *node
 /* Writes a sector chunk (EAX = sector, EDX = stream; the flags are the fourth stack slot). */
 BMX_ADDR(0x004c2cd0)
 __attribute__((regparm(3))) RpWorldSector *rpSectorStreamWrite(const RpWorldSector *sector, RwStream *stream,
-                                                               int32_t unused, int32_t pad0, int32_t pad1,
+                                                               const void *unused, int32_t pad0, int32_t pad1,
                                                                int32_t pad2, uint32_t flags)
 {
     (void)pad0;
@@ -2531,7 +2533,7 @@ __attribute__((regparm(3))) RpWorldSector *rpSectorStreamWrite(const RpWorldSect
 /* Writes a plane node chunk and, recursively, its two children (EAX = node, EDX = stream, ECX = world). */
 BMX_ADDR(0x004c34f0)
 __attribute__((regparm(3))) RpPlaneSector *rpBspStreamWrite(const RpPlaneSector *node, RwStream *stream,
-                                                            int32_t world, int32_t pad0, int32_t pad1,
+                                                            const void *world, int32_t pad0, int32_t pad1,
                                                             int32_t pad2, uint32_t flags)
 {
     (void)pad0;
@@ -2588,7 +2590,7 @@ static void *worldCursorTake(uint8_t **cursor, uint32_t size, int *failed)
 /* Reads a sector chunk into the world's memory block (EAX = stream, EDX = block cursor, ECX = world). */
 BMX_ADDR(0x004c2f50)
 __attribute__((regparm(3))) RpWorldSector *rpSectorStreamRead(RwStream *stream, uint8_t **cursor,
-                                                              int32_t world, int32_t pad0, int32_t pad1,
+                                                              const void *world, int32_t pad0, int32_t pad1,
                                                               int32_t pad2, uint32_t flags)
 {
     (void)world;
@@ -2725,9 +2727,9 @@ __attribute__((regparm(3))) RpWorldSector *rpSectorStreamRead(RwStream *stream, 
 
 /* Reads a plane chunk and, recursively, its children (EAX = stream, EDX = block cursor, ECX = world). */
 BMX_ADDR(0x004c36a0)
-__attribute__((regparm(3))) RpPlaneSector *rpBspStreamRead(RwStream *stream, uint8_t **cursor, int32_t world,
-                                                           int32_t pad0, int32_t pad1, int32_t pad2,
-                                                           uint32_t flags)
+__attribute__((regparm(3))) RpPlaneSector *rpBspStreamRead(RwStream *stream, uint8_t **cursor,
+                                                           const void *world, int32_t pad0, int32_t pad1,
+                                                           int32_t pad2, uint32_t flags)
 {
     (void)pad0;
     (void)pad1;
@@ -2822,12 +2824,11 @@ RpWorld *RpWorldStreamWrite(RpWorld *world, RwStream *stream)
     const int32_t materialsSize = _rpMaterialListStreamGetSize(&world->matList);
     int32_t size;
     if (world->rootSector->type < 0) {
-        size =
-            rpSectorStreamGetSize((const RpWorldSector *)world->rootSector, (int32_t)(intptr_t)world, flags) +
-            0x58 + materialsSize;
+        size = rpSectorStreamGetSize((const RpWorldSector *)world->rootSector, world, flags) + 0x58 +
+               materialsSize;
     } else {
-        size = rpBspStreamGetSize((const RpPlaneSector *)world->rootSector, (int32_t)(intptr_t)world, flags) +
-               0x58 + materialsSize;
+        size =
+            rpBspStreamGetSize((const RpPlaneSector *)world->rootSector, world, flags) + 0x58 + materialsSize;
     }
     const int32_t plugins = _rwPluginRegistryGetSize(&rpWorldRegistry, world);
     if (_rwStreamWriteVersionedChunkHeader(stream, 0xb, plugins + 0xc + size, 0x303) == NULL ||
@@ -2886,11 +2887,10 @@ RpWorld *RpWorldStreamWrite(RpWorld *world, RwStream *stream)
     }
     const void *written;
     if (world->rootSector->type < 0) {
-        written = rpSectorStreamWrite((const RpWorldSector *)world->rootSector, stream,
-                                      (int32_t)(intptr_t)world, 0, 0, 0, flags);
+        written =
+            rpSectorStreamWrite((const RpWorldSector *)world->rootSector, stream, world, 0, 0, 0, flags);
     } else {
-        written = rpBspStreamWrite((const RpPlaneSector *)world->rootSector, stream, (int32_t)(intptr_t)world,
-                                   0, 0, 0, flags);
+        written = rpBspStreamWrite((const RpPlaneSector *)world->rootSector, stream, world, 0, 0, 0, flags);
     }
     if (written == NULL || _rwPluginRegistryWriteDataChunks(&rpWorldRegistry, stream, world) == NULL) {
         return NULL;
@@ -2989,8 +2989,7 @@ RpWorld *RpWorldStreamRead(RwStream *stream)
             rpReport(rwERR_BADVERSION);
             return NULL;
         }
-        world->rootSector =
-            (RpSector *)rpBspStreamRead(stream, &cursor, (int32_t)(intptr_t)world, 0, 0, 0, format);
+        world->rootSector = (RpSector *)rpBspStreamRead(stream, &cursor, world, 0, 0, 0, format);
     } else {
         if (RwStreamFindChunk(stream, 9, NULL, &version) == 0) {
             rpWorldUnregister(world);
@@ -3001,8 +3000,7 @@ RpWorld *RpWorldStreamRead(RwStream *stream)
             rpReport(rwERR_BADVERSION);
             return NULL;
         }
-        world->rootSector =
-            (RpSector *)rpSectorStreamRead(stream, &cursor, (int32_t)(intptr_t)world, 0, 0, 0, format);
+        world->rootSector = (RpSector *)rpSectorStreamRead(stream, &cursor, world, 0, 0, 0, format);
     }
     if (world->rootSector == NULL) {
         rpWorldUnregister(world);

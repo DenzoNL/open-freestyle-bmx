@@ -30,11 +30,11 @@ GuiElement *guiCreateElement(int16_t type, int16_t order, uint32_t id);
 void guiDestroyElement(GuiElement *element);
 
 /* Messaging. */
-int guiSend(int msg, GuiElement *element, int arg3, int arg4);
+int guiSend(int msg, GuiElement *element, intptr_t arg3, intptr_t arg4);
 int guiSendById(int msg, uint32_t id, int arg3, int arg4);
-int guiBroadcast(int msg, GuiElement *element, int arg3, int arg4);
+int guiBroadcast(int msg, GuiElement *element, intptr_t arg3, intptr_t arg4);
 int guiPostToVisible(int msg, int arg2, int arg3);
-int BMX_CDECL guiDefaultHookProc(int msg, GuiElement *element, int arg3, int arg4);
+int BMX_CDECL guiDefaultHookProc(int msg, GuiElement *element, intptr_t arg3, intptr_t arg4);
 void guiFocusById(uint32_t id);
 
 /* Element setters and getters. */
@@ -81,8 +81,8 @@ void guiSetTint(GuiElement *el, uint8_t r, uint8_t g, uint8_t b, uint32_t alpha)
 const char *guiResolveText(const char *text);
 
 /* Rectangle/line (type 7) and box (type 8) elements: two corner points. */
-int BMX_CDECL guiRectProc(int msg, GuiElement *el, int arg3, int arg4);
-int BMX_CDECL guiBoxProc(int msg, GuiElement *el, int arg3, int arg4);
+int BMX_CDECL guiRectProc(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4);
+int BMX_CDECL guiBoxProc(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4);
 void guiLineSetStart(GuiElement *el, int16_t x, int16_t y);
 void guiLineSetEnd(GuiElement *el, int16_t x, int16_t y);
 void guiLineGetX(const GuiElement *el, int16_t *x0, int16_t *x1);

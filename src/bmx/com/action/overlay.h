@@ -201,7 +201,7 @@ typedef uint32_t OvlSize2[2];
 #define gOvlBackdropRect ORIG_VAR(0x0056bef8, uint16_t, gOvlBackdropRect)
 #define gOvlWarnLevel    ORIG_VAR(0x0056b617, uint8_t, gOvlWarnLevel)
 #define gOvlStrings      ORIG_VAR(0x0056be34, OvlStringSets, gOvlStrings)
-#define gOvlLibrary      ORIG_VAR(0x00678490, int32_t, gOvlLibrary)
+#define gOvlLibrary      ORIG_VAR(0x00678490, struct ZassetLibrary *, gOvlLibrary)
 #define gOvlEmpty        ORIG_VAR(0x0056bd44, OvlText4, gOvlEmpty) /* "" */
 
 /* Game state read by the overlay. */

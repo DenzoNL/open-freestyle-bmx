@@ -20,9 +20,9 @@ int zobjLightDestroy(ZObjLight *light)
 }
 
 BMX_ADDR(0x0048ff70)
-int zobjLightSetParam(ZObjLight *light, uint32_t param)
+int zobjLightSetParam(ZObjLight *light, const ZVec3 *position)
 {
-    gZrwLightSetParam(light->handle, param);
+    gZrwLightSetParam(light->handle, position);
     return 1;
 }
 
@@ -48,7 +48,7 @@ int zobjLightInitialize(void)
 }
 
 BMX_ADDR(0x00490010)
-void *zobjLightCreate(int type, int param)
+void *zobjLightCreate(int type, const uint8_t *rgba)
 {
     ZObjLight *light = zobjAlloc();
 
@@ -58,7 +58,7 @@ void *zobjLightCreate(int type, int param)
     zobjInit(light, 1);
     light->ops = (const void *)&gZobjLightOps;
     if ((uint32_t)type <= 3) {
-        light->handle = gZrwLightCreate(type, param);
+        light->handle = gZrwLightCreate(type, rgba);
         return light;
     }
     zdebugFail("Unknown type", kZobjLightFile, 0xda, 0);

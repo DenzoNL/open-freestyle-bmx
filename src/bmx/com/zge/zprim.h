@@ -98,7 +98,7 @@ typedef struct ZPrimFrame {
     int32_t pixelOffset; /* 0x04 */
     uint16_t originX;    /* 0x08 subtracted from the draw position (not for compressed sets) */
     uint16_t originY;    /* 0x0a */
-    int32_t texture;     /* 0x0c renderer texture handle, 0 = none */
+    int32_t texture;     /* 0x0c the material's handle (zrwmatHandle), 0 = none */
 } ZPrimFrame;
 
 typedef struct ZPrimSet {
@@ -172,7 +172,7 @@ typedef struct ZPrimRect {
 typedef ZPrimAsset *ZPrimGroupTable[4];
 
 #define gZprimHandle  ORIG_VAR(0x006783fc, int32_t, gZprimHandle)
-#define gZprimLibrary ORIG_VAR(0x00678400, int32_t, gZprimLibrary)
+#define gZprimLibrary ORIG_VAR(0x00678400, struct ZassetLibrary *, gZprimLibrary)
 #define gZprimPool    ORIG_VAR(0x00678404, ZPrimAsset *, gZprimPool)
 #define gZprimFree    ORIG_VAR(0x00678408, ZPrimAsset *, gZprimFree)
 #define gZprimUsed    ORIG_VAR(0x0067840c, ZPrimAsset *, gZprimUsed)
@@ -183,10 +183,12 @@ typedef ZPrimAsset *ZPrimGroupTable[4];
 /* Locked state array while some zprim call has it open, else NULL. */
 #define gZprimStates ORIG_VAR(0x00678430, ZPrimState *, gZprimStates)
 
+struct ZrwMaterial;
 /* Renderer texture entry points the exe stores in data (0x561024, 0x56103c, 0x561048). */
-typedef void(BMX_CDECL *ZRwTextureFreeFn)(int32_t texture);
-typedef int32_t(BMX_CDECL *ZRwTextureCloneFn)(int32_t texture);
-typedef int32_t(BMX_CDECL *ZRwTextureLoadFn)(const void *bmp, uint32_t size, const char *name, int a, int b);
+typedef void(BMX_CDECL *ZRwTextureFreeFn)(struct ZrwMaterial *material);
+typedef struct ZrwMaterial *(BMX_CDECL *ZRwTextureCloneFn)(struct ZrwMaterial *material);
+typedef struct ZrwMaterial *(BMX_CDECL *ZRwTextureLoadFn)(const void *bmp, uint32_t size, const char *name,
+                                                          int a, int b);
 #define gRwTextureFree  ORIG_VAR(0x00561024, ZRwTextureFreeFn, gRwTextureFree)
 #define gRwTextureClone ORIG_VAR(0x0056103c, ZRwTextureCloneFn, gRwTextureClone)
 #define gRwTextureLoad  ORIG_VAR(0x00561048, ZRwTextureLoadFn, gRwTextureLoad)
@@ -206,8 +208,8 @@ void zprimStateSave(void);
 void zprimStateRestore(void);
 void zprimStatePush(void);
 void zprimStatePop(void);
-void zprimSet(uint16_t prop, int value);
-uint32_t zprimGet(uint16_t prop);
+void zprimSet(uint16_t prop, intptr_t arg);
+uintptr_t zprimGet(uint16_t prop);
 void zprimSetScreen(ZPrimAsset *asset);
 void zprimSetSource(ZPrimAsset *asset, int16_t type, uint16_t arg6, uint16_t arg8, uint16_t arg10);
 void zprimSetFont(ZPrimAsset *font);
@@ -251,7 +253,7 @@ uint16_t zprimSpriteFrameWidth(ZPrimAsset *asset, uint16_t index);
 uint16_t zprimSpriteFrameHeight(ZPrimAsset *asset, uint16_t index);
 uint16_t zprimSpriteFrameCount(ZPrimAsset *asset);
 void zprimDecompress(const ZPrimAsset *src, uint16_t srcFrame, const ZPrimAsset *dst, uint16_t dstFrame);
-int zprimSpriteFrameData(const uint16_t *set, uint16_t frame);
+const uint8_t *zprimSpriteFrameData(const uint16_t *set, uint16_t frame);
 int zprimRleDecode(const uint8_t *src, uint8_t *dst);
 ZPrimAsset *zprimLoadFont(uint32_t id, int keep);
 void zprimFreeFont(ZPrimAsset *a);

@@ -86,7 +86,7 @@ ORIG_FN(0x00493060, void *, zrwcamHandle, (void *camera));
 ORIG_FN(0x00497620, int, zrwtxrFlush, (void));
 
 /* The screen shake's update node (ngifpsxUpdate) as its registration stores it; the effect objects' ops. */
-#define kShakeNode ((uint32_t)(uintptr_t)BMX_FNPTR(void *, 0x00401a4b, ngifpsxUpdate))
+#define kShakeNode ((uintptr_t)BMX_FNPTR(void *, 0x00401a4b, ngifpsxUpdate))
 #define kEffectOps ((const ZObjOps *)BMX_ORIG(0x00562098))
 enum {
     kSim,
@@ -126,7 +126,7 @@ typedef struct Hashes {
 enum { kMaxWhere = 48 };
 static int gLevel;
 static uint32_t gTicks, gDraws;
-static uint32_t gWhere[kMaxWhere];
+static uintptr_t gWhere[kMaxWhere]; /* a step (an index into kStepName) or a node's function */
 static uint32_t gChanges[kSubs][kMaxWhere];
 static uint32_t gFirstTick[kSubs][kMaxWhere];
 static int gWheres;
@@ -327,7 +327,7 @@ static void hashAll(Hashes *out)
     out->h[kLightFrame] = fnv(seed, &RwEngineInstance->lightFrame, 2);
 }
 
-static int whereSlot(uint32_t where)
+static int whereSlot(uintptr_t where)
 {
     for (int i = 0; i < gWheres; i++) {
         if (gWhere[i] == where) {
@@ -342,7 +342,7 @@ static int whereSlot(uint32_t where)
 }
 
 /* Hashes the state and counts every sub-hash that differs from the last checkpoint against `where`. */
-static void checkpoint(uint32_t where)
+static void checkpoint(uintptr_t where)
 {
     Hashes now;
 
@@ -359,12 +359,12 @@ static void checkpoint(uint32_t where)
     gLast = now;
 }
 
-static void whereName(char *out, size_t size, uint32_t where)
+static void whereName(char *out, size_t size, uintptr_t where)
 {
     if (where < sizeof kStepName / sizeof kStepName[0]) {
         snprintf(out, size, "%s", kStepName[where]);
     } else {
-        snprintf(out, size, "node %08x", (unsigned)where);
+        snprintf(out, size, "node %p", (void *)where);
     }
 }
 
@@ -372,7 +372,7 @@ static void runList(int index, int second)
 {
     for (GuardNode *node = gLists[index].head; node != NULL;) {
         GuardNode *const next = node->next;
-        const uint32_t fn = (uint32_t)(uintptr_t)node->fn;
+        const uintptr_t fn = (uintptr_t)node->fn;
 
         if (!(second && fn == kShakeNode)) {
             const int ok = node->fn(node->arg);

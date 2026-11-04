@@ -74,7 +74,7 @@ typedef struct ZMovie {
     int32_t sampleSize;                       /* 0x224 bytes per sample */
     uint16_t samplesPerSecLow;                /* 0x228 */
     uint16_t avgBytesPerSecLow;               /* 0x22a */
-    uint32_t waveOut;                         /* 0x22c HWAVEOUT, 0 when closed */
+    uintptr_t waveOut;                        /* 0x22c HWAVEOUT, 0 when closed */
     uint16_t bufferCount;                     /* 0x230 prepared buffers */
     uint16_t queued;                          /* 0x232 buffers handed to the device */
     uint16_t head;                            /* 0x234 next buffer to fill */
@@ -98,11 +98,11 @@ BMX_LAYOUT32_ASSERT(sizeof(ZMovie) == 0x28c, "movie layout");
 void zmovieInit(ZMovie *movie);
 void zmovieShutdown(ZMovie *movie);
 /* Opens the waveOut device for the audio stream and prepares the buffers; 1 when audio is ready. */
-int zmovieOpenAudio(ZMovie *movie, uint32_t callback);
+int zmovieOpenAudio(ZMovie *movie, uintptr_t callback);
 /* Reads audio into free buffers and queues them. Returns 0 on a read or device error. */
 int zmovieFillAudio(ZMovie *movie);
 /* Starts the audio at the current position (opening the device first). */
-int zmovieStartAudio(ZMovie *movie, uint32_t callback);
+int zmovieStartAudio(ZMovie *movie, uintptr_t callback);
 /* Collects the time span and the video/audio streams of an opened file. */
 void zmovieScanStreams(ZMovie *movie);
 int zmovieOpen(ZMovie *movie, const char *path);

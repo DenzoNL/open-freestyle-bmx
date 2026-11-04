@@ -94,7 +94,7 @@ static ZObjLinks *newLinks(ZObj *parent, uint32_t part, ZObj *next, ZObj *firstC
 {
     ZObjLinks *l = dt_alloc(sizeof *l);
     l->parent = parent;
-    l->partId = part;
+    l->partId = (void *)(uintptr_t)part;
     l->next = next;
     l->firstChild = firstChild;
     return l;

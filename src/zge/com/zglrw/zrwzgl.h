@@ -7,6 +7,7 @@
 #include <stdint.h>
 
 #include "compat/orig.h"
+#include "zge/zfile.h"
 #include "zge/zmem.h"
 
 /* Intrusive doubly linked list: nodes start with { next, prev } pointers. */
@@ -52,9 +53,10 @@ typedef ZrwStateEntry ZrwStateStack[kZrwStateStackSize];
 #define gZrwStateDepth  ORIG_VAR(0x006727f4, int, gZrwStateDepth)
 #define gZrwNodePool    ORIG_VAR(0x006727f8, ZMemFreeList *, gZrwNodePool)
 #define gZrwSkipDevice  ORIG_VAR(0x006727fc, int, gZrwSkipDevice)
-#define gZrwEngineOpen  ORIG_VAR(0x00672800, uint32_t, gZrwEngineOpen)
-#define gZrwEngineInit  ORIG_VAR(0x00672804, uint32_t, gZrwEngineInit)
-#define gZrwArgBuffer   ORIG_VAR(0x00672808, char, gZrwArgBuffer)
+#define gZrwEngineOpen                                                                                       \
+    ORIG_VAR(0x00672800, void *, gZrwEngineOpen) /* RwEngineOpen's parameters: the window */
+#define gZrwEngineInit ORIG_VAR(0x00672804, uint32_t, gZrwEngineInit)
+#define gZrwArgBuffer  ORIG_VAR(0x00672808, char, gZrwArgBuffer)
 
 #define gZrwRaster       ORIG_VAR(0x006976c0, void *, gZrwRaster)
 #define gZrwDebugLight   ORIG_VAR(0x006976c8, void *, gZrwDebugLight)
@@ -101,7 +103,7 @@ void zrwPrintMaterialUsage(void);
 uint32_t zrwTimeGetTime(void);
 void zrwDebugOutput(const char *text);
 /* Registers the platform file devices into a ZfileDeviceTable (count, then device pointers); 0 on failure. */
-int zrwFileSystemsInitialize(void *table);
+int zrwFileSystemsInitialize(ZfileDeviceTable *table);
 int zrwReturnZero(void);
 /* Sets a renderer parameter; 0 for an unknown id. */
 int zrwSetParameter(int id, const void *value, const void *extra);

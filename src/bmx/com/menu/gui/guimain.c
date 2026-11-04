@@ -350,7 +350,7 @@ int guiUpdate(void)
         guiLoadScreen();
     }
     if (gGuiScreen.backdrop != NULL) {
-        zprimSet(1, (int)(intptr_t)gGuiScreen.backdrop);
+        zprimSet(1, (intptr_t)gGuiScreen.backdrop);
     } else {
         zprimSet(4, 0);
     }

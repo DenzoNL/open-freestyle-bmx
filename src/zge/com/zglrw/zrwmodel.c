@@ -720,13 +720,13 @@ int zrwObjSetShown(void *object, int shown)
 BMX_ADDR(0x00488e20)
 uint32_t zrwObjEntryKey(void *object)
 {
-    return (uint32_t)(uintptr_t)gZrwVtKey(((const ZObj *)object)->model, NULL);
+    return gZrwVtKey(((const ZObj *)object)->model, NULL);
 }
 
 BMX_ADDR(0x00488e40)
 void *zrwObjClump(void *object)
 {
-    return (void *)(uintptr_t)gZrwVtClump(((const ZObj *)object)->model);
+    return gZrwVtClump(((const ZObj *)object)->model);
 }
 
 BMX_ADDR(0x00488e60)

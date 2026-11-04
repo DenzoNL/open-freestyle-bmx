@@ -53,6 +53,12 @@ typedef struct ZrwColHit {
 } ZrwColHit;
 
 BMX_LAYOUT32_ASSERT(sizeof(ZrwColHit) == 0x4c, "collision hit");
+
+/* What a sphere query hands back: its hit records (in gZrwCol's buffer) and how many. */
+typedef struct ZrwColSphereResult {
+    ZrwColHit *hits;
+    uint32_t count;
+} ZrwColSphereResult;
 _Static_assert(offsetof(ZrwColHit, distance) == 0x40, "collision hit");
 
 /* Result of the line query (0x58 bytes): the nearest hit and the point where the line meets it. */
@@ -121,26 +127,29 @@ ZrwColTriangle *zrwcolKeepNearest(void *arg, ZrwColTriangle *triangle, float dis
  * zrwModelSetCollision; the ids to skip are clump pointers), then enumerate the atomic's triangles with the
  * callback.
  */
-RpAtomic *zrwcolFilterNearest(void *arg, void *unused, RpAtomic *atomic, void *unused2, const int *excluded);
-RpAtomic *zrwcolFilterRecord(void *arg, void *unused, RpAtomic *atomic, void *unused2, const int *excluded);
+RpAtomic *zrwcolFilterNearest(void *arg, void *unused, RpAtomic *atomic, void *unused2,
+                              void *const *excluded);
+RpAtomic *zrwcolFilterRecord(void *arg, void *unused, RpAtomic *atomic, void *unused2, void *const *excluded);
 /* Appends a hit record for a triangle of the world (atomic NULL) or of an atomic. */
 ZrwColTriangle *zrwcolRecordHit(void *arg, const RpWorldSector *sector, ZrwColTriangle *triangle,
                                 float distance, RpAtomic *atomic);
 ZrwColTriangle *zrwcolRecordObjectHit(void *arg, ZrwColTriangle *triangle, float distance, RpAtomic *atomic);
 /* Sphere query: 1 and the hit buffer and count in out[0], out[1] when something was hit. */
-int zrwcolQuerySphere(const float *center, float radius, uint32_t flags, const int *excluded, uint32_t *out);
+int zrwcolQuerySphere(const float *center, float radius, uint32_t flags, void *const *excluded,
+                      ZrwColSphereResult *out);
 /* Sets gZrwColEnabled when the tag tables initialise; returns whether they did. */
 int zrwcolEnableIfTagInfo(void);
 /* Line and sphere tests through the function pointers at 0x562068 / 0x56206c. */
-int zrwcolLineTest(const float *a, const float *b, int mode, int flags, float *out);
-int zrwcolSphereTest(const float *center, float radius, uint32_t flags, const int *excluded, uint32_t *out);
+int zrwcolLineTest(const float *a, const float *b, int mode, void *const *excluded, float *out);
+int zrwcolSphereTest(const float *center, float radius, uint32_t flags, void *const *excluded,
+                     ZrwColSphereResult *out);
 
 /*
  * Line query (held by the pointer at 0x562068): 1 and the nearest hit in *out when the line from `from` to
  * `to` hits the world (flags bit 0) or objects (bits 1, 2; bit 3 skips the `excluded` ids). With bit 5 the
  * line is first clipped to the world box, in place (0 when it misses the box).
  */
-int zrwcolQueryLine(float *from, float *to, uint32_t flags, const int *excluded, ZrwColLineHit *out);
+int zrwcolQueryLine(float *from, float *to, uint32_t flags, void *const *excluded, ZrwColLineHit *out);
 /*
  * Prelit colour of the world at the point of the last line hit (in gZrwColColor, alpha 0), opaque black when
  * the hit was not on the world. Sorts the hit's corners by z in place.

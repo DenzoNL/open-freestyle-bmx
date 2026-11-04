@@ -3,10 +3,12 @@
 
 #include "bmx/com/zge/ngif/ngifzroller.h"
 #include "compat/crt.h"
+#include "zge/com/zglrw/zrwmat.h"
 #include "zge/com/zglrw/zrwzgl.h"
 #include "zge/zdebug.h"
 #include "zge/zgemods/zobjcamera.h"
 #include "zge/zgemods/zobjpemit.h"
+#include "zge/zgemods/zprop.h"
 #include "zge/zlist.h"
 #include "zge/zmem.h"
 #include "zge/zobj.h"
@@ -78,11 +80,11 @@ typedef void(BMX_CDECL *ZfxDrawFn)(uint32_t flags, const void *primitives, int c
                                    int zero);
 typedef void *(BMX_CDECL *ZfxCameraFn)(void);
 typedef ZObjCamera *(BMX_CDECL *ZfxCameraObjectFn)(void *camera);
-typedef uint32_t(BMX_CDECL *ZfxTextureByHashFn)(int hash, int flags);
-typedef uint32_t(BMX_CDECL *ZfxFindTextureFn)(void *library, int hash);
-typedef uint32_t(BMX_CDECL *ZfxLoadTextureFn)(int hash);
-typedef void *(BMX_CDECL *ZfxGetRasterFn)(uint32_t material, int index);
-typedef void(BMX_CDECL *ZfxSetRasterFn)(uint32_t material, void *raster, int index);
+typedef struct ZrwMaterial *(BMX_CDECL *ZfxTextureByHashFn)(int hash, int flags);
+typedef struct ZrwMaterial *(BMX_CDECL *ZfxFindTextureFn)(void *model, int hash);
+typedef struct ZrwMaterial *(BMX_CDECL *ZfxLoadTextureFn)(int hash);
+typedef void *(BMX_CDECL *ZfxGetRasterFn)(struct ZrwMaterial *material, int index);
+typedef void(BMX_CDECL *ZfxSetRasterFn)(struct ZrwMaterial *material, void *raster, int index);
 #define gFxSetParam      ORIG_VAR(0x00561484, ZfxSetParamFn, gFxSetParam)
 #define gFxDrawTriangles ORIG_VAR(0x0056172c, ZfxDrawFn, gFxDrawTriangles)
 #define gFxDrawQuads     ORIG_VAR(0x00561738, ZfxDrawFn, gFxDrawQuads)
@@ -1051,29 +1053,27 @@ int ngiffxFindSkidObjects(void)
     const uint32_t now = gTimeGetTime();
     const uint32_t config = gFxSkidConfig;
     const int hash = zstrHash(gFxSkidName);
-    const uint32_t *object;
     int found = 0;
 
     for (int i = 0; i < kFxSkidEntries; i++) {
         gFxSkids[i].object = NULL;
     }
-    for (object = (const uint32_t *)*(void **)zobjTreeObjectList(); object != NULL;
-         object = (const uint32_t *)(uintptr_t)object[0]) {
+    for (ZPropDef *def = *zobjTreeObjectList(); def != NULL; def = def->next) {
         ZfxSkid *skid = &gFxSkids[found];
 
-        if (hash != (int)object[2]) {
+        if (hash != (int)def->object.id) {
             continue;
         }
-        skid->object = (void *)(uintptr_t)object;
+        skid->object = def;
         skid->frame = 0;
         skid->fps = (uint8_t)config;
         skid->count = (uint8_t)(config >> 8);
         skid->lastTime = now;
         skid->base = gFxLoadTexture(zstrHash(gFxSkidBase));
         for (int j = 0; j < (int)(uint8_t)(config >> 8); j++) {
-            uint32_t texture = gFxFindTexture((void *)(uintptr_t)object[8], zstrHash(gFxSkidFrameNames[j]));
+            struct ZrwMaterial *texture = gFxFindTexture(def->object.model, zstrHash(gFxSkidFrameNames[j]));
 
-            if (texture == 0) {
+            if (texture == NULL) {
                 texture = gFxLoadTexture(zstrHash(gFxSkidFrameNames[j]));
             }
             skid->texture[j] = texture;
@@ -1142,12 +1142,12 @@ void ngiffxRegisterHandlers(void)
     gFxShard.attach(&gFxShard, "floorcoll", NULL);
     gFxCube = zsceneFindModel(0, "SFXCube");
     zobjSetVisible(gFxCube, 0);
-    gFxSparkTexture = gFxTextureByHash(zstrHash("SPARK"), 0);
-    gFxSkidTexture = gFxTextureByHash(zstrHash("SKID"), 0);
-    gFxRippleTexture = gFxTextureByHash(zstrHash("RIPPLE"), 0);
-    gFxSplashTexture = gFxTextureByHash(zstrHash("SPLASH"), 0);
+    gFxSparkTexture = zrwmatHandle(gFxTextureByHash(zstrHash("SPARK"), 0));
+    gFxSkidTexture = zrwmatHandle(gFxTextureByHash(zstrHash("SKID"), 0));
+    gFxRippleTexture = zrwmatHandle(gFxTextureByHash(zstrHash("RIPPLE"), 0));
+    gFxSplashTexture = zrwmatHandle(gFxTextureByHash(zstrHash("SPLASH"), 0));
     for (int i = 0; i < 16; i++) {
-        gFxDustTextures[i] = gFxTextureByHash(zstrHash(kDust[i]), 0);
+        gFxDustTextures[i] = zrwmatHandle(gFxTextureByHash(zstrHash(kDust[i]), 0));
     }
     gFxWorldObject = zsceneAddWorldObject(0);
     if (gFxAnimHandle == 0 && ngiffxFindSkidObjects() == 1) {

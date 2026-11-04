@@ -121,7 +121,7 @@ void optionsGameSlideOut(void)
  * the option name, then its On/Off text, each positioned by the row's slide offset.
  */
 BMX_ADDR(0x00441180)
-int BMX_CDECL optionsGameHook(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL optionsGameHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     switch (msg) {
     case kGuiMsgDraw:
@@ -326,7 +326,7 @@ void controlsClose(void)
 
 /* Hook of the controller panel: draws the gradient strips; back leaves, everything else is ignored. */
 BMX_ADDR(0x00441bd0)
-int BMX_CDECL controlsHook(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL controlsHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     switch (msg) {
     case kGuiMsgTickAll:
@@ -467,7 +467,7 @@ static void keyboardShowLayout(void)
  * draws a box around the row and binds the first button pressed) or, on the OK/cancel rows, leaves.
  */
 BMX_ADDR(0x004420a0)
-int BMX_CDECL keyboardHook(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL keyboardHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     PlayerSetup *profile = &gPlayers[gKeyPlayer];
     const GuiPadDevice *device = zpadGetDevice(gKeyPlayer);
@@ -692,7 +692,7 @@ static void soundPanelStoreLevels(void)
 }
 
 BMX_ADDR(0x00442ce0)
-int BMX_CDECL soundPanelHook(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL soundPanelHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     switch (msg) {
     case kGuiMsgDraw:
@@ -805,7 +805,7 @@ int optionsInit(void)
 }
 
 BMX_ADDR(0x00443420)
-int BMX_CDECL optionsMainHook(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL optionsMainHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     switch (msg) {
     case kGuiMsgTickAll:

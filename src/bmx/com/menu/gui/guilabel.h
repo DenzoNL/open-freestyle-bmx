@@ -7,7 +7,7 @@
 #include "bmx/com/menu/gui/gui.h"
 
 /* Label/sprite element: tick is a no-op, draw renders the sprite (with animation) and the text. */
-int BMX_CDECL guiLabelProc(int msg, GuiElement *el, int arg3, int arg4);
+int BMX_CDECL guiLabelProc(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4);
 
 /* Parses an optionally signed integer after spaces/commas; returns the position after it (and trailing
  * spaces/commas). */

@@ -8,7 +8,7 @@ static const char kZdebugFile[] = "C:\\NgEngine\\Zge\\zdebug.c";
 typedef int(BMX_CDECL *ZDebugStartFn)(void);
 #define gZdebugStart ORIG_VAR(0x00560030, ZDebugStartFn, gZdebugStart)
 /* The assert handler the original calls through its pointer (not through the wrapper zdebugFail). */
-typedef void(BMX_CDECL *ZDebugFailFn)(const char *why, const char *file, int line, int flags);
+typedef void(BMX_CDECL *ZDebugFailFn)(const char *why, const char *file, int line, const char *function);
 #define gZdebugFailHandler ORIG_VAR(0x0056147c, ZDebugFailFn, gZdebugFailHandler)
 
 /* Timer ticks per second the sound sequencer and sources count in. */

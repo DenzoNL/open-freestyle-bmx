@@ -572,7 +572,7 @@ static void begin(DtCtx *c)
     gActionSubMode = (uint8_t)dt_u32();
     gActionLanguage = (uint8_t)rnd(0, 5);
     gActionOptions = (uint8_t)dt_u32();
-    gActionReplayLib = (int32_t)dt_u32();
+    gActionReplayLib = (struct ZassetLibrary *)(uintptr_t)dt_u32();
     gPlayerCount = (uint8_t)(dt_u32() % 8 == 0 ? rnd(2, 3) : rnd(0, 2));
     gDemoPlayer = (uint8_t)(dt_u32() % 2 ? 0xff : rnd(0, 2));
     gCurrentPlayer = (uint8_t)rnd(0, 1);

@@ -188,7 +188,7 @@ static void hiscoreBase(DtCtx *c)
     gHiscoreBlink = (uint16_t)dt_u32();
     gHiscoreWait = (uint16_t)dt_range(0, 3);
     gHiscoreSprite = (ZPrimAsset *)(uintptr_t)(0x58000000u + (dt_u32() & 0xff0));
-    gAssetLibrary = dt_range(0, 5);
+    gAssetLibrary = (struct ZassetLibrary *)(uintptr_t)dt_range(0, 5);
     if (dt_u32() % 2 == 0) {
         const int sizes[2] = {0, 1};
         dtFrontQueue(DT_Q_ASSETSIZE, sizes, 1 + (int)(dt_u32() % 2));
@@ -205,7 +205,7 @@ static void infoBase(DtCtx *c)
     randomSlide(gInfoSlide, 0x1d6);
     gInfoSprite = (ZPrimAsset *)(uintptr_t)(0x59000000u + (dt_u32() & 0xff0));
     gInfoTicks = (uint16_t)dt_u32();
-    gAssetLibrary = dt_range(0, 5);
+    gAssetLibrary = (struct ZassetLibrary *)(uintptr_t)dt_range(0, 5);
     if (dt_u32() % 2 == 0) {
         const int sizes[2] = {0, 1};
         dtFrontQueue(DT_Q_ASSETSIZE, sizes, 1 + (int)(dt_u32() % 2));
@@ -361,7 +361,7 @@ static void setup_init_app(DtCtx *c)
     dtFrontQueue(DT_Q_ASSETSIZE, sizes, 1);
     staticRegion();
     macroState(1);
-    gAssetLibrary = dt_range(0, 5);
+    gAssetLibrary = (struct ZassetLibrary *)(uintptr_t)dt_range(0, 5);
     gSelResume = (uint8_t)(dt_u32() % 2 == 0 ? dt_range(0, 5) : 0);
     gAutoLoadDone = dt_u32() % 2 == 0 ? 0 : dt_u32();
 }
@@ -389,7 +389,7 @@ static void setup_set_language(DtCtx *c)
         zstringRegister((const ZStringSet *)buffer);
         gMacroSize = size;
     }
-    gAssetLibrary = dt_range(0, 5);
+    gAssetLibrary = (struct ZassetLibrary *)(uintptr_t)dt_range(0, 5);
     /* the data of every language exists; its size is valid (the failure paths abort) */
     const int sizes[1] = {1};
     dtFrontQueue(DT_Q_ASSETSIZE, sizes, 1);

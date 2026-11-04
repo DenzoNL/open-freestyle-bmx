@@ -315,7 +315,7 @@ const BmxHook *bmxSmoothJumps(uint32_t *count)
     if (mode > 2) {
         bmxLog("audio: smooth_resample = %d is out of range, using 2 (cubic)\n", mode);
     }
-    gJumps[0].orig = (uint32_t)(uintptr_t)winchanMix;
+    gJumps[0].orig = (uintptr_t)winchanMix;
     gJumps[0].impl = (void *)bmxSmoothMix;
     *count = gMode != 0 ? 1u : 0u;
     return gJumps;

@@ -8,10 +8,10 @@
 
 /* ---- Win32 interfaces (import thunks and import table slots of the exe) ------------------------------ */
 
-typedef uint32_t(BMX_STDCALL *WaveOutHandleFn)(uint32_t hwo);
-typedef uint32_t(BMX_STDCALL *WaveOutHeaderFn)(uint32_t hwo, ZMovieWaveHeader *header, uint32_t size);
-typedef uint32_t(BMX_STDCALL *WaveOutOpenFn)(uint32_t *hwo, int32_t device, const void *format,
-                                             uint32_t callback, uint32_t instance, uint32_t flags);
+typedef uint32_t(BMX_STDCALL *WaveOutHandleFn)(uintptr_t hwo);
+typedef uint32_t(BMX_STDCALL *WaveOutHeaderFn)(uintptr_t hwo, ZMovieWaveHeader *header, uint32_t size);
+typedef uint32_t(BMX_STDCALL *WaveOutOpenFn)(uintptr_t *hwo, int32_t device, const void *format,
+                                             uintptr_t callback, uintptr_t instance, uint32_t flags);
 typedef uint32_t(BMX_STDCALL *SndPlaySoundFn)(const char *name, uint32_t flags);
 typedef uint32_t(BMX_STDCALL *GetTickCountFn)(void);
 typedef int32_t(BMX_STDCALL *GetClientRectFn)(void *window, ZMovieRect *rect);
@@ -163,7 +163,7 @@ void zmovieShutdown(ZMovie *m)
 }
 
 BMX_ADDR(0x0049fcf0)
-int zmovieOpenAudio(ZMovie *m, uint32_t callback)
+int zmovieOpenAudio(ZMovie *m, uintptr_t callback)
 {
     AviStreamInfo info;
     void *stream;
@@ -274,7 +274,7 @@ int zmovieFillAudio(ZMovie *m)
 }
 
 BMX_ADDR(0x004a0270)
-int zmovieStartAudio(ZMovie *m, uint32_t callback)
+int zmovieStartAudio(ZMovie *m, uintptr_t callback)
 {
     int32_t sample, end;
 
@@ -451,7 +451,7 @@ void zmoviePlay(ZMovie *m, void *window, int useDirectDraw, int loop, const ZMov
         m->loop = loop;
         m->startTick = gGetTickCount() - (uint32_t)m->position;
         m->window = window;
-        zmovieStartAudio(m, (uint32_t)(uintptr_t)window);
+        zmovieStartAudio(m, (uintptr_t)window);
         if (rect != 0) {
             m->rect = *rect;
             m->playing = 1;

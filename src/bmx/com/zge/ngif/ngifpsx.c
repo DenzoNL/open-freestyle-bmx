@@ -217,7 +217,7 @@ int ngifReturnOneB(void)
 typedef int(BMX_CDECL *NgifUpdateFn)(void);
 typedef void *(BMX_CDECL *NgifRegisterFn)(int type, NgifUpdateFn callback, void *arg, int append);
 typedef void(BMX_CDECL *NgifUnregisterFn)(void *node);
-typedef void(BMX_CDECL *NgifQueryFn)(int what, void *out, int arg);
+typedef void(BMX_CDECL *NgifQueryFn)(int what, void *out, const void *extra);
 typedef void *(BMX_CDECL *NgifCameraFn)(void);
 typedef void(BMX_CDECL *NgifSetViewportFn)(void *camera, int flags, const float *rect);
 typedef void(BMX_CDECL *NgifSetOffsetFn)(void *camera, float x, float y);
@@ -228,7 +228,7 @@ typedef void(BMX_CDECL *NgifSetOffsetFn)(void *camera, float x, float y);
 #define gNgifSetViewport   ORIG_VAR(0x00561db8, NgifSetViewportFn, gNgifSetViewport)
 #define gNgifSetViewOffset ORIG_VAR(0x00561dc0, NgifSetOffsetFn, gNgifSetViewOffset)
 #define gNgifDrawQuads     ORIG_VAR(0x00561738, ZrwDrawFn, gNgifDrawQuads)
-typedef void *(BMX_CDECL *NgifGetTextureFn)(uint32_t material, int index);
+typedef void *(BMX_CDECL *NgifGetTextureFn)(struct ZrwMaterial *material, int index);
 typedef int(BMX_CDECL *NgifTextureSizeFn)(void *texture);
 #define gNgifGetTexture    ORIG_VAR(0x00561034, NgifGetTextureFn, gNgifGetTexture)
 #define gNgifTextureWidth  ORIG_VAR(0x00562404, NgifTextureSizeFn, gNgifTextureWidth)
@@ -472,8 +472,8 @@ static void setTexel(ZrwDbgVertex *v, const uint8_t *prim, uint32_t flags, unsig
 /* Size of texture 0 of a material, as the 16 bit values the original keeps. */
 static void textureSize(uint32_t material, float *width, double *height)
 {
-    *width = (float)(int16_t)gNgifTextureWidth(gNgifGetTexture(material, 0));
-    *height = (double)(int16_t)gNgifTextureHeight(gNgifGetTexture(material, 0));
+    *width = (float)(int16_t)gNgifTextureWidth(gNgifGetTexture(zrwmatFromHandle(material), 0));
+    *height = (double)(int16_t)gNgifTextureHeight(gNgifGetTexture(zrwmatFromHandle(material), 0));
 }
 
 /* Base renderer flags of the quads: 0x2000000 unless the float flag 0x20 is set, 4 unless flag 8 is set. */
@@ -1154,11 +1154,11 @@ void ngifDrawPoly3D(int flags, int count, const NgifVert3 *verts, int texture)
         put32(p, 0x84, get32(v, 0x44));
         put16(p, 0xc, tex->u0);
         put16(p, 0xe, tex->v0);
-        image = zrwmatGetTexture((ZrwMaterial *)(uintptr_t)tex->material, 0);
+        image = zrwmatGetTexture(zrwmatFromHandle(tex->material), 0);
         put16(p, 0x2a,
               (uint32_t)bmxFtol((double)(int16_t)zrwTextureGetWidth(image) + (double)rd16(p, 0xc) -
                                 (double)1.0f));
-        image = zrwmatGetTexture((ZrwMaterial *)(uintptr_t)tex->material, 0);
+        image = zrwmatGetTexture(zrwmatFromHandle(tex->material), 0);
         put16(p, 0x2c,
               (uint32_t)bmxFtol((double)(int16_t)zrwTextureGetHeight(image) + (double)rd16(p, 0xe) -
                                 (double)1.0f));

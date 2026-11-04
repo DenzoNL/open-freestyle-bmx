@@ -87,7 +87,7 @@ static void slotHideAll(void)
 }
 
 BMX_ADDR(0x00444310)
-int BMX_CDECL slotScreenHook(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL slotScreenHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     static const uint32_t dialogRows[8] = {0xa012000d, 0xa012000e, 0xa012000f, 0xa0120010,
                                            0xa0120011, 0xa0120012, 0xa0120013, 0xa0120014};

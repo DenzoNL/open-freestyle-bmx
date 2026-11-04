@@ -138,7 +138,7 @@ void *zsceneFindModel(int flags, const char *name);
 void *zsceneFindAnim(int flags, const char *name);
 /* Copies the animations of a library into a table of `size` entries (padding with the first). */
 int zsceneAnimTable(void *library, void **table, int size);
-void *zsceneAddLight(int flags, int type, int param);
+void *zsceneAddLight(int flags, int type, const uint8_t *rgba);
 void *zsceneAddWorldObject(int flags);
 
 /* Free list destructor of the scene nodes. */

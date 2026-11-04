@@ -335,7 +335,7 @@ const BmxHook *drvWideJumps(uint32_t *count)
 {
     const DrvWideConfig *const cfg = drvWideConfig();
 
-    gJumps[0].orig = (uint32_t)(uintptr_t)ngifDrawList;
+    gJumps[0].orig = (uintptr_t)ngifDrawList;
     gJumps[0].impl = (void *)wideDrawList;
     *count = cfg->enabled && cfg->hud == 1 ? 1u : 0u;
     return gJumps;

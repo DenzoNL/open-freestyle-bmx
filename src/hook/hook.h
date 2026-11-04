@@ -5,7 +5,7 @@
 
 /* One redirected function: the original entry point is overwritten with `jmp impl`. */
 typedef struct BmxHook {
-    uint32_t orig;
+    uintptr_t orig;
     void *impl;
 } BmxHook;
 

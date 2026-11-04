@@ -62,14 +62,14 @@ static void randomise_tables(void)
         gZactorPose.bikeReady[i] = (dt_u32() & 1) ? 0 : dt_u32();
         gZactorPose.riderReady[i] = (dt_u32() & 1) ? 0 : dt_u32();
     }
-    for (uint32_t *p = &gZactorPose.bikeNodes[0][0]; p < &gZactorPose.bikeNodes[0][0] + 20; p++) {
+    for (void **p = &gZactorPose.bikeNodes[0][0]; p < &gZactorPose.bikeNodes[0][0] + 20; p++) {
         if (dt_u32() % 4 == 0) {
-            *p = 0;
+            *p = NULL;
         }
     }
-    for (uint32_t *p = &gZactorPose.riderNodes[0][0]; p < &gZactorPose.riderNodes[0][0] + 30; p++) {
+    for (void **p = &gZactorPose.riderNodes[0][0]; p < &gZactorPose.riderNodes[0][0] + 30; p++) {
         if (dt_u32() % 4 == 0) {
-            *p = 0;
+            *p = NULL;
         }
     }
 }

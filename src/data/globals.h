@@ -8473,11 +8473,11 @@ struct BmxGroup_gZresGroup {
     _Static_assert(offsetof(struct BmxGroup_gZresGroup, member) == BMX_DATA_OFF((addr) - 0x005f8f60, off64), \
                    #member)
 AT(gZres, 0x005f8f60, 0x0);
-AT(pad_005fb034, 0x005fb034, 0x20f8);
+AT(pad_005fb034, 0x005fb034, 0x2108);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZresGroup, pad_005fb034) +
                        sizeof(((struct BmxGroup_gZresGroup *)0)->pad_005fb034) ==
-                   BMX_DATA_OFF(0x2768, 0x278c),
+                   BMX_DATA_OFF(0x2768, 0x279c),
                "gZresGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x005fb740..0x005fb760.
@@ -9080,18 +9080,20 @@ _Static_assert(offsetof(struct BmxGroup_gFxDustTexturesGroup, pad_0068fc60) +
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0068ffa8..0x0068ffc0.
  */
 struct BmxGroup_gZresReplayLibGroup {
-    uint8_t lead_[8];               /* nothing: the members' offsets keep their original alignment */
-    int gZresReplayLib;             /* 0x0068ffa8, also gActionReplayLib */
-    unsigned char pad_0068ffac[20]; /* 0x0068ffac */
+    uint8_t lead_[8];                     /* nothing: the members' offsets keep their original alignment */
+    struct ZassetLibrary *gZresReplayLib; /* 0x0068ffa8, also gActionReplayLib */
+    unsigned char pad_0068ffac[20];       /* 0x0068ffac */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gZresReplayLibGroup, member) == (addr) - 0x0068ffa0, #member)
-AT(gZresReplayLib, 0x0068ffa8);
-AT(pad_0068ffac, 0x0068ffac);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gZresReplayLibGroup, member) ==                                  \
+                       BMX_DATA_OFF((addr) - 0x0068ffa0, off64),                                             \
+                   #member)
+AT(gZresReplayLib, 0x0068ffa8, 0x8);
+AT(pad_0068ffac, 0x0068ffac, 0x10);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gZresReplayLibGroup, pad_0068ffac) +
                        sizeof(((struct BmxGroup_gZresReplayLibGroup *)0)->pad_0068ffac) ==
-                   0x20,
+                   BMX_DATA_OFF(0x20, 0x24),
                "gZresReplayLibGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0068ffc0..0x0068fff0.
@@ -11986,7 +11988,7 @@ extern BmxType_gZrwVtNodeToWorld gZrwVtNodeToWorld;                     /* 0x005
 extern BmxType_gZrwVtNodeVector gZrwVtNodeVector;                       /* 0x00560eb4 */
 extern BmxType_gZrwVtNodeMatrix gZrwVtNodeMatrix;                       /* 0x00560eb8 */
 extern void *p_00560ebc;                                                /* 0x00560ebc */
-extern ZrwModelLookup gZrwVtKey;                                        /* 0x00560ec0 */
+extern ZrwModelKeyFn gZrwVtKey;                                         /* 0x00560ec0 */
 extern ZrwModelLookup gZrwVtEntry;                                      /* 0x00560ec4 */
 extern BmxType_gZrwVtNodeHashes gZrwVtNodeHashes;                       /* 0x00560ec8 */
 extern struct BmxGroup_gZrwVtSkeletonGroup gZrwVtSkeletonGroup;         /* 0x00560ecc */
@@ -11994,7 +11996,7 @@ extern void *p_00560ed4;                                                /* 0x005
 extern ZrwModelFlagsFn gZrwVtSetFlags;                                  /* 0x00560ed8, also gZobjSetFlags */
 extern BmxType_gZrwVtOwner gZrwVtOwner;                                 /* 0x00560edc */
 extern ZbspObjectFrameFn gZbspObjectFrameFn;                            /* 0x00560ee0 */
-extern ZrwModelCall gZrwVtClump;                                        /* 0x00560ee4 */
+extern ZrwModelClumpFn gZrwVtClump;                                     /* 0x00560ee4 */
 extern BmxType_gFxFindTexture gFxFindTexture;                           /* 0x00560ee8 */
 extern struct BmxGroup_gZrwVtMatCountGroup gZrwVtMatCountGroup;         /* 0x00560eec */
 extern struct BmxGroup_gZobjSetColorGroup gZobjSetColorGroup;           /* 0x00560ef4 */
@@ -12070,7 +12072,7 @@ extern BmxType_gZrwEndHook gZrwEndHook;     /* 0x00561498 */
 extern ZMemAllocFn gRwMalloc;               /* 0x0056149c */
 extern ZMemFreeFn gRwFree;                  /* 0x005614a0 */
 extern ZMemReallocFn gRwRealloc;            /* 0x005614a4 */
-extern uint32_t gZglMemoryFuncs;            /* 0x005614a8 */
+extern void *gZglMemoryFuncs;               /* 0x005614a8 */
 extern BmxType_gZglAllocHookNop gZglAllocHookNop;         /* 0x005614ac */
 extern char sUnknownParameterD[24];                       /* 0x005614b0 */
 extern char sCNgEngineZgeComZglRwZrwZglC[36];             /* 0x005614c8 */
@@ -12979,7 +12981,7 @@ extern ZActor *gZactors;                                                  /* 0x0
 extern int32_t gMotionBankCount;                                          /* 0x00641e20 */
 extern int32_t gActorAngleBase;                                           /* 0x00641e24 */
 extern int32_t gActorAngleFlip;                                           /* 0x00641e28 */
-extern int32_t gMotionLibrary;                                            /* 0x00641e2c */
+extern struct ZassetLibrary *gMotionLibrary;                              /* 0x00641e2c */
 extern struct BmxGroup_gMotionBufferGroup gMotionBufferGroup;             /* 0x00641e30 */
 extern uint32_t gZprimTextureCounter;                                     /* 0x0064eb34 */
 extern ZsndNotePool gZsndNotes;                                           /* 0x0064eb38 */
@@ -13073,7 +13075,7 @@ extern ZrwStateStack gZrwStateStack;                                    /* 0x006
 extern int gZrwStateDepth;                                              /* 0x006727f4 */
 extern ZMemFreeList *gZrwNodePool;                                      /* 0x006727f8 */
 extern int gZrwSkipDevice;                                              /* 0x006727fc */
-extern uint32_t gZrwEngineOpen;                                         /* 0x00672800 */
+extern void *gZrwEngineOpen;                                            /* 0x00672800 */
 extern uint32_t gZrwEngineInit;                                         /* 0x00672804 */
 extern struct BmxGroup_gZrwArgBufferGroup gZrwArgBufferGroup;           /* 0x00672808 */
 extern int gNoMovies;                                                   /* 0x0067288c, also gMovieSkip */
@@ -13429,7 +13431,7 @@ extern unsigned char d_006783cc[4];                             /* 0x006783cc */
 extern unsigned char d_006783d0[4];                             /* 0x006783d0 */
 extern unsigned char d_006783d4[40];                            /* 0x006783d4 */
 extern int32_t gZprimHandle;                                    /* 0x006783fc */
-extern int32_t gZprimLibrary;                                   /* 0x00678400 */
+extern struct ZassetLibrary *gZprimLibrary;                     /* 0x00678400 */
 extern ZPrimAsset *gZprimPool;                                  /* 0x00678404 */
 extern ZPrimAsset *gZprimFree;                                  /* 0x00678408 */
 extern ZPrimAsset *gZprimUsed;                                  /* 0x0067840c */
@@ -13439,9 +13441,9 @@ extern uint16_t gZprimNextId;                                   /* 0x00678428 */
 extern int32_t gZprimDepth;                                     /* 0x0067842c */
 extern ZPrimState *gZprimStates;                                /* 0x00678430 */
 extern struct BmxGroup_gZrollerShadowGroup gZrollerShadowGroup; /* 0x00678440 */
-extern int gZresTablesLib;                                      /* 0x0067847c */
-extern int gZresMaterialLib;                                    /* 0x0067848c */
-extern int gZresMiscLib; /* 0x00678490, also gAssetLibrary, gOvlLibrary */
+extern struct ZassetLibrary *gZresTablesLib;                    /* 0x0067847c */
+extern struct ZassetLibrary *gZresMaterialLib;                  /* 0x0067848c */
+extern struct ZassetLibrary *gZresMiscLib; /* 0x00678490, also gAssetLibrary, gOvlLibrary */
 extern struct BmxGroup_gZrollerEdgesGroup gZrollerEdgesGroup;         /* 0x00678494 */
 extern struct BmxGroup_gNgifPrim3DBufferGroup gNgifPrim3DBufferGroup; /* 0x00678560 */
 extern ZrollerModelTable

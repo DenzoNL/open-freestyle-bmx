@@ -26,6 +26,9 @@ printf '%s\0' "${units[@]}" | xargs -0 -n 16 -P "${BMX_JOBS:-$(nproc)}" "${tidy[
 echo "== functions.csv (${SECONDS} s)"
 "${PYTHON:-python3}" -I tools/progress.py --check >/dev/null
 "${PYTHON:-python3}" -I -m py_compile tools/*.py tests/oracle/*.py
+echo "== pointer widths (${SECONDS} s)"
+# Declarations that pass a pointer where the ported function takes a 32-bit integer (docs/PORTING.md "X2e").
+"${PYTHON:-python3}" -I tools/width_audit.py . | tail -n 20
 echo "== native32 imports (${SECONDS} s)"
 # The native exe's import table must stay free of the Windows DLLs the platform layer replaced (docs/PLATFORM.md
 # 4f). Only when build/native32 exists (CI without it is unaffected); needs llvm-objdump (llvm-mingw has it).

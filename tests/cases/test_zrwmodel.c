@@ -444,10 +444,10 @@ static void zrwEnv(const DtCtx *c, int stubFail)
     gZrwVtSetPos = stubVt2;
     gZrwVtSetRot = stubVt2;
     gZrwVtSetScale = stubVt2;
-    gZrwVtKey = stubVtLookup;
-    gZrwVtEntry = stubVtLookup;
+    gZrwVtKey = (ZrwModelKeyFn)(void *)stubVtLookup;
+    gZrwVtEntry = (ZrwModelLookup)stubVtLookup;
     gZrwVtSetFlags = stubVtFlags;
-    gZrwVtClump = stubVt1;
+    gZrwVtClump = (ZrwModelClumpFn)(void *)stubVt1;
 }
 
 /* ---- fixtures ------------------------------------------------------------------------------------- */

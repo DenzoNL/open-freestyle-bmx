@@ -17,7 +17,7 @@ typedef void(BMX_CDECL *GuiFreeSpriteSheetFn)(void *sprites);
 
 /* Sends a message to one element: its own handler if set, else the type handler. */
 BMX_ADDR(0x00439460)
-int guiSend(int msg, GuiElement *el, int arg3, int arg4)
+int guiSend(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     if (el == NULL) {
         (*gGuiDebugPrint)("GUIMAIN: Error - sending message %d to NULL element\n", msg);
@@ -48,7 +48,7 @@ int guiSendById(int msg, uint32_t id, int arg3, int arg4)
 
 /* Offers the message to the screen hook first, then to every element until one handles it. */
 BMX_ADDR(0x00439520)
-int guiBroadcast(int msg, GuiElement *el, int arg3, int arg4)
+int guiBroadcast(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     int handled;
     if (gGuiScreen.hook == NULL) {
@@ -88,7 +88,7 @@ int guiPostToVisible(int msg, int arg2, int arg3)
 
 /* Hook used when a screen installs none: turns the draw-all/tick-all broadcasts into per-element messages. */
 BMX_ADDR(0x004396b0)
-int BMX_CDECL guiDefaultHookProc(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL guiDefaultHookProc(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     if (msg == kGuiMsgDrawAll) {
         for (int i = 0; i < gGuiElementCount; i++) {
@@ -412,7 +412,7 @@ void guiSetText(GuiElement *el, const char *str)
     }
     memcpy(dst, text, size);
     zmemdmmUnlock(el->textHandle);
-    guiSend(kGuiMsgTextChanged, el, (int)(intptr_t)text, 0);
+    guiSend(kGuiMsgTextChanged, el, (intptr_t)text, 0);
 }
 
 BMX_ADDR(0x00439060)
@@ -664,7 +664,7 @@ void guiBoxSetEnd(GuiElement *el, int16_t x, int16_t y)
 
 /* Line element: draws a line from (x, y) to (spriteX, spriteY) in the text colour. */
 BMX_ADDR(0x00437460)
-int BMX_CDECL guiRectProc(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL guiRectProc(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     if (msg != kGuiMsgDraw) {
         return 0;
@@ -681,7 +681,7 @@ int BMX_CDECL guiRectProc(int msg, GuiElement *el, int arg3, int arg4)
 
 /* Box element: outline between the two corners, drawn twice (the second one inset by a pixel). */
 BMX_ADDR(0x004398d0)
-int BMX_CDECL guiBoxProc(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL guiBoxProc(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     if (msg != kGuiMsgDraw) {
         return 0;

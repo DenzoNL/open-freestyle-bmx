@@ -242,24 +242,24 @@ RpWorld *_rpWorldGenerateSectorMeshes(RpWorld *world);
 
 /* Sector and plane readers/writers: register arguments (EAX, EDX, ECX), then stack slots of which only the
  * fourth (the format flags) is read; the three pads stand for the slots the original never reads. */
-__attribute__((regparm(3))) int32_t rpSectorDataSize(const RpWorldSector *sector, int32_t unused,
+__attribute__((regparm(3))) int32_t rpSectorDataSize(const RpWorldSector *sector, const void *unused,
                                                      uint32_t flags);
-__attribute__((regparm(3))) int32_t rpSectorStreamGetSize(const RpWorldSector *sector, int32_t unused,
+__attribute__((regparm(3))) int32_t rpSectorStreamGetSize(const RpWorldSector *sector, const void *unused,
                                                           uint32_t flags);
-__attribute__((regparm(3))) int32_t rpBspStreamGetSize(const RpPlaneSector *node, int32_t unused,
+__attribute__((regparm(3))) int32_t rpBspStreamGetSize(const RpPlaneSector *node, const void *unused,
                                                        uint32_t flags);
 __attribute__((regparm(3))) RpWorldSector *rpSectorStreamWrite(const RpWorldSector *sector, RwStream *stream,
-                                                               int32_t unused, int32_t pad0, int32_t pad1,
+                                                               const void *unused, int32_t pad0, int32_t pad1,
                                                                int32_t pad2, uint32_t flags);
 __attribute__((regparm(3))) RpPlaneSector *rpBspStreamWrite(const RpPlaneSector *node, RwStream *stream,
-                                                            int32_t world, int32_t pad0, int32_t pad1,
+                                                            const void *world, int32_t pad0, int32_t pad1,
                                                             int32_t pad2, uint32_t flags);
 __attribute__((regparm(3))) RpWorldSector *rpSectorStreamRead(RwStream *stream, uint8_t **cursor,
-                                                              int32_t world, int32_t pad0, int32_t pad1,
+                                                              const void *world, int32_t pad0, int32_t pad1,
                                                               int32_t pad2, uint32_t flags);
-__attribute__((regparm(3))) RpPlaneSector *rpBspStreamRead(RwStream *stream, uint8_t **cursor, int32_t world,
-                                                           int32_t pad0, int32_t pad1, int32_t pad2,
-                                                           uint32_t flags);
+__attribute__((regparm(3))) RpPlaneSector *rpBspStreamRead(RwStream *stream, uint8_t **cursor,
+                                                           const void *world, int32_t pad0, int32_t pad1,
+                                                           int32_t pad2, uint32_t flags);
 RpWorld *RpWorldStreamWrite(RpWorld *world, RwStream *stream);
 RpWorld *RpWorldStreamRead(RwStream *stream);
 

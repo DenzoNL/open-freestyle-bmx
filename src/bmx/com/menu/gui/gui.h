@@ -99,7 +99,7 @@ enum {
 
 typedef struct GuiElement GuiElement;
 /* Element message handler: (message, element, arg3, arg4); returns non-zero when handled. */
-typedef int(BMX_CDECL *GuiProcFn)(int msg, GuiElement *element, int arg3, int arg4);
+typedef int(BMX_CDECL *GuiProcFn)(int msg, GuiElement *element, intptr_t arg3, intptr_t arg4);
 
 struct GuiElement {
     int16_t type;           /* 0x00: GuiType, 0 = slot unused */
@@ -148,7 +148,7 @@ BMX_LAYOUT32_ASSERT(offsetof(GuiElement, textFlags) == 0xc8, "GuiElement layout"
 BMX_LAYOUT32_ASSERT(offsetof(GuiElement, dataHandle) == 0xec, "GuiElement layout");
 
 /* Screen hook: gets every broadcast first and may consume it. */
-typedef int(BMX_CDECL *GuiHookFn)(int msg, GuiElement *element, int arg3, int arg4);
+typedef int(BMX_CDECL *GuiHookFn)(int msg, GuiElement *element, intptr_t arg3, intptr_t arg4);
 
 /* Backdrop, selection fonts/colours and the hook, one block of six dwords. */
 typedef struct GuiScreenState {

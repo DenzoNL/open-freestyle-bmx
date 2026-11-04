@@ -38,15 +38,14 @@ static void *actorObject(const void *actor)
  * Row of the part cache for a player. The player index is not range checked (it is the current view
  * player byte); the tables hold two rows.
  */
-static uint32_t *riderRow(int player)
+static void **riderRow(int player)
 {
-    return (uint32_t *)((uint8_t *)&gZactorPose.riderNodes +
-                        (size_t)player * sizeof gZactorPose.riderNodes[0]);
+    return gZactorPose.riderNodes[player];
 }
 
-static uint32_t *bikeRow(int player)
+static void **bikeRow(int player)
 {
-    return (uint32_t *)((uint8_t *)&gZactorPose.bikeNodes + (size_t)player * sizeof gZactorPose.bikeNodes[0]);
+    return gZactorPose.bikeNodes[player];
 }
 
 static uint32_t *riderReady(int player)
@@ -60,7 +59,7 @@ static uint32_t *bikeReady(int player)
 }
 
 /* The (lazily built) node row of the actor's kind for a player. */
-static const uint32_t *partRow(void *actor, int player)
+static void *const *partRow(void *actor, int player)
 {
     if (((ZActor *)actor)->skeleton == 0) {
         if (*riderReady(player) == 0) {
@@ -103,11 +102,11 @@ static void printUnknownPart(int line, const char *what)
 static void partPosition(void *actor, int part, const ZVec3 *local, ZVec3 *out, int line, int player)
 {
     ZVec3 v;
-    uint32_t node;
+    void *node;
 
     rotateLocal(actor, part, local, &v);
     node = partRow(actor, player)[(uint32_t)part & 0xffff];
-    if (node == 0) {
+    if (node == NULL) {
         printUnknownPart(line, "testzactorGetAbsolutePartPosition: Unknown part");
         out->x = 0;
         out->y = 0;
@@ -127,7 +126,7 @@ uint32_t zactorViewPlayer(void)
 BMX_ADDR(0x00464740)
 void zactorInitRiderParts(void *actor, int player)
 {
-    uint32_t *row = riderRow(player);
+    void **row = riderRow(player);
 
     *riderReady(player) = 1;
     for (int i = 0; i < kZactorRiderParts; i++) {
@@ -139,7 +138,7 @@ void zactorInitRiderParts(void *actor, int player)
 BMX_ADDR(0x004649a0)
 void zactorInitBikeParts(void *actor, int player)
 {
-    uint32_t *row = bikeRow(player);
+    void **row = bikeRow(player);
 
     *bikeReady(player) = 1;
     for (int i = 0; i < kZactorBikeParts; i++) {
@@ -167,10 +166,10 @@ BMX_ADDR(0x00464ea0)
 double zactorGetPartLength(void *actor, int part)
 {
     const int player = (int)zactorViewPlayer();
-    const uint32_t node = partRow(actor, player)[(uint32_t)part & 0xffff];
+    void *const node = partRow(actor, player)[(uint32_t)part & 0xffff];
     ZVec3 v;
 
-    if (node == 0) {
+    if (node == NULL) {
         printUnknownPart(0x11b, "testzactorGetPartLength: Unknown part");
         v.x = 0;
         v.y = 0;
@@ -182,7 +181,7 @@ double zactorGetPartLength(void *actor, int part)
 }
 
 BMX_ADDR(0x00464fb0)
-uint32_t zactorGetPartNode(void *actor, int part, int player)
+void *zactorGetPartNode(void *actor, int part, int player)
 {
     return partRow(actor, player)[(uint32_t)part & 0xffff];
 }
@@ -190,9 +189,9 @@ uint32_t zactorGetPartNode(void *actor, int part, int player)
 BMX_ADDR(0x00465040)
 void zactorGetPartVector(void *actor, int part, ZVec3 *out, int player)
 {
-    const uint32_t node = partRow(actor, player)[part];
+    void *const node = partRow(actor, player)[part];
 
-    if (node != 0) {
+    if (node != NULL) {
         zrwmatNodeVector(actorObject(actor), node, &out->x, 1);
         return;
     }

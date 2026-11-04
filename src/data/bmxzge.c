@@ -2209,7 +2209,7 @@ int32_t gActorAngleBase;
 int32_t gActorAngleFlip;
 
 /* 0x00641e2c */
-int32_t gMotionLibrary;
+struct ZassetLibrary *gMotionLibrary;
 
 struct BmxGroup_gMotionBufferGroup gMotionBufferGroup __attribute__((aligned(16)));
 
@@ -2273,7 +2273,7 @@ unsigned char d_006500b0[192];
 int32_t gZprimHandle;
 
 /* 0x00678400 */
-int32_t gZprimLibrary;
+struct ZassetLibrary *gZprimLibrary;
 
 /* 0x00678404 */
 ZPrimAsset *gZprimPool;
@@ -2302,13 +2302,13 @@ ZPrimState *gZprimStates;
 struct BmxGroup_gZrollerShadowGroup gZrollerShadowGroup __attribute__((aligned(16)));
 
 /* 0x0067847c */
-int gZresTablesLib;
+struct ZassetLibrary *gZresTablesLib;
 
 /* 0x0067848c */
-int gZresMaterialLib;
+struct ZassetLibrary *gZresMaterialLib;
 
 /* 0x00678490, also gAssetLibrary, gOvlLibrary */
-int gZresMiscLib;
+struct ZassetLibrary *gZresMiscLib;
 
 struct BmxGroup_gZrollerEdgesGroup gZrollerEdgesGroup __attribute__((aligned(16)));
 

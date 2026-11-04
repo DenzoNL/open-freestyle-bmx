@@ -2,7 +2,7 @@
  * Asset library files, .ZAL (C:\NgEngine\Zge\zasset.c). A library is a directory of groups of assets; a
  * group is {id, then `assetsPerGroup` entries of {offset, size, [stored size]}}. Entries are either plain
  * data, compressed (stored size set, method 0 or 1), or names of loose files ("linked" libraries).
- * A library is handled as an int (its address); one cursor selects the asset zassetSize / zassetRead use.
+ * One cursor per library selects the asset zassetSize / zassetRead use.
  */
 #ifndef ZGE_ZASSET_H
 #define ZGE_ZASSET_H
@@ -40,21 +40,21 @@ BMX_LAYOUT32_ASSERT(sizeof(ZassetLibrary) == 0x128, "zasset size");
 /* Free list of open libraries (0x65e2b0), created with the first library and destroyed with the last. */
 #define gZassetLibraries ORIG_VAR(0x0065e2b0, ZMemFreeList *, gZassetLibraries)
 
-/* Opens a library file; returns a handle or 0. */
-int zassetOpenLibrary(const char *name);
-void zassetCloseLibrary(int lib);
+/* Opens a library file; returns it or NULL. */
+ZassetLibrary *zassetOpenLibrary(const char *name);
+void zassetCloseLibrary(ZassetLibrary *lib);
 /* Selects asset `asset` of group `group`; returns 1 when it exists. */
-int zassetFind(int lib, int group, int asset);
+int zassetFind(ZassetLibrary *lib, int group, int asset);
 /* Prints the group and asset sizes of the library. */
-void zassetDump(int lib);
+void zassetDump(ZassetLibrary *lib);
 /* Size in bytes of the selected resource. */
-uint32_t zassetSize(int lib);
+uint32_t zassetSize(ZassetLibrary *lib);
 /* Reads the selected resource into dst and steps to the next asset of the group; returns 1 on success. */
-int zassetRead(int lib, void *dst);
+int zassetRead(ZassetLibrary *lib, void *dst);
 
 /* Number of groups in the library, and a step to the next one (the selection of the loop in zscene.c). */
-int zassetCount(int lib);
-int zassetNext(int lib);
+int zassetCount(ZassetLibrary *lib);
+int zassetNext(ZassetLibrary *lib);
 
 /* Decompressor of the renderer (kind 1 or 2): source, size, destination, bytes written. */
 int zassetDecompress(int kind, const void *packed, uint32_t size, void *dest, uint32_t *outSize);

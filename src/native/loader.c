@@ -68,10 +68,16 @@ void *bmxRealProc(const char *dll, const char *name)
 }
 
 /* Writes `jmp to` at from (one of our own functions: the opt-in replacements below). */
-static void writeJump(uint32_t from, const void *to)
+static void writeJump(uintptr_t from, const void *to)
 {
-    uint8_t *p = (uint8_t *)(uintptr_t)from;
-    const int32_t rel = (int32_t)((uintptr_t)to - (from + 5));
+    uint8_t *p = (uint8_t *)from;
+    const intptr_t distance = (intptr_t)((uintptr_t)to - (from + 5));
+    const int32_t rel = (int32_t)distance;
+
+    if ((intptr_t)rel != distance) { /* 64-bit: both ends lie in our image, well inside +-2 GB */
+        bmxLog("jump from %p to %p does not fit a rel32\n", (void *)from, to);
+        abort();
+    }
 
     p[0] = 0xE9;
     memcpy(p + 1, &rel, 4);
@@ -272,8 +278,8 @@ int bmxLoaderInit(void)
             for (uint32_t i = 0; i < count; i++) {
                 DWORD prot;
 
-                if (!VirtualProtect((void *)(uintptr_t)jumps[i].orig, 5, PAGE_EXECUTE_READWRITE, &prot)) {
-                    bmxLog("%s: cannot patch %#x (error %lu)\n", kOptional[k].what, (unsigned)jumps[i].orig,
+                if (!VirtualProtect((void *)jumps[i].orig, 5, PAGE_EXECUTE_READWRITE, &prot)) {
+                    bmxLog("%s: cannot patch %p (error %lu)\n", kOptional[k].what, (void *)jumps[i].orig,
                            GetLastError());
                     return -1;
                 }

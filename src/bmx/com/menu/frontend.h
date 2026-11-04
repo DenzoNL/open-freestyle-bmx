@@ -111,7 +111,7 @@ typedef uint8_t LanguageTable[3];
 int languageScreenInit(void);
 void languageScreenLayout(void);
 void languageScreenDone(void);
-int BMX_CDECL languageScreenHook(int msg, GuiElement *el, int arg3, int arg4);
+int BMX_CDECL languageScreenHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4);
 
 /* Volumes of the two sound channels, one byte each. */
 #define gSoundVolume0 ORIG_VAR(0x006955e4, uint8_t, gSoundVolume0)
@@ -138,7 +138,7 @@ typedef uint32_t McRows[8];
 #define gMcDone      ORIG_VAR(0x0057459c, McDoneFn, gMcDone)
 
 void mcDialogOpen(int16_t save, uint16_t slot, const uint32_t *rows, uint16_t mode, McDoneFn done);
-int BMX_CDECL mcDialogHook(int msg, GuiElement *el, int arg3, int arg4);
+int BMX_CDECL mcDialogHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4);
 void mcStepClose(void);
 void mcStepLoadProbe(void);
 void mcStepLoadRead(void);
@@ -252,22 +252,22 @@ typedef const char *KeyLabelTable[5][18];
 
 void keyboardOpen(void);
 void keyboardClose(void);
-int BMX_CDECL keyboardHook(int msg, GuiElement *el, int arg3, int arg4);
+int BMX_CDECL keyboardHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4);
 void soundPanelOpen(void);
 void soundPanelClose(void);
 void soundPanelSlideIn(void);
 void soundPanelSlideOut(void);
-int BMX_CDECL soundPanelHook(int msg, GuiElement *el, int arg3, int arg4);
+int BMX_CDECL soundPanelHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4);
 
 void controlsDrawStrips(void);
 void optionsGameOpen(void);
 void optionsGameClose(void);
 void optionsGameSlideIn(void);
 void optionsGameSlideOut(void);
-int BMX_CDECL optionsGameHook(int msg, GuiElement *el, int arg3, int arg4);
+int BMX_CDECL optionsGameHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4);
 void controlsOpen(void);
 void controlsClose(void);
-int BMX_CDECL controlsHook(int msg, GuiElement *el, int arg3, int arg4);
+int BMX_CDECL controlsHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4);
 
 /* Options main list: selected row (0x691e60, -1 while leaving), "ready" flag, frame pulse, save delay. */
 #define gOptMainSel       ORIG_VAR(0x00691e60, int, gOptMainSel)
@@ -277,7 +277,7 @@ int BMX_CDECL controlsHook(int msg, GuiElement *el, int arg3, int arg4);
 #define gOptSaveDelay     ORIG_VAR(0x00691e14, int, gOptSaveDelay)
 
 int optionsInit(void);
-int BMX_CDECL optionsMainHook(int msg, GuiElement *el, int arg3, int arg4);
+int BMX_CDECL optionsMainHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4);
 void optionsMainHighlight(void);
 void optionsMainSave(void);
 void optionsMainSlideOut(void);
@@ -295,7 +295,7 @@ int slotScreenInit(void);
 void slotScreenLayout(void);
 void slotScreenDone(void);
 void slotScreenReturn(void);
-int BMX_CDECL slotScreenHook(int msg, GuiElement *el, int arg3, int arg4);
+int BMX_CDECL slotScreenHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4);
 
 /* ---- game setup screen (screen 0xa009, frontend_select.c) ---------------------------------------- */
 /*
@@ -460,8 +460,8 @@ void selChangeStage(int delta);
 void selLeaveStep(void);
 void selIntroStep(void);
 void selScreenLayout(void);
-int BMX_CDECL selScreenHook(int msg, GuiElement *el, int arg3, int arg4);
-int BMX_CDECL selScreenDraw(int msg, GuiElement *el, int arg3, int arg4);
+int BMX_CDECL selScreenHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4);
+int BMX_CDECL selScreenDraw(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4);
 void selCaptionFeed(int count, int offset);
 
 void selRiderPreview(int step);
@@ -528,18 +528,18 @@ typedef uint16_t MenuEntryStrings[6];
 #define gMenuEntryStrings ORIG_VAR(0x0055a35c, MenuEntryStrings, gMenuEntryStrings)
 
 void autoloadScreenInit(void);
-int BMX_CDECL autoloadScreenHook(int msg, GuiElement *el, int arg3, int arg4);
+int BMX_CDECL autoloadScreenHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4);
 void pressStartInit(void);
-int BMX_CDECL pressStartHook(int msg, GuiElement *el, int arg3, int arg4);
+int BMX_CDECL pressStartHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4);
 int mainMenuInit(int skipLoad);
 void mainMenuSetHook(void);
 void mainMenuEnter(void);
-int BMX_CDECL mainMenuHook(int msg, GuiElement *el, int arg3, int arg4);
+int BMX_CDECL mainMenuHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4);
 void mainMenuScrollDown(void);
 void mainMenuScrollUp(void);
 void mainMenuLayout(void);
 int mainMenuIdleExit(void);
-int BMX_CDECL blankScreenHook(int msg, GuiElement *el, int arg3, int arg4);
+int BMX_CDECL blankScreenHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4);
 
 /* Belongs to bmxsound.c: stores a quit/transition request (flag at 0x574654, code at 0x574658). */
 ORIG_FN(0x0044dd10, void, frontendRequestExit, (int code));
@@ -650,7 +650,7 @@ typedef uint16_t RiderNameTable[12];
 #define gHiscoreWait   ORIG_VAR(0x00690894, uint16_t, gHiscoreWait)
 #define gAssetSetSize  ORIG_VAR(0x00690890, uint32_t, gAssetSetSize)
 #define gAssetSetData  ORIG_VAR(0x0057464c, void *, gAssetSetData)
-#define gAssetLibrary  ORIG_VAR(0x00678490, int, gAssetLibrary)
+#define gAssetLibrary  ORIG_VAR(0x00678490, struct ZassetLibrary *, gAssetLibrary)
 /* Factor and rounding term that turn a score into a time (floats in the exe). */
 #define gScoreToTime ORIG_VAR(0x0054d0ec, float, gScoreToTime)
 #define gScoreRound  ORIG_VAR(0x0054d074, float, gScoreRound)
@@ -667,7 +667,7 @@ typedef uint16_t InfoLineTable[6][3][4];
 #define gInfoTicks   ORIG_VAR(0x0069122c, uint16_t, gInfoTicks)
 
 int extrasMenuInit(void);
-int BMX_CDECL extrasMenuHook(int msg, GuiElement *el, int arg3, int arg4);
+int BMX_CDECL extrasMenuHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4);
 void extrasMenuExit(void);
 void extrasMenuHighlight(void);
 void extrasMenuSlideIn(void);
@@ -680,20 +680,20 @@ void extrasOpen(void);
 void extrasShowMenu(void);
 void extrasSlideIn(void);
 void extrasSlideOut(void);
-int BMX_CDECL extrasListDraw(int msg, GuiElement *el, int arg3, int arg4);
-int BMX_CDECL extrasHook(int msg, GuiElement *el, int arg3, int arg4);
+int BMX_CDECL extrasListDraw(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4);
+int BMX_CDECL extrasHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4);
 void hiscoreOpen(void);
 void hiscoreClose(void);
 void hiscoreBuild(void);
 void hiscoreSlideIn(void);
 void hiscoreSlideOut(void);
-int BMX_CDECL hiscoreHook(int msg, GuiElement *el, int arg3, int arg4);
+int BMX_CDECL hiscoreHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4);
 void infoOpen(void);
 void infoClose(void);
 void infoBuild(void);
 void infoSlideIn(void);
 void infoSlideOut(void);
-int BMX_CDECL infoHook(int msg, GuiElement *el, int arg3, int arg4);
+int BMX_CDECL infoHook(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4);
 
 /* ---- start-up (frontend_extras.c) ----------------------------------------------------------------- */
 /* The macro string set (0x57465c: 16 KiB buffer, 0x574660: size of the set in it). */

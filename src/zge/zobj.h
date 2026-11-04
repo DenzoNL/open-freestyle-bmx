@@ -25,9 +25,9 @@ typedef struct ZObjOps {
 
 /* Hierarchy record of an object (0x10 bytes, from the pool at 0x6722d8). */
 typedef struct ZObjLinks {
-    struct ZObj *parent;     /* 0x00 */
-    uint32_t partId;         /* 0x04 body part of the parent's model the object is attached to, 0 for none */
-    struct ZObj *next;       /* 0x08 next sibling */
+    struct ZObj *parent; /* 0x00 */
+    void *partId;      /* 0x04 skeleton node of the parent's model the object is attached to, NULL for none */
+    struct ZObj *next; /* 0x08 next sibling */
     struct ZObj *firstChild; /* 0x0c */
 } ZObjLinks;
 
@@ -74,7 +74,7 @@ enum {
 };
 
 /* Callback for zobjForEachChild. */
-typedef int(BMX_CDECL *ZObjChildFn)(struct ZObj *child, int arg);
+typedef int(BMX_CDECL *ZObjChildFn)(struct ZObj *child, void *arg);
 
 #define gZobjInitialized ORIG_VAR(0x006722d0, int, gZobjInitialized)
 
@@ -116,9 +116,9 @@ void zobjDetach(ZObj *object);
  */
 void zobjDispatchEvents(ZObj *object);
 /* Calls fn(child, arg) for every child of the object. Always returns 1. */
-int zobjForEachChild(ZObj *object, ZObjChildFn fn, int arg);
+int zobjForEachChild(ZObj *object, ZObjChildFn fn, void *arg);
 /* Refreshes the world transform of an object and (recursively) its children. */
-int zobjRefresh(ZObj *object, int arg);
+int zobjRefresh(ZObj *object, void *arg);
 /* Update callback of the object system (registered at type 8): refreshes every active root object. */
 int zobjUpdateAll(void *arg);
 /* Debug callback: prints the number of objects in use. */

@@ -380,7 +380,8 @@ static void stubs_on(void)
     dt_stub(0x00470ba0, NULL, (void *)stub_updateFades);
     dt_stub(0x00470d10, NULL, (void *)stub_strmUpdate);
     dt_stub(0x0047ea10, NULL, (void *)stub_measure);
-    gZsystemGetObject = stub_getObject;
+    gZsystemGetObject =
+        (ZsystemGetObjectFn)(void *)stub_getObject; /* stub of the 32-bit build: an int third argument */
     gWinTimeGetDevCaps = imp_getDevCaps;
     gWinTimeBeginPeriod = imp_beginPeriod;
     gWinTimeSetEvent = imp_setEvent;

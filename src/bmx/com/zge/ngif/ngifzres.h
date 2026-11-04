@@ -17,7 +17,7 @@ enum { kZresLevelInfoBytes = 100, kZresRiderRecordBytes = 0x18, kZresFixedDefsSi
 typedef struct ZresState {
     uint8_t levelInfo[kZresLevelInfoBytes]; /* 0x00 record returned by ngifzresLoadLevelInfo */
     uint8_t bufferA[kZresFixedDefsSize]; /* 0x64 fixed buffer for assets loaded with the "alternate" flag */
-    int libs[2];                         /* 0x1064 Material and MiscData libraries (overlay sources) */
+    struct ZassetLibrary *libs[2];       /* 0x1064 Material and MiscData libraries (overlay sources) */
     uint32_t spare;                      /* 0x106c */
     uint8_t *mapData;                    /* 0x1070 Tables asset 0 (level table), loaded once */
     uint8_t pad1074[4];
@@ -40,7 +40,7 @@ typedef struct ZresState {
     int overlayInit;          /* 0x20d0 */
 } ZresState;
 
-_Static_assert(__builtin_offsetof(ZresState, libs) == 0x1064, "zres layout");
+BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZresState, libs) == 0x1064, "zres layout");
 BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZresState, playerCount) == 0x1088, "zres layout");
 BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZresState, bufferB) == 0x1098, "zres layout");
 BMX_LAYOUT32_ASSERT(__builtin_offsetof(ZresState, riderRecord) == 0x20a0, "zres layout");
@@ -50,10 +50,10 @@ BMX_LAYOUT32_ASSERT(sizeof(ZresState) == 0x20d4, "zres size");
 #define gZres ORIG_VAR(0x005f8f60, ZresState, gZres)
 
 /* Library handles (zasset). */
-#define gZresTablesLib   ORIG_VAR(0x0067847c, int, gZresTablesLib)
-#define gZresMaterialLib ORIG_VAR(0x0067848c, int, gZresMaterialLib)
-#define gZresMiscLib     ORIG_VAR(0x00678490, int, gZresMiscLib)
-#define gZresReplayLib   ORIG_VAR(0x0068ffa8, int, gZresReplayLib)
+#define gZresTablesLib   ORIG_VAR(0x0067847c, struct ZassetLibrary *, gZresTablesLib)
+#define gZresMaterialLib ORIG_VAR(0x0067848c, struct ZassetLibrary *, gZresMaterialLib)
+#define gZresMiscLib     ORIG_VAR(0x00678490, struct ZassetLibrary *, gZresMiscLib)
+#define gZresReplayLib   ORIG_VAR(0x0068ffa8, struct ZassetLibrary *, gZresReplayLib)
 /* Free lists the resource system owns (destroyed by ngifzresUnload). */
 #define gZresListA ORIG_VAR(0x005f34ac, struct ZMemFreeList *, gZresListA)
 #define gZresListB ORIG_VAR(0x005f34b0, struct ZMemFreeList *, gZresListB)
@@ -75,10 +75,10 @@ typedef struct ZresOverlaySlot {
     uint8_t pad08[4];
     uint8_t width, height; /* 0x0c in pixels, capped at 255 */
     uint8_t pad0e[2];
-    void *texture; /* 0x10 renderer handle, 0 when the slot is free */
+    uint32_t texture; /* 0x10 the material's handle (zrwmatHandle), 0 when the slot is free */
 } ZresOverlaySlot;
 
-BMX_LAYOUT32_ASSERT(sizeof(ZresOverlaySlot) == 0x14, "overlay slot");
+_Static_assert(sizeof(ZresOverlaySlot) == 0x14, "overlay slot");
 
 typedef ZresOverlaySource ZresOverlaySourceTable[kZresOverlaySources];
 typedef ZresOverlaySlot ZresOverlaySlotTable[kZresOverlaySlots];
@@ -95,7 +95,8 @@ typedef uint32_t(BMX_CDECL *ZresTextureSizeFn)(void *texture);
 #define gZresTextureHeight ORIG_VAR(0x00562408, ZresTextureSizeFn, gZresTextureHeight)
 
 /* Loads asset (group, asset) of a library into one of the two fixed buffers; NULL when it does not exist. */
-uint8_t *ngifzresLoadAsset(int lib, uint32_t group, uint32_t asset, uint32_t *sizeOut, int alternate);
+uint8_t *ngifzresLoadAsset(struct ZassetLibrary *lib, uint32_t group, uint32_t asset, uint32_t *sizeOut,
+                           int alternate);
 /* Opens the level table (once). */
 int ngifzresInitLevels(void);
 /* Opens the player table (once). */

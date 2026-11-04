@@ -184,7 +184,7 @@ int zsceneFindNode(ZsceneNode *node, ZsceneQuery *query)
     if (node->sibling != 0 && zsceneFindNode(node->sibling, query) == 0) {
         return 0;
     }
-    return BMX_LAYOUT32 ? (int)(intptr_t)node : 1; /* not found: any non-zero value */
+    return bmxPtrResult(node); /* not found: non-zero */
 }
 
 BMX_ADDR(0x004906a0)
@@ -298,12 +298,12 @@ void zsceneReleaseEntries(int all)
             break;
         case kZsceneEntryAnimLib:
             if (entry != 0) {
-                uint32_t *anim = entry->object;
+                ZsceneAnim *anim = entry->object;
 
-                while (anim != 0) {
-                    uint32_t *following = (uint32_t *)(uintptr_t)anim[2];
+                while (anim != NULL) {
+                    ZsceneAnim *following = anim->next;
 
-                    ziffFreeAnim((void *)(uintptr_t)anim[1]);
+                    ziffFreeAnim(anim->anim);
                     zmemFree(anim);
                     anim = following;
                 }
@@ -431,7 +431,7 @@ BMX_ADDR(0x00490e90)
 int zsceneLoadAnimLibrary(ZsceneRequest *request)
 {
     ZsceneAnim *list = 0;
-    int lib = zassetOpenLibrary(request->file);
+    ZassetLibrary *lib = zassetOpenLibrary(request->file);
     int count;
 
     if (lib == 0) {
@@ -829,9 +829,9 @@ int zsceneAnimTable(void *library, void **table, int size)
 }
 
 BMX_ADDR(0x00491ba0)
-void *zsceneAddLight(int flags, int type, int param)
+void *zsceneAddLight(int flags, int type, const uint8_t *rgba)
 {
-    void *light = zobjLightCreate(type, param);
+    void *light = zobjLightCreate(type, rgba);
 
     if (light != 0 && (flags & 1) == 0) {
         ZsceneEntry *entry;
@@ -888,14 +888,14 @@ int zscnptsReset(void)
 BMX_ADDR(0x00491dc0)
 int zscnptsFreeNode(void *node)
 {
-    uint32_t *fields = node;
+    ZrwMarker *marker = node;
 
     if (node == 0) {
         return 0;
     }
-    if (fields[0x48 / 4] != 0) {
-        zmemFree((void *)(uintptr_t)fields[0x48 / 4]);
-        fields[0x48 / 4] = 0;
+    if (marker->data != NULL) {
+        zmemFree(marker->data);
+        marker->data = NULL;
     }
     return 1;
 }

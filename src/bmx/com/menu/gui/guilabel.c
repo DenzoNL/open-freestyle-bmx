@@ -187,7 +187,7 @@ static void guiLabelAnimate(GuiElement *el)
  */
 BMX_ADDR(0x00439fa1)
 BMX_ADDR(0x00439f80)
-int BMX_CDECL guiLabelProc(int msg, GuiElement *el, int arg3, int arg4)
+int BMX_CDECL guiLabelProc(int msg, GuiElement *el, intptr_t arg3, intptr_t arg4)
 {
     if (msg == kGuiMsgTick) {
         return 1;

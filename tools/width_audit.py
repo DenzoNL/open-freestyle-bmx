@@ -220,6 +220,27 @@ for path in sorted((repo / "src").rglob("*")):
             continue
         compare(f"{rel}:{line}: BMX_FNPTR {fn}", fm.group(1), fm.group(2), f)
 
+# the function src/data stores in a function pointer ORIG_VAR: `Type gName = (Type)fn;` or `.gName = fn,`
+name_addr = {}
+for addr, uses in var_types.items():
+    for _, where in uses:
+        name_addr[where.rsplit(" ", 1)[1]] = addr
+INIT = re.compile(r"(?:^\s*[\w\s\*]+?\b|\.)(g\w+)\s*=\s*(?:\(\s*\w+\s*\)\s*)?(\w+)\s*[;,]", re.M)
+for path in sorted((repo / "src" / "data").glob("*.c")):
+    text = ac.strip_c(path.read_text(errors="replace"))
+    for m in INIT.finditer(text):
+        var, fn = m.group(1), m.group(2)
+        addr = name_addr.get(var)
+        f = by_name.get(fn)
+        if addr is None or f is None:
+            continue
+        line = text.count("\n", 0, m.start()) + 1
+        for typ, where in var_types[addr]:
+            if typ in FN_SIGS:
+                ret, params = FN_SIGS[typ]
+                compare(f"{where.split(' ')[0]}: {typ} (holds {fn}, {path.relative_to(repo).as_posix()}:{line})",
+                        ret, params, f)
+
 for addr, uses in sorted(var_types.items()):
     classes = {}
     for typ, where in uses:

@@ -127,7 +127,7 @@ static void primFill3D(ZrwIm3DVertex *out, const ZrwPrimVertex *src, const ZMatr
 static void primSetTexture(uint32_t flags, uint32_t texture)
 {
     const uint32_t state = flags & 0xffffff;
-    ZrwMaterial *material = (ZrwMaterial *)(uintptr_t)texture;
+    ZrwMaterial *material = zrwmatFromHandle(texture);
 
     if (state == gZrwRenderFlags) {
         const void *raster = (material == NULL) ? NULL : zrwmatGetRaster(material, 0);

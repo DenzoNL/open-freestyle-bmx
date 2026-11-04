@@ -649,8 +649,8 @@ static void formatCore(Out *o, const char *fmt, va_list ap)
             const char *alpha = (conv == 'X' || conv == 'p') ? "0123456789ABCDEF" : "0123456789abcdef";
 
             if (conv == 'p') {
-                prec = 8;
-                v = (uint32_t)(uintptr_t)va_arg(ap, void *);
+                prec = (int)(2 * sizeof(void *));
+                v = (uintptr_t)va_arg(ap, void *);
             } else if (size == 3) {
                 v = va_arg(ap, uint64_t);
             } else if (isSigned) {

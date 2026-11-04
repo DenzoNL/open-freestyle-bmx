@@ -16,12 +16,12 @@ enum { kZactorRiderParts = 15, kZactorBikeParts = 10 };
 /* Part cache of two players. The *Ready words say whether a player's row has been looked up. */
 typedef struct ZactorPoseTables {
     uint32_t bikeReady[2];
-    uint32_t bikeNodes[2][kZactorBikeParts];
+    void *bikeNodes[2][kZactorBikeParts]; /* skeleton nodes (zrwmatFindNode), NULL when missing */
     uint32_t riderReady[2];
-    uint32_t riderNodes[2][kZactorRiderParts];
+    void *riderNodes[2][kZactorRiderParts];
 } ZactorPoseTables;
 
-_Static_assert(sizeof(ZactorPoseTables) == 0xd8, "pose tables");
+BMX_LAYOUT32_ASSERT(sizeof(ZactorPoseTables) == 0xd8, "pose tables");
 
 #define gZactorPose ORIG_VAR(0x005da1e8, ZactorPoseTables, gZactorPose)
 
@@ -38,7 +38,7 @@ void zactorGetPartPositionNoSync(void *actor, int part, const ZVec3 *local, ZVec
 /* Length of model part `part` of an actor (a vector length, returned unrounded on the x87 stack). */
 double zactorGetPartLength(void *actor, int part);
 /* Cached model node of a part for `player` (0 when the part does not exist). */
-uint32_t zactorGetPartNode(void *actor, int part, int player);
+void *zactorGetPartNode(void *actor, int part, int player);
 /* Vector of a part (as zactorGetPartLength measures it) for `player`. */
 void zactorGetPartVector(void *actor, int part, ZVec3 *out, int player);
 

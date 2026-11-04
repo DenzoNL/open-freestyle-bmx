@@ -103,7 +103,7 @@ extern int32_t drvCameraOffset; /* the driver's camera plugin data (DrvCameraExt
 enum { kDrvCameraExtBytes = 0x20 };
 DrvRasterExt *drvRasterExt(const RwRaster *raster);
 /* Dev aid: BMX_DRIVER_TRACE=1 logs every driver entry with its first three arguments. */
-void drvTrace(const char *name, uint32_t a, uint32_t b, uint32_t c);
+void drvTrace(const char *name, uintptr_t a, uintptr_t b, uintptr_t c);
 #define DRV_TRACE(name, a, b, c) drvTrace(name, a, b, c)
 
 /* Sets RW's error slot like the original driver: plugin 1, errorCode = _rwerror(...)'s result. */
