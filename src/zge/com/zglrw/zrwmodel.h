@@ -33,8 +33,14 @@ typedef struct ZrwPartDef {
     float offset[3]; /* 0x08 game units */
     uint8_t pad14[4];
     ZQuat rotation; /* 0x18 */
-    uint8_t pad28[0x1c];
+    float scale[3]; /* 0x28 */
+    uint8_t pad34[8];
+    void *items; /* 0x3c */
+    uint8_t pad40[4];
 } ZrwPartDef;
+
+/* The same record as ZSkeletonNode (zge/ziff.h, which zrwmatSetSkeleton hands over): it holds a pointer, so
+ * it is 0x50 bytes on 64-bit, and the two must keep the same size or the table's stride differs. */
 
 /* The part definitions of a model: a count, then the array at +8. */
 typedef struct ZrwPartDefTable {
@@ -128,7 +134,7 @@ _Static_assert(sizeof(ZrwModelEntry) == 0x14, "zrw entry");
 _Static_assert(offsetof(ZrwPartDef, hash) == 0x04, "zrw part definition");
 _Static_assert(offsetof(ZrwPartDef, offset) == 0x08, "zrw part definition");
 _Static_assert(offsetof(ZrwPartDef, rotation) == 0x18, "zrw part definition");
-_Static_assert(sizeof(ZrwPartDef) == 0x44, "zrw part definition");
+BMX_LAYOUT32_ASSERT(sizeof(ZrwPartDef) == 0x44, "zrw part definition");
 _Static_assert(offsetof(ZrwPartDefTable, defs) == 0x08, "zrw part definition table");
 _Static_assert(offsetof(ZrwModelPart, def) == 0x08, "zrw part");
 BMX_LAYOUT32_ASSERT(offsetof(ZrwModelPart, frame) == 0x0c, "zrw part");

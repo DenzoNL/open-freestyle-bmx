@@ -5,6 +5,7 @@
 
 #include "compat/crt.h"
 #include "zge/com/zglrw/zrwmat.h"
+#include "zge/com/zglrw/zrwmodel.h"
 #include "zge/zanim.h"
 #include "zge/zdebug.h"
 #include "zge/zfile.h"
@@ -457,6 +458,14 @@ void zrwmatSetNodeRotation(void *nodep, const float *quat)
     node->quat[3] = quat[3];
     node->flags |= 1;
 }
+
+/* zrwModelMatchParts reads the skeleton as a ZrwPartDefTable of ZrwPartDef. */
+_Static_assert(sizeof(ZSkeletonNode) == sizeof(ZrwPartDef), "skeleton node and part definition");
+_Static_assert(offsetof(ZSkeletonNode, hash) == offsetof(ZrwPartDef, hash),
+               "skeleton node and part definition");
+_Static_assert(offsetof(ZSkeletonNode, quat) == offsetof(ZrwPartDef, rotation),
+               "skeleton node and part definition");
+_Static_assert(offsetof(ZSkeleton, nodes) == offsetof(ZrwPartDefTable, defs), "skeleton and part table");
 
 BMX_ADDR(0x004993f0)
 void *zrwmatBuildSkeleton(void *object)

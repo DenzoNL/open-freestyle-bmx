@@ -1003,7 +1003,7 @@ void ngappUpdateSun(void)
         const ZActor *rider;
         ZVec3 from;
         ZVec3 to;
-        uint8_t hit[0x5c];
+        ZrwColLineHit hit; /* was 0x5c bytes; the record holds two pointers, so 0x68 on 64-bit */
 
         gNgSunTick = 0;
         rider = riderActor(gNgPlayer);
@@ -1013,8 +1013,8 @@ void ngappUpdateSun(void)
         to.x = from.x;
         to.y = (float)((double)from.y + (double)1000.0f);
         to.z = from.z;
-        if (zrwcolLineTest(&from.x, &to.x, 1, 0, (float *)hit) != 0 && gNgMainLight != NULL) {
-            uint8_t *color = zrwcolHitColor((ZrwColLineHit *)hit);
+        if (zrwcolLineTest(&from.x, &to.x, 1, 0, (float *)&hit) != 0 && gNgMainLight != NULL) {
+            uint8_t *color = zrwcolHitColor(&hit);
 
             color[0] = (uint8_t)((color[0] >> 1) + 0x20);
             color[1] = (uint8_t)((color[1] >> 1) + 0x20);

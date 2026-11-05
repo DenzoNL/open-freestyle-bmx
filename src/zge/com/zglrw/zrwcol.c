@@ -105,7 +105,7 @@ static int objectWanted(const RpAtomic *atomic, void *const *excluded)
 }
 
 BMX_ADDR(0x004942a0)
-RpAtomic *zrwcolFilterNearest(void *arg, void *unused, RpAtomic *atomic, void *unused2, void *const *excluded)
+RpAtomic *zrwcolFilterNearest(void *arg, void *unused, RpAtomic *atomic, float unused2, void *const *excluded)
 {
     (void)unused;
     (void)unused2;
@@ -118,7 +118,7 @@ RpAtomic *zrwcolFilterNearest(void *arg, void *unused, RpAtomic *atomic, void *u
 }
 
 BMX_ADDR(0x00494750)
-RpAtomic *zrwcolFilterRecord(void *arg, void *unused, RpAtomic *atomic, void *unused2, void *const *excluded)
+RpAtomic *zrwcolFilterRecord(void *arg, void *unused, RpAtomic *atomic, float unused2, void *const *excluded)
 {
     (void)unused;
     (void)unused2;

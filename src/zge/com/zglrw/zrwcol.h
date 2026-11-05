@@ -127,9 +127,9 @@ ZrwColTriangle *zrwcolKeepNearest(void *arg, ZrwColTriangle *triangle, float dis
  * zrwModelSetCollision; the ids to skip are clump pointers), then enumerate the atomic's triangles with the
  * callback.
  */
-RpAtomic *zrwcolFilterNearest(void *arg, void *unused, RpAtomic *atomic, void *unused2,
+RpAtomic *zrwcolFilterNearest(void *arg, void *unused, RpAtomic *atomic, float unused2,
                               void *const *excluded);
-RpAtomic *zrwcolFilterRecord(void *arg, void *unused, RpAtomic *atomic, void *unused2, void *const *excluded);
+RpAtomic *zrwcolFilterRecord(void *arg, void *unused, RpAtomic *atomic, float unused2, void *const *excluded);
 /* Appends a hit record for a triangle of the world (atomic NULL) or of an atomic. */
 ZrwColTriangle *zrwcolRecordHit(void *arg, const RpWorldSector *sector, ZrwColTriangle *triangle,
                                 float distance, RpAtomic *atomic);

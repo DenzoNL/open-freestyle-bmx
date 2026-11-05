@@ -278,25 +278,25 @@ double zcollideProbeHeight(const ZVec3 *p, ZcollideProbe *out)
 {
     float top[4] = {p->x, 500.0f, p->z, 0.0f};
     float bottom[4] = {p->x, -500.0f, p->z, 0.0f};
-    float hit[0x16];
+    ZrwColLineHit hit; /* was float[0x16]; 0x68 bytes on 64-bit (two pointers) */
 
-    if (zrwcolLineTest(bottom, top, 3, 0, hit) == 0) {
+    if (zrwcolLineTest(bottom, top, 3, 0, (float *)&hit) == 0) {
         return 10000.0f;
     }
     out->kind = 2;
     out->points = &out->point;
     out->pad04 = 0;
-    out->point.x = hit[0];
-    out->point.y = hit[1];
-    out->point.z = hit[2];
+    out->point.x = hit.hit.normal[0];
+    out->point.y = hit.hit.normal[1];
+    out->point.z = hit.hit.normal[2];
     out->pad3c = 0;
     out->count = 1;
     out->byte55 = 0;
-    out->point2.x = hit[0];
-    out->point2.y = hit[1];
+    out->point2.x = hit.hit.normal[0];
+    out->point2.y = hit.hit.normal[1];
     out->byte54 = 0;
     out->word56 = 0;
-    out->point2.z = hit[2];
+    out->point2.z = hit.hit.normal[2];
     out->pad4c = 0;
     out->pad50 = 0;
     out->points2 = &out->point2;
@@ -308,8 +308,8 @@ double zcollideProbeHeight(const ZVec3 *p, ZcollideProbe *out)
     out->pad28 = 0;
     out->pad2c = 0;
     out->material = &gZcollideProbeMaterial.flags;
-    out->height = hit[0x14];
-    return hit[0x14];
+    out->height = hit.point[1];
+    return hit.point[1];
 }
 
 /* Allocates and lists the collision edges of a prop: 4 for shape kind 2, 1 for kinds 3 and 4. */

@@ -84,6 +84,18 @@ typedef struct RwVideoMode {
 enum { kMessageQuit = 0x12, kMessageAudioTick = 0x3bd, kMaxSubSystems = 8, kSubSystemNameBytes = 0x50 };
 static const char kReadBinary[] = "rb";
 
+/* MSG, as PeekMessageA fills it. */
+typedef struct ZrwMsg {
+    void *window;
+    uint32_t message;
+    uintptr_t wParam;
+    uintptr_t lParam;
+    uint32_t time;
+    int32_t x;
+    int32_t y;
+} ZrwMsg;
+BMX_LAYOUT32_ASSERT(sizeof(ZrwMsg) == 0x1c, "MSG");
+
 /* Windows entry points called through the exe's import slots. */
 typedef int(BMX_STDCALL *PeekMessageFn)(void *msg, void *window, uint32_t min, uint32_t max, uint32_t remove);
 typedef int(BMX_STDCALL *MessageFn)(const void *msg);
@@ -130,7 +142,6 @@ typedef int(BMX_STDCALL *ClipCursorFn)(const void *rect);
 typedef intptr_t(BMX_STDCALL *DefWindowProcFn)(void *window, uint32_t message, uintptr_t wparam,
                                                uintptr_t lparam);
 typedef int(BMX_STDCALL *AdjustWindowRectFn)(int32_t *rect, uint32_t style, int menu);
-typedef int(BMX_CDECL *FormatLabelFn)(char *dst, const char *format, ...);
 #define gMessageBox       ORIG_VAR(0x006997bc, MessageBoxFn, gMessageBox)
 #define gDebugBreak       ORIG_VAR(0x006995f4, DebugBreakFn, gDebugBreak)
 #define gPostQuit         ORIG_VAR(0x00699774, PostQuitFn, gPostQuit)
@@ -147,12 +158,6 @@ typedef char ZrwEpicBuffer[0x100];
 #define gEpicMessage ORIG_VAR(0x006723d0, ZrwEpicBuffer, gEpicMessage)
 typedef uint32_t ZrwKeyTable[256];
 #define gZrwKeyActions ORIG_VAR(0x0054dce8, ZrwKeyTable, gZrwKeyActions)
-/* The string interface object (+0xe8: sprintf). */
-typedef struct ZrwStringApi {
-    uint8_t pad[0xe8];
-    FormatLabelFn format;
-} ZrwStringApi;
-#define gZrwStringApi ORIG_VAR(0x0067696c, ZrwStringApi *, gZrwStringApi)
 /* IDirectDraw and IDirectDrawSurface, as far as the quit prompt uses them. */
 typedef struct DdSurfaceVtbl {
     uint8_t pad[0x28];
@@ -994,7 +999,7 @@ BMX_ADDR(0x0048bed0)
 int zrwPlayMovie(const char *name)
 {
     char path[0x200];
-    uint8_t msg[0x1c];
+    ZrwMsg msg; /* MSG: 0x1c bytes on 32-bit, 0x30 on 64-bit */
     uint32_t aborted = 0;
     void *file;
 
@@ -1015,8 +1020,8 @@ int zrwPlayMovie(const char *name)
         zmoviePlay(&gMovie, gZrwWindow, gZrwFullscreen, 0, NULL);
         tick = gTimeGetTime();
         do {
-            if (gPeekMessage(msg, NULL, 0, 0, 1) != 0) {
-                const uint32_t message = *(const uint32_t *)(msg + 4);
+            if (gPeekMessage(&msg, NULL, 0, 0, 1) != 0) {
+                const uint32_t message = msg.message;
 
                 if (message == kMessageAudioTick) {
                     gZdebugPrint("Movie : Audio Tick\n");
@@ -1025,8 +1030,8 @@ int zrwPlayMovie(const char *name)
                     if (message == kMessageQuit) {
                         rwExit(-1);
                     }
-                    gTranslateMessage(msg);
-                    gDispatchMessage(msg);
+                    gTranslateMessage(&msg);
+                    gDispatchMessage(&msg);
                 }
             } else {
                 if (gTimeGetTime() - tick >= 0x28) {
@@ -1054,9 +1059,9 @@ int zrwPlayMovie(const char *name)
         while (gTimeGetTime() - end < 500) {
             gSleep(0x14);
             zpadPoll();
-            if (gPeekMessage(msg, NULL, 0, 0, 1) != 0 && *(const uint32_t *)(msg + 4) != kMessageAudioTick) {
-                gTranslateMessage(msg);
-                gDispatchMessage(msg);
+            if (gPeekMessage(&msg, NULL, 0, 0, 1) != 0 && msg.message != kMessageAudioTick) {
+                gTranslateMessage(&msg);
+                gDispatchMessage(&msg);
             }
         }
     }
@@ -1135,8 +1140,8 @@ static uintptr_t addModeLabel(void *list, const RwVideoMode *mode, int index)
     char label[100];
     uintptr_t item;
 
-    gZrwStringApi->format(label, "%lu x %lu x %lu %s", mode->width, mode->height, mode->depth,
-                          (mode->flags & 1) != 0 ? "(Fullscreen)" : "");
+    RwEngineInstance->stringFuncs.rwsprintf(label, "%lu x %lu x %lu %s", mode->width, mode->height,
+                                            mode->depth, (mode->flags & 1) != 0 ? "(Fullscreen)" : "");
     item = gSendMessage(list, 0x143, 0, (uintptr_t)label);
     gSendMessage(list, 0x151, item, (uintptr_t)index);
     return item;
