@@ -122,47 +122,66 @@ static inline void bmxX87Rotate(float *r1, float *r2, float a, float b, const fl
  * The core's x87 matrix product (_rwcseg 0x54b038) instruction by instruction: three rows of the rotation
  * part (the loop), then the position row with the second matrix's position added. EAX = out, EDX = a,
  * EBX = b, ECX = the row counter, as the original uses them. The result depends on the x87 control word
- * (the camera update runs it at 24 bit precision, rounding down).
+ * (the camera update runs it at 24 bit precision, rounding down). On x86_64 the same registers in their
+ * 64-bit form (the pointers are 64-bit; addressing through EAX would drop the upper half).
  */
+#if defined(__x86_64__)
+#define X87_AX  "%%rax"
+#define X87_DX  "%%rdx"
+#define X87_BX  "%%rbx"
+#define X87_LEA "leaq"
+#else
+#define X87_AX  "%%eax"
+#define X87_DX  "%%edx"
+#define X87_BX  "%%ebx"
+#define X87_LEA "leal"
+#endif
 // NOLINTBEGIN(readability-non-const-parameter)
 static inline void bmxX87MatrixMultiply(float *out, const float *a, const float *b)
 {
     int rows = 3;
-    __asm__ volatile(
-        "1:\n\t"
-        "flds (%%edx)\n\tfmuls (%%ebx)\n\t"
-        "flds 4(%%edx)\n\tfmuls 0x10(%%ebx)\n\t"
-        "flds 8(%%edx)\n\tfmuls 0x20(%%ebx)\n\t"
-        "flds (%%edx)\n\tfxch %%st(1)\n\tfaddp %%st, %%st(2)\n\t"
-        "fmuls 4(%%ebx)\n\tfxch %%st(1)\n\tfaddp %%st, %%st(2)\n\t"
-        "flds 4(%%edx)\n\tfmuls 0x14(%%ebx)\n\t"
-        "flds 8(%%edx)\n\tfmuls 0x24(%%ebx)\n\t"
-        "flds (%%edx)\n\tfxch %%st(1)\n\tfaddp %%st, %%st(2)\n\t"
-        "fmuls 8(%%ebx)\n\tfxch %%st(1)\n\tfaddp %%st, %%st(2)\n\t"
-        "flds 4(%%edx)\n\tfmuls 0x18(%%ebx)\n\t"
-        "flds 8(%%edx)\n\tfmuls 0x28(%%ebx)\n\t"
-        "fxch %%st(4)\n\tfstps (%%eax)\n\tfaddp %%st, %%st(3)\n\t"
-        "fxch %%st(1)\n\tfstps 4(%%eax)\n\tfaddp %%st, %%st(1)\n\t"
-        "leal 0x10(%%edx), %%edx\n\tdecl %%ecx\n\tfstps 8(%%eax)\n\tleal 0x10(%%eax), %%eax\n\t"
-        "jne 1b\n\t"
-        "flds (%%edx)\n\tfmuls (%%ebx)\n\t"
-        "flds 4(%%edx)\n\tfxch %%st(1)\n\tfadds 0x30(%%ebx)\n\tfxch %%st(1)\n\tfmuls 0x10(%%ebx)\n\t"
-        "flds 8(%%edx)\n\tfmuls 0x20(%%ebx)\n\t"
-        "flds (%%edx)\n\tfxch %%st(1)\n\tfaddp %%st, %%st(2)\n\t"
-        "fmuls 4(%%ebx)\n\tfxch %%st(1)\n\tfaddp %%st, %%st(2)\n\t"
-        "flds 4(%%edx)\n\tfxch %%st(1)\n\tfadds 0x34(%%ebx)\n\tfxch %%st(1)\n\tfmuls 0x14(%%ebx)\n\t"
-        "flds 8(%%edx)\n\tfmuls 0x24(%%ebx)\n\t"
-        "flds (%%edx)\n\tfxch %%st(1)\n\tfaddp %%st, %%st(2)\n\t"
-        "fmuls 8(%%ebx)\n\tfxch %%st(1)\n\tfaddp %%st, %%st(2)\n\t"
-        "flds 4(%%edx)\n\tfxch %%st(1)\n\tfadds 0x38(%%ebx)\n\tfxch %%st(1)\n\tfmuls 0x18(%%ebx)\n\t"
-        "flds 8(%%edx)\n\tfmuls 0x28(%%ebx)\n\t"
-        "fxch %%st(4)\n\tfstps (%%eax)\n\tfaddp %%st, %%st(3)\n\t"
-        "fxch %%st(1)\n\tfstps 4(%%eax)\n\tfaddp %%st, %%st(1)\n\tfstps 8(%%eax)"
-        : "+a"(out), "+d"(a), "+c"(rows)
-        : "b"(b)
-        : "memory", "cc", "st", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)");
+    __asm__ volatile("1:\n\t"
+                     "flds (" X87_DX ")\n\tfmuls (" X87_BX ")\n\t"
+                     "flds 4(" X87_DX ")\n\tfmuls 0x10(" X87_BX ")\n\t"
+                     "flds 8(" X87_DX ")\n\tfmuls 0x20(" X87_BX ")\n\t"
+                     "flds (" X87_DX ")\n\tfxch %%st(1)\n\tfaddp %%st, %%st(2)\n\t"
+                     "fmuls 4(" X87_BX ")\n\tfxch %%st(1)\n\tfaddp %%st, %%st(2)\n\t"
+                     "flds 4(" X87_DX ")\n\tfmuls 0x14(" X87_BX ")\n\t"
+                     "flds 8(" X87_DX ")\n\tfmuls 0x24(" X87_BX ")\n\t"
+                     "flds (" X87_DX ")\n\tfxch %%st(1)\n\tfaddp %%st, %%st(2)\n\t"
+                     "fmuls 8(" X87_BX ")\n\tfxch %%st(1)\n\tfaddp %%st, %%st(2)\n\t"
+                     "flds 4(" X87_DX ")\n\tfmuls 0x18(" X87_BX ")\n\t"
+                     "flds 8(" X87_DX ")\n\tfmuls 0x28(" X87_BX ")\n\t"
+                     "fxch %%st(4)\n\tfstps (" X87_AX ")\n\tfaddp %%st, %%st(3)\n\t"
+                     "fxch %%st(1)\n\tfstps 4(" X87_AX ")\n\tfaddp %%st, %%st(1)\n\t" X87_LEA " 0x10(" X87_DX
+                     "), " X87_DX "\n\tdecl %%ecx\n\tfstps 8(" X87_AX ")\n\t" X87_LEA " 0x10(" X87_AX
+                     "), " X87_AX "\n\t"
+                     "jne 1b\n\t"
+                     "flds (" X87_DX ")\n\tfmuls (" X87_BX ")\n\t"
+                     "flds 4(" X87_DX ")\n\tfxch %%st(1)\n\tfadds 0x30(" X87_BX
+                     ")\n\tfxch %%st(1)\n\tfmuls 0x10(" X87_BX ")\n\t"
+                     "flds 8(" X87_DX ")\n\tfmuls 0x20(" X87_BX ")\n\t"
+                     "flds (" X87_DX ")\n\tfxch %%st(1)\n\tfaddp %%st, %%st(2)\n\t"
+                     "fmuls 4(" X87_BX ")\n\tfxch %%st(1)\n\tfaddp %%st, %%st(2)\n\t"
+                     "flds 4(" X87_DX ")\n\tfxch %%st(1)\n\tfadds 0x34(" X87_BX
+                     ")\n\tfxch %%st(1)\n\tfmuls 0x14(" X87_BX ")\n\t"
+                     "flds 8(" X87_DX ")\n\tfmuls 0x24(" X87_BX ")\n\t"
+                     "flds (" X87_DX ")\n\tfxch %%st(1)\n\tfaddp %%st, %%st(2)\n\t"
+                     "fmuls 8(" X87_BX ")\n\tfxch %%st(1)\n\tfaddp %%st, %%st(2)\n\t"
+                     "flds 4(" X87_DX ")\n\tfxch %%st(1)\n\tfadds 0x38(" X87_BX
+                     ")\n\tfxch %%st(1)\n\tfmuls 0x18(" X87_BX ")\n\t"
+                     "flds 8(" X87_DX ")\n\tfmuls 0x28(" X87_BX ")\n\t"
+                     "fxch %%st(4)\n\tfstps (" X87_AX ")\n\tfaddp %%st, %%st(3)\n\t"
+                     "fxch %%st(1)\n\tfstps 4(" X87_AX ")\n\tfaddp %%st, %%st(1)\n\tfstps 8(" X87_AX ")"
+                     : "+a"(out), "+d"(a), "+c"(rows)
+                     : "b"(b)
+                     : "memory", "cc", "st", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)");
 }
 // NOLINTEND(readability-non-const-parameter)
+#undef X87_AX
+#undef X87_DX
+#undef X87_BX
+#undef X87_LEA
 
 #else
 #include <math.h>

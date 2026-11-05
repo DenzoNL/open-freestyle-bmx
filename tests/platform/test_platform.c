@@ -2695,7 +2695,7 @@ static void testWindow(void)
               strcmp(SDL_GetWindowTitle(bmxWindowSdl(window)), "Dave Mirra Freestyle BMX") == 0,
           "title");
     bmxWindowSetInstance((void *)GetModuleHandleA(NULL));
-    CHECK(bmxStandGetWindowLongA(window, GWL_HINSTANCE) == (intptr_t)GetModuleHandleA(NULL), "GWL_HINSTANCE");
+    CHECK(bmxStandGetWindowLongA(window, GWLP_HINSTANCE) == (intptr_t)GetModuleHandleA(NULL), "GWL_HINSTANCE");
     CHECK(bmxStandShowCursor(0) == -1 && bmxStandShowCursor(1) == 0, "ShowCursor counter");
     {
         int32_t rect[4] = {0, 0, 640, 480};

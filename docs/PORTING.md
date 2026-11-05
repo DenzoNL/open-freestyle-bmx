@@ -554,6 +554,13 @@ differences are compile-time switches on the pointer width (`BMX_LAYOUT32`, comp
 - src/data declared the small HUD font (0x56bf38) as a byte and padding: the 64-bit `OvlFont` overran it.
 - Copies with 32-bit byte counts: the goal marker lists (64 pointers copied as 0x100 bytes), the LOD atomic data's
   header (0x18 bytes up to `levels`).
+- The x87 matrix product (`bmxX87MatrixMultiply`, compat/x87.h) addressed its matrices through EAX / EDX / EBX:
+  on x86_64 that drops the upper half of each pointer. It uses the 64-bit registers there now.
+- tests/platform: `GWL_HINSTANCE` is not declared for 64-bit Windows; `GWLP_HINSTANCE` (the same -6) is.
+
+The game code calls no libm function (the transcendental functions go through compat/x87.h's real x87
+instructions, everything else is SSE2 on both widths), and the x87 control word is set by `fldcw` directly (not
+`_controlfp`, which ignores the precision on x64), so neither explains the last-bit difference.
 
 **tools/data_size64.py** looks for the src/data class above: every `ORIG_VAR` site whose type, on 64-bit, reaches
 past the definition (or group member) that src/data gives its address, while it fits on 32-bit. It compiles a probe
