@@ -180,7 +180,7 @@ static void fill_modifiers(ZfxEffect *effect, int count)
             prev->next = node;
             prev->next = node;
         }
-        node->pad4 = (uint32_t)(uintptr_t)prev;
+        node->prev = prev;
         prev = node;
     }
     words[10] = (uint32_t)(uintptr_t)prev; /* tail */

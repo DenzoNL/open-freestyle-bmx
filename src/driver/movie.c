@@ -135,7 +135,7 @@ static SDL_GPUTexture *texture(SDL_GPUDevice *device, int32_t width, int32_t hei
     info.height = (Uint32)height;
     info.layer_count_or_depth = 1;
     info.num_levels = 1;
-    return SDL_CreateGPUTexture(device, &info);
+    return DRV_FPU_GUARDED(SDL_CreateGPUTexture(device, &info));
 }
 
 /* The frame texture and the target, (re)made when a size changes; a new target starts black. */
@@ -219,7 +219,7 @@ static int drawFrame(SDL_GPUDevice *device, const DibHeader *h, const uint8_t *b
     SDL_zero(info);
     info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
     info.size = size;
-    buffer = SDL_CreateGPUTransferBuffer(device, &info);
+    buffer = DRV_FPU_GUARDED(SDL_CreateGPUTransferBuffer(device, &info));
     mapped = buffer != NULL ? SDL_MapGPUTransferBuffer(device, buffer, false) : NULL;
     if (mapped == NULL) {
         SDL_ReleaseGPUTransferBuffer(device, buffer);
@@ -258,7 +258,7 @@ static int drawFrame(SDL_GPUDevice *device, const DibHeader *h, const uint8_t *b
     blit.filter = SDL_GPU_FILTER_NEAREST;
     SDL_BlitGPUTexture(cmd, &blit);
     SDL_ReleaseGPUTransferBuffer(device, buffer);
-    return SDL_SubmitGPUCommandBuffer(cmd);
+    return DRV_FPU_GUARDED(SDL_SubmitGPUCommandBuffer(cmd));
 }
 
 /*

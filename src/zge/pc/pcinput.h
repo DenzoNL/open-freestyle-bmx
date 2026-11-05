@@ -72,11 +72,11 @@ struct ZpadDiDevice {
 
 /* Record of a device in the DirectInput list: its device block and DirectInput object. */
 typedef struct ZpadDiRecord {
-    ZpadDevice *device;       /* 0x00 */
-    ZpadDiDevice *di;         /* 0x04 */
-    uint32_t flags;           /* 0x08 bit 0: acquired */
-    const uint8_t *keyMap;    /* 0x0c pairs {key, input slot}, ended by 0xff; keyboard binding */
-    const uint8_t *buttonMap; /* 0x10 8 byte header, then pairs {button, input slot}, ended by 0xff */
+    ZpadDevice *device;                  /* 0x00 */
+    ZpadDiDevice *di;                    /* 0x04 */
+    uint32_t flags;                      /* 0x08 bit 0: acquired */
+    const uint8_t *keyMap;               /* 0x0c pairs {key, input slot}, ended by 0xff; keyboard binding */
+    const struct ZpadProfile *buttonMap; /* 0x10 the pad's profile (its map: pairs {button, input slot}) */
 } ZpadDiRecord;
 
 /* 0x674028 non zero once DirectInput is set up; the records' free list; the keyboard object and its state. */
@@ -113,9 +113,10 @@ typedef struct ZpadGuid {
 typedef struct ZpadProfile {
     const char *const *names;
     const ZpadGuid *const *guids;
-    uint8_t map[1]; /* pairs {button, input slot}, ended by 0xff */
+    uint8_t map[]; /* pairs {button, input slot}, ended by 0xff */
 } ZpadProfile;
-#define gZpadProfiles ORIG_VAR(0x00561f2c, const ZpadProfile *, gZpadProfiles)
+typedef const ZpadProfile *ZpadProfileList[3];
+#define gZpadProfiles ORIG_VAR(0x00561f2c, ZpadProfileList, gZpadProfiles)
 
 /*
  * Creates the DirectInput record of a device: kind 1 (keyboard) and 2 (both) bind the keyboard (created on

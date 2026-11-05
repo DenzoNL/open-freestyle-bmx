@@ -18,14 +18,14 @@ struct ZbspShape;
  * placed props point at it, PhysPropNode.source).
  */
 typedef struct ZbspTreeObject {
-    uint32_t id;                     /* 0x00 */
-    char name[0x14];                 /* 0x04 name of the model in the scene */
-    void *model;                     /* 0x18 renderer model of the definition */
-    uint32_t pad1c;                  /* 0x1c */
-    const struct ZbspObjectDef *def; /* 0x20 OBJI block */
-    uint32_t pad24;                  /* 0x24 */
-    struct ZbspShape *shape;         /* 0x28 collision shape, built on first use */
-    uint32_t pad2c;                  /* 0x2c */
+    uint32_t id;                                /* 0x00 */
+    char name[0x14];                            /* 0x04 name of the model in the scene */
+    void *model;                                /* 0x18 renderer model of the definition */
+    uint32_t pad1c;                             /* 0x1c */
+    const struct ZbspObjectDef *def;            /* 0x20 OBJI block */
+    void(BMX_CDECL *defRelease)(void *def);     /* 0x24 releases `def` on unload (NULL: zmemFree) */
+    struct ZbspShape *shape;                    /* 0x28 collision shape, built on first use */
+    void(BMX_CDECL *shapeRelease)(void *shape); /* 0x2c releases `shape` on unload (NULL: zmemFree) */
     union {
         uint32_t params[7]; /* 0x30 the last seven words of the PDIN header */
         struct {
@@ -41,7 +41,7 @@ typedef struct ZbspTreeObject {
 /* Prop definition (0x54 bytes): a node of the tree object list (ZbspTreeNode, head at 0x6722b8). */
 typedef struct ZPropDef {
     struct ZPropDef *next; /* 0x00 */
-    uint32_t pad04;        /* 0x04 */
+    struct ZPropDef *prev; /* 0x04 */
     ZbspTreeObject object; /* 0x08 */
 } ZPropDef;
 
@@ -57,15 +57,15 @@ struct ZbspTreeObject;
  * collision code walks it as PhysPropNode; its collision object is built on first use.
  */
 typedef struct PhysPropNode {
-    struct PhysPropNode *next;           /* 0x00 */
-    uint32_t pad04;                      /* 0x04 */
-    uint32_t id;                         /* 0x08 id of the definition */
-    uint32_t placement[4];               /* 0x0c the PRBL header's tag words */
-    struct ZObj *frame;                  /* 0x1c scene object made from the model of the definition */
-    const struct ZbspTreeObject *source; /* 0x20 the definition's data (ZPropDef + 8) */
-    const struct PhysPropTag *tag;       /* 0x24 OBJI block (ngapp.c reads its first word as a colour) */
-    uint8_t pad28[0x4];                  /* 0x28 */
-    struct PhysPropObject *object;       /* 0x2c */
+    struct PhysPropNode *next;              /* 0x00 */
+    struct PhysPropNode *prev;              /* 0x04 */
+    uint32_t id;                            /* 0x08 id of the definition */
+    uint32_t placement[4];                  /* 0x0c the PRBL header's tag words */
+    struct ZObj *frame;                     /* 0x1c scene object made from the model of the definition */
+    const struct ZbspTreeObject *source;    /* 0x20 the definition's data (ZPropDef + 8) */
+    const struct PhysPropTag *tag;          /* 0x24 OBJI block (ngapp.c reads its first word as a colour) */
+    void(BMX_CDECL *tagRelease)(void *tag); /* 0x28 releases `tag` on unload (NULL: zmemFree) */
+    struct PhysPropObject *object;          /* 0x2c */
     void(BMX_CDECL *destroy)(struct PhysPropObject *object); /* 0x30 frees the object (0x468d20) */
 } PhysPropNode;
 

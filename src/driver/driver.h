@@ -21,6 +21,47 @@
 #include "rw/rwd3d.h"
 #include "rw/rwtexture.h"
 
+/*
+ * The FPU state around a call into the graphics driver. The game's float code runs on SSE in the rounding the
+ * port chose (round to nearest; the x87's mode only inside rwD3DRoundBegin / End, rw/rwd3d.h). A call into
+ * the GPU driver can leave the calling thread's MXCSR changed: on 32-bit Windows this PC's driver, compiling
+ * a pipeline, sets the SSE rounding from the x87 control word, which inside a camera update rounds down, so
+ * the game logic after it rounded down too (docs/PORTING.md X3). Every SDL GPU call that runs driver code
+ * goes through DRV_FPU_GUARDED, which puts both control words back as they were.
+ */
+typedef struct DrvFpuState {
+    uint32_t mxcsr;
+    uint16_t x87;
+} DrvFpuState;
+
+static inline DrvFpuState drvFpuSave(void)
+{
+    DrvFpuState s = {0, 0};
+#if defined(__i386__) || defined(__x86_64__)
+    __asm__ volatile("stmxcsr %0" : "=m"(s.mxcsr)::"memory");
+    __asm__ volatile("fnstcw %0" : "=m"(s.x87)::"memory");
+#endif
+    return s;
+}
+
+static inline void drvFpuRestore(DrvFpuState s)
+{
+#if defined(__i386__) || defined(__x86_64__)
+    __asm__ volatile("fldcw %0" ::"m"(s.x87) : "memory");
+    __asm__ volatile("ldmxcsr %0" ::"m"(s.mxcsr) : "memory");
+#else
+    (void)s;
+#endif
+}
+
+#define DRV_FPU_GUARDED(call)                                                                                \
+    __extension__({                                                                                          \
+        const DrvFpuState drvFpuSaved_ = drvFpuSave();                                                       \
+        __typeof__(call) drvFpuResult_ = (call);                                                             \
+        drvFpuRestore(drvFpuSaved_);                                                                         \
+        drvFpuResult_;                                                                                       \
+    })
+
 /* (original address, our function) pairs: these override a port of the same address (tools/gen_origmap.py).
  */
 extern const BmxHook bmxDriverJumps[];

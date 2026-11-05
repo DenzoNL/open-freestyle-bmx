@@ -458,7 +458,18 @@ void ngappLinkFaces(void)
         uint16_t *tag = (uint16_t *)(uintptr_t)face->tag;
 
         if (tag != NULL && *tag != 0) {
-            *(void **)(tag + 4) = ngappFindFace((struct ZbspLevelFace *)faces, *tag & 0xfffu);
+            struct ZbspLevelFace *const linked = ngappFindFace((struct ZbspLevelFace *)faces, *tag & 0xfffu);
+#if BMX_LAYOUT32
+            *(void **)(tag + 4) = linked;
+#else
+            /*
+             * The level file's tag record has a 32-bit word at +8 for the linked face; a 64-bit pointer would
+             * run 4 bytes into the next record (docs/PORTING.md X3). Its readers only test it for zero
+             * (ngifzbsp.c, ngifzcollide.c), so it keeps the face's index + 1 here, 0 for none.
+             */
+            const uint32_t word = linked != NULL ? (uint32_t)(linked - faces) + 1 : 0;
+            memcpy(tag + 4, &word, sizeof word);
+#endif
         }
     }
 }
@@ -939,7 +950,7 @@ dispatch:
             zrwmatReleaseTexture(gNgLoadTexture);
         }
         zrwUnregisterUpdateFunction(gNgLoadNode);
-        zpadSetKeyMap(*(void **)contrlerGet(0), (const uint8_t *)gNgKeyMaps + (int)gNgKeyMapSel * 0x20);
+        zpadSetKeyMap((void *)contrlerGet(0)->device, (const uint8_t *)gNgKeyMaps + (int)gNgKeyMapSel * 0x20);
         zrwOnIdle();
         zrwOnIdle();
         zrwOnIdle();

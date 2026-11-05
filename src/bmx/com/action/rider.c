@@ -112,13 +112,6 @@ static float bitsToFloat(uint32_t bits)
     return f;
 }
 
-static float readFloat(const uint8_t *base, uint32_t offset)
-{
-    float f;
-    memcpy(&f, base + offset, sizeof f);
-    return f;
-}
-
 static const void *inputState(const PhysRider *r)
 {
     return &r->inputBits;
@@ -237,17 +230,17 @@ void riderReadPads(void)
 {
     for (uint32_t i = 0; i < gPlayerCount; i++) {
         PhysRider *r = &gPhysRiders[i];
-        const uint8_t *pad = contrlerGet(gProfiles[i].controller);
+        const ContrlerState *pad = &contrlerGet(gProfiles[i].controller)->state;
 
-        memcpy(&r->inputBits, pad + 0x10, 4);
-        memcpy(&r->inputBits2, pad + 0x14, 4);
+        r->inputBits = pad->buttons;
+        r->inputBits2 = pad->pressed;
         for (uint32_t j = 0; j < 2; j++) {
-            const int32_t a = bmxFtol((double)readFloat(pad, 0x28 + j * 8) * 127.0f);
-            const int32_t b = bmxFtol((double)readFloat(pad, 0x2c + j * 8) * 127.0f);
+            const int32_t a = bmxFtol((double)pad->prevAxis[j * 2] * 127.0f);
+            const int32_t b = bmxFtol((double)pad->prevAxis[j * 2 + 1] * 127.0f);
             r->axis[j * 2] = (float)((double)(int8_t)a * (double)0x1.020408p-7f);
             r->axis[j * 2 + 1] = (float)((double)(int8_t)b * (double)0x1.020408p-7f);
-            const int32_t c = bmxFtol((double)readFloat(pad, 0x1c + j * 8) * 127.0f);
-            const int32_t d = bmxFtol((double)readFloat(pad, 0x18 + j * 8) * 127.0f);
+            const int32_t c = bmxFtol((double)pad->axis[j * 2 + 1] * 127.0f);
+            const int32_t d = bmxFtol((double)pad->axis[j * 2] * 127.0f);
             r->stick[j * 2] = (float)((double)(int8_t)d * (double)0x1.020408p-7f);
             r->stick[j * 2 + 1] = (float)((double)(int8_t)c * (double)0x1.020408p-7f);
         }

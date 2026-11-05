@@ -218,7 +218,7 @@ static SDL_GPUTexture *textureFor(RwRaster *raster, SDL_GPUCopyPass *copy)
         info.height = (Uint32)(top->height > 0 ? top->height : 1);
         info.layer_count_or_depth = 1;
         info.num_levels = 1;
-        ext->texture = SDL_CreateGPUTexture(device, &info);
+        ext->texture = DRV_FPU_GUARDED(SDL_CreateGPUTexture(device, &info));
         ext->dirty = 1;
     }
     if (ext->texture != NULL && ext->dirty && copy != NULL && ext->cpu != NULL && top->width > 0 &&
@@ -229,7 +229,7 @@ static SDL_GPUTexture *textureFor(RwRaster *raster, SDL_GPUCopyPass *copy)
         SDL_zero(tinfo);
         tinfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
         tinfo.size = size;
-        buffer = SDL_CreateGPUTransferBuffer(device, &tinfo);
+        buffer = DRV_FPU_GUARDED(SDL_CreateGPUTransferBuffer(device, &tinfo));
         if (buffer != NULL) {
             uint8_t *dst = SDL_MapGPUTransferBuffer(device, buffer, false);
             const int32_t stride = ((top->width * top->depth + 7) / 8 + 3) & ~3;
@@ -338,7 +338,7 @@ static SDL_GPUGraphicsPipeline *pipelineFor(const PipelineKey *key)
     info.target_info.num_color_targets = 1;
     info.target_info.has_depth_stencil_target = key->depth != 0;
     info.target_info.depth_stencil_format = SDL_GPU_TEXTUREFORMAT_D16_UNORM;
-    pipeline = SDL_CreateGPUGraphicsPipeline(drvGpuDevice(), &info);
+    pipeline = DRV_FPU_GUARDED(SDL_CreateGPUGraphicsPipeline(drvGpuDevice(), &info));
     if (pipeline == NULL) {
         bmxLog("driver: SDL_CreateGPUGraphicsPipeline failed: %s\n", SDL_GetError());
         return NULL;
@@ -367,7 +367,7 @@ static SDL_GPUSampler *samplerFor(int forceLinear)
         info.min_filter = info.mag_filter = linear ? SDL_GPU_FILTER_LINEAR : SDL_GPU_FILTER_NEAREST;
         info.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_NEAREST;
         info.address_mode_u = info.address_mode_v = info.address_mode_w = kModes[address];
-        *slot = SDL_CreateGPUSampler(drvGpuDevice(), &info);
+        *slot = DRV_FPU_GUARDED(SDL_CreateGPUSampler(drvGpuDevice(), &info));
     }
     return *slot;
 }
@@ -505,7 +505,7 @@ static SDL_GPUBuffer *gpuBuffer(SDL_GPUBuffer *buffer, uint32_t *have, uint32_t 
     info.usage = usage;
     info.size = size < 0x10000 ? 0x10000 : size * 2;
     *have = info.size;
-    return SDL_CreateGPUBuffer(drvGpuDevice(), &info);
+    return DRV_FPU_GUARDED(SDL_CreateGPUBuffer(drvGpuDevice(), &info));
 }
 
 /* Uploads the batch and draws it into the target; called before anything else touches the target. */
@@ -533,7 +533,7 @@ void drvDrawFlush(void)
     SDL_zero(tinfo);
     tinfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
     tinfo.size = vbytes + ibytes;
-    transfer = SDL_CreateGPUTransferBuffer(device, &tinfo);
+    transfer = DRV_FPU_GUARDED(SDL_CreateGPUTransferBuffer(device, &tinfo));
     cmd = SDL_AcquireGPUCommandBuffer(device);
     if (transfer == NULL || cmd == NULL || draw.vertexBuffer == NULL || draw.indexBuffer == NULL) {
         bmxLog("driver: draw flush failed: %s\n", SDL_GetError());
@@ -596,7 +596,7 @@ void drvDrawFlush(void)
         SDL_DrawGPUIndexedPrimitives(pass, d->numIndices, 1, d->firstIndex, d->vertexOffset, 0);
     }
     SDL_EndGPURenderPass(pass);
-    if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+    if (!DRV_FPU_GUARDED(SDL_SubmitGPUCommandBuffer(cmd))) {
         bmxLog("driver: SDL_SubmitGPUCommandBuffer failed: %s\n", SDL_GetError());
     }
     draw.numDraws = draw.numVertices = draw.numIndices = 0;
@@ -703,17 +703,17 @@ int drvDrawStart(void)
     info.code_size = dxil ? sizeof tl_vs_dxil : sizeof tl_vs_spirv;
     info.stage = SDL_GPU_SHADERSTAGE_VERTEX;
     info.num_uniform_buffers = 1;
-    draw.vs = SDL_CreateGPUShader(device, &info);
+    draw.vs = DRV_FPU_GUARDED(SDL_CreateGPUShader(device, &info));
     info.entrypoint = "psMain";
     info.code = dxil ? tl_ps_dxil : tl_ps_spirv;
     info.code_size = dxil ? sizeof tl_ps_dxil : sizeof tl_ps_spirv;
     info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
     info.num_samplers = 1;
     info.num_uniform_buffers = 1;
-    draw.ps = SDL_CreateGPUShader(device, &info);
+    draw.ps = DRV_FPU_GUARDED(SDL_CreateGPUShader(device, &info));
     info.code = dxil ? ui_ps_dxil : ui_ps_spirv;
     info.code_size = dxil ? sizeof ui_ps_dxil : sizeof ui_ps_spirv;
-    draw.psUi = SDL_CreateGPUShader(device, &info);
+    draw.psUi = DRV_FPU_GUARDED(SDL_CreateGPUShader(device, &info));
     if (draw.vs == NULL || draw.ps == NULL || draw.psUi == NULL) {
         bmxLog("driver: SDL_CreateGPUShader failed: %s\n", SDL_GetError());
         return 0;
@@ -725,7 +725,7 @@ int drvDrawStart(void)
     tinfo.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
     tinfo.width = tinfo.height = 1;
     tinfo.layer_count_or_depth = tinfo.num_levels = 1;
-    draw.white = SDL_CreateGPUTexture(device, &tinfo);
+    draw.white = DRV_FPU_GUARDED(SDL_CreateGPUTexture(device, &tinfo));
     return draw.white != NULL;
 }
 

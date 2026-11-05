@@ -964,49 +964,36 @@ struct BmxGroup_gZpadKeyMapOtherGroup gZpadKeyMapOtherGroup __attribute__((align
                    47, 11, 48, 14, 49, 16, 50, 15, 35, 17, 57, 20, 255},
 };
 
-struct BmxGroup_gZpadDefaultButtonMapGroup gZpadDefaultButtonMapGroup __attribute__((aligned(16))) = {
-    .d_00561ea9 = {0,  0, 0,  0, 0,  0, 0,  3, 8,  0, 9,  2, 10, 1,
-                   11, 4, 14, 6, 16, 5, 15, 7, 17, 8, 21, 9, 20, 255},
+/* 0x00561ea8: the profile of an unknown pad (no names, no GUIDs). */
+ZpadProfile gZpadDefaultButtonMap = {
+    .map = {3, 8, 0, 9, 2, 10, 1, 11, 4, 14, 6, 16, 5, 15, 7, 17, 8, 21, 9, 20, 255, 0, 0, 0},
 };
 
-struct BmxGroup_p_00561ec8Group p_00561ec8Group __attribute__((aligned(16))) = {
-    .p_00561ec8 =
-        {
-            &sGravisGrIP,
-            &sGravisGamePadPro,
-        },
+/* 0x00561ec8 */
+const char *const gZpadGravisNames[4] = {sGravisGrIP, sGravisGamePadPro, NULL, NULL};
+
+/* 0x00561ed8 */
+ZpadProfile gZpadGravisProfile = {
+    .names = gZpadGravisNames,
+    .map = {3, 8, 0, 9, 2, 10, 1, 11, 4, 14, 6, 16, 5, 15, 7, 17, 8, 21, 9, 20, 255, 0, 0, 0},
 };
 
-struct BmxGroup_p_00561ed8Group p_00561ed8Group __attribute__((aligned(16))) = {
-    .p_00561ed8 = &p_00561ec8Group.p_00561ec8,
-    .d_00561edc = {0, 0x9000803, 0xb010a02, 0x10060e04, 0x11070f05, 0x14091508, 255},
+/* 0x00561ef8 */
+const char *const gZpadSideWinderNames[3] = {sMicrosoftSideWinderGamePad, sMicrosoftSideWinderAutoDetect,
+                                             NULL};
+
+/* 0x00561f04 */
+const ZpadGuid *const gZpadSideWinderGuids[3] = {(const ZpadGuid *)&d_0054e0f0, NULL, NULL};
+
+/* 0x00561f10 */
+ZpadProfile gZpadSideWinderProfile = {
+    .names = gZpadSideWinderNames,
+    .guids = gZpadSideWinderGuids,
+    .map = {4, 8, 3, 9, 1, 10, 0, 11, 6, 14, 7, 15, 8, 20, 9, 21, 255, 0, 0, 0},
 };
 
-struct BmxGroup_p_00561ef8Group p_00561ef8Group __attribute__((aligned(16))) = {
-    .p_00561ef8 =
-        {
-            &sMicrosoftSideWinderGamePad,
-            &sMicrosoftSideWinderAutoDetect,
-        },
-};
-
-struct BmxGroup_p_00561f04Group p_00561f04Group __attribute__((aligned(16))) = {
-    .p_00561f04 = (void *)&d_0054e0f0,
-};
-
-struct BmxGroup_p_00561f10Group p_00561f10Group __attribute__((aligned(16))) = {
-    .p_00561f10 =
-        {
-            &p_00561ef8Group.p_00561ef8,
-            &p_00561f04Group.p_00561f04,
-        },
-    .d_00561f18 = {0x9030804, 0xb000a01, 0xf070e06, 0x15091408, 255},
-};
-
-struct BmxGroup_gZpadProfilesGroup gZpadProfilesGroup __attribute__((aligned(16))) = {
-    .gZpadProfiles = (void *)((char *)&p_00561ed8Group.p_00561ed8 + 0),
-    .p_00561f30 = &p_00561f10Group.p_00561f10,
-};
+/* 0x00561f2c */
+ZpadProfileList gZpadProfiles = {&gZpadGravisProfile, &gZpadSideWinderProfile, NULL};
 
 /* 0x00561f38 */
 char sMicrosoftSideWinderAutoDetect[36] = "Microsoft SideWinder (Auto Detect)";

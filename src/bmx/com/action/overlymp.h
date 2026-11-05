@@ -8,14 +8,16 @@
 #include <stdint.h>
 
 #include "bmx/com/action/memcard.h"
+#include "bmx/com/action/overlay.h"
 #include "compat/orig.h"
 
 /* The word being entered: 8 letters plus the terminator, then the cursor (0..7). */
 typedef char OvlMpWord[9];
 #define gOvlMpWord       ORIG_VAR(0x00557254, OvlMpWord, gOvlMpWord)
 #define gOvlMpWordCursor ORIG_VAR(0x0055725d, uint8_t, gOvlMpWordCursor)
-/* Number of text lines of the mode selection screen (the captions plus one). */
-#define gOvlMpModeLines ORIG_VAR(0x00557184, uint8_t, gOvlMpModeLines)
+/* Number of text lines of the mode selection screen (the captions plus one): its screen record's item count
+ * (0x557184). */
+#define gOvlMpModeLines (gOvlScreenRecords[14].itemCount)
 
 /* Draws a screen title in the small font, centred at the top. */
 void overlympDrawHeader(const char *title);

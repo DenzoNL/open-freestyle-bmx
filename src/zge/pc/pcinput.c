@@ -153,7 +153,7 @@ static void pollJoystick(ZpadDiRecord *record, ZpadDevice *device)
     device->input[7] = axisInput(state[1], 1);
     device->input[4] = axisInput(state[0], 0);
     device->input[5] = axisInput(state[0], 1);
-    for (const int8_t *map = (const int8_t *)record->buttonMap + 8; *map != -1; map += 2) {
+    for (const int8_t *map = (const int8_t *)record->buttonMap->map; *map != -1; map += 2) {
         ((float *)device->input)[(uint8_t)map[1]] = (buttons[map[0]] & 0x80) ? 1.0f : 0.0f;
     }
 }
@@ -300,7 +300,7 @@ ZpadDiDevice *zpadCreateDiDevice(void *window, ZpadGuid guid, const void *format
 #define gZpadFormatJoystick   ORIG_VAR(0x0054e7c8, uint8_t, gZpadFormatJoystick)
 #define gZpadKeyMapFirst      ORIG_VAR(0x00561e68, uint8_t, gZpadKeyMapFirst)
 #define gZpadKeyMapOther      ORIG_VAR(0x00561e88, uint8_t, gZpadKeyMapOther)
-#define gZpadDefaultButtonMap ORIG_VAR(0x00561ea8, uint8_t, gZpadDefaultButtonMap)
+#define gZpadDefaultButtonMap ORIG_VAR(0x00561ea8, ZpadProfile, gZpadDefaultButtonMap)
 
 /* DIPROPRANGE and DIPROPDWORD. */
 typedef struct ZpadPropRange {
@@ -386,7 +386,7 @@ ZpadDiRecord *zpadSetupDirectInput(int kind, ZpadDevice *device)
             info.size = sizeof info;
             record->di->vtbl->getDeviceInfo(record->di, &info);
             record->buttonMap = &gZpadDefaultButtonMap;
-            for (const ZpadProfile *const *entry = &gZpadProfiles; *entry != NULL; entry++) {
+            for (const ZpadProfile *const *entry = gZpadProfiles; *entry != NULL; entry++) {
                 const ZpadProfile *profile = *entry;
                 const char *const *name = profile->names;
                 const ZpadGuid *const *guid = profile->guids;
@@ -395,12 +395,12 @@ ZpadDiRecord *zpadSetupDirectInput(int kind, ZpadDevice *device)
                     name++;
                 }
                 if (*name != NULL) {
-                    record->buttonMap = (const uint8_t *)profile;
+                    record->buttonMap = profile;
                     continue;
                 }
                 for (; guid != NULL && *guid != NULL; guid++) {
                     if (memcmp(*guid, &info.guidProduct, sizeof(ZpadGuid)) == 0) {
-                        record->buttonMap = (const uint8_t *)profile;
+                        record->buttonMap = profile;
                         break;
                     }
                 }

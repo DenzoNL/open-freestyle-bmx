@@ -3097,206 +3097,80 @@ OvlElementTable gOvlElements = {
     },
 };
 
-/* 0x00557098 */
-void *p_00557098 = ovlScreen1Enter;
-
-/* 0x0055709c */
-void *p_0055709c = ovlScreen1Update;
-
-/* 0x005570a0 */
-uint32_t d_005570a0[2] = {0, 5};
-
-struct BmxGroup_p_005570a8Group p_005570a8Group __attribute__((aligned(16))) = {
-    .p_005570a8 =
-        {
-            ovlScreen2Enter,
-            ovlScreen2Update,
-        },
-    .d_005570b0 = {0, 3},
-};
-
-struct BmxGroup_p_005570b8Group p_005570b8Group __attribute__((aligned(16))) = {
-    .p_005570b8 =
-        {
-            ovlScreen3Enter,
-            ovlScreen3Update,
-            ovlScreen3Draw,
-        },
-    .d_005570c4 = 3,
-};
-
-struct BmxGroup_p_005570c8Group p_005570c8Group __attribute__((aligned(16))) = {
-    .p_005570c8 =
-        {
-            ovlScreen4Enter,
-            ovlScreen4Update,
-            ovlScreen4Draw,
-        },
-    .d_005570d4 = 1,
-};
-
-struct BmxGroup_p_005570d8Group p_005570d8Group __attribute__((aligned(16))) = {
-    .p_005570d8 =
-        {
-            ovlScreen7Enter,
-            ovlScreen7Update,
-        },
-    .d_005570e0 = {0, 2},
-};
-
-struct BmxGroup_d_005570e8Group d_005570e8Group __attribute__((aligned(16))) = {
-    .p_005570ec =
-        {
-            ovlScreen8Update,
-            ovlScreen8Draw,
-        },
-    .d_005570f4 = 1,
-};
-
-struct BmxGroup_d_005570f8Group d_005570f8Group __attribute__((aligned(16))) = {
-    .p_005570fc =
-        {
-            ovlScreen9Update,
-            ovlScreen9Draw,
-        },
-    .d_00557104 = 5,
-};
-
-struct BmxGroup_p_00557108Group p_00557108Group __attribute__((aligned(16))) = {
-    .p_00557108 =
-        {
-            ovlScreen10Enter,
-            ovlScreen10Update,
-            ovlScreen10Draw,
-        },
-    .d_00557114 = 6,
-};
-
-struct BmxGroup_p_00557118Group p_00557118Group __attribute__((aligned(16))) = {
-    .p_00557118 =
-        {
-            ovlScreen11Enter,
-            ovlScreen11Update,
-            ovlScreen11Draw,
-        },
-};
-
-struct BmxGroup_p_00557128Group p_00557128Group __attribute__((aligned(16))) = {
-    .p_00557128 =
-        {
-            ovlScreen12Enter,
-            ovlScreen12Update,
-            ovlScreen12Draw,
-        },
-    .d_00557134 = 2,
-};
-
-struct BmxGroup_p_00557138Group p_00557138Group __attribute__((aligned(16))) = {
-    .p_00557138 =
-        {
-            ovlScreen13Enter,
-            ovlScreen13Update,
-            ovlScreen13Draw,
-        },
-    .d_00557144 = 1,
-};
-
-struct BmxGroup_p_00557148Group p_00557148Group __attribute__((aligned(16))) = {
-    .p_00557148 =
-        {
-            ovlScreen16Enter,
-            ovlScreen16Update,
-            ovlScreen16Draw,
-        },
-    .d_00557154 = 1,
-};
-
-struct BmxGroup_p_00557158Group p_00557158Group __attribute__((aligned(16))) = {
-    .p_00557158 =
-        {
-            ovlScreen17Enter,
-            ovlScreen17Update,
-            ovlScreen17Draw,
-        },
-    .d_00557164 = 2,
-};
-
-struct BmxGroup_p_00557168Group p_00557168Group __attribute__((aligned(16))) = {
-    .p_00557168 =
-        {
-            ovlScreen18Enter,
-            ovlScreen18Update,
-            ovlScreen18Draw,
-        },
-    .d_00557174 = 1,
-};
-
-struct BmxGroup_d_00557178Group d_00557178Group __attribute__((aligned(16))) = {
-    .p_0055717c =
-        {
-            overlympModesUpdate,
-            overlympDrawModes,
-        },
-};
-
-/* 0x00557184 */
-uint8_t gOvlMpModeLines = 11;
-
-struct BmxGroup_d_00557188Group d_00557188Group __attribute__((aligned(16))) = {
-    .p_0055718c =
-        {
-            overlympWordEntryUpdate,
-            overlympDrawWordEntry,
-        },
-    .d_00557194 = 2,
-};
-
-struct BmxGroup_d_00557198Group d_00557198Group __attribute__((aligned(16))) = {
-    .p_0055719c =
-        {
-            overlympResultsUpdate,
-            overlympDrawRunStats,
-        },
-    .d_005571a4 = 2,
-};
-
-struct BmxGroup_d_005571a8Group d_005571a8Group __attribute__((aligned(16))) = {
-    .p_005571ac =
-        {
-            ovlScreen25Update,
-            overlympDrawResults,
-        },
-    .d_005571b4 = 3,
+/* 0x00557098: the menu screens gOvlScreens points at (OvlScreen records). */
+OvlScreenRecords gOvlScreenRecords = {
+    {.enter = ovlScreen1Enter, .update = ovlScreen1Update, .itemCount = 5}, /* 0x00557098 */
+    {.enter = ovlScreen2Enter, .update = ovlScreen2Update, .itemCount = 3}, /* 0x005570a8 */
+    {.enter = ovlScreen3Enter,
+     .update = ovlScreen3Update,
+     .draw = ovlScreen3Draw,
+     .itemCount = 3}, /* 0x005570b8 */
+    {.enter = ovlScreen4Enter,
+     .update = ovlScreen4Update,
+     .draw = ovlScreen4Draw,
+     .itemCount = 1},                                                       /* 0x005570c8 */
+    {.enter = ovlScreen7Enter, .update = ovlScreen7Update, .itemCount = 2}, /* 0x005570d8 */
+    {.update = ovlScreen8Update, .draw = ovlScreen8Draw, .itemCount = 1},   /* 0x005570e8 */
+    {.update = ovlScreen9Update, .draw = ovlScreen9Draw, .itemCount = 5},   /* 0x005570f8 */
+    {.enter = ovlScreen10Enter,
+     .update = ovlScreen10Update,
+     .draw = ovlScreen10Draw,
+     .itemCount = 6},                                                                  /* 0x00557108 */
+    {.enter = ovlScreen11Enter, .update = ovlScreen11Update, .draw = ovlScreen11Draw}, /* 0x00557118 */
+    {.enter = ovlScreen12Enter,
+     .update = ovlScreen12Update,
+     .draw = ovlScreen12Draw,
+     .itemCount = 2}, /* 0x00557128 */
+    {.enter = ovlScreen13Enter,
+     .update = ovlScreen13Update,
+     .draw = ovlScreen13Draw,
+     .itemCount = 1}, /* 0x00557138 */
+    {.enter = ovlScreen16Enter,
+     .update = ovlScreen16Update,
+     .draw = ovlScreen16Draw,
+     .itemCount = 1}, /* 0x00557148 */
+    {.enter = ovlScreen17Enter,
+     .update = ovlScreen17Update,
+     .draw = ovlScreen17Draw,
+     .itemCount = 2}, /* 0x00557158 */
+    {.enter = ovlScreen18Enter,
+     .update = ovlScreen18Update,
+     .draw = ovlScreen18Draw,
+     .itemCount = 1},                                                                   /* 0x00557168 */
+    {.update = overlympModesUpdate, .draw = overlympDrawModes, .itemCount = 11},        /* 0x00557178 */
+    {.update = overlympWordEntryUpdate, .draw = overlympDrawWordEntry, .itemCount = 2}, /* 0x00557188 */
+    {.update = overlympResultsUpdate, .draw = overlympDrawRunStats, .itemCount = 2},    /* 0x00557198 */
+    {.update = ovlScreen25Update, .draw = overlympDrawResults, .itemCount = 3},         /* 0x005571a8 */
 };
 
 /* 0x005571b8 */
 OvlScreenTable gOvlScreens = {
     0,
-    (void *)((char *)&p_00557098 + 0),
-    (void *)((char *)&p_005570a8Group.p_005570a8 + 0),
-    (void *)((char *)&p_005570b8Group.p_005570b8 + 0),
-    (void *)((char *)&p_005570c8Group.p_005570c8 + 0),
-    (void *)((char *)&p_005570c8Group.p_005570c8 + 0),
-    (void *)((char *)&p_005570c8Group.p_005570c8 + 0),
-    (void *)((char *)&p_005570d8Group.p_005570d8 + 0),
-    (void *)((char *)&d_005570e8Group.d_005570e8 + 0),
-    (void *)((char *)&d_005570f8Group.d_005570f8 + 0),
-    (void *)((char *)&p_00557108Group.p_00557108 + 0),
-    (void *)((char *)&p_00557118Group.p_00557118 + 0),
-    (void *)((char *)&p_00557128Group.p_00557128 + 0),
-    (void *)((char *)&p_00557138Group.p_00557138 + 0),
-    (void *)((char *)&p_00557138Group.p_00557138 + 0),
-    (void *)((char *)&p_00557138Group.p_00557138 + 0),
-    (void *)((char *)&p_00557148Group.p_00557148 + 0),
-    (void *)((char *)&p_00557158Group.p_00557158 + 0),
-    (void *)((char *)&p_00557168Group.p_00557168 + 0),
-    (void *)((char *)&p_00557168Group.p_00557168 + 0),
-    (void *)((char *)&p_00557168Group.p_00557168 + 0),
-    (void *)((char *)&p_00557168Group.p_00557168 + 0),
-    (void *)((char *)&d_00557178Group.d_00557178 + 0),
-    (void *)((char *)&d_00557188Group.d_00557188 + 0),
-    (void *)((char *)&d_00557198Group.d_00557198 + 0),
-    (void *)((char *)&d_005571a8Group.d_005571a8 + 0),
+    &gOvlScreenRecords[0],
+    &gOvlScreenRecords[1],
+    &gOvlScreenRecords[2],
+    &gOvlScreenRecords[3],
+    &gOvlScreenRecords[3],
+    &gOvlScreenRecords[3],
+    &gOvlScreenRecords[4],
+    &gOvlScreenRecords[5],
+    &gOvlScreenRecords[6],
+    &gOvlScreenRecords[7],
+    &gOvlScreenRecords[8],
+    &gOvlScreenRecords[9],
+    &gOvlScreenRecords[10],
+    &gOvlScreenRecords[10],
+    &gOvlScreenRecords[10],
+    &gOvlScreenRecords[11],
+    &gOvlScreenRecords[12],
+    &gOvlScreenRecords[13],
+    &gOvlScreenRecords[13],
+    &gOvlScreenRecords[13],
+    &gOvlScreenRecords[13],
+    &gOvlScreenRecords[14],
+    &gOvlScreenRecords[15],
+    &gOvlScreenRecords[16],
+    &gOvlScreenRecords[17],
 };
 
 /* 0x00557224 */

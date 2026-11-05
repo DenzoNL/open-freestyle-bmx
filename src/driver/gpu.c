@@ -156,15 +156,15 @@ int drvGpuStart(void *window)
         bmxLog("driver: the window handle %p is not the game's SDL window\n", window);
         return 0;
     }
-    gpuDevice = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL |
-                                        SDL_GPU_SHADERFORMAT_DXBC | SDL_GPU_SHADERFORMAT_MSL,
-                                    false, NULL);
+    gpuDevice = DRV_FPU_GUARDED(SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL |
+                                                        SDL_GPU_SHADERFORMAT_DXBC | SDL_GPU_SHADERFORMAT_MSL,
+                                                    false, NULL));
     if (gpuDevice == NULL) {
         sdlFail("SDL_CreateGPUDevice");
         drvGpuStop();
         return 0;
     }
-    if (!SDL_ClaimWindowForGPUDevice(gpuDevice, gpuWindow)) {
+    if (!DRV_FPU_GUARDED(SDL_ClaimWindowForGPUDevice(gpuDevice, gpuWindow))) {
         sdlFail("SDL_ClaimWindowForGPUDevice");
         drvGpuStop();
         return 0;
@@ -220,7 +220,7 @@ struct SDL_GPUTexture *drvGpuCreateTarget(int32_t width, int32_t height, int dep
         info.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
         info.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER;
     }
-    texture = SDL_CreateGPUTexture(gpuDevice, &info);
+    texture = DRV_FPU_GUARDED(SDL_CreateGPUTexture(gpuDevice, &info));
     if (texture == NULL) {
         sdlFail("SDL_CreateGPUTexture");
     }
@@ -269,7 +269,7 @@ int drvGpuClear(struct SDL_GPUTexture *color, struct SDL_GPUTexture *depth, cons
     depthTarget.stencil_store_op = SDL_GPU_STOREOP_DONT_CARE;
     pass = SDL_BeginGPURenderPass(cmd, &target, 1, depth != NULL ? &depthTarget : NULL);
     SDL_EndGPURenderPass(pass);
-    return SDL_SubmitGPUCommandBuffer(cmd) ? 1 : sdlFail("SDL_SubmitGPUCommandBuffer");
+    return DRV_FPU_GUARDED(SDL_SubmitGPUCommandBuffer(cmd)) ? 1 : sdlFail("SDL_SubmitGPUCommandBuffer");
 }
 
 /* Saves the colour target as a BMP (BMX_SHOT). */
@@ -287,7 +287,7 @@ static void saveShot(SDL_GPUTexture *texture, int32_t width, int32_t height, con
     SDL_zero(info);
     info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;
     info.size = (Uint32)(width * height * 4);
-    buffer = SDL_CreateGPUTransferBuffer(gpuDevice, &info);
+    buffer = DRV_FPU_GUARDED(SDL_CreateGPUTransferBuffer(gpuDevice, &info));
     cmd = buffer != NULL ? SDL_AcquireGPUCommandBuffer(gpuDevice) : NULL;
     if (cmd == NULL) {
         sdlFail("screenshot buffer");
@@ -304,7 +304,7 @@ static void saveShot(SDL_GPUTexture *texture, int32_t width, int32_t height, con
     dst.transfer_buffer = buffer;
     SDL_DownloadFromGPUTexture(copy, &region, &dst);
     SDL_EndGPUCopyPass(copy);
-    fence = SDL_SubmitGPUCommandBufferAndAcquireFence(cmd);
+    fence = DRV_FPU_GUARDED(SDL_SubmitGPUCommandBufferAndAcquireFence(cmd));
     if (fence != NULL && SDL_WaitForGPUFences(gpuDevice, true, &fence, 1)) {
         pixels = SDL_MapGPUTransferBuffer(gpuDevice, buffer, false);
         if (pixels != NULL) {
@@ -352,7 +352,7 @@ static int presentTarget(struct SDL_GPUTexture *color, int32_t x, int32_t y, int
         return sdlFail("SDL_AcquireGPUCommandBuffer");
     }
     start = measureAcquire ? SDL_GetTicksNS() : 0;
-    if (!SDL_WaitAndAcquireGPUSwapchainTexture(cmd, gpuWindow, &swapchain, &w, &h)) {
+    if (!DRV_FPU_GUARDED(SDL_WaitAndAcquireGPUSwapchainTexture(cmd, gpuWindow, &swapchain, &w, &h))) {
         SDL_CancelGPUCommandBuffer(cmd);
         return sdlFail("SDL_WaitAndAcquireGPUSwapchainTexture");
     }
@@ -374,7 +374,7 @@ static int presentTarget(struct SDL_GPUTexture *color, int32_t x, int32_t y, int
         blit.clear_color.a = 1.0f;
         SDL_BlitGPUTexture(cmd, &blit);
     }
-    if (!SDL_SubmitGPUCommandBuffer(cmd)) {
+    if (!DRV_FPU_GUARDED(SDL_SubmitGPUCommandBuffer(cmd))) {
         return sdlFail("SDL_SubmitGPUCommandBuffer");
     }
     return 1;

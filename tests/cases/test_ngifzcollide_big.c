@@ -125,7 +125,7 @@ static void BMX_CDECL stubBuildColl(PhysPropNode *node)
 {
     ngLog(0x468bc0);
     ngLogPtr(node);
-    node->object = *(PhysPropObject **)node->pad28;
+    node->object = *(PhysPropObject **)(void *)&node->tagRelease;
 }
 
 static void makeProps(void)
@@ -142,7 +142,7 @@ static void makeProps(void)
         n->frame = gFrames[i];
         tag->range = dt_u32() % 3 ? 0 : (uint16_t)dt_u32();
         n->tag = dt_u32() % 4 ? tag : NULL;
-        *(PhysPropObject **)n->pad28 = o;
+        *(PhysPropObject **)(void *)&n->tagRelease = o;
         n->object = dt_u32() % 3 ? o : NULL;
         n->next = head;
         head = n;

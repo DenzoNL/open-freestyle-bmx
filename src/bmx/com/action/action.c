@@ -244,7 +244,7 @@ uint32_t actionStopSounds(void)
 BMX_ADDR(0x004040e0)
 uint32_t actionUpdate(void)
 {
-    uint32_t *const padFlags = *(uint32_t **)contrlerGet(0);
+    uint32_t *const padFlags = (uint32_t *)(void *)contrlerGet(0)->device; /* the device record's words */
     const uint32_t buttons = contrlerPoll();
     uint32_t player = 0;
     uint32_t i;
@@ -289,24 +289,23 @@ uint32_t actionUpdate(void)
         goto L_4211;
     case 1:
         for (i = 0; i < 2; i++) {
-            uint8_t *const pad = contrlerGet(i);
-            uint32_t *const padWords = (uint32_t *)(void *)pad;
+            ContrlerPad *const pad = contrlerGet(i);
 
-            if ((padWords[5] & 0xfffffcffu) != 0) {
-                *(uint16_t *)(void *)(pad + 0xe) = 0x14;
+            if ((pad->state.pressed & 0xfffffcffu) != 0) {
+                pad->flags2 = 0x14;
                 gAction.timer = 0;
             } else {
-                uint16_t hold = *(uint16_t *)(void *)(pad + 0xe);
+                uint16_t hold = pad->flags2;
 
                 if (hold == 0) {
-                    const uint32_t keys = padWords[4];
+                    const uint32_t keys = pad->state.buttons;
 
-                    padWords[5] = keys & 0xf;
+                    pad->state.pressed = keys & 0xf;
                     hold = (keys & 0x300) != 0 ? 0 : 3;
                 } else {
                     hold = (uint16_t)(hold - 1);
                 }
-                *(uint16_t *)(void *)(pad + 0xe) = hold;
+                pad->flags2 = hold;
             }
         }
         ovlUpdate();
@@ -639,10 +638,9 @@ L_49fe:
 
 L_4a2d:
     for (i = 0; i < 2; i++) {
-        const uint8_t *const pad = contrlerGet(i);
-        const uint32_t *const padWords = (const uint32_t *)(const void *)pad;
+        const ContrlerPad *const pad = contrlerGet(i);
 
-        if ((pad[0xc] & 1) == 0 && (padWords[4] & padWords[5]) != 0) {
+        if ((pad->flags & 1) == 0 && (pad->state.buttons & pad->state.pressed) != 0) {
             goto L_477b;
         }
     }

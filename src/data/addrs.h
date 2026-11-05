@@ -65,7 +65,7 @@ extern struct BmxDataOpaque bmxAt_gGoalEntriesBGroup __asm__(BMX_SYM("gGoalEntri
 extern struct BmxDataOpaque bmxAt_gOvlSavedSubMode __asm__(BMX_SYM("gOvlSavedSubMode"));
 extern struct BmxDataOpaque bmxAt_gOvlSaveStep __asm__(BMX_SYM("gOvlSaveStep"));
 extern struct BmxDataOpaque bmxAt_gOvlElements __asm__(BMX_SYM("gOvlElements"));
-extern struct BmxDataOpaque bmxAt_gOvlMpModeLines __asm__(BMX_SYM("gOvlMpModeLines"));
+extern struct BmxDataOpaque bmxAt_gOvlScreenRecords __asm__(BMX_SYM("gOvlScreenRecords"));
 extern struct BmxDataOpaque bmxAt_gOvlScreens __asm__(BMX_SYM("gOvlScreens"));
 extern struct BmxDataOpaque bmxAt_gOvlSavePages __asm__(BMX_SYM("gOvlSavePages"));
 extern struct BmxDataOpaque bmxAt_gOvlMpWord __asm__(BMX_SYM("gOvlMpWord"));
@@ -319,8 +319,8 @@ extern struct BmxDataOpaque bmxAt_gNgifSetViewportGroup __asm__(BMX_SYM("gNgifSe
 extern struct BmxDataOpaque bmxAt_gNgifSetViewOffset __asm__(BMX_SYM("gNgifSetViewOffset"));
 extern struct BmxDataOpaque bmxAt_gZpadKeyMapFirstGroup __asm__(BMX_SYM("gZpadKeyMapFirstGroup"));
 extern struct BmxDataOpaque bmxAt_gZpadKeyMapOtherGroup __asm__(BMX_SYM("gZpadKeyMapOtherGroup"));
-extern struct BmxDataOpaque bmxAt_gZpadDefaultButtonMapGroup __asm__(BMX_SYM("gZpadDefaultButtonMapGroup"));
-extern struct BmxDataOpaque bmxAt_gZpadProfilesGroup __asm__(BMX_SYM("gZpadProfilesGroup"));
+extern struct BmxDataOpaque bmxAt_gZpadDefaultButtonMap __asm__(BMX_SYM("gZpadDefaultButtonMap"));
+extern struct BmxDataOpaque bmxAt_gZpadProfiles __asm__(BMX_SYM("gZpadProfiles"));
 extern struct BmxDataOpaque bmxAt_gZglInitCol __asm__(BMX_SYM("gZglInitCol"));
 extern struct BmxDataOpaque bmxAt_gZglExitCol __asm__(BMX_SYM("gZglExitCol"));
 extern struct BmxDataOpaque bmxAt_gZrwColLineFn __asm__(BMX_SYM("gZrwColLineFn"));
@@ -1308,7 +1308,7 @@ extern struct BmxDataOpaque bmxAt_rpAnimHeadNameGroup __asm__(BMX_SYM("rpAnimHea
 #define BMX_DATA_0x00556ef8 ((char *)&bmxAt_gOvlSavedSubMode)
 #define BMX_DATA_0x00556efc ((char *)&bmxAt_gOvlSaveStep)
 #define BMX_DATA_0x00556f00 ((char *)&bmxAt_gOvlElements)
-#define BMX_DATA_0x00557184 ((char *)&bmxAt_gOvlMpModeLines)
+#define BMX_DATA_0x00557098 ((char *)&bmxAt_gOvlScreenRecords)
 #define BMX_DATA_0x005571b8 ((char *)&bmxAt_gOvlScreens)
 #define BMX_DATA_0x00557224 ((char *)&bmxAt_gOvlSavePages)
 #define BMX_DATA_0x00557254 ((char *)&bmxAt_gOvlMpWord)
@@ -1616,8 +1616,8 @@ extern struct BmxDataOpaque bmxAt_rpAnimHeadNameGroup __asm__(BMX_SYM("rpAnimHea
 #define BMX_DATA_0x00561dc0 ((char *)&bmxAt_gNgifSetViewOffset)
 #define BMX_DATA_0x00561e68 ((char *)&bmxAt_gZpadKeyMapFirstGroup + 0x8)
 #define BMX_DATA_0x00561e88 ((char *)&bmxAt_gZpadKeyMapOtherGroup + 0x8)
-#define BMX_DATA_0x00561ea8 ((char *)&bmxAt_gZpadDefaultButtonMapGroup + 0x8)
-#define BMX_DATA_0x00561f2c ((char *)&bmxAt_gZpadProfilesGroup + BMX_DATA_OFF(0xc, 0x10))
+#define BMX_DATA_0x00561ea8 ((char *)&bmxAt_gZpadDefaultButtonMap)
+#define BMX_DATA_0x00561f2c ((char *)&bmxAt_gZpadProfiles)
 #define BMX_DATA_0x00562060 ((char *)&bmxAt_gZglInitCol)
 #define BMX_DATA_0x00562064 ((char *)&bmxAt_gZglExitCol)
 #define BMX_DATA_0x00562068 ((char *)&bmxAt_gZrwColLineFn)

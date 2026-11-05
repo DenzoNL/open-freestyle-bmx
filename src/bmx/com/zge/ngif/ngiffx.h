@@ -47,7 +47,7 @@ typedef struct ZfxModifier {
 
 typedef struct ZfxModifierNode {
     struct ZfxModifierNode *next;
-    uint32_t pad4;
+    struct ZfxModifierNode *prev;
     ZfxModifier *modifier; /* 0x08 */
     void *arg;             /* 0x0c */
 } ZfxModifierNode;

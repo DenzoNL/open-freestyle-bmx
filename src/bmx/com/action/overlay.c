@@ -703,10 +703,10 @@ int ovlScreen2Update(void)
         ovlSound(kOvlSoundBack, 0, 0);
         return 1;
     }
-    if ((contrlerGet(profile->controller)[0xc] & 3) != 0) {
+    if ((contrlerGet(profile->controller)->flags & 3) != 0) {
         profile->flags &= 0xfe;
         ovlScreen2Refresh();
-        if ((contrlerGet(profile->controller)[0xc] & 2) != 0) {
+        if ((contrlerGet(profile->controller)->flags & 2) != 0) {
             ovlSound(kOvlSoundSelect, 0, 0);
         }
     }

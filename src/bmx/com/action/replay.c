@@ -117,7 +117,7 @@ static void recordFrame(uint32_t handle, Replay *r)
     r->field08++;
     r->field10++;
     /* The counters are advanced before the lookup: a bad controller index asserts (and aborts) inside it. */
-    pad = (const ContrlerPad *)contrlerGet(((const OvlProfile *)gProfiles)[r->rider].controller);
+    pad = contrlerGet(((const OvlProfile *)gProfiles)[r->rider].controller);
     if ((pad->flags & 1) != 0) {
         return;
     }
@@ -350,8 +350,7 @@ uint8_t replaySetMode(uint32_t handle, uint32_t mode)
 {
     Replay *const rp = replayLookup(handle, 0x175, 0x177);
     PhysRider *const r = &gPhysRiders[rp->rider];
-    const ContrlerPad *const pad =
-        (const ContrlerPad *)contrlerGet(((const OvlProfile *)gProfiles)[rp->rider].controller);
+    const ContrlerPad *const pad = contrlerGet(((const OvlProfile *)gProfiles)[rp->rider].controller);
     const uint32_t old = rp->state;
 
     if (mode == old) {

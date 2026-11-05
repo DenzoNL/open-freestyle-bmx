@@ -94,8 +94,8 @@ int zpropLoadDef(void *iff)
         ziffRead(iff, extra, block.bytes);
         def->object.def = extra;
     }
-    def->object.pad2c = 0;
-    def->object.pad24 = 0;
+    def->object.shapeRelease = NULL;
+    def->object.defRelease = NULL;
     def->object.shape = NULL;
     zrwListAdd(&gZpropDefs, def);
     zsceneAddEntry(NULL, header.id, 1, 1, def->object.model);
@@ -183,7 +183,7 @@ int zpropLoad(void *iff)
         inst->tag = extra;
     }
     inst->destroy = NULL;
-    *(uint32_t *)(void *)inst->pad28 = 0;
+    inst->tagRelease = NULL;
     ziffEndModel(iff);
     return 1;
 }

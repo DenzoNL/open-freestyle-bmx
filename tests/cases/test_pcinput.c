@@ -210,7 +210,7 @@ static ZMemFreeList *make_records(int count)
         r->di = (dt_u32() % 5 == 0) ? NULL : make_di();
         r->flags = dt_u32();
         r->keyMap = (dt_u32() % 3 == 0) ? NULL : make_map(0, 0xff);
-        r->buttonMap = make_map(8, 0xff);
+        r->buttonMap = (const ZpadProfile *)make_map(8, 0xff);
     }
     return list;
 }
@@ -474,7 +474,7 @@ static int32_t BMX_STDCALL stubGetDeviceInfo(ZpadDiDevice *self, void *infop)
     ngLog(0xd1e006);
     ngLogPtr(self);
     ngLog(*(uint32_t *)info);
-    while ((&gZpadProfiles)[profiles] != NULL) {
+    while (gZpadProfiles[profiles] != NULL) {
         profiles++;
     }
     fill_words(info + 0x14, 0x10);
@@ -483,7 +483,7 @@ static int32_t BMX_STDCALL stubGetDeviceInfo(ZpadDiDevice *self, void *infop)
     }
     info[0x12c + 12] = 0;
     if (mode >= 1 && mode <= 3) {
-        const ZpadProfile *p = (&gZpadProfiles)[dt_u32() % profiles];
+        const ZpadProfile *p = gZpadProfiles[dt_u32() % profiles];
         const uint32_t n = nameCount(p);
 
         if (n != 0) {
@@ -498,7 +498,7 @@ static int32_t BMX_STDCALL stubGetDeviceInfo(ZpadDiDevice *self, void *infop)
         }
     }
     if (mode >= 3) {
-        const ZpadProfile *p = (&gZpadProfiles)[dt_u32() % profiles];
+        const ZpadProfile *p = gZpadProfiles[dt_u32() % profiles];
         const uint32_t n = guidCount(p);
 
         if (n != 0) {

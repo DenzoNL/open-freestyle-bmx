@@ -161,6 +161,16 @@ __attribute__((regparm(2))) int EngineOpen(const RwDevice *device, void *openPar
         return 0;
     }
     *instance = RwDefaultGlobals;
+    /*
+     * Port fix (docs/PORTING.md X3): the original leaves the plugin part (the modules' data) as malloc
+     * returned it, and the image module never sets its name buffer fields (0x210 / 0x214), so it relies on
+     * that memory being zero. With a reused heap block the buffer size is garbage, no name buffer is ever
+     * made and every image lookup fails (the shadow texture at start-up). Zeroed here.
+     */
+    if ((size_t)rwEngineRegistry.sizeOfStruct > sizeof *instance) {
+        memset((uint8_t *)instance + sizeof *instance, 0,
+               (size_t)rwEngineRegistry.sizeOfStruct - sizeof *instance);
+    }
     if (!device->fpSystem(rwDEVICESYSTEMREGISTER, &RwEngineInstance->dOpenDevice,
                           &RwEngineInstance->memoryFuncs, 0)) {
         rwDeviceError(rwDEVICESYSTEMREGISTER);

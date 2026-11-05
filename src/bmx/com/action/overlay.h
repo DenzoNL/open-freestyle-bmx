@@ -163,6 +163,7 @@ typedef uint8_t OvlBytes128[0x80];
 typedef uint8_t OvlBytes256[0x100];
 typedef OvlElement OvlElementTable[17];
 typedef OvlScreen *OvlScreenTable[0x1b];
+typedef OvlScreen OvlScreenRecords[18];
 typedef OvlPageDef OvlPageDefs[12];
 typedef const ZStringSet *OvlStringSets[2];
 typedef uint8_t OvlVolumes[4];
@@ -181,6 +182,8 @@ typedef uint32_t OvlSize2[2];
 /* Element and screen tables. */
 #define gOvlElements ORIG_VAR(0x00556f00, OvlElementTable, gOvlElements)
 #define gOvlScreens  ORIG_VAR(0x005571b8, OvlScreenTable, gOvlScreens)
+/* The screens gOvlScreens points at (record 14: the multiplayer mode selection). */
+#define gOvlScreenRecords ORIG_VAR(0x00557098, OvlScreenRecords, gOvlScreenRecords)
 
 /* Current screen state. */
 #define gOvlScreen       ORIG_VAR(0x0056bf20, OvlScreen *, gOvlScreen)

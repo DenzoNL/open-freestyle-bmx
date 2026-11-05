@@ -281,12 +281,12 @@ BMX_ADDR(0x004086d0)
 void contrlerRumble(int player, int a, int b) {}
 
 BMX_ADDR(0x004086f0)
-uint8_t *contrlerGet(uint32_t index)
+ContrlerPad *contrlerGet(uint32_t index)
 {
     if (index > 1) {
         zdebugFail("controller number out of range", contrlerFile, 0x346, 0);
     }
-    return (uint8_t *)&(&gContrlerPads[0])[index];
+    return &(&gContrlerPads[0])[index];
 }
 
 /*

@@ -2108,7 +2108,7 @@ static int32_t speedPitch(const PhysRider *r)
 BMX_ADDR(0x0042b5e0)
 void physMoveScripted(PhysRider *r)
 {
-    const uint8_t *obj;
+    const ZRig *rig; /* the rider and bike rigs of the scripted motion (zoverii.h) */
 
     for (int w = 0; w < 2; w++) {
         decaySpin(&r->wheel[w]);
@@ -2127,19 +2127,17 @@ void physMoveScripted(PhysRider *r)
         for (int i = 0; i < 30; i++) {
             dst[i] = src[i];
         }
-        obj = r->actor2;
-        zmatrixCopyRotation(orient(r), (const ZMatrix *)(const void *)(obj + 8));
-        obj = r->actor2;
-        r->pos = *(const ZVec3 *)(const void *)(obj + 0xe70);
+        rig = r->actor2;
+        zmatrixCopyRotation(orient(r), &rig->points[0].basis);
+        r->pos = rig->center;
         zvec3Zero(&r->step);
-        obj = r->actor2;
-        r->vel = *(const ZVec3 *)(const void *)(obj + 0x88);
+        r->vel = rig->points[0].vel;
         r->speed = (float)zvec3Length(&r->vel);
     }
     zoverStepBikeMotion(r->bikeObj2, r->bikeObj);
-    obj = r->bikeObj2;
-    r->center = *(const ZVec3 *)(const void *)(obj + 0xe70);
-    zmatrixCopyRotation(&r->basis, (const ZMatrix *)(const void *)(obj + 8));
+    rig = r->bikeObj2;
+    r->center = rig->center;
+    zmatrixCopyRotation(&r->basis, &rig->points[0].basis);
     bmxSoundPlayAt(4000, &r->center, (int)((uint32_t)r->player << 28 | 0x103), 0, wheelVolume(r));
 }
 

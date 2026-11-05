@@ -86,8 +86,8 @@ int contrlerPressed(int player, uint32_t mask, uint32_t status);
 const float *contrlerAxes(const void *state, uint32_t index);
 /* Force feedback pulse; empty in the PC build. */
 void contrlerRumble(int player, int a, int b);
-/* Controller record (asserts index < 2); bits 0 and 1 of the byte at +0xc are the pad flags. */
-uint8_t *contrlerGet(uint32_t index);
+/* Controller record (asserts index < 2). */
+ContrlerPad *contrlerGet(uint32_t index);
 /* Tests a state against a mask in one of the modes above. */
 int contrlerTest(const ContrlerState *state, uint32_t mask, uint32_t mode);
 

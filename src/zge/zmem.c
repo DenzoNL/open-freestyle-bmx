@@ -4,6 +4,7 @@
 #include "compat/crt.h"
 #include "zge/com/zglrw/zrwzgl.h"
 #include "zge/zdebug.h"
+#include "zge/zgemods/zprop.h"
 #include "zge/zstring.h"
 
 static const char zmemFile[] = "C:\\NgEngine\\Zge\\zmem.c";
@@ -459,26 +460,7 @@ void zmemPoolFree(ZMemPool *pool, void *payload)
  * 0x490ff0/0x4913d0 (their only callers), not zmem.c.
  */
 
-/* Resource released through `release`, or zmemFree when there is no release function. */
-typedef struct ZDeferredResource {
-    void *ptr;
-    ZMemDestroyFn release;
-} ZDeferredResource;
-
-/* Node of list 0x6722c4. */
-typedef struct ZDeferredNodeC {
-    ZMemFreeNode links;
-    uint8_t unknown[0x1c];
-    ZDeferredResource res[2];
-} ZDeferredNodeC;
-
-/* Node of list 0x6722b8: four more bytes of header. */
-typedef struct ZDeferredNodeB {
-    ZMemFreeNode links;
-    uint8_t unknown[0x20];
-    ZDeferredResource res[2];
-} ZDeferredNodeB;
-
+/* zprop's lists: the prop definitions (B) and the placed props (C). */
 #define gDeferredB ORIG_VAR(0x006722b8, ZrwList, gDeferredB)
 #define gDeferredC ORIG_VAR(0x006722c4, ZrwList, gDeferredC)
 
@@ -490,12 +472,13 @@ int zmemDeferredInit(void)
     return 1;
 }
 
-static void zmemReleaseResource(const ZDeferredResource *res)
+/* A resource released through `release`, or zmemFree when there is no release function. */
+static void zmemReleaseResource(void *ptr, ZMemDestroyFn release)
 {
-    if (res->release != NULL) {
-        res->release(res->ptr);
-    } else if (res->ptr != NULL) {
-        zmemFree(res->ptr);
+    if (release != NULL) {
+        release(ptr);
+    } else if (ptr != NULL) {
+        zmemFree(ptr);
     }
 }
 
@@ -503,18 +486,18 @@ static void zmemReleaseResource(const ZDeferredResource *res)
 BMX_ADDR(0x00486940)
 void zmemDeferredFlush(void)
 {
-    ZDeferredNodeC *c;
+    ZPropInst *c;
     while ((c = gDeferredC.head) != NULL) {
         zrwListRemove(&gDeferredC, c);
-        zmemReleaseResource(&c->res[0]);
-        zmemReleaseResource(&c->res[1]);
+        zmemReleaseResource((void *)c->tag, c->tagRelease);
+        zmemReleaseResource(c->object, (ZMemDestroyFn)c->destroy);
         zmemFree(c);
     }
-    ZDeferredNodeB *b;
+    ZPropDef *b;
     while ((b = gDeferredB.head) != NULL) {
         zrwListRemove(&gDeferredB, b);
-        zmemReleaseResource(&b->res[0]);
-        zmemReleaseResource(&b->res[1]);
+        zmemReleaseResource((void *)b->object.def, b->object.defRelease);
+        zmemReleaseResource(b->object.shape, b->object.shapeRelease);
         zmemFree(b);
     }
 }

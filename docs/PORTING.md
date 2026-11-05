@@ -561,6 +561,48 @@ differences are compile-time switches on the pointer width (`BMX_LAYOUT32`, comp
 The game code calls no libm function (the transcendental functions go through compat/x87.h's real x87
 instructions, everything else is SSE2 on both widths), and the x87 control word is set by `fldcw` directly (not
 `_controlfp`, which ignores the precision on x64), so neither explains the last-bit difference.
+Found running the scripted ride and the user's recording on both widths (all invisible on 32-bit):
+- Records src/data held as loose words where the code reads structs with pointers: the 18 overlay menu screens
+  (now `gOvlScreenRecords`, `OvlScreen`; `gOvlMpModeLines` is screen 14's item count), the pad profiles (the three
+  `ZpadProfile` records with their NULL-ended name and GUID lists, `gZpadProfiles` a 3-entry list; the button map
+  is read as `profile->map`, not at a literal +8).
+- The prop lists' nodes: `ZPropDef` / `PhysPropNode` had a 32-bit word where zrwList keeps its `prev` pointer, and
+  32-bit words for the release functions zmem's deferred flush calls (`defRelease`, `shapeRelease`,
+  `tagRelease`); the flush walks the real types now instead of its own 32-bit views. The effect modifier node
+  had the same `prev` word.
+- The controller record read through byte offsets (`contrlerGet` returned bytes): `riderReadPads` read the
+  buttons and sticks 4 bytes early on 64-bit (the device pointer grew). `contrlerGet` returns `ContrlerPad *`.
+- `ngappLinkFaces` stores the linked face in the level file's tag record, whose slot is a 32-bit word: on
+  64-bit the pointer zeroed the next record's id (faces lost their surface kind). Its readers only test the slot
+  for zero, so 64-bit stores the face index + 1 (32-bit unchanged).
+- `physMoveScripted` read the rigs' centre, basis and velocity at literal offsets; `ZRig`'s centre moves on 64-bit
+  (its hinges hold pointers). Named fields now.
+
+#### The SSE rounding after a driver call
+
+On 32-bit Windows this PC's graphics driver, compiling a pipeline (SDL_CreateGPUGraphicsPipeline, first use of a
+render state), leaves the calling thread's MXCSR rounding set from the x87 control word. Pipelines are made during
+the camera update, when the x87 rounds down (camera mode), so from the first one on (tick 0) the 32-bit game
+logic ran its SSE maths rounding down; the 64-bit driver does not do this. That was the last-bit difference from
+tick 1. It also means the 32-bit reference replays depended on the GPU driver.
+1. Save and restore both control words around every SDL GPU call that runs driver code (`DRV_FPU_GUARDED`,
+   driver.h: object creation, submit, swapchain, window claim). The game logic rounds to nearest as the port
+   intends, on any driver and width. The 32-bit replays change once (new reference hashes).
+2. Imitate the accident on 64-bit (round down after the first pipeline): keeps the old reference hashes, but
+   encodes this driver's quirk; another driver gives other results.
+Decision (2026-11-05, proposed, for the user to confirm): option 1.
+
+#### The engine instance's plugin data
+
+`EngineOpen` mallocs the engine instance and copies only the static part; the modules' data behind it stays as
+the heap returned it. The image module never sets its name buffer fields and relies on them being zero; with a
+reused heap block the size is garbage, no name buffer is made and every image lookup fails (on 64-bit about one
+start in seven: the shadow texture, then a crash in LoadTexture). The original has the same read.
+1. Zero the plugin part in `EngineOpen` (engine.c). What the original evidently relied on; the only change is
+   where the original read uninitialised memory.
+2. Initialise just the image module's two fields in `_rwImageOpen`: narrower, but any other module with the
+   same assumption stays exposed.
+Decision (2026-11-05, proposed, for the user to confirm): option 1.
 
 **tools/data_size64.py** looks for the src/data class above: every `ORIG_VAR` site whose type, on 64-bit, reaches
 past the definition (or group member) that src/data gives its address, while it fits on 32-bit. It compiles a probe
@@ -586,8 +628,9 @@ Decision (2026-11-05): option 1 (32-bit byte-identical, the oracle unaffected).
 **Debug aids:** `BMX_GUARD_HEAP=1` (src/native/crt.c) puts every C-runtime block before an inaccessible page so an
 overrun faults at the write; with lldb (llvm-mingw's) that gives the writer's backtrace.
 
-**Where it stands:** the 64-bit exe starts, loads the front end and levels and runs the scripted ride's first 24
-ticks. Open: the camera's ground probe differs in the last bit from tick 2 (being traced); the remaining crashes.
+**Where it stands (2026-11-05):** the scripted ride (1014 ticks) and the user's recording (6189 ticks) give the same
+BMX_SIM_HASH on native32 and native64 on every tick. The 32-bit reference hashes were made again after the FPU
+guard (above). Next: the user plays the 64-bit build; a release build.
 
 
 ## Not in scope
