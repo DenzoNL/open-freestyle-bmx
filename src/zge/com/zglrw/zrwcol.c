@@ -48,8 +48,8 @@ int zrwColSystemShutdown(void)
 }
 
 BMX_ADDR(0x00494240)
-ZrwColTriangle *zrwcolKeepNearestSub(void *arg, uint32_t sub, ZrwColTriangle *triangle, float distance,
-                                     uint32_t user)
+ZrwColTriangle *zrwcolKeepNearestSub(void *arg, const RpWorldSector *sub, ZrwColTriangle *triangle,
+                                     float distance, RpAtomic *user)
 {
     (void)arg;
     if (gZrwCol.found != 0 && distance > gZrwCol.nearest) {
@@ -64,7 +64,7 @@ ZrwColTriangle *zrwcolKeepNearestSub(void *arg, uint32_t sub, ZrwColTriangle *tr
 }
 
 BMX_ADDR(0x00494310)
-ZrwColTriangle *zrwcolKeepNearest(void *arg, ZrwColTriangle *triangle, float distance, uint32_t user)
+ZrwColTriangle *zrwcolKeepNearest(void *arg, ZrwColTriangle *triangle, float distance, RpAtomic *user)
 {
     (void)arg;
     if (gZrwCol.found != 0 && distance > gZrwCol.nearest) {
@@ -72,7 +72,7 @@ ZrwColTriangle *zrwcolKeepNearest(void *arg, ZrwColTriangle *triangle, float dis
     }
     gZrwCol.found = 1;
     gZrwCol.bestUser = user;
-    gZrwCol.bestSub = 0;
+    gZrwCol.bestSub = NULL;
     gZrwCol.nearest = distance;
     zmemCopy(&gZrwCol.best, triangle, sizeof gZrwCol.best);
     return triangle;
@@ -266,8 +266,8 @@ int zrwcolQueryLine(float *from, float *to, uint32_t flags, void *const *exclude
     if (gZrwCol.found == 0) {
         return 0;
     }
-    if (gZrwCol.bestUser != 0) {
-        RpAtomic *atomic = (RpAtomic *)(uintptr_t)gZrwCol.bestUser;
+    if (gZrwCol.bestUser != NULL) {
+        RpAtomic *atomic = gZrwCol.bestUser;
         const void *matrix = RwFrameGetLTM(RpAtomicGetFrame(atomic));
         float moved[3];
 
@@ -281,8 +281,8 @@ int zrwcolQueryLine(float *from, float *to, uint32_t flags, void *const *exclude
         out->hit.normal[0] = moved[0];
         out->hit.objectData = zrwMdlGetUserData(atomic);
         out->hit.materialData = materialData(triangleMaterial(atomic, best->index));
-    } else if (gZrwCol.bestSub != 0) {
-        const RpWorldSector *sector = (const RpWorldSector *)(uintptr_t)gZrwCol.bestSub;
+    } else if (gZrwCol.bestSub != NULL) {
+        const RpWorldSector *sector = gZrwCol.bestSub;
 
         out->hit.normal[0] = best->normal[0];
         out->hit.normal[1] = -best->normal[1];
@@ -369,10 +369,10 @@ uint8_t *zrwcolHitColor(ZrwColLineHit *hit)
     gZrwColColor[1] = 0;
     gZrwColColor[2] = 0;
     gZrwColColor[3] = 0xff;
-    if (gZrwCol.bestSub == 0) {
+    if (gZrwCol.bestSub == NULL) {
         return gZrwColColor;
     }
-    sector = (const RpWorldSector *)(uintptr_t)gZrwCol.bestSub;
+    sector = gZrwCol.bestSub;
     polygon = &sector->polygons[(uint32_t)best->index];
     for (int k = 0; k < 3; k++) {
         /* The first three bytes (r g b) of the vertex's prelit colour. */

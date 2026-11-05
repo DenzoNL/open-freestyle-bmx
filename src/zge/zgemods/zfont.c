@@ -109,7 +109,7 @@ int zfontParseBody(const uint8_t *p)
                 uint16_t m;
 
                 p += 2;
-                range->glyphs = (ZFontGlyph **)zmemAlloc((uint32_t)n << 2);
+                range->glyphs = (ZFontGlyph **)zmemAlloc((uint32_t)n * (uint32_t)sizeof(ZFontGlyph *));
                 range->count = n;
                 range->field00 = 0;
                 for (m = 0; m < n; m++) {

@@ -1461,7 +1461,7 @@ class Gen:
         decls = sorted(self.declared.get(file, ()))
         if decls:
             L.append("/* Functions the data points at that no header declares (assembler name = C name). */")
-            L += [f'void {n}(void) __asm__("_{n}");' for n in decls]
+            L += [f'void {n}(void) __asm__(BMX_SYM("{n}"));' for n in decls]
             L.append("")
         unserved = sorted(self.unserved.get(file, ()))
         if unserved:
@@ -1520,7 +1520,7 @@ class Gen:
             off = a - u.lo + u.lead
             macros.append(f"#define BMX_DATA_{sp} ((char *)&bmxAt_{u.name}" + (f" + {off:#x})" if off else ")"))
         for u in used:
-            L.append(f'extern struct BmxDataOpaque bmxAt_{u.name} __asm__("_{u.name}");')
+            L.append(f'extern struct BmxDataOpaque bmxAt_{u.name} __asm__(BMX_SYM("{u.name}"));')
         L += [""] + macros + ["", "#endif", ""]
         return L
 
@@ -1745,9 +1745,15 @@ def data_h(headers):
           "    }", "",
           "/* A pointer the original keeps off its natural alignment (in a packed table). */",
           "typedef struct __attribute__((packed)) BmxUnalignedPtr {", "    void *p;", "} BmxUnalignedPtr;", "",
-          "/* An original `jmp [import slot]` thunk that ported code calls by address: the same jump, through our slot. */",
+          "/* An original `jmp [import slot]` thunk that ported code calls by address: the same jump, through our slot.",
+          " * `offset` is the 32-bit one; every member of bmxImports is a pointer, so on x86_64 it is twice that. */",
+          "#if defined(__x86_64__)",
+          "#define BMX_IMPORT_THUNK(addr, offset) \\",
+          '    __asm__(".globl bmxImportThunk_" #addr "\\nbmxImportThunk_" #addr ":\\n\\tjmp *bmxImports+2*" #offset "(%rip)\\n")',
+          "#else",
           "#define BMX_IMPORT_THUNK(addr, offset) \\",
           '    __asm__(".globl _bmxImportThunk_" #addr "\\n_bmxImportThunk_" #addr ":\\n\\tjmp *_bmxImports+" #offset "\\n")',
+          "#endif",
           "", '#include "data/globals.h"', "", "#endif", ""]
     return "\n".join(L)
 

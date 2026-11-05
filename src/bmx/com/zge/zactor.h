@@ -219,7 +219,9 @@ typedef struct ZActorRootPose {
     ZAngle pad16; /* 0x16 */
 } ZActorRootPose;
 
-typedef ZMotionBank ZMotionBankTable[2];
+/* Room for one bank: the original reserves 0x18 bytes, and only zmotionLoadExtraBank (which nothing calls)
+ * would add a second (over the following globals). */
+typedef ZMotionBank ZMotionBankTable[1];
 
 #define gZactorMax       ORIG_VAR(0x0055f360, int32_t, gZactorMax)
 #define gZactors         ORIG_VAR(0x00641e1c, ZActor *, gZactors)

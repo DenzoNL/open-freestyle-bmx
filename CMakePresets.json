@@ -16,10 +16,19 @@
       "binaryDir": "${sourceDir}/build/native32",
       "toolchainFile": "${sourceDir}/cmake/i686-mingw.cmake",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "BMX_HOOK": "OFF", "BMX_NATIVE32": "ON" }
+    },
+    {
+      "name": "native64",
+      "displayName": "x86_64 native exe (bmxnative.exe, llvm-mingw; docs/PORTING.md X3)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/native64",
+      "toolchainFile": "${sourceDir}/cmake/x86_64-mingw.cmake",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "BMX_HOOK": "OFF", "BMX_NATIVE32": "ON" }
     }
   ],
   "buildPresets": [
     { "name": "hook", "configurePreset": "hook" },
-    { "name": "native32", "configurePreset": "native32" }
+    { "name": "native32", "configurePreset": "native32" },
+    { "name": "native64", "configurePreset": "native64" }
   ]
 }

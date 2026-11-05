@@ -384,7 +384,7 @@ static void makeProps(void)
         dt_fill(p, sizeof *p);
         dt_fill(object, sizeof *object);
         object->model = (void *)(uintptr_t)(0x46000000u + (uint32_t)i * 16u);
-        p->frame = (struct PhysPropFrame *)(void *)object;
+        p->frame = (struct ZObj *)(void *)object;
         p->next = NULL;
         p->id = dt_u32() % 2 == 0 ? (uint32_t)DT_ORIG(0x004828c0, int (*)(const char *))("light_") : dt_u32();
         if (dt_u32() % 2 == 0) {

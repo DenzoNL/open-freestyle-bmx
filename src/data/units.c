@@ -2050,7 +2050,7 @@ const BmxDataUnit bmxDataUnits[] = {
     {0x00566fc0, 0x00566fd4, (const void *)&rwImageRegistry},
     {0x00566fe0, 0x00566fe4, (const void *)&d_00566fe0},
     {0x00566fe4, 0x0056701c, (const void *)&rwD3D7Device},
-    {0x0056701c, 0x00567100, (const char *)&d_0056701cGroup + 12},
+    {0x0056701c, 0x00567100, (const char *)&d_0056701cGroup + BMX_DATA_OFF(12, 16)},
     {0x00567100, 0x00567180, (const void *)&d_00567100},
     {0x00567180, 0x00567200, (const void *)&d_00567180},
     {0x00567200, 0x0056727c, (const void *)&d_00567200},

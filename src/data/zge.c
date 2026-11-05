@@ -7,7 +7,7 @@
 #include "data/data.h"
 
 /* Functions the data points at that no header declares (assembler name = C name). */
-void crtExit(void) __asm__("_crtExit");
+void crtExit(void) __asm__(BMX_SYM("crtExit"));
 
 /* Code nothing serves (unported, unreachable): calling one reports the address and stops. */
 BMX_DATA_UNSERVED(004a4a37)

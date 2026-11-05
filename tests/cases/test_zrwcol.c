@@ -394,16 +394,16 @@ static void setup_line_query(DtCtx *c)
     dt_fill(object, sizeof *object);
     switch (dt_u32() % 5) {
     case 0:
-        gZrwCol.bestUser = 0;
-        gZrwCol.bestSub = 0;
+        gZrwCol.bestUser = NULL;
+        gZrwCol.bestSub = NULL;
         break;
     case 1:
     case 2:
-        gZrwCol.bestUser = (uint32_t)(uintptr_t)object;
+        gZrwCol.bestUser = object;
         break;
     default:
-        gZrwCol.bestUser = 0;
-        gZrwCol.bestSub = (uint32_t)(uintptr_t)sector;
+        gZrwCol.bestUser = NULL;
+        gZrwCol.bestSub = sector;
         break;
     }
     gZrwCol.nearest = dt_float_edgy(0.0f, 1.0f);
@@ -448,7 +448,7 @@ static void setup_hit_color(DtCtx *c)
     }
     sector->polygons = (RpPolygon *)map;
     sector->preLitLum = (uint32_t *)prelit;
-    gZrwCol.bestSub = (dt_u32() % 8 == 0) ? 0 : (uint32_t)(uintptr_t)sector;
+    gZrwCol.bestSub = (dt_u32() % 8 == 0) ? NULL : sector;
     dt_fill(hit, sizeof *hit);
     for (int i = 0; i < 3; i++) {
         float *v = hit->hit.vertex[i];

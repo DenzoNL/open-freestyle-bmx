@@ -218,14 +218,14 @@ __attribute__((used, noinline)) static uint32_t rpCollCheckPointImpl(const RwV3d
 BMX_ADDR(0x004bc570)
 __attribute__((naked)) uint32_t _rpCollCheckPoint(void)
 {
-    __asm__ volatile("subl $8, %esp\n\t"
-                     "fstpl (%esp)\n\t"
-                     "pushl %ecx\n\t"
-                     "pushl %edx\n\t"
-                     "pushl %eax\n\t"
-                     "call _rpCollCheckPointImpl\n\t"
-                     "addl $20, %esp\n\t"
-                     "ret");
+    BMX_X86_ENTRY("subl $8, %esp\n\t"
+                  "fstpl (%esp)\n\t"
+                  "pushl %ecx\n\t"
+                  "pushl %edx\n\t"
+                  "pushl %eax\n\t"
+                  "call _rpCollCheckPointImpl\n\t"
+                  "addl $20, %esp\n\t"
+                  "ret");
 }
 
 /* Where the segment crosses each face plane in `outcodes`, test the crossing point against the cube. */
@@ -1364,17 +1364,17 @@ __attribute__((naked)) int32_t _rpCollLineTriangleIntersect(uint32_t unused0, ui
                                                             uint32_t unused2, uint32_t unused3,
                                                             const RwV3d *b, const RwV3d *c, float *distance)
 {
-    __asm__ volatile("subl $8, %esp\n\t"
-                     "fstpl (%esp)\n\t"
-                     "pushl 0x24(%esp)\n\t"
-                     "pushl 0x24(%esp)\n\t"
-                     "pushl 0x24(%esp)\n\t"
-                     "pushl %ecx\n\t"
-                     "pushl %edx\n\t"
-                     "pushl %eax\n\t"
-                     "call _rpCollLineTriangleImpl\n\t"
-                     "addl $32, %esp\n\t"
-                     "ret");
+    BMX_X86_ENTRY("subl $8, %esp\n\t"
+                  "fstpl (%esp)\n\t"
+                  "pushl 0x24(%esp)\n\t"
+                  "pushl 0x24(%esp)\n\t"
+                  "pushl 0x24(%esp)\n\t"
+                  "pushl %ecx\n\t"
+                  "pushl %edx\n\t"
+                  "pushl %eax\n\t"
+                  "call _rpCollLineTriangleImpl\n\t"
+                  "addl $32, %esp\n\t"
+                  "ret");
 }
 
 /*

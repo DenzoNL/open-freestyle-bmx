@@ -47,7 +47,7 @@ typedef struct ZPropDef {
 
 typedef ZPropDef ZbspTreeNode;
 
-struct PhysPropFrame;
+struct ZObj;
 struct PhysPropTag;
 struct PhysPropObject;
 struct ZbspTreeObject;
@@ -61,7 +61,7 @@ typedef struct PhysPropNode {
     uint32_t pad04;                      /* 0x04 */
     uint32_t id;                         /* 0x08 id of the definition */
     uint32_t placement[4];               /* 0x0c the PRBL header's tag words */
-    struct PhysPropFrame *frame;         /* 0x1c scene object made from the model of the definition */
+    struct ZObj *frame;                  /* 0x1c scene object made from the model of the definition */
     const struct ZbspTreeObject *source; /* 0x20 the definition's data (ZPropDef + 8) */
     const struct PhysPropTag *tag;       /* 0x24 OBJI block (ngapp.c reads its first word as a colour) */
     uint8_t pad28[0x4];                  /* 0x28 */

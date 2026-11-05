@@ -110,7 +110,8 @@ typedef struct NgVec16Slot {
 } NgVec16Slot;
 typedef NgVec16Slot NgLightDirs[3];
 typedef uint8_t NgLightColors[3][4];
-typedef const char *NgLevelNames[32];
+/* The 14 levels' scene files (src/data has 14; the original declared no length). */
+typedef const char *NgLevelNames[14];
 typedef void *NgLightSlots[3];
 typedef uint8_t NgKeyMaps[8][0x20];
 #define gNgLightDir    ORIG_VAR(0x0055bc90, NgLightDirs, gNgLightDir)

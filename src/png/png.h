@@ -14,4 +14,7 @@
 extern const BmxHook bmxPngJumps[];
 extern const uint32_t bmxPngJumpCount;
 
+/* libpng's png_get_io_ptr: the pointer png_set_read_fn stored (rwPngRead's stream). */
+void *bmxPngIoPtr(void *png);
+
 #endif

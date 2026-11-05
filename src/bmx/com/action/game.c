@@ -2679,7 +2679,7 @@ static void goalMarkers(const GameGoal *goal)
     case 15:
         a = zbspFindTaggedFaces(goal->min, goal->min);
         if (a != NULL) {
-            zmemCopy((void *)gGameMarkersA, (const void *)a, 0x100);
+            zmemCopy((void *)gGameMarkersA, (const void *)a, sizeof gGameMarkersA);
         }
         b = zbspFindTaggedFaces(goal->max, goal->max);
         a = NULL;
@@ -2687,7 +2687,7 @@ static void goalMarkers(const GameGoal *goal)
     case 16:
         a = zbspFindTaggedEdges(goal->min, goal->min);
         if (a != NULL) {
-            zmemCopy((void *)gGameMarkersA, (const void *)a, 0x100);
+            zmemCopy((void *)gGameMarkersA, (const void *)a, sizeof gGameMarkersA);
         }
         b = zbspFindTaggedEdges(goal->max, goal->max);
         a = NULL;
@@ -2695,7 +2695,7 @@ static void goalMarkers(const GameGoal *goal)
     case 17:
         a = zbspFindPropsNear(goal->min, goal->min);
         if (a != NULL) {
-            zmemCopy((void *)gGameMarkersA, (const void *)a, 0x100);
+            zmemCopy((void *)gGameMarkersA, (const void *)a, sizeof gGameMarkersA);
         }
         b = zbspFindPropsNear(goal->max, goal->max);
         a = NULL;
@@ -2703,7 +2703,7 @@ static void goalMarkers(const GameGoal *goal)
     case 18:
         a = zbspFindTaggedFaces(goal->min, goal->min);
         if (a != NULL) {
-            zmemCopy((void *)gGameMarkersA, (const void *)a, 0x100);
+            zmemCopy((void *)gGameMarkersA, (const void *)a, sizeof gGameMarkersA);
         }
         b = zbspFindTaggedEdges(goal->max, goal->arg3);
         a = NULL;
@@ -2711,7 +2711,7 @@ static void goalMarkers(const GameGoal *goal)
     case 19:
         a = zbspFindTaggedFaces(goal->min, goal->min);
         if (a != NULL) {
-            zmemCopy((void *)gGameMarkersA, (const void *)a, 0x100);
+            zmemCopy((void *)gGameMarkersA, (const void *)a, sizeof gGameMarkersA);
         }
         b = zbspFindPropsNear(goal->max, goal->arg3);
         a = NULL;
@@ -2723,10 +2723,10 @@ static void goalMarkers(const GameGoal *goal)
         break;
     }
     if (a != NULL) {
-        zmemCopy((void *)gGameMarkersA, (const void *)a, 0x100);
+        zmemCopy((void *)gGameMarkersA, (const void *)a, sizeof gGameMarkersA);
     }
     if (b != NULL) {
-        zmemCopy((void *)gGameMarkersB, (const void *)b, 0x100);
+        zmemCopy((void *)gGameMarkersB, (const void *)b, sizeof gGameMarkersB);
     }
 }
 

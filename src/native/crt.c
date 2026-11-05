@@ -31,14 +31,81 @@
 /* Memory                                                                                            */
 /* ------------------------------------------------------------------------------------------------ */
 
+/*
+ * BMX_GUARD_HEAP=1 (debugging): every block gets its own pages and ends (rounded up to 16 bytes) right
+ * before an inaccessible page, so a write past its end faults at the write, under a debugger with the
+ * writer's backtrace. Freed blocks' pages are released. Slow and wasteful; only for finding overruns.
+ */
+typedef struct GuardHead {
+    void *base;
+    size_t size;
+    size_t magic;
+    size_t pad;
+} GuardHead;
+
+enum { kGuardMagic = 0x6b636f6c /* "lock" */ };
+
+static int guardHeapOn(void)
+{
+    static int on = -1;
+
+    if (on < 0) {
+        const char *v = getenv("BMX_GUARD_HEAP");
+        on = v != NULL && v[0] == '1';
+    }
+    return on;
+}
+
+static void *guardAlloc(size_t size)
+{
+    const size_t page = 4096;
+    const size_t rounded = (size + 15) & ~(size_t)15;
+    const size_t span = (rounded + sizeof(GuardHead) + page - 1) / page * page + page;
+    uint8_t *const base = VirtualAlloc(NULL, span, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    DWORD old;
+
+    if (base == NULL) {
+        return NULL;
+    }
+    VirtualProtect(base + span - page, page, PAGE_NOACCESS, &old);
+    uint8_t *const block = base + span - page - rounded;
+    GuardHead *const head = (GuardHead *)block - 1;
+    head->base = base;
+    head->size = size;
+    head->magic = kGuardMagic;
+    return block;
+}
+
+static GuardHead *guardHead(void *p)
+{
+    GuardHead *const head = (GuardHead *)p - 1;
+
+    if (head->magic != kGuardMagic) {
+        bmxLog("BMX_GUARD_HEAP: %p is not a guarded block\n", p);
+        __builtin_trap();
+    }
+    return head;
+}
+
 void *crtMalloc(size_t size)
 {
     /* MSVC6 malloc(0) returns a valid block. */
+    if (guardHeapOn()) {
+        return guardAlloc(size ? size : 1);
+    }
     return malloc(size ? size : 1);
 }
 
 void crtFree(void *p)
 {
+    if (guardHeapOn()) {
+        if (p != NULL) {
+            GuardHead *const head = guardHead(p);
+            head->magic = 0;
+            VirtualFree(head->base, 0, MEM_RELEASE);
+        }
+        return;
+    }
     free(p);
 }
 
@@ -48,8 +115,18 @@ void *crtRealloc(void *p, size_t size)
         return crtMalloc(size);
     }
     if (size == 0) {
-        free(p); /* MSVC6: realloc(p, 0) frees and returns NULL */
+        crtFree(p); /* MSVC6: realloc(p, 0) frees and returns NULL */
         return NULL;
+    }
+    if (guardHeapOn()) {
+        const size_t old = guardHead(p)->size;
+        void *const q = guardAlloc(size);
+
+        if (q != NULL) {
+            memcpy(q, p, old < size ? old : size);
+            crtFree(p);
+        }
+        return q;
     }
     return realloc(p, size);
 }
@@ -956,8 +1033,27 @@ void crtExit(int code)
 /* The table                                                                                         */
 /* ------------------------------------------------------------------------------------------------ */
 
+#if defined(__i386__)
 extern void bmxCrtFtol(void), bmxCrtCIsqrt(void), bmxCrtChkstk(void), bmxCrtAllmul(void), bmxCrtAulldiv(void),
     bmxCrtAullrem(void), bmxCrtAllshl(void), bmxCrtSetjmp3(void), bmxCrtLongjmp(void);
+#else
+/* x86_64: crtasm.S is i386 code. Only the original's code called these helpers (the PNG reader's setjmp /
+ * longjmp use the compiler's builtins there, rw/texture.c and png/png.c); the origin map still names them. */
+#define CRT_X86_ONLY(fn, addr)                                                                               \
+    void fn(void)                                                                                            \
+    {                                                                                                        \
+        bmxOrigTrap(addr, (uint32_t)(uintptr_t)__builtin_return_address(0));                                 \
+    }
+CRT_X86_ONLY(bmxCrtFtol, 0x004a4a80)
+CRT_X86_ONLY(bmxCrtCIsqrt, 0x004a5390)
+CRT_X86_ONLY(bmxCrtChkstk, 0x004a4d50)
+CRT_X86_ONLY(bmxCrtAllmul, 0x004ab3b0)
+CRT_X86_ONLY(bmxCrtAulldiv, 0x004ad3f0)
+CRT_X86_ONLY(bmxCrtAullrem, 0x004ad460)
+CRT_X86_ONLY(bmxCrtAllshl, 0x004ae8d0)
+CRT_X86_ONLY(bmxCrtSetjmp3, 0x0051e008)
+CRT_X86_ONLY(bmxCrtLongjmp, 0x0051e084)
+#endif
 
 typedef struct {
     uint32_t orig;
@@ -968,7 +1064,7 @@ typedef struct {
 #define E(addr, fn, name) {addr, (const void *)(fn), name}
 
 const CrtEntry bmxCrtTable[] = {
-    /* compiler helpers (assembly) */
+    /* compiler helpers (assembly, crtasm.S; i386 only, traps on x86_64) */
     E(0x004a4a80, bmxCrtFtol, "_ftol"),
     E(0x004a5390, bmxCrtCIsqrt, "_CIsqrt"),
     E(0x004a4d50, bmxCrtChkstk, "_chkstk"),

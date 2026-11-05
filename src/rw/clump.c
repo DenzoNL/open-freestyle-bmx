@@ -785,7 +785,7 @@ static int geometryAddMorphTarget(RpGeometry *geometry)
     if (!geometryCheck(geometry)) {
         return 0;
     }
-    const int32_t size = (geometry->numMorphTargets * 4 + 4) * 7;
+    const int32_t size = (geometry->numMorphTargets + 1) * (int32_t)sizeof(RpMorphTarget);
     RpMorphTarget *morphTargets;
     if (geometry->morphTarget == NULL) {
         morphTargets = RwEngineInstance->memoryFuncs.rwmalloc((size_t)size);
@@ -1584,7 +1584,7 @@ static void materialListAppend(RpMaterialList *list, RpMaterial *material)
         list->numMaterials++;
         return;
     }
-    const int32_t size = list->space * 4 + 0x14;
+    const int32_t size = (list->space + 5) * (int32_t)sizeof(RpMaterial *);
     RpMaterial **materials;
     if (list->materials == NULL) {
         materials = (RpMaterial **)engineAlloc((size_t)size);
@@ -1974,7 +1974,7 @@ BMX_ADDR(0x004c5e30)
 RpMeshHeader *_rpMeshGenerateTriList(RpBuildMesh *build, uint32_t flags)
 {
     const uint32_t count = build->numTriangles;
-    RpBuildMeshTriangle **sorted = (RpBuildMeshTriangle **)engineAlloc(count << 2);
+    RpBuildMeshTriangle **sorted = (RpBuildMeshTriangle **)engineAlloc(count * sizeof *sorted);
     if (sorted == NULL) {
         rpReportNoMem((int32_t)(count << 2));
         return NULL;
@@ -1982,7 +1982,7 @@ RpMeshHeader *_rpMeshGenerateTriList(RpBuildMesh *build, uint32_t flags)
     for (uint32_t i = 0; i < count; i++) {
         sorted[i] = &build->triangles[i];
     }
-    rwQsort((void *)sorted, count, 4, RW_CB(void *, RP_MESH_SORT_COMPARE));
+    rwQsort((void *)sorted, count, sizeof *sorted, RW_CB(void *, RP_MESH_SORT_COMPARE));
     int32_t numMeshes = 1;
     if (count > 1) {
         RpMaterial *current = sorted[0]->material;
@@ -2168,18 +2168,18 @@ double rwMatrixOrthogonalError(const RwMatrix *matrix)
 #define RP_WORLD_DEFAULT_CALLBACK 0x004bc360
 
 /* The world module data in the engine instance: the free list of world records and their list. */
-static uint8_t *worldModule(void)
+static RpWorldGlobals *worldModule(void)
 {
-    return (uint8_t *)RwEngineInstance + rpWorldGlobalsOffset;
+    return (RpWorldGlobals *)((uint8_t *)RwEngineInstance + rpWorldGlobalsOffset);
 }
 
 /* Marks a world as existing (with its allocation size) in the module's list. */
 BMX_ADDR(0x004b9ed0)
 void rpWorldRegister(RpWorld *world, uint32_t size)
 {
-    RpWorldListEntry *record = RwEngineInstance->freeListAlloc(*(RwFreeList **)(worldModule() + 4));
+    RpWorldListEntry *record = RwEngineInstance->freeListAlloc(worldModule()->entryFreeList);
     if (record != NULL) {
-        RwLLLink *head = (RwLLLink *)(worldModule() + 8);
+        RwLLLink *head = &worldModule()->worlds;
         record->size = size;
         record->world = world;
         record->link.next = head->next;
@@ -2193,14 +2193,14 @@ void rpWorldRegister(RpWorld *world, uint32_t size)
 BMX_ADDR(0x004b9f60)
 void rpWorldUnregister(RpWorld *world)
 {
-    RwLLLink *head = (RwLLLink *)(worldModule() + 8);
+    RwLLLink *head = &worldModule()->worlds;
     RwLLLink *link = head->next;
     while (link != head) {
         RpWorldListEntry *record = (RpWorldListEntry *)((uint8_t *)link - offsetof(RpWorldListEntry, link));
         if (record->world == world) {
             link->prev->next = link->next;
             link->next->prev = link->prev;
-            RwEngineInstance->freeListFree(*(RwFreeList **)(worldModule() + 4), record);
+            RwEngineInstance->freeListFree(worldModule()->entryFreeList, record);
             return;
         }
         link = link->next;

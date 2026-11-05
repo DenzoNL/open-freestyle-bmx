@@ -9,22 +9,14 @@
 #include "compat/orig.h"
 #include "zge/zgemods/zprop.h"
 #include "zge/zmath.h"
+#include "zge/zobj.h"
 
 /* Dynamic collision object (props). */
 
-/* Scene frame of a prop: position at +4, rotation quaternion at +0x14 (y stored negated relative to the
- * world). */
-typedef struct PhysPropFrame {
-    uint8_t pad00[0x4];
-    ZVec3 pos;
-    uint8_t pad10[0x4];
-    ZQuat rot;
-    uint8_t pad24[0x8];
-    void *model; /* renderer handle (flags are set through the pointer at 0x560ed8) */
-} PhysPropFrame;
-
-_Static_assert(offsetof(PhysPropFrame, rot) == 0x14, "PhysPropFrame.rot");
-BMX_LAYOUT32_ASSERT(offsetof(PhysPropFrame, model) == 0x2c, "PhysPropFrame.model");
+/* Scene frame of a prop: the scene object its node carries (rotation y stored negated relative to the world;
+ * the model's flags are set through the pointer at 0x560ed8). Was a separate view with the pointers as
+ * padding, which put `model` in the wrong place on 64-bit. */
+typedef ZObj PhysPropFrame;
 
 /* Placement record of a prop in the level file (bytes 4-7 and the word at 8 feed the collision object). */
 typedef struct PhysPropTag {

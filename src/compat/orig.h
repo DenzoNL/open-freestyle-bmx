@@ -76,6 +76,17 @@ void *bmxOrigPtr(uint32_t addr);
 #define BMX_ORIG_PTR(addr) ((uintptr_t)(addr))
 #endif
 
+/*
+ * The body of a naked entry that takes the original's own register convention (EAX / EDX / ECX, ST0) and
+ * calls the C implementation: i386 only. Only the original's code and the oracle call such an entry; on
+ * x86_64 nothing does (our callers call the implementation), and the entry is a trap (docs/PORTING.md X3).
+ */
+#if defined(__i386__)
+#define BMX_X86_ENTRY(code) __asm__ volatile(code)
+#else
+#define BMX_X86_ENTRY(code) __asm__ volatile("ud2")
+#endif
+
 /* Macro arguments are types and parameter lists, which cannot be parenthesised. */
 // NOLINTBEGIN(bugprone-macro-parentheses)
 #if defined(BMX_IMAGE)

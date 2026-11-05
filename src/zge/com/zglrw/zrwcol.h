@@ -71,17 +71,17 @@ BMX_LAYOUT32_ASSERT(sizeof(ZrwColLineHit) == 0x58, "line hit");
 
 /* State of the collision system (0x674160, 0x50 bytes, cleared at initialisation). */
 typedef struct ZrwColState {
-    int initialized;     /* 0x00 */
-    ZrwColHit *cursor;   /* 0x04 next free record */
-    uint32_t count;      /* 0x08 records stored */
-    ZrwColHit *hits;     /* 0x0c record buffer */
-    uint32_t capacity;   /* 0x10 records the buffer holds */
-    uint32_t flags;      /* 0x14 query flags: 1 world, 2 / 4 solid / not solid objects, 8 skip ids */
-    int found;           /* 0x18 */
-    float nearest;       /* 0x1c distance of the nearest hit so far */
-    ZrwColTriangle best; /* 0x20 copy of the nearest triangle */
-    uint32_t bestUser;   /* 0x48 the RpAtomic it belongs to, 0 for the world */
-    uint32_t bestSub;    /* 0x4c the RpWorldSector it belongs to, 0 for an atomic */
+    int initialized;              /* 0x00 */
+    ZrwColHit *cursor;            /* 0x04 next free record */
+    uint32_t count;               /* 0x08 records stored */
+    ZrwColHit *hits;              /* 0x0c record buffer */
+    uint32_t capacity;            /* 0x10 records the buffer holds */
+    uint32_t flags;               /* 0x14 query flags: 1 world, 2 / 4 solid / not solid objects, 8 skip ids */
+    int found;                    /* 0x18 */
+    float nearest;                /* 0x1c distance of the nearest hit so far */
+    ZrwColTriangle best;          /* 0x20 copy of the nearest triangle */
+    RpAtomic *bestUser;           /* 0x48 the RpAtomic it belongs to, NULL for the world */
+    const RpWorldSector *bestSub; /* 0x4c the RpWorldSector it belongs to, NULL for an atomic */
 } ZrwColState;
 
 BMX_LAYOUT32_ASSERT(offsetof(ZrwColState, best) == 0x20, "collision state");
@@ -119,9 +119,9 @@ int zrwColSystemShutdown(void);
 
 /* Triangle callbacks: remember the nearest hit (the triangle is copied when it is nearer than the stored
  * one). */
-ZrwColTriangle *zrwcolKeepNearestSub(void *arg, uint32_t sub, ZrwColTriangle *triangle, float distance,
-                                     uint32_t user);
-ZrwColTriangle *zrwcolKeepNearest(void *arg, ZrwColTriangle *triangle, float distance, uint32_t user);
+ZrwColTriangle *zrwcolKeepNearestSub(void *arg, const RpWorldSector *sub, ZrwColTriangle *triangle,
+                                     float distance, RpAtomic *user);
+ZrwColTriangle *zrwcolKeepNearest(void *arg, ZrwColTriangle *triangle, float distance, RpAtomic *user);
 /*
  * Atomic filters: skip by the flags of the query (bit 7 of the atomic's flags marks it solid, see
  * zrwModelSetCollision; the ids to skip are clump pointers), then enumerate the atomic's triangles with the

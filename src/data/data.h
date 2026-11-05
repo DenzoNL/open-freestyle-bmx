@@ -135,9 +135,15 @@ typedef struct __attribute__((packed)) BmxUnalignedPtr {
 } BmxUnalignedPtr;
 
 /* An original `jmp [import slot]` thunk that ported code calls by address: the same jump, through our slot.
- */
+ * `offset` is the 32-bit one; every member of bmxImports is a pointer, so on x86_64 it is twice that. */
+#if defined(__x86_64__)
+#define BMX_IMPORT_THUNK(addr, offset)                                                                       \
+    __asm__(".globl bmxImportThunk_" #addr "\nbmxImportThunk_" #addr ":\n\tjmp *bmxImports+2*" #offset       \
+            "(%rip)\n")
+#else
 #define BMX_IMPORT_THUNK(addr, offset)                                                                       \
     __asm__(".globl _bmxImportThunk_" #addr "\n_bmxImportThunk_" #addr ":\n\tjmp *_bmxImports+" #offset "\n")
+#endif
 
 #include "data/globals.h"
 

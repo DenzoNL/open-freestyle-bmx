@@ -446,8 +446,8 @@ RwCamera *CameraBeginUpdate(RwCamera *camera)
     }
     RwEngineInstance->curCamera = camera;
     rwFrameSyncDirtyList();
-    if (((RwStandardCameraFunc)(uintptr_t)RwEngineInstance->stdFunc[rwSTANDARDCAMERABEGINUPDATE])(
-            NULL, camera, 0) == 0) {
+    if (((RwStandardCameraFunc)RwEngineInstance->stdFunc[rwSTANDARDCAMERABEGINUPDATE])(NULL, camera, 0) ==
+        0) {
         return NULL;
     }
     rwCoreExtCallSlot1(camera);
@@ -458,8 +458,7 @@ RwCamera *CameraBeginUpdate(RwCamera *camera)
 BMX_ADDR(0x004de7b0)
 RwCamera *CameraEndUpdate(RwCamera *camera)
 {
-    if (((RwStandardCameraFunc)(uintptr_t)RwEngineInstance->stdFunc[rwSTANDARDCAMERAENDUPDATE])(NULL, camera,
-                                                                                                0) == 0) {
+    if (((RwStandardCameraFunc)RwEngineInstance->stdFunc[rwSTANDARDCAMERAENDUPDATE])(NULL, camera, 0) == 0) {
         return NULL;
     }
     RwEngineInstance->curCamera = NULL;
@@ -664,8 +663,7 @@ RwCamera *RwCameraGetCurrentCamera(void)
 BMX_ADDR(0x004de8a0)
 RwCamera *RwCameraClear(RwCamera *camera, const void *color, int32_t flags)
 {
-    const RwCameraClearFunc clear =
-        (RwCameraClearFunc)(uintptr_t)RwEngineInstance->stdFunc[rwSTANDARDCAMERACLEAR];
+    const RwCameraClearFunc clear = (RwCameraClearFunc)RwEngineInstance->stdFunc[rwSTANDARDCAMERACLEAR];
     if (clear(camera, color, flags) == 0) {
         return NULL;
     }
@@ -788,8 +786,8 @@ ORIG_FN(0x004b81f0, void *, RpWorldAddCamera, (void *world, RwCamera *camera));
  * there are any), near plane 0.25, the given far plane, a 1 x 1 view window, added to the world; and the
  * image it is read back into.
  */
-__attribute__((used, noinline)) static void rwPvsCameraCreateImpl(void *world, RwRaster *raster,
-                                                                  RwRaster *zRaster, double farClip)
+__attribute__((used, noinline)) void rwPvsCameraCreateImpl(void *world, RwRaster *raster, RwRaster *zRaster,
+                                                           double farClip)
 {
     const int32_t rect[4] = {0, 0, 128, 128};
     rwPvsCamera = RwCameraCreate();
@@ -825,14 +823,14 @@ __attribute__((used, noinline)) static void rwPvsCameraCreateImpl(void *world, R
 BMX_ADDR(0x004ce6d0)
 __attribute__((naked)) void rwPvsCameraCreate(void)
 {
-    __asm__ volatile("subl $8, %esp\n\t"
-                     "fstpl (%esp)\n\t"
-                     "pushl %ecx\n\t"
-                     "pushl %edx\n\t"
-                     "pushl %eax\n\t"
-                     "call _rwPvsCameraCreateImpl\n\t"
-                     "addl $20, %esp\n\t"
-                     "ret");
+    BMX_X86_ENTRY("subl $8, %esp\n\t"
+                  "fstpl (%esp)\n\t"
+                  "pushl %ecx\n\t"
+                  "pushl %edx\n\t"
+                  "pushl %eax\n\t"
+                  "call _rwPvsCameraCreateImpl\n\t"
+                  "addl $20, %esp\n\t"
+                  "ret");
 }
 
 #define rwCameraModuleCount ORIG_VAR(0x00676d14, int32_t, rwCameraModuleCount)

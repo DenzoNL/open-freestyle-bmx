@@ -46,7 +46,7 @@ static int BMX_CDECL stStdRasterToImage(RwImage *image, RwRaster *raster, int32_
 static void setup_set_from_raster(DtCtx *c)
 {
     RwGlobals *g = texEnv(c);
-    g->stdFunc[6] = (uint32_t)(uintptr_t)stStdRasterToImage;
+    g->stdFunc[6] = (void *)stStdRasterToImage;
     RwImage *image = mkImage(1);
     image->flags = dt_u32();
     DT_ARG_PTR(c, 0, image);
@@ -72,7 +72,7 @@ static int BMX_CDECL stStdFindFormat(RwRaster *info, RwImage *image, int32_t fla
 static void setup_find_format(DtCtx *c)
 {
     RwGlobals *g = texEnv(c);
-    g->stdFunc[9] = (uint32_t)(uintptr_t)stStdFindFormat;
+    g->stdFunc[9] = (void *)stStdFindFormat;
     DT_ARG_PTR(c, 0, mkImage(1));
     DT_ARG_INT(c, 1, dt_u32());
     DT_ARG_PTR(c, 2, dt_alloc(4));

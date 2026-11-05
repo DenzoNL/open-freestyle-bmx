@@ -483,7 +483,7 @@ BMX_ADDR(0x00438440)
 void guiSortElements(void)
 {
     if (gGuiElementCount > 1) {
-        qsort(&gGuiSorted, (size_t)gGuiElementCount, 4,
+        qsort(&gGuiSorted, (size_t)gGuiElementCount, sizeof gGuiSorted[0],
               BMX_FNPTR(int (*)(const void *, const void *), 0x00402072, guiCompareOrder));
     }
 }

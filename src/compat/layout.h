@@ -23,6 +23,12 @@
 #define BMX_LAYOUT32_ASSERT(cond, msg) _Static_assert(1, msg)
 #endif
 
+/* The assembler name of a C symbol, for `__asm__("...")` labels: the i386 Windows targets put an underscore
+ * before C names, x86_64 does not (docs/PORTING.md X3). */
+#define BMX_SYM_STR2(x) #x
+#define BMX_SYM_STR(x)  BMX_SYM_STR2(x)
+#define BMX_SYM(name)   BMX_SYM_STR(__USER_LABEL_PREFIX__) name
+
 /* An offset into src/data's definitions that differs with the pointer width: src/data/addrs.h (a global
  * inside a group) and the group asserts of src/data/globals.h, both widths asserted. tools/data_off64.py
  * computes o64. */

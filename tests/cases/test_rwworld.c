@@ -1051,7 +1051,7 @@ static RwCamera *gFixCamera;
 static RwImage *gFixImage;
 
 static void BMX_CDECL stCameraCreateC(RpWorld *world, RwRaster *raster, RwRaster *zRaster,
-                                      float farClip) __asm__("_stCameraCreateC");
+                                      float farClip) __asm__(BMX_SYM("stCameraCreateC"));
 __attribute__((used)) static void BMX_CDECL stCameraCreateC(RpWorld *world, RwRaster *raster,
                                                             RwRaster *zRaster, float farClip)
 {
@@ -1806,7 +1806,7 @@ static void setup_atomic_sync(DtCtx *c)
 static void setup_camera_sync(DtCtx *c)
 {
     RwGlobals *g = worldEnv(c, 0);
-    g->stdFunc[22] = (uint32_t)(uintptr_t)stDeviceWorldSync;
+    g->stdFunc[22] = (void *)stDeviceWorldSync;
     dt_stub(0x004b7e80, NULL, (void *)stCameraSectors);
     RpWorld *world = dt_u32() % 4 == 0 ? NULL : mkWorld();
     if (world != NULL && dt_u32() % 2) {

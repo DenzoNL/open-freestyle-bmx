@@ -178,39 +178,50 @@ static LONG CALLBACK trapHandler(EXCEPTION_POINTERS *ep)
 {
     static volatile LONG reported;
     const DWORD code = ep->ExceptionRecord->ExceptionCode;
-    const uint32_t eip = ep->ContextRecord->Eip;
-    const uint32_t esp = ep->ContextRecord->Esp;
+#if defined(__x86_64__)
+    const uintptr_t pc = (uintptr_t)ep->ContextRecord->Rip;
+    const uintptr_t sp = (uintptr_t)ep->ContextRecord->Rsp;
+#else
+    const uintptr_t pc = ep->ContextRecord->Eip;
+    const uintptr_t sp = ep->ContextRecord->Esp;
+#endif
     char what[160], who[200];
-    uint32_t ret = 0;
+    uintptr_t ret = 0;
 
     if (code != EXCEPTION_BREAKPOINT && code != EXCEPTION_ACCESS_VIOLATION &&
         code != EXCEPTION_ILLEGAL_INSTRUCTION && code != EXCEPTION_INT_DIVIDE_BY_ZERO &&
         code != EXCEPTION_PRIV_INSTRUCTION) {
         return EXCEPTION_CONTINUE_SEARCH;
     }
-    if (!IsBadReadPtr((void *)(uintptr_t)esp, 4)) {
-        ret = *(const uint32_t *)(uintptr_t)esp;
+    if (!IsBadReadPtr((void *)sp, sizeof(uintptr_t))) {
+        ret = *(const uintptr_t *)sp;
     }
-    describe(eip, what, sizeof what);
-    describe(ret, who, sizeof who);
+    /* Our code is below 4 GB (fixed image base, CMakeLists.txt): its addresses fit the symbol table's. */
+    describe((uint32_t)pc, what, sizeof what);
+    describe((uint32_t)ret, who, sizeof who);
     if (InterlockedExchange(&reported, 1)) {
         ExitProcess(3);
     }
-    bmxLog("EXCEPTION %08lx at %08x  %s\n", code, (unsigned)eip, what);
+    bmxLog("EXCEPTION %08lx at %p  %s\n", code, (void *)pc, what);
     if (code == EXCEPTION_ACCESS_VIOLATION) {
-        const uint32_t addr = (uint32_t)ep->ExceptionRecord->ExceptionInformation[1];
+        const uintptr_t addr = ep->ExceptionRecord->ExceptionInformation[1];
 
-        bmxLog("  access address %08lx (%s)%s\n", (unsigned long)addr,
+        bmxLog("  access address %p (%s)%s\n", (void *)addr,
                ep->ExceptionRecord->ExceptionInformation[0] ? "write" : "read",
                addr >= kBmxImageBase && addr < kImageEnd ? ": an original address, not converted?" : "");
     }
-    if (eip >= kBmxImageBase && eip < kImageEnd) {
+    if (pc >= kBmxImageBase && pc < kImageEnd) {
         bmxLog(
             "  (a jump to original code, which is not loaded: an ORIG_FN or code pointer not converted?)\n");
     }
-    bmxLog("  caller (return address at esp): %08x  %s\n", (unsigned)ret, who);
-    for (int i = 1; i < 5 && !IsBadReadPtr((void *)(uintptr_t)(esp + (uint32_t)i * 4), 4); i++) {
-        bmxLog("  stack[%d]: %08x\n", i, (unsigned)*(const uint32_t *)(uintptr_t)(esp + (uint32_t)i * 4));
+    bmxLog("  caller (return address at the stack pointer): %p  %s\n", (void *)ret, who);
+    for (int i = 1; i < 5; i++) {
+        const uintptr_t *slot = (const uintptr_t *)sp + i;
+
+        if (IsBadReadPtr(slot, sizeof *slot)) {
+            break;
+        }
+        bmxLog("  stack[%d]: %p\n", i, (void *)*slot);
     }
     if (logFile) {
         fclose(logFile);
@@ -224,5 +235,9 @@ void bmxTrapInstall(void)
     if (symCount == 0) {
         loadSymbols();
     }
-    AddVectoredExceptionHandler(1, trapHandler);
+    /* Under a debugger the debugger reports the fault (with a backtrace); the handler would end the process
+     * before it sees it. */
+    if (!IsDebuggerPresent()) {
+        AddVectoredExceptionHandler(1, trapHandler);
+    }
 }

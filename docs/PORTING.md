@@ -522,6 +522,66 @@ a table of 20-byte entries; the effect skid search walked the prop definitions a
 
 tools/width_audit.py reports nothing now, and the gate runs it (tools/check.sh, "pointer widths").
 
+### X3 (in progress, 2026-11-05): Windows x64
+
+One codebase builds both: the `native32` preset as before (unchanged behaviour, the replays stay identical) and the
+new `native64` preset (cmake/x86_64-mingw.cmake, llvm-mingw x86_64, SDL3's x86_64-w64-mingw32 package). The
+differences are compile-time switches on the pointer width (`BMX_LAYOUT32`, compat/layout.h) or the CPU
+(`__i386__`).
+
+**Build:**
+- Assembler names: `__asm__("...")` labels go through `BMX_SYM("name")` (compat/layout.h): the i386 Windows
+  targets put an underscore before C names, x86_64 does not (src/data, gen_data.py, gen_origmap.py, 4 headers).
+- The naked entries with the original's register conventions (EAX / EDX / ECX and ST0, 8 in src/rw) are i386 only
+  (`BMX_X86_ENTRY`, compat/orig.h); on x86_64 they are a trap and our callers call the C implementation (world.c's
+  PVS camera). The MSVC compiler helpers of crtasm.S are i386 only; the crt table names trap stubs on x86_64.
+- The PNG reader's error jump: the CRT's `_setjmp3` / `_longjmp` are i386 code; x86_64 uses
+  `__builtin_setjmp` / `__builtin_longjmp` (5 pointer slots of the png struct's 64-byte jmp_buf).
+- The import thunks (`BMX_IMPORT_THUNK`) jump RIP-relative through slot offset times 2 (every slot a pointer).
+- trap.c reads RIP / RSP; under a debugger it does not install its handler (the debugger reports the fault).
+
+**Bugs found running it** (all invisible on 32-bit):
+- RenderWare's standard function table (`RwGlobals.stdFunc`) was `uint32_t[]`, filled through a `void **`.
+- The driver's standards table in src/data sat behind a 12-byte lead: typed as (slot, function) pairs now.
+- Sizes written in 4-byte units for pointer arrays: the GUI sort (qsort element 4), RW frame lists, the PNG row
+  table, zfont glyph tables, zlist, the material list, morph targets, the mesh sort, the 2D sort items, the
+  camera's visible sector list.
+- Byte offsets into module data: the world module's free list and list (now `RpWorldGlobals`); the PNG io pointer
+  at 0x54 (`bmxPngIoPtr`).
+- `PhysPropFrame` was a view of `ZObj` with its pointers as padding: now the same type.
+- The collision query kept the nearest atomic / sector in `uint32_t` fields, passed in as `uint32_t` arguments.
+- `zrwmatClone` copied the material's 64-bit handle with the record: clone and original shared one handle.
+- src/data declared the small HUD font (0x56bf38) as a byte and padding: the 64-bit `OvlFont` overran it.
+- Copies with 32-bit byte counts: the goal marker lists (64 pointers copied as 0x100 bytes), the LOD atomic data's
+  header (0x18 bytes up to `levels`).
+
+**tools/data_size64.py** looks for the src/data class above: every `ORIG_VAR` site whose type, on 64-bit, reaches
+past the definition (or group member) that src/data gives its address, while it fits on 32-bit. It compiles a probe
+after src/data's headers for both widths, and for types local to a .c file a probe that follows that file. Found
+and fixed besides the font: the collision list `gZrwColList` (src/data had its own copy of the record with a
+32-bit `tag`, now the code's `ZrwRenderColHit`), the motion bank table (src/data reserved 0x18 bytes; it is one
+bank now, as only `zmotionLoadExtraBank`, which nothing calls, would add a second over the next globals), and the
+level name table (declared 32 entries, src/data has the 14 levels). Now: 1633 sites checked, 0 found (the one it
+cannot name is a float table). It takes some minutes, so it is not in the gate.
+
+#### zmem's headers
+
+zmem hides a 32-bit size word before every heap and static block, and its free lists and pools a link header
+before each node; the original adds them with literal 4s and 8s. On 64-bit that gave 4-byte-aligned payloads and
+node headers too small for their two pointers.
+1. Natural sizes on 64-bit: the header region before a payload is 8 bytes (the size word in its last 4), sizes
+   round up to 8, free-list and pool headers are their structs' sizes. 32-bit unchanged.
+2. Keep 4-byte alignment on 64-bit (x86 tolerates it): undefined behaviour in C, breaks atomics, and arm64 later.
+3. Plain malloc on 64-bit: loses the static region's mark / release.
+
+Decision (2026-11-05): option 1 (32-bit byte-identical, the oracle unaffected).
+
+**Debug aids:** `BMX_GUARD_HEAP=1` (src/native/crt.c) puts every C-runtime block before an inaccessible page so an
+overrun faults at the write; with lldb (llvm-mingw's) that gives the writer's backtrace.
+
+**Where it stands:** the 64-bit exe starts, loads the front end and levels and runs the scripted ride's first 24
+ticks. Open: the camera's ground probe differs in the last bit from tick 2 (being traced); the remaining crashes.
+
 
 ## Not in scope
 

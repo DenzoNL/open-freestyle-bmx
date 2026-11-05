@@ -174,22 +174,22 @@ BMX_LAYOUT32_ASSERT(sizeof(RwFileFunctions) == 0x28, "RwFileFunctions layout");
  * sizeof(RwGlobals): the error slot, the resource arena, the matrix globals.
  */
 typedef struct RwGlobals {
-    void *curCamera;                           /* 0x00 */
-    void *curWorld;                            /* 0x04 */
-    uint16_t renderFrame;                      /* 0x08 */
-    uint16_t lightFrame;                       /* 0x0a */
-    uint16_t lightVisit;                       /* 0x0c stamp of the light walk (rpLightVisitOnce) */
-    uint8_t pad0e[2];                          /* 0x0e */
-    RwDevice dOpenDevice;                      /* 0x10 */
-    uint32_t stdFunc[rwSTANDARDNUMOFSTANDARD]; /* 0x48 */
-    RwLLLink dirtyFrameList;                   /* 0xb8 frame hierarchies waiting for a sync */
-    RwFileFunctions fileFuncs;                 /* 0xc0 */
-    RwStringFunctions stringFuncs;             /* 0xe8 */
-    RwMemoryFunctions memoryFuncs;             /* 0x128 */
-    RwFreeListAllocFunc freeListAlloc;         /* 0x138 */
-    RwFreeListFreeFunc freeListFree;           /* 0x13c */
-    int32_t *metrics;                          /* 0x140 */
-    int32_t engineStatus;                      /* 0x144 */
+    void *curCamera;                        /* 0x00 */
+    void *curWorld;                         /* 0x04 */
+    uint16_t renderFrame;                   /* 0x08 */
+    uint16_t lightFrame;                    /* 0x0a */
+    uint16_t lightVisit;                    /* 0x0c stamp of the light walk (rpLightVisitOnce) */
+    uint8_t pad0e[2];                       /* 0x0e */
+    RwDevice dOpenDevice;                   /* 0x10 */
+    void *stdFunc[rwSTANDARDNUMOFSTANDARD]; /* 0x48 the device's standard functions */
+    RwLLLink dirtyFrameList;                /* 0xb8 frame hierarchies waiting for a sync */
+    RwFileFunctions fileFuncs;              /* 0xc0 */
+    RwStringFunctions stringFuncs;          /* 0xe8 */
+    RwMemoryFunctions memoryFuncs;          /* 0x128 */
+    RwFreeListAllocFunc freeListAlloc;      /* 0x138 */
+    RwFreeListFreeFunc freeListFree;        /* 0x13c */
+    int32_t *metrics;                       /* 0x140 */
+    int32_t engineStatus;                   /* 0x144 */
 } RwGlobals;
 
 BMX_LAYOUT32_ASSERT(sizeof(RwGlobals) == 0x148, "RwGlobals layout");

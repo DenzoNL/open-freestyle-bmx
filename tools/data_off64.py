@@ -49,16 +49,24 @@ def num(m, first):
     return int(m.group(first) or m.group(first + 1), 0)
 
 
-def compile_probe(exprs, cc, target64):
-    """Each expression's value, compiled like src/data/misc.c (for x86_64 when target64)."""
+class ProbeError(Exception):
+    """The probe did not compile (compile_probe with all_errors); the compiler's messages."""
+
+
+def compile_probe(exprs, cc, target64, all_errors=False, unit='src/data/misc.c'):
+    """Each expression's value, compiled like src/data/misc.c (for x86_64 when target64), after src/data's
+    headers. With all_errors, a failed compile raises ProbeError with every error (tools/data_size64.py drops
+    those expressions). With another `unit` (a .c file of the native build) the probe follows that file instead,
+    compiled like it, so the file's own types are visible."""
     cmds = json.load(open(os.path.join(ROOT, 'build', 'native32', 'compile_commands.json')))
-    entry = next(e for e in cmds if e['file'].replace(chr(92), '/').endswith('src/data/misc.c'))
+    entry = next(e for e in cmds if e['file'].replace(chr(92), '/').endswith(unit))
+    include = 'data/data.h' if unit == 'src/data/misc.c' else os.path.join(ROOT, unit).replace(chr(92), '/')
     with tempfile.TemporaryDirectory() as tmp:
         probe = os.path.join(tmp, 'probe.c')
         out = os.path.join(tmp, 'probe.ll')
         with open(probe, 'w') as f:
             f.write('#pragma clang diagnostic ignored "-Wkeyword-macro"\n#define _Static_assert(c, m)\n'
-                    '#include "data/data.h"\nconst unsigned long long bmxProbe[] = {\n')
+                    f'#include "{include}"\nconst unsigned long long bmxProbe[] = {{\n')
             f.write(''.join(f'    (unsigned long long)({e}),\n' for e in exprs))
             f.write('};\n')
         args = entry['command'].split()
@@ -72,13 +80,16 @@ def compile_probe(exprs, cc, target64):
             if a == '-o':
                 skip = True
                 continue
-            if a in ('-c', '-Werror', '-msse2', '-mfpmath=sse', '-MD') or a.startswith('-MF') or a.endswith('misc.c'):
+            if a in ('-c', '-Werror', '-msse2', '-mfpmath=sse', '-MD') or a.startswith('-MF') or a.replace(chr(92), '/').endswith(unit):
                 continue
             keep.append(a)
         compiler = cc if target64 else args[0]
-        r = subprocess.run([compiler] + keep + ['-w', '-S', '-emit-llvm', '-o', out, probe], cwd=entry['directory'],
-                           capture_output=True, text=True)
+        limit = ['-ferror-limit=0'] if all_errors else []
+        r = subprocess.run([compiler] + keep + limit + ['-w', '-S', '-emit-llvm', '-o', out, probe],
+                           cwd=entry['directory'], capture_output=True, text=True)
         if r.returncode != 0:
+            if all_errors:
+                raise ProbeError(r.stderr)
             sys.exit(r.stderr[-4000:])
         ll = open(out).read()
     m = re.search(r'@bmxProbe = .*?constant \[\d+ x i64\] \[(.*?)\]', ll)
@@ -220,4 +231,5 @@ def main():
           f'64-bit value')
 
 
-main()
+if __name__ == '__main__':
+    main()

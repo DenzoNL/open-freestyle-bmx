@@ -8,7 +8,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(BMX_HOOK "Build against the original NgBMX.exe (i686 hook/oracle phase)" ON)
 
-option(BMX_NATIVE32 "Build bmxnative.exe: our own 32-bit exe on a relocated copy of the original's data" OFF)
+option(BMX_NATIVE32 "Build bmxnative.exe, our own exe (32- or 64-bit, by the toolchain: presets native32 / native64)" OFF)
 set(BMX_WORK_DIR "${CMAKE_SOURCE_DIR}/work" CACHE PATH "Directory with labels.raw (names in trap reports)")
 
 set(BMX_WARNINGS -Wall -Wextra -Werror -Wno-unused-parameter -Wno-microsoft-anon-tag)
@@ -94,11 +94,17 @@ if(BMX_NATIVE32)
       OUTPUT_STRIP_TRAILING_WHITESPACE)
     list(APPEND BMX_CRT_STARTFILES ${crtPath})
   endforeach()
-  # SDL3 for i686 mingw (the SDL3-<version>/i686-w64-mingw32 folder of the SDL release's mingw devel package).
-  file(GLOB BMX_SDL3_GUESS "$ENV{HOME}/tools/sdl3/SDL3-*/i686-w64-mingw32" "$ENV{USERPROFILE}/tools/sdl3/SDL3-*/i686-w64-mingw32")
+  # SDL3 for mingw (the SDL3-<version>/<triple> folder of the SDL release's mingw devel package).
+  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(BMX_MINGW_TRIPLE x86_64-w64-mingw32)
+  else()
+    set(BMX_MINGW_TRIPLE i686-w64-mingw32)
+  endif()
+  file(GLOB BMX_SDL3_GUESS "$ENV{HOME}/tools/sdl3/SDL3-*/${BMX_MINGW_TRIPLE}"
+    "$ENV{USERPROFILE}/tools/sdl3/SDL3-*/${BMX_MINGW_TRIPLE}")
   list(SORT BMX_SDL3_GUESS)
   list(POP_BACK BMX_SDL3_GUESS BMX_SDL3_GUESS_LAST)
-  set(BMX_SDL3_DIR "${BMX_SDL3_GUESS_LAST}" CACHE PATH "SDL3 i686-w64-mingw32 prefix (bin/SDL3.dll, lib/cmake/SDL3)")
+  set(BMX_SDL3_DIR "${BMX_SDL3_GUESS_LAST}" CACHE PATH "SDL3 ${BMX_MINGW_TRIPLE} prefix (bin/SDL3.dll, lib/cmake/SDL3)")
   find_package(SDL3 REQUIRED CONFIG PATHS "${BMX_SDL3_DIR}" NO_DEFAULT_PATH)
   # The SDL3 render driver (src/driver): native exe only, the hook DLL keeps running the original D3D7 driver.
   # Compiled like the game objects (BMX_HOOK, BMX_IMAGE: RW globals in the relocated data copy) but hosted.
@@ -119,9 +125,13 @@ if(BMX_NATIVE32)
   target_include_directories(bmx_png PRIVATE ${CMAKE_BINARY_DIR}/gen)
   add_dependencies(bmx_png bmx_origmap)
   target_compile_options(bmx_png PRIVATE ${BMX_WARNINGS} -ffreestanding -fno-builtin -fno-stack-protector)
+  # The MSVC compiler helpers the original's code called (i386 only; nothing calls them on x86_64).
+  if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+    set(BMX_CRT_ASM src/native/crtasm.S)
+  endif()
   add_executable(bmxnative $<TARGET_OBJECTS:bmx_game> $<TARGET_OBJECTS:bmx_data> $<TARGET_OBJECTS:bmx_driver>
     $<TARGET_OBJECTS:bmx_png>
-    ${BMX_NATIVE_SOURCES} src/native/crtasm.S ${CMAKE_BINARY_DIR}/gen/origmap.c
+    ${BMX_NATIVE_SOURCES} ${BMX_CRT_ASM} ${CMAKE_BINARY_DIR}/gen/origmap.c
     third_party/dr_flac/dr_flac.c ${CMAKE_BINARY_DIR}/music_edits.c)
   target_include_directories(bmxnative PRIVATE src ${CMAKE_BINARY_DIR}/gen)
   target_include_directories(bmxnative SYSTEM PRIVATE third_party/dr_flac)

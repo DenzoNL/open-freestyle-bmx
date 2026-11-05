@@ -296,15 +296,15 @@ BMX_ADDR(0x004d0a00)
 __attribute__((naked)) RwMatrix *RwMatrixRotateOneMinusCosineSine(uint32_t unused0, uint32_t unused1,
                                                                   uint32_t unused2, float sine)
 {
-    __asm__ volatile("pushl 0x10(%esp)\n\t"
-                     "subl $8, %esp\n\t"
-                     "fstpl (%esp)\n\t"
-                     "pushl %ecx\n\t"
-                     "pushl %edx\n\t"
-                     "pushl %eax\n\t"
-                     "call _rwMatrixRotateImpl\n\t"
-                     "addl $24, %esp\n\t"
-                     "ret");
+    BMX_X86_ENTRY("pushl 0x10(%esp)\n\t"
+                  "subl $8, %esp\n\t"
+                  "fstpl (%esp)\n\t"
+                  "pushl %ecx\n\t"
+                  "pushl %edx\n\t"
+                  "pushl %eax\n\t"
+                  "call _rwMatrixRotateImpl\n\t"
+                  "addl $24, %esp\n\t"
+                  "ret");
 }
 
 /*
@@ -832,7 +832,7 @@ RwFrameList *_rwFrameListStreamRead(void *stream, RwFrameList *frameList)
     }
     RwMemNative32(&count, 4);
     frameList->numFrames = count;
-    frameList->frames = (RwFrame **)RwEngineInstance->memoryFuncs.rwmalloc((size_t)count << 2);
+    frameList->frames = (RwFrame **)RwEngineInstance->memoryFuncs.rwmalloc((size_t)count * sizeof(RwFrame *));
     if (frameList->frames == NULL) {
         rwReportError(rwERR_NOMEM, (const char *)(uintptr_t)((uint32_t)count << 2));
         return NULL;
@@ -1127,7 +1127,7 @@ BMX_ADDR(0x004e96d0)
 RwFrameList *_rwFrameListInitialize(RwFrameList *frameList, RwFrame *root)
 {
     const int32_t count = RwFrameCount(root);
-    RwFrame **frames = (RwFrame **)RwEngineInstance->memoryFuncs.rwmalloc((size_t)count << 2);
+    RwFrame **frames = (RwFrame **)RwEngineInstance->memoryFuncs.rwmalloc((size_t)count * sizeof(RwFrame *));
     if (frames == NULL) {
         rwReportNoMemory(count << 2);
         return NULL;

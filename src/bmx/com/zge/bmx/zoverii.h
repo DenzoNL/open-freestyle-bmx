@@ -223,7 +223,7 @@ ORIG_FN(0x0046e010, void, zoverPollInput, (void));
  */
 #if defined(BMX_HOOK)
 uint32_t BMX_STDCALL zoverPollTimer(uint32_t a, uint32_t b, uint32_t c, uint32_t d,
-                                    uint32_t e) __asm__("_zoverPollTimer");
+                                    uint32_t e) __asm__(BMX_SYM("zoverPollTimer"));
 #else
 uint32_t BMX_STDCALL zoverPollTimer(uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t e);
 #endif

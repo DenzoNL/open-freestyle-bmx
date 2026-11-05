@@ -154,7 +154,7 @@ int zpadDirectInputInitialize(void);
 /* A stdcall callback; the label keeps the symbol undecorated for the generated hook table. */
 #if defined(BMX_HOOK)
 uint32_t BMX_STDCALL zpadEnumJoysticksCallback(const void *instance,
-                                               void *guid) __asm__("_zpadEnumJoysticksCallback");
+                                               void *guid) __asm__(BMX_SYM("zpadEnumJoysticksCallback"));
 #else
 uint32_t BMX_STDCALL zpadEnumJoysticksCallback(const void *instance, void *guid);
 #endif

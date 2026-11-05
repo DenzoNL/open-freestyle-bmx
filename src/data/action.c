@@ -7,7 +7,7 @@
 #include "data/data.h"
 
 /* Functions the data points at that no header declares (assembler name = C name). */
-void bmxphysUpdatePositionRoll(void) __asm__("_bmxphysUpdatePositionRoll");
+void bmxphysUpdatePositionRoll(void) __asm__(BMX_SYM("bmxphysUpdatePositionRoll"));
 
 /* 0x00551a30 */
 uint8_t gActionMode = 255;

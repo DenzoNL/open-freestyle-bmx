@@ -172,7 +172,7 @@ __attribute__((regparm(2))) int EngineOpen(const RwDevice *device, void *openPar
         RwEngineInstance->memoryFuncs.rwfree(instance);
         return 0;
     }
-    if (!device->fpSystem(rwDEVICESYSTEMSTANDARDS, RwEngineInstance->stdFunc, NULL,
+    if (!device->fpSystem(rwDEVICESYSTEMSTANDARDS, (void *)RwEngineInstance->stdFunc, NULL,
                           rwSTANDARDNUMOFSTANDARD)) {
         rwDeviceError(rwDEVICESYSTEMSTANDARDS);
     }

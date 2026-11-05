@@ -98,6 +98,7 @@ const RwV2d *RwCameraGetViewWindow(const RwCamera *camera);
 /* Creates the PVS camera and image (asm entry: EAX = world, EDX / ECX = parent camera / z raster or NULL, ST0
  * = far clip plane). */
 void rwPvsCameraCreate(void);
+void rwPvsCameraCreateImpl(void *world, RwRaster *raster, RwRaster *zRaster, double farClip);
 RwCamera *RwCameraBeginUpdate(RwCamera *camera);
 RwCamera *RwCameraEndUpdate(RwCamera *camera);
 RwCamera *RwCameraGetCurrentCamera(void);

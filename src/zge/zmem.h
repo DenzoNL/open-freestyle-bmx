@@ -10,7 +10,18 @@
 /*
  * Every zmem allocation is preceded by a 32 bit header word: the low 30 bits hold the (4 byte aligned)
  * size, the top two bits say where the block came from.
+ *
+ * kZmemHead: the bytes before a heap or static payload; the header word is their last 4. kZmemAlign: what
+ * payload sizes are rounded up to. 4 and 4 on 32-bit, as in the original; on 64-bit 8 and 8, so payloads
+ * (with pointers in them) stay pointer aligned (docs/PORTING.md X3, "zmem's headers"). The free lists' and
+ * pools' headers are their structs' sizes.
  */
+#if BMX_LAYOUT32
+enum { kZmemHead = 4, kZmemAlign = 4 };
+#else
+enum { kZmemHead = 8, kZmemAlign = 8 };
+#endif
+
 enum {
     kZmemSizeMask = 0x3fffffff,
     kZmemOriginShift = 30,
@@ -37,11 +48,11 @@ typedef struct ZMemFreeNode {
 
 typedef void(BMX_CDECL *ZMemDestroyFn)(void *payload);
 
-/* Chunk of a free list: link to the previous chunk, then kZmemChunkHeader bytes in the first node. */
+/* Chunk of a free list: link to the previous chunk, then the first node. */
 typedef struct ZMemChunk {
     struct ZMemChunk *next;
 } ZMemChunk;
-enum { kZmemChunkHeader = 4 };
+enum { kZmemChunkHeader = sizeof(ZMemChunk) };
 
 /*
  * Fixed size object allocator. Memory comes in chunks ({next chunk, nodes...}); the chunk size doubles
@@ -81,6 +92,9 @@ typedef struct ZMemState {
 
 typedef uint32_t ZMemInUseTable[128];
 typedef ZMemFreeList ZMemFreeListTable[128];
+BMX_LAYOUT32_ASSERT(sizeof(ZMemFreeNode) == 8 && sizeof(ZMemBlock) == 8 && kZmemChunkHeader == 4 &&
+                        sizeof(ZMemFreeList) == 0x20,
+                    "zmem headers");
 
 #define gZmem               ORIG_VAR(0x00670880, ZMemState, gZmem)
 #define gZmemFreeListInUse  ORIG_VAR(0x00670680, ZMemInUseTable, gZmemFreeListInUse)

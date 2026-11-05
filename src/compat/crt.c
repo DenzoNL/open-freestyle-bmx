@@ -129,7 +129,10 @@ char *strchr(const char *s, int c)
  * shifts). The exe contains the MSVC6 versions; forward to them so the calling convention (arguments on
  * the stack, callee pops) matches exactly.
  */
-#if defined(BMX_IMAGE)
+#if defined(BMX_IMAGE) && !defined(__i386__)
+/* x86_64: the compiler does 64-bit arithmetic inline; nothing to forward. */
+#define BMX_FORWARD(name, addr)
+#elif defined(BMX_IMAGE)
 #define BMX_FORWARD(name, addr)                                                                              \
     __attribute__((naked)) void name(void)                                                                   \
     {                                                                                                        \

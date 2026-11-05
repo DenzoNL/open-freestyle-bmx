@@ -121,9 +121,9 @@ void zrwDialogSelectDevice(void *dialog);
 /* stdcall; the label keeps the symbol undecorated for the generated hook table. */
 #if defined(BMX_HOOK)
 int BMX_STDCALL zrwDialogProc(void *dialog, uint32_t message, uintptr_t wparam,
-                              uintptr_t lparam) __asm__("_zrwDialogProc");
+                              uintptr_t lparam) __asm__(BMX_SYM("zrwDialogProc"));
 intptr_t BMX_STDCALL zrwMainWndProc(void *window, uint32_t message, uintptr_t wparam,
-                                    uintptr_t lparam) __asm__("_zrwMainWndProc");
+                                    uintptr_t lparam) __asm__(BMX_SYM("zrwMainWndProc"));
 #else
 int BMX_STDCALL zrwDialogProc(void *dialog, uint32_t message, uintptr_t wparam, uintptr_t lparam);
 

@@ -19,6 +19,11 @@ ORIG_FN(0x005070d0, void *, png_create_read_struct_2,
 ORIG_FN(0x00508e40, void *, png_create_info_struct, (void *png));
 /* The CRT setjmp (MSVC _setjmp3(buf, count, ...)): the original reads more stack slots than count names. */
 ORIG_FN(0x0051e008, int, _setjmp3, (void *jmpBuf, int count, ...));
+#if defined(BMX_IMAGE) && !defined(__i386__)
+/* x86_64: the CRT's setjmp is i386 code; the compiler's (5 pointer slots of the png struct's 64-byte jmp_buf;
+ * png/png.c's png_error longjmps with the matching builtin). */
+#define _setjmp3(jmpBuf, count) __builtin_setjmp((void **)(jmpBuf))
+#endif
 ORIG_FN(0x005090f0, void, png_set_read_fn, (void *png, void *ioPtr, void *readFn));
 ORIG_FN(0x00507290, void, png_read_info, (void *png, void *info));
 ORIG_FN(0x00509600, uint32_t, png_get_IHDR,
@@ -64,7 +69,7 @@ typedef int(BMX_CDECL *RwStandardFunc)(void *out, void *in, int32_t flags);
 
 static RwStandardFunc standardFunc(int index)
 {
-    return (RwStandardFunc)(uintptr_t)RwEngineInstance->stdFunc[index];
+    return (RwStandardFunc)RwEngineInstance->stdFunc[index];
 }
 
 /* Records an error with no arguments in the error slot. */
@@ -1362,7 +1367,7 @@ RwImage *RtPNGImageRead(const char *name)
         uint8_t *pixels = RwImageGetPixels(image);
         uint8_t *palette = RwImageGetPalette(image);
         const int32_t stride = image->stride;
-        rows = (uint8_t **)RwOsGetMemoryInterface()->rwmalloc((size_t)(height << 2));
+        rows = (uint8_t **)RwOsGetMemoryInterface()->rwmalloc((size_t)height * sizeof(uint8_t *));
         if (rows == NULL) {
             RwImageFreePixels(image);
             RwImageDestroy(image);
@@ -1673,7 +1678,7 @@ BMX_ADDR(0x004e7f20)
 RwImage *RwImageSetFromRaster(RwImage *image, RwRaster *raster)
 {
     typedef int(BMX_CDECL * Fn)(RwImage *, RwRaster *, int32_t);
-    if (((Fn)(uintptr_t)RwEngineInstance->stdFunc[rwSTANDARDRASTERGETIMAGE])(image, raster, 0) == 0) {
+    if (((Fn)RwEngineInstance->stdFunc[rwSTANDARDRASTERGETIMAGE])(image, raster, 0) == 0) {
         return NULL;
     }
     if ((raster->privateFlags & 1) != 0) {
@@ -1692,8 +1697,7 @@ RwImage *RwImageFindRasterFormat(RwImage *image, int32_t flags, int32_t *width, 
 {
     typedef int(BMX_CDECL * Fn)(RwRaster *, RwImage *, int32_t);
     RwRaster info;
-    if (((Fn)(uintptr_t)RwEngineInstance->stdFunc[rwSTANDARDIMAGEFINDRASTERFORMAT])(&info, image, flags) ==
-        0) {
+    if (((Fn)RwEngineInstance->stdFunc[rwSTANDARDIMAGEFINDRASTERFORMAT])(&info, image, flags) == 0) {
         return NULL;
     }
     *format = RwRasterGetFormat(&info) | info.type;

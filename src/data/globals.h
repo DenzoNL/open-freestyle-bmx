@@ -475,6 +475,7 @@
 #undef gPhysGrindMinSpeed
 #undef gPhysGrindYawDamp
 #undef gPhysHudFont
+#undef gMotionBanks
 #undef gPhysHudHandle
 #undef gPhysIkLimbMasks
 #undef gPhysLandCrashSpeed
@@ -7438,126 +7439,24 @@ _Static_assert(offsetof(struct BmxGroup_rwEngineRegistryGroup, d_00566dd4) +
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0056701c..0x00567100.
  */
 struct BmxGroup_d_0056701cGroup {
-    uint8_t lead_[12];              /* nothing: the members' offsets keep their original alignment */
-    uint32_t d_0056701c;            /* 0x0056701c */
-    void *p_00567020;               /* 0x00567020 */
-    uint32_t d_00567024;            /* 0x00567024 */
-    void *p_00567028;               /* 0x00567028 */
-    uint32_t d_0056702c;            /* 0x0056702c */
-    void *p_00567030;               /* 0x00567030 */
-    uint32_t d_00567034;            /* 0x00567034 */
-    void *p_00567038;               /* 0x00567038 */
-    uint32_t d_0056703c;            /* 0x0056703c */
-    void *p_00567040;               /* 0x00567040 */
-    uint32_t d_00567044;            /* 0x00567044 */
-    void *p_00567048;               /* 0x00567048 */
-    uint32_t d_0056704c;            /* 0x0056704c */
-    void *p_00567050;               /* 0x00567050 */
-    uint32_t d_00567054;            /* 0x00567054 */
-    void *p_00567058;               /* 0x00567058 */
-    uint32_t d_0056705c;            /* 0x0056705c */
-    void *p_00567060;               /* 0x00567060 */
-    uint32_t d_00567064;            /* 0x00567064 */
-    void *p_00567068;               /* 0x00567068 */
-    uint32_t d_0056706c;            /* 0x0056706c */
-    void *p_00567070;               /* 0x00567070 */
-    uint32_t d_00567074;            /* 0x00567074 */
-    void *p_00567078;               /* 0x00567078 */
-    uint32_t d_0056707c;            /* 0x0056707c */
-    void *p_00567080;               /* 0x00567080 */
-    uint32_t d_00567084;            /* 0x00567084 */
-    void *p_00567088;               /* 0x00567088 */
-    uint32_t d_0056708c;            /* 0x0056708c */
-    void *p_00567090;               /* 0x00567090 */
-    uint32_t d_00567094;            /* 0x00567094 */
-    void *p_00567098;               /* 0x00567098 */
-    uint32_t d_0056709c;            /* 0x0056709c */
-    void *p_005670a0;               /* 0x005670a0 */
-    uint32_t d_005670a4;            /* 0x005670a4 */
-    void *p_005670a8;               /* 0x005670a8 */
-    uint32_t d_005670ac;            /* 0x005670ac */
-    void *p_005670b0;               /* 0x005670b0 */
-    uint32_t d_005670b4;            /* 0x005670b4 */
-    void *p_005670b8;               /* 0x005670b8 */
-    uint32_t d_005670bc;            /* 0x005670bc */
-    void *p_005670c0;               /* 0x005670c0 */
-    uint32_t d_005670c4;            /* 0x005670c4 */
-    void *p_005670c8;               /* 0x005670c8 */
-    uint32_t d_005670cc;            /* 0x005670cc */
-    void *p_005670d0;               /* 0x005670d0 */
-    uint32_t d_005670d4;            /* 0x005670d4 */
-    void *p_005670d8;               /* 0x005670d8 */
-    uint32_t d_005670dc;            /* 0x005670dc */
-    void *p_005670e0;               /* 0x005670e0 */
-    uint32_t d_005670e4;            /* 0x005670e4 */
-    void *p_005670e8;               /* 0x005670e8 */
-    uint32_t d_005670ec;            /* 0x005670ec */
-    void *p_005670f0;               /* 0x005670f0 */
+    uint8_t lead_[12]; /* nothing: the members' offsets keep their original alignment */
+    /* The D3D7 driver's standards: (slot, function) pairs (src/driver/device.c, DrvStandard). */
+    struct {
+        int32_t id;
+        void *fn;
+    } d_0056701c[27];               /* 0x0056701c */
     unsigned char pad_005670f4[12]; /* 0x005670f4 */
 };
 #define AT(member, addr, off64)                                                                              \
     _Static_assert(offsetof(struct BmxGroup_d_0056701cGroup, member) ==                                      \
                        BMX_DATA_OFF((addr) - 0x00567010, off64),                                             \
                    #member)
-AT(d_0056701c, 0x0056701c, 0xc);
-AT(p_00567020, 0x00567020, 0x10);
-AT(d_00567024, 0x00567024, 0x18);
-AT(p_00567028, 0x00567028, 0x20);
-AT(d_0056702c, 0x0056702c, 0x28);
-AT(p_00567030, 0x00567030, 0x30);
-AT(d_00567034, 0x00567034, 0x38);
-AT(p_00567038, 0x00567038, 0x40);
-AT(d_0056703c, 0x0056703c, 0x48);
-AT(p_00567040, 0x00567040, 0x50);
-AT(d_00567044, 0x00567044, 0x58);
-AT(p_00567048, 0x00567048, 0x60);
-AT(d_0056704c, 0x0056704c, 0x68);
-AT(p_00567050, 0x00567050, 0x70);
-AT(d_00567054, 0x00567054, 0x78);
-AT(p_00567058, 0x00567058, 0x80);
-AT(d_0056705c, 0x0056705c, 0x88);
-AT(p_00567060, 0x00567060, 0x90);
-AT(d_00567064, 0x00567064, 0x98);
-AT(p_00567068, 0x00567068, 0xa0);
-AT(d_0056706c, 0x0056706c, 0xa8);
-AT(p_00567070, 0x00567070, 0xb0);
-AT(d_00567074, 0x00567074, 0xb8);
-AT(p_00567078, 0x00567078, 0xc0);
-AT(d_0056707c, 0x0056707c, 0xc8);
-AT(p_00567080, 0x00567080, 0xd0);
-AT(d_00567084, 0x00567084, 0xd8);
-AT(p_00567088, 0x00567088, 0xe0);
-AT(d_0056708c, 0x0056708c, 0xe8);
-AT(p_00567090, 0x00567090, 0xf0);
-AT(d_00567094, 0x00567094, 0xf8);
-AT(p_00567098, 0x00567098, 0x100);
-AT(d_0056709c, 0x0056709c, 0x108);
-AT(p_005670a0, 0x005670a0, 0x110);
-AT(d_005670a4, 0x005670a4, 0x118);
-AT(p_005670a8, 0x005670a8, 0x120);
-AT(d_005670ac, 0x005670ac, 0x128);
-AT(p_005670b0, 0x005670b0, 0x130);
-AT(d_005670b4, 0x005670b4, 0x138);
-AT(p_005670b8, 0x005670b8, 0x140);
-AT(d_005670bc, 0x005670bc, 0x148);
-AT(p_005670c0, 0x005670c0, 0x150);
-AT(d_005670c4, 0x005670c4, 0x158);
-AT(p_005670c8, 0x005670c8, 0x160);
-AT(d_005670cc, 0x005670cc, 0x168);
-AT(p_005670d0, 0x005670d0, 0x170);
-AT(d_005670d4, 0x005670d4, 0x178);
-AT(p_005670d8, 0x005670d8, 0x180);
-AT(d_005670dc, 0x005670dc, 0x188);
-AT(p_005670e0, 0x005670e0, 0x190);
-AT(d_005670e4, 0x005670e4, 0x198);
-AT(p_005670e8, 0x005670e8, 0x1a0);
-AT(d_005670ec, 0x005670ec, 0x1a8);
-AT(p_005670f0, 0x005670f0, 0x1b0);
-AT(pad_005670f4, 0x005670f4, 0x1b8);
+AT(d_0056701c, 0x0056701c, 0x10);
+AT(pad_005670f4, 0x005670f4, 0x1c0);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_d_0056701cGroup, pad_005670f4) +
                        sizeof(((struct BmxGroup_d_0056701cGroup *)0)->pad_005670f4) ==
-                   BMX_DATA_OFF(0xf0, 0x1c4),
+                   BMX_DATA_OFF(0xf0, 0x1cc),
                "d_0056701cGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x0056727c..0x00567300.
@@ -7912,8 +7811,7 @@ struct BmxGroup_gGameRoundStatesGroup {
     OvlHandles6 gOvlHeightHandles;    /* 0x0056bf24 */
     uint8_t gOvlPage;                 /* 0x0056bf30 */
     unsigned char pad_0056bf31[7];    /* 0x0056bf31 */
-    uint8_t gPhysHudFont;             /* 0x0056bf38, also gOvlFontSmall */
-    unsigned char pad_0056bf39[11];   /* 0x0056bf39 */
+    OvlFont gPhysHudFont;             /* 0x0056bf38, also gOvlFontSmall */
     OvlTimedMsg gOvlHint;             /* 0x0056bf44 */
     unsigned char pad_0056bf48[4];    /* 0x0056bf48 */
     OvlTimedMsg gOvlGoalMsg;          /* 0x0056bf4c */
@@ -8054,74 +7952,73 @@ AT(gOvlScreen, 0x0056bf20, 0xa40);
 AT(gOvlHeightHandles, 0x0056bf24, 0xa48);
 AT(gOvlPage, 0x0056bf30, 0xa54);
 AT(pad_0056bf31, 0x0056bf31, 0xa55);
-AT(gPhysHudFont, 0x0056bf38, 0xa5c);
-AT(pad_0056bf39, 0x0056bf39, 0xa5d);
-AT(gOvlHint, 0x0056bf44, 0xa68);
-AT(pad_0056bf48, 0x0056bf48, 0xa6c);
-AT(gOvlGoalMsg, 0x0056bf4c, 0xa70);
-AT(pad_0056bf50, 0x0056bf50, 0xa74);
-AT(gOvlTimerShownTicks, 0x0056bf54, 0xa78);
-AT(gOvlTimerTicks, 0x0056bf58, 0xa7c);
-AT(gOvlIndicator, 0x0056bf5c, 0xa80);
-AT(pad_0056bf60, 0x0056bf60, 0xa84);
-AT(gOvlNameCursor, 0x0056bf64, 0xa88);
-AT(pad_0056bf65, 0x0056bf65, 0xa89);
-AT(gOvlPulse, 0x0056bf68, 0xa8c);
-AT(gOvlTrickRows, 0x0056bf6c, 0xa90);
-AT(d_0056bf96, 0x0056bf96, 0xaba);
-AT(gOvlFontIcons, 0x0056bf98, 0xac0);
-AT(gOvlDrawDelay, 0x0056bfa4, 0xad8);
-AT(gOvlStatusHandle, 0x0056bfa8, 0xadc);
-AT(pad_0056bfaa, 0x0056bfaa, 0xade);
-AT(gOvlTimerText, 0x0056bfac, 0xae0);
-AT(d_0056bfb4, 0x0056bfb4, 0xae8);
-AT(d_0056bfb5, 0x0056bfb5, 0xae9);
-AT(gOvlHeightValue, 0x0056bfc0, 0xaf4);
-AT(gOvlHeightTarget, 0x0056bfc4, 0xaf8);
-AT(d_0056bfc8, 0x0056bfc8, 0xafc);
-AT(gOvlHeightKind, 0x0056bfca, 0xafe);
-AT(pad_0056bfcc, 0x0056bfcc, 0xb00);
-AT(gOvlElement8Value, 0x0056bfd9, 0xb0d);
-AT(pad_0056bfda, 0x0056bfda, 0xb0e);
-AT(gOvlHintHandles, 0x0056bfdc, 0xb10);
-AT(d_0056bfea, 0x0056bfea, 0xb1e);
-AT(gOvlBalanceHandles, 0x0056bfec, 0xb20);
-AT(gOvlImgButton, 0x0056bffa, 0xb2e);
-AT(gOvlCaptionHandle, 0x0056bffc, 0xb30);
-AT(pad_0056bffe, 0x0056bffe, 0xb32);
-AT(gOvlTimerHandle, 0x0056c000, 0xb34);
-AT(pad_0056c002, 0x0056c002, 0xb36);
-AT(gOvlFontButton, 0x0056c008, 0xb40);
-AT(pad_0056c014, 0x0056c014, 0xb58);
-AT(gOvlStatus, 0x0056c018, 0xb5c);
-AT(pad_0056c020, 0x0056c020, 0xb64);
-AT(gOvlMenuItems2, 0x0056c028, 0xb6c);
-AT(gOvlFade, 0x0056c050, 0xb94);
-AT(gOvlTrickView, 0x0056c070, 0xbb4);
-AT(gOvlSaveSlot, 0x0056c074, 0xbb8);
-AT(pad_0056c075, 0x0056c075, 0xbb9);
-AT(gPhysTick, 0x0056c07c, 0xbc0);
-AT(pad_0056c080, 0x0056c080, 0xbc4);
-AT(gPhysRay, 0x0056c128, 0xc70);
-AT(gPhysBestEdge, 0x0056c200, 0xd80);
-AT(gPhysAlignEdge, 0x0056c238, 0xdc0);
-AT(pad_0056c270, 0x0056c270, 0xe00);
-AT(gPhysNearEdge, 0x0056c2c0, 0xe50);
-AT(gPhysEdgeProbe, 0x0056c2f8, 0xe90);
-AT(gPhysGrindEdge, 0x0056c330, 0xed0);
-AT(pad_0056c368, 0x0056c368, 0xf10);
-AT(gPhysLipFace, 0x0056c3b8, 0xf60);
-AT(gPhysForceStep, 0x0056c440, 0x1008);
-AT(gPhysDebugDraw, 0x0056c444, 0x100c);
-AT(gPhysDebugEdges, 0x0056c448, 0x1010);
-AT(gPhysDebugFrame, 0x0056c44c, 0x1018);
-AT(pad_0056c450, 0x0056c450, 0x101c);
-AT(gPropDefaults, 0x0056c4f8, 0x10c4);
-AT(pad_0056d038, 0x0056d038, 0x1f44);
+AT(gPhysHudFont, 0x0056bf38, 0xa60);
+AT(gOvlHint, 0x0056bf44, 0xa78);
+AT(pad_0056bf48, 0x0056bf48, 0xa7c);
+AT(gOvlGoalMsg, 0x0056bf4c, 0xa80);
+AT(pad_0056bf50, 0x0056bf50, 0xa84);
+AT(gOvlTimerShownTicks, 0x0056bf54, 0xa88);
+AT(gOvlTimerTicks, 0x0056bf58, 0xa8c);
+AT(gOvlIndicator, 0x0056bf5c, 0xa90);
+AT(pad_0056bf60, 0x0056bf60, 0xa94);
+AT(gOvlNameCursor, 0x0056bf64, 0xa98);
+AT(pad_0056bf65, 0x0056bf65, 0xa99);
+AT(gOvlPulse, 0x0056bf68, 0xa9c);
+AT(gOvlTrickRows, 0x0056bf6c, 0xaa0);
+AT(d_0056bf96, 0x0056bf96, 0xaca);
+AT(gOvlFontIcons, 0x0056bf98, 0xad0);
+AT(gOvlDrawDelay, 0x0056bfa4, 0xae8);
+AT(gOvlStatusHandle, 0x0056bfa8, 0xaec);
+AT(pad_0056bfaa, 0x0056bfaa, 0xaee);
+AT(gOvlTimerText, 0x0056bfac, 0xaf0);
+AT(d_0056bfb4, 0x0056bfb4, 0xaf8);
+AT(d_0056bfb5, 0x0056bfb5, 0xaf9);
+AT(gOvlHeightValue, 0x0056bfc0, 0xb04);
+AT(gOvlHeightTarget, 0x0056bfc4, 0xb08);
+AT(d_0056bfc8, 0x0056bfc8, 0xb0c);
+AT(gOvlHeightKind, 0x0056bfca, 0xb0e);
+AT(pad_0056bfcc, 0x0056bfcc, 0xb10);
+AT(gOvlElement8Value, 0x0056bfd9, 0xb1d);
+AT(pad_0056bfda, 0x0056bfda, 0xb1e);
+AT(gOvlHintHandles, 0x0056bfdc, 0xb20);
+AT(d_0056bfea, 0x0056bfea, 0xb2e);
+AT(gOvlBalanceHandles, 0x0056bfec, 0xb30);
+AT(gOvlImgButton, 0x0056bffa, 0xb3e);
+AT(gOvlCaptionHandle, 0x0056bffc, 0xb40);
+AT(pad_0056bffe, 0x0056bffe, 0xb42);
+AT(gOvlTimerHandle, 0x0056c000, 0xb44);
+AT(pad_0056c002, 0x0056c002, 0xb46);
+AT(gOvlFontButton, 0x0056c008, 0xb50);
+AT(pad_0056c014, 0x0056c014, 0xb68);
+AT(gOvlStatus, 0x0056c018, 0xb6c);
+AT(pad_0056c020, 0x0056c020, 0xb74);
+AT(gOvlMenuItems2, 0x0056c028, 0xb7c);
+AT(gOvlFade, 0x0056c050, 0xba4);
+AT(gOvlTrickView, 0x0056c070, 0xbc4);
+AT(gOvlSaveSlot, 0x0056c074, 0xbc8);
+AT(pad_0056c075, 0x0056c075, 0xbc9);
+AT(gPhysTick, 0x0056c07c, 0xbd0);
+AT(pad_0056c080, 0x0056c080, 0xbd4);
+AT(gPhysRay, 0x0056c128, 0xc80);
+AT(gPhysBestEdge, 0x0056c200, 0xd90);
+AT(gPhysAlignEdge, 0x0056c238, 0xdd0);
+AT(pad_0056c270, 0x0056c270, 0xe10);
+AT(gPhysNearEdge, 0x0056c2c0, 0xe60);
+AT(gPhysEdgeProbe, 0x0056c2f8, 0xea0);
+AT(gPhysGrindEdge, 0x0056c330, 0xee0);
+AT(pad_0056c368, 0x0056c368, 0xf20);
+AT(gPhysLipFace, 0x0056c3b8, 0xf70);
+AT(gPhysForceStep, 0x0056c440, 0x1018);
+AT(gPhysDebugDraw, 0x0056c444, 0x101c);
+AT(gPhysDebugEdges, 0x0056c448, 0x1020);
+AT(gPhysDebugFrame, 0x0056c44c, 0x1028);
+AT(pad_0056c450, 0x0056c450, 0x102c);
+AT(gPropDefaults, 0x0056c4f8, 0x10d4);
+AT(pad_0056d038, 0x0056d038, 0x1f54);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gGameRoundStatesGroup, pad_0056d038) +
                        sizeof(((struct BmxGroup_gGameRoundStatesGroup *)0)->pad_0056d038) ==
-                   BMX_DATA_OFF(0x1b78, 0x2184),
+                   BMX_DATA_OFF(0x1b78, 0x2194),
                "gGameRoundStatesGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00573260..0x00574584.
@@ -8573,19 +8470,23 @@ _Static_assert(offsetof(struct BmxGroup_gWinstrmTickGroup, pad_00601b84) +
  */
 struct BmxGroup_gMotionDeltaEGroup {
     uint8_t lead_[8];               /* nothing: the members' offsets keep their original alignment */
-    unsigned char d_00601dc8[24];   /* 0x00601dc8, also gMotionBanks */
+    ZMotionBankTable gMotionBanks;  /* 0x00601dc8 */
+    unsigned char pad_00601ddc[4];  /* 0x00601ddc */
     ZMotionDelta gMotionDeltaE;     /* 0x00601de0 */
     unsigned char pad_00601df8[16]; /* 0x00601df8 */
 };
-#define AT(member, addr)                                                                                     \
-    _Static_assert(offsetof(struct BmxGroup_gMotionDeltaEGroup, member) == (addr) - 0x00601dc0, #member)
-AT(d_00601dc8, 0x00601dc8);
-AT(gMotionDeltaE, 0x00601de0);
-AT(pad_00601df8, 0x00601df8);
+#define AT(member, addr, off64)                                                                              \
+    _Static_assert(offsetof(struct BmxGroup_gMotionDeltaEGroup, member) ==                                   \
+                       BMX_DATA_OFF((addr) - 0x00601dc0, off64),                                             \
+                   #member)
+AT(gMotionBanks, 0x00601dc8, 0x8);
+AT(pad_00601ddc, 0x00601ddc, 0x30);
+AT(gMotionDeltaE, 0x00601de0, 0x34);
+AT(pad_00601df8, 0x00601df8, 0x4c);
 #undef AT
 _Static_assert(offsetof(struct BmxGroup_gMotionDeltaEGroup, pad_00601df8) +
                        sizeof(((struct BmxGroup_gMotionDeltaEGroup *)0)->pad_00601df8) ==
-                   0x48,
+                   BMX_DATA_OFF(0x48, 0x5c),
                "gMotionDeltaEGroup");
 
 /* Globals the code uses as one piece (a view over them, or a table declared shorter), 0x00641e30..0x0064eb34.
@@ -8887,30 +8788,8 @@ _Static_assert(offsetof(struct BmxGroup_gZtaginfRootGroup, gZtaginfData) +
                    BMX_DATA_OFF(0x40, 0x58),
                "gZtaginfRootGroup");
 
-/* The type is local to zge/com/zglrw/zrwmodelrender.c. */
-typedef struct {
-    uint8_t valid;
-    uint8_t pad01[3];
-    struct {
-        float x;
-        float y;
-        float z;
-    } v0;
-    uint32_t pad10;
-    struct {
-        float x;
-        float y;
-        float z;
-    } v1;
-    uint32_t pad20;
-    struct {
-        float x;
-        float y;
-        float z;
-    } v2;
-    uint32_t pad30;
-    uint32_t tag;
-} BmxType_gZrwColList[64];
+/* zrwmodelrender.c names the array type locally (ZrwRenderColList). */
+typedef ZrwRenderColHit BmxType_gZrwColList[64];
 
 /* The world's state: zrwworld.c clears it in one memset from gZrwWorldReady, 0x006741e0..0x0067428c. */
 struct BmxGroup_bmxZrwWorldState {

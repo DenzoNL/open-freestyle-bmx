@@ -447,9 +447,10 @@ void rwD3DDeferFlush(void)
     }
     rwD3DSaveState(&saved);
     if (rwD3DSortCap < rwD3DSortNeed) {
-        RwD3DSortItem *items = rwD3DSortItems == NULL
-                                   ? rwD3DMemory->rwmalloc(rwD3DSortNeed << 4)
-                                   : rwD3DMemory->rwrealloc(rwD3DSortItems, rwD3DSortNeed << 4);
+        RwD3DSortItem *items =
+            rwD3DSortItems == NULL
+                ? rwD3DMemory->rwmalloc(rwD3DSortNeed * sizeof(RwD3DSortItem))
+                : rwD3DMemory->rwrealloc(rwD3DSortItems, rwD3DSortNeed * sizeof(RwD3DSortItem));
         if (items == NULL) {
             rwD3DDeferReset(rwD3DDefer);
             rwD3DSortNeed = 0;

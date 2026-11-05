@@ -101,12 +101,18 @@ typedef struct PngStruct {
     uint8_t *image; /* the inflated, still filtered scanlines of all passes */
 } PngStruct;
 
+_Static_assert(sizeof(((PngStruct *)0)->jmpBuf) >= 5 * sizeof(void *), "__builtin_setjmp's 5 slots");
 #if UINTPTR_MAX == 0xffffffffu
 _Static_assert(offsetof(PngStruct, readFn) == 0x50 && offsetof(PngStruct, ioPtr) == 0x54,
                "rwPngRead reads the stream at 0x54");
 #endif
 
 /* ---- errors, memory, input ----------------------------------------------------------------------------- */
+
+void *bmxPngIoPtr(void *png)
+{
+    return ((PngStruct *)png)->ioPtr;
+}
 
 /* libpng's png_error: the error callback (none in the game), then longjmp(jmpbuf, 1). */
 void pngError(void *png, const char *message)
@@ -115,7 +121,12 @@ void pngError(void *png, const char *message)
     if (p->errorFn != NULL) {
         p->errorFn(png, message);
     }
+#if defined(__i386__)
     crtLongjmp(p->jmpBuf, 1);
+#else
+    /* x86_64: the builtin pair (rw/texture.c's RtPNGImageRead sets it with __builtin_setjmp). */
+    __builtin_longjmp((void **)p->jmpBuf, 1);
+#endif
     __builtin_unreachable();
 }
 

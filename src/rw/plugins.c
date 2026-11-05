@@ -6,6 +6,7 @@
 
 #include "compat/crt.h"
 #include "compat/x87.h"
+#include "png/png.h"
 #include "rw/rwanim.h"
 #include "rw/rwclump.h"
 #include "rw/rwim.h"
@@ -2152,13 +2153,13 @@ __attribute__((used, noinline)) static RpAnimInstance *rpAnimInstanceResetImpl(R
 BMX_ADDR(0x004fbf30)
 __attribute__((naked)) RpAnimInstance *rpAnimInstanceReset(void)
 {
-    __asm__ volatile("subl $8, %esp\n\t"
-                     "fstpl (%esp)\n\t"
-                     "pushl %edx\n\t"
-                     "pushl %eax\n\t"
-                     "call _rpAnimInstanceResetImpl\n\t"
-                     "addl $16, %esp\n\t"
-                     "ret");
+    BMX_X86_ENTRY("subl $8, %esp\n\t"
+                  "fstpl (%esp)\n\t"
+                  "pushl %edx\n\t"
+                  "pushl %eax\n\t"
+                  "call _rpAnimInstanceResetImpl\n\t"
+                  "addl $16, %esp\n\t"
+                  "ret");
 }
 
 /*
@@ -2341,15 +2342,15 @@ BMX_ADDR(0x004fbf60)
 __attribute__((naked)) RpAnimInstance *rpAnimRotationUpdate(uint32_t unused0, uint32_t unused1,
                                                             uint32_t unused2, int32_t forward)
 {
-    __asm__ volatile("pushl 0x10(%esp)\n\t"
-                     "subl $8, %esp\n\t"
-                     "fstpl (%esp)\n\t"
-                     "pushl %ecx\n\t"
-                     "pushl %edx\n\t"
-                     "pushl %eax\n\t"
-                     "call _rpAnimRotationUpdateImpl\n\t"
-                     "addl $24, %esp\n\t"
-                     "ret");
+    BMX_X86_ENTRY("pushl 0x10(%esp)\n\t"
+                  "subl $8, %esp\n\t"
+                  "fstpl (%esp)\n\t"
+                  "pushl %ecx\n\t"
+                  "pushl %edx\n\t"
+                  "pushl %eax\n\t"
+                  "call _rpAnimRotationUpdateImpl\n\t"
+                  "addl $24, %esp\n\t"
+                  "ret");
 }
 
 /*
@@ -2394,14 +2395,14 @@ rpAnimInterpolatorUpdateImpl(RpAnimInterpolator *interp, RwFrame *frame, int32_t
 BMX_ADDR(0x004fc2e0)
 __attribute__((naked)) RpAnimInterpolator *rpAnimInterpolatorUpdate(void)
 {
-    __asm__ volatile("subl $8, %esp\n\t"
-                     "fstpl (%esp)\n\t"
-                     "pushl %ecx\n\t"
-                     "pushl %edx\n\t"
-                     "pushl %eax\n\t"
-                     "call _rpAnimInterpolatorUpdateImpl\n\t"
-                     "addl $20, %esp\n\t"
-                     "ret");
+    BMX_X86_ENTRY("subl $8, %esp\n\t"
+                  "fstpl (%esp)\n\t"
+                  "pushl %ecx\n\t"
+                  "pushl %edx\n\t"
+                  "pushl %eax\n\t"
+                  "call _rpAnimInterpolatorUpdateImpl\n\t"
+                  "addl $20, %esp\n\t"
+                  "ret");
 }
 
 #define rpAnimTimeOffset ORIG_VAR(0x0069c698, float, rpAnimTimeOffset)
@@ -2489,15 +2490,15 @@ BMX_ADDR(0x004ff960)
 __attribute__((naked)) RpClump *rpAnimClumpStartSequence(uint32_t unused0, uint32_t unused1, uint32_t unused2,
                                                          int32_t priority)
 {
-    __asm__ volatile("pushl 0x10(%esp)\n\t"
-                     "subl $8, %esp\n\t"
-                     "fstpl (%esp)\n\t"
-                     "pushl %ecx\n\t"
-                     "pushl %edx\n\t"
-                     "pushl %eax\n\t"
-                     "call _rpAnimClumpStartSequenceImpl\n\t"
-                     "addl $24, %esp\n\t"
-                     "ret");
+    BMX_X86_ENTRY("pushl 0x10(%esp)\n\t"
+                  "subl $8, %esp\n\t"
+                  "fstpl (%esp)\n\t"
+                  "pushl %ecx\n\t"
+                  "pushl %edx\n\t"
+                  "pushl %eax\n\t"
+                  "call _rpAnimClumpStartSequenceImpl\n\t"
+                  "addl $24, %esp\n\t"
+                  "ret");
 }
 
 /* The default callback at the end of a sequence: starts it again (forward, same priority) at the time wrapped
@@ -2681,7 +2682,7 @@ BMX_ADDR(0x00505db0)
 __attribute__((regparm(2))) RpLodAtomicData *rpLodAtomicDataCopy(RpLodAtomicData *dst, RpLodAtomicData *src)
 {
     if (dst != NULL && src != NULL) {
-        memcpy(dst, src, 0x18);
+        memcpy(dst, src, offsetof(RpLodAtomicData, levels));
         for (int i = 0; i < 10; i++) {
             dst->levels[i] = src->levels[i];
             if (src->levels[i] != NULL) {
@@ -2916,11 +2917,16 @@ void rwPngFree(void *png, void *block)
     RwOsGetMemoryInterface()->rwfree(block);
 }
 
-/* libpng's read function: reads from the RenderWare stream the PNG struct carries (at 0x54). */
+/* libpng's read function: reads from the RenderWare stream the PNG struct carries (at 0x54 on 32-bit, in
+ * libpng's struct and in ours; 64-bit builds are native, with our reader, png/png.c). */
 BMX_ADDR(0x00506860)
 uint32_t rwPngRead(void *png, void *buffer, uint32_t length)
 {
+#if BMX_LAYOUT32
     RwStream *stream = *(RwStream **)((uint8_t *)png + 0x54);
+#else
+    RwStream *stream = bmxPngIoPtr(png);
+#endif
     if (stream != NULL) {
         return RwStreamRead(stream, buffer, length);
     }

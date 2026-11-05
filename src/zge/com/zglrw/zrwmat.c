@@ -425,6 +425,9 @@ ZrwMaterial *zrwmatClone(ZrwMaterial *material)
         return NULL;
     }
     memcpy(copy, material, sizeof *copy);
+#if !BMX_LAYOUT32
+    copy->handle = 0; /* the copy is another material: its own handle */
+#endif
     i = 0;
     if (material->textureCount != 0) {
         do {

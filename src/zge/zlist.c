@@ -13,8 +13,8 @@ ZList *zlistCreate(int capacity)
 {
     ZList *list = zmemAlloc(sizeof *list);
     list->cursor = -1;
-    list->items = (void **)zmemAlloc((uint32_t)capacity * 4);
-    zmemFill((void *)list->items, 0, (uint32_t)capacity * 4);
+    list->items = (void **)zmemAlloc((uint32_t)capacity * (uint32_t)sizeof(void *));
+    zmemFill((void *)list->items, 0, (uint32_t)capacity * (uint32_t)sizeof(void *));
     list->capacity = capacity;
     list->count = 0;
     return list;
@@ -38,7 +38,7 @@ void zlistClear(ZList *list, ZListVisitFn visit, void *arg)
             }
         }
     }
-    zmemFill((void *)list->items, 0, (uint32_t)list->capacity << 2);
+    zmemFill((void *)list->items, 0, (uint32_t)list->capacity * (uint32_t)sizeof(void *));
     list->cursor = -1;
     list->count = 0;
 }
@@ -106,9 +106,9 @@ void zlistInsert(ZList *list, void *item)
     }
     if (list->count == list->capacity) {
         void **old = list->items;
-        list->items = (void **)zmemAlloc((uint32_t)list->capacity << 3);
-        zmemFill((void *)list->items, 0, (uint32_t)list->capacity << 3);
-        zmemCopy((void *)list->items, (const void *)old, (uint32_t)list->capacity << 2);
+        list->items = (void **)zmemAlloc((uint32_t)list->capacity * 2 * (uint32_t)sizeof(void *));
+        zmemFill((void *)list->items, 0, (uint32_t)list->capacity * 2 * (uint32_t)sizeof(void *));
+        zmemCopy((void *)list->items, (const void *)old, (uint32_t)list->capacity * (uint32_t)sizeof(void *));
         list->capacity <<= 1;
         zmemFree((void *)old);
     }

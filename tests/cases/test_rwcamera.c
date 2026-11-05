@@ -64,7 +64,7 @@ static void camera_env(DtCtx *c)
 {
     dt_seed(c);
     RwGlobals *g = mathEnv();
-    g->stdFunc[rwSTANDARDCAMERACLEAR] = (uint32_t)(uintptr_t)stub_clear;
+    g->stdFunc[rwSTANDARDCAMERACLEAR] = (void *)stub_clear;
     gUpdateCalls = 0;
 }
 
@@ -773,8 +773,8 @@ static void setup_begin_update(DtCtx *c)
 {
     camera_env(c);
     RwGlobals *g = RwEngineInstance;
-    g->stdFunc[1] = (uint32_t)(uintptr_t)stub_device_update;
-    g->stdFunc[10] = (uint32_t)(uintptr_t)stub_device_update;
+    g->stdFunc[1] = (void *)stub_device_update;
+    g->stdFunc[10] = (void *)stub_device_update;
     ((uint32_t *)(uintptr_t)0x0069bee0)[1] = (uint32_t)(uintptr_t)stub_core_ext;
     g->curCamera = dt_alloc(8);
     RwCamera *camera = make_camera(0);
@@ -796,8 +796,8 @@ static void setup_end_update(DtCtx *c)
 {
     camera_env(c);
     RwGlobals *g = RwEngineInstance;
-    g->stdFunc[1] = (uint32_t)(uintptr_t)stub_device_update;
-    g->stdFunc[10] = (uint32_t)(uintptr_t)stub_device_update;
+    g->stdFunc[1] = (void *)stub_device_update;
+    g->stdFunc[10] = (void *)stub_device_update;
     g->curCamera = dt_alloc(8);
     DT_ARG_PTR(c, 0, make_camera(0));
     rwtEnd();

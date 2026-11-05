@@ -17,13 +17,19 @@
  * raster, ECX = z raster and the far clip plane on the x87 stack (popped by the callee). It creates the
  * camera and image the generation renders with (rpPVSCamera, rpPVSImage).
  */
-#ifdef BMX_HOOK
+#if defined(BMX_HOOK) && defined(__i386__)
 static void rpPVSCameraCreate(RpWorld *world, RwRaster *raster, RwRaster *zRaster, float farClip)
 {
     __asm__ volatile("flds %[far]\n\tcall *%[fn]"
                      : "+a"(world), "+d"(raster), "+c"(zRaster)
                      : [far] "m"(farClip), [fn] "r"(BMX_FNPTR(uintptr_t, 0x004ce6d0, rwPvsCameraCreate))
                      : "memory", "cc", "st");
+}
+#elif defined(BMX_HOOK)
+/* x86_64: the implementation directly (the register entry is i386 only). */
+static void rpPVSCameraCreate(RpWorld *world, RwRaster *raster, RwRaster *zRaster, float farClip)
+{
+    rwPvsCameraCreateImpl(world, raster, zRaster, farClip);
 }
 #else
 void rpPVSCameraCreate(RpWorld *world, RwRaster *raster, RwRaster *zRaster, float farClip);
@@ -2251,7 +2257,7 @@ __attribute__((regparm(2))) RpWorld *rpWorldCameraSyncSectors(RpWorld *world, Rw
         }
         if (i == 6) {
             if (count >= data->capacity) {
-                const size_t size = (size_t)data->capacity * 4 + 200;
+                const size_t size = ((size_t)data->capacity + 50) * sizeof(RpWorldSector *);
                 RpWorldSector **sectors =
                     (RpWorldSector **)(data->sectors != NULL ? RwEngineInstance->memoryFuncs.rwrealloc(
                                                                    (void *)data->sectors, size)
@@ -2296,8 +2302,8 @@ RwCamera *WorldCameraSync(RwCamera *camera)
     RpWorld *world = data->world;
     if (world != NULL) {
         rpWorldCameraSyncSectors(world, camera);
-        ((void(BMX_CDECL *)(void *, void *, int32_t))(
-             uintptr_t)RwEngineInstance->stdFunc[rwSTANDARDWORLDCAMERASYNC])(NULL, NULL, world->flags == 1);
+        ((void(BMX_CDECL *)(void *, void *, int32_t))RwEngineInstance->stdFunc[rwSTANDARDWORLDCAMERASYNC])(
+            NULL, NULL, world->flags == 1);
     }
     camera->version++;
     return camera;

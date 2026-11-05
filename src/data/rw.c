@@ -7,23 +7,23 @@
 #include "data/data.h"
 
 /* Functions the data points at that no header declares (assembler name = C name). */
-void drvCameraBeginUpdate(void) __asm__("_drvCameraBeginUpdate");
-void drvCameraClear(void) __asm__("_drvCameraClear");
-void drvCameraEndUpdate(void) __asm__("_drvCameraEndUpdate");
-void drvCoreExtAttach(void) __asm__("_drvCoreExtAttach");
-void drvHintRenderFront2Back(void) __asm__("_drvHintRenderFront2Back");
-void drvIm2DNothing(void) __asm__("_drvIm2DNothing");
-void drvImageFindRasterFormat(void) __asm__("_drvImageFindRasterFormat");
-void drvRasterCreate(void) __asm__("_drvRasterCreate");
-void drvRasterDestroy(void) __asm__("_drvRasterDestroy");
-void drvRasterLock(void) __asm__("_drvRasterLock");
-void drvRasterSetFromImage(void) __asm__("_drvRasterSetFromImage");
-void drvRasterShowRaster(void) __asm__("_drvRasterShowRaster");
-void drvRasterSubRaster(void) __asm__("_drvRasterSubRaster");
-void drvRasterUnlock(void) __asm__("_drvRasterUnlock");
-void drvSetRasterContext(void) __asm__("_drvSetRasterContext");
-void drvSystem(void) __asm__("_drvSystem");
-void drvTextureSetRaster(void) __asm__("_drvTextureSetRaster");
+void drvCameraBeginUpdate(void) __asm__(BMX_SYM("drvCameraBeginUpdate"));
+void drvCameraClear(void) __asm__(BMX_SYM("drvCameraClear"));
+void drvCameraEndUpdate(void) __asm__(BMX_SYM("drvCameraEndUpdate"));
+void drvCoreExtAttach(void) __asm__(BMX_SYM("drvCoreExtAttach"));
+void drvHintRenderFront2Back(void) __asm__(BMX_SYM("drvHintRenderFront2Back"));
+void drvIm2DNothing(void) __asm__(BMX_SYM("drvIm2DNothing"));
+void drvImageFindRasterFormat(void) __asm__(BMX_SYM("drvImageFindRasterFormat"));
+void drvRasterCreate(void) __asm__(BMX_SYM("drvRasterCreate"));
+void drvRasterDestroy(void) __asm__(BMX_SYM("drvRasterDestroy"));
+void drvRasterLock(void) __asm__(BMX_SYM("drvRasterLock"));
+void drvRasterSetFromImage(void) __asm__(BMX_SYM("drvRasterSetFromImage"));
+void drvRasterShowRaster(void) __asm__(BMX_SYM("drvRasterShowRaster"));
+void drvRasterSubRaster(void) __asm__(BMX_SYM("drvRasterSubRaster"));
+void drvRasterUnlock(void) __asm__(BMX_SYM("drvRasterUnlock"));
+void drvSetRasterContext(void) __asm__(BMX_SYM("drvSetRasterContext"));
+void drvSystem(void) __asm__(BMX_SYM("drvSystem"));
+void drvTextureSetRaster(void) __asm__(BMX_SYM("drvTextureSetRaster"));
 
 /* Code nothing serves (unported, unreachable): calling one reports the address and stops. */
 BMX_DATA_UNSERVED(004aa42d)
@@ -339,60 +339,18 @@ RwDevice rwD3D7Device = {
 };
 
 struct BmxGroup_d_0056701cGroup d_0056701cGroup __attribute__((aligned(16))) = {
-    .d_0056701c = 1,
-    .p_00567020 = drvCameraBeginUpdate,
-    .d_00567024 = 10,
-    .p_00567028 = drvCameraEndUpdate,
-    .d_0056702c = 21,
-    .p_00567030 = drvCameraClear,
-    .d_00567034 = 20,
-    .p_00567038 = drvRasterShowRaster,
-    .d_0056703c = 2,
-    .p_00567040 = unserved_004f7ea0,
-    .d_00567044 = 3,
-    .p_00567048 = unserved_004f80f0,
-    .d_0056704c = 7,
-    .p_00567050 = drvRasterSetFromImage,
-    .d_00567054 = 6,
-    .p_00567058 = unserved_004f6bc0,
-    .d_0056705c = 5,
-    .p_00567060 = drvRasterDestroy,
-    .d_00567064 = 4,
-    .p_00567068 = drvRasterCreate,
-    .d_0056706c = 9,
-    .p_00567070 = drvImageFindRasterFormat,
-    .d_00567074 = 8,
-    .p_00567078 = drvTextureSetRaster,
-    .d_0056707c = 15,
-    .p_00567080 = drvRasterLock,
-    .d_00567084 = 16,
-    .p_00567088 = drvRasterUnlock,
-    .d_0056708c = 23,
-    .p_00567090 = unserved_004d5410,
-    .d_00567094 = 24,
-    .p_00567098 = unserved_004d5560,
-    .d_0056709c = 14,
-    .p_005670a0 = unserved_004f92e0,
-    .d_005670a4 = 13,
-    .p_005670a8 = unserved_004f90f0,
-    .d_005670ac = 17,
-    .p_005670b0 = unserved_004f9740,
-    .d_005670b4 = 18,
-    .p_005670b8 = unserved_004f9780,
-    .d_005670bc = 19,
-    .p_005670c0 = unserved_004f9510,
-    .d_005670c4 = 11,
-    .p_005670c8 = drvSetRasterContext,
-    .d_005670cc = 12,
-    .p_005670d0 = drvRasterSubRaster,
-    .d_005670d4 = 22,
-    .p_005670d8 = drvHintRenderFront2Back,
-    .d_005670dc = 25,
-    .p_005670e0 = unserved_004db0b0,
-    .d_005670e4 = 27,
-    .p_005670e8 = unserved_004db1f0,
-    .d_005670ec = 26,
-    .p_005670f0 = unserved_004db400,
+    .d_0056701c =
+        {
+            {1, drvCameraBeginUpdate},  {10, drvCameraEndUpdate},      {21, drvCameraClear},
+            {20, drvRasterShowRaster},  {2, unserved_004f7ea0},        {3, unserved_004f80f0},
+            {7, drvRasterSetFromImage}, {6, unserved_004f6bc0},        {5, drvRasterDestroy},
+            {4, drvRasterCreate},       {9, drvImageFindRasterFormat}, {8, drvTextureSetRaster},
+            {15, drvRasterLock},        {16, drvRasterUnlock},         {23, unserved_004d5410},
+            {24, unserved_004d5560},    {14, unserved_004f92e0},       {13, unserved_004f90f0},
+            {17, unserved_004f9740},    {18, unserved_004f9780},       {19, unserved_004f9510},
+            {11, drvSetRasterContext},  {12, drvRasterSubRaster},      {22, drvHintRenderFront2Back},
+            {25, unserved_004db0b0},    {27, unserved_004db1f0},       {26, unserved_004db400},
+        },
 };
 
 /* 0x00567100 */
