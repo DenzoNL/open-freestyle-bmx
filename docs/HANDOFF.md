@@ -38,10 +38,20 @@ bugs that very likely explain the Mac playtest findings:
 
 Steps from the list below, on Windows (2026-11-07):
 1. native32 and native64 build warning-free (the only linker warning, "/align specified without /driver", is
-   the old bmxplatformtest one). Gate: see the commit that pushes this.
+   the old bmxplatformtest one). Gate (tools/check.sh, native32): passed, 2964/2964 differential cases.
 2. Shaders: DXIL and SPIR-V of all three shaders regenerate byte-identically with dxc 1.9.2609. MSL not checked
    (no spirv-cross on the PC).
-3.-5. Not run yet: they start bmxnative or long CPU runs and the user was gaming.
+3. Replays: the user recording (6189 ticks) and the X3 ride (1014 ticks) are identical to the X3 references on
+   native32 and native64.
+4. bmxx87test on an Intel i5-13600KF (native32 and native64, same output): exactly nixbox's numbers. All tables,
+   AngleOfCosine, TanFloat and Rotate/MatrixMultiply equal; Fsin/Fcos 15 / 26 / 25 of 2M and the scaled
+   asin/atan 54 of 250k differ in the last bit. (The 128-bit-pi section at the end differs a lot by design.)
+   native32's bmxx87test needs libwinpthread-1.dll next to it (copied from llvm-mingw's i686 bin; the build
+   doesn't copy it).
+5. ride.keys, windowed vs `BMX_GPU=null` vs data/simhash/ride.arm64.hash: identical (2973 ticks) on native64 and
+   on native32. A `-DBMX_X87_SOFT=ON` native64 build (build/native64-soft) replays the user recording identical
+   to native64 and the native32 reference (6189 ticks). So the real x87, the soft x87, x86, x64 and arm64 agree
+   on both inputs.
 
 ## Windows handover (2026-11-06, Mac session)
 
