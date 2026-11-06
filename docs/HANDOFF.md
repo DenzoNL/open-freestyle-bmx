@@ -65,6 +65,19 @@ registers too, so **native64 almost certainly showed the same green level** befo
 native64 now. Also compare the hint icon in "tap [icon] to turn the bike around": it is missing on the Mac (no pad).
 
 **Mac:** a windowed run (muted) shows menus, movies and a level correctly on Metal (2026-11-06, Greenville start).
+User playtest (2026-11-06, ~17:00, keyboard only) found:
+- **Rider T-posed on the bike, no animation at all** (macOS arm64). Next thing to chase: likely another
+  64-bit / arm64 issue in the anim / skin / bone path (rw/plugins.c RpAnim*/skin helpers with ST0-argument
+  entries that are naked asm on i386 and C callers elsewhere, interpolator float arguments through int
+  prototypes like the clip-plane bug, or zactor/motion bank layouts). Check native64 on Windows: if the rider
+  animates there it's arm64-specific (x87soft / FPCR / the BMX_X87_ENTRY C paths); if not, 64-bit. The sim hash
+  can't catch it (it hashes rider physics, not the skinned pose); BMX_VTX_DUMP of a level frame on native32 vs
+  arm64 would show it.
+- **Movie skip works with the MacBook's built-in keyboard but not a USB keyboard** (the USB one does work in the
+  menus? unknown). Likely the DirectInput keyboard stand-in on SDL3 picks one keyboard id instead of all
+  keyboards (SDL_GetKeyboardState is global; per-device SDL_KeyboardID filtering in src/platform/input.c).
+- Acclaim and Z-Axis logos played to the end before the window had focus; check whether the original lets
+  Enter skip them on Windows.
 
 **Mac (when at home, the user's call):** `nix develop -c cmake --preset macos && cmake --build --preset macos`
 (or `--target bmxnative_app`), run from a copy of the game folder: menus, a level, the MSL output against the
