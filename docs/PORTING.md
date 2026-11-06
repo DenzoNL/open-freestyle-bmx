@@ -633,6 +633,140 @@ BMX_SIM_HASH on native32 and native64 on every tick. The 32-bit reference hashes
 guard (above). Next: the user plays the 64-bit build; a release build.
 
 
+### X5 part 2 (portable x87, 2026-11-06)
+
+Decision X4-A: compat/x87.h's helpers in portable C, bit-exact with the x87 sequences they replace.
+
+**Design.** compat/x87soft.c emulates the x87 in integer arithmetic only, so no host FPU mode, NaN convention or
+libm leaks in (it also builds for the freestanding i386 targets: no 64-bit division helper, no int-to-float
+conversion):
+- A register is the 80-bit format (64-bit significand, 15-bit exponent). FADD / FSUB / FMUL / FSQRT compute the
+  exact result and round once to the precision control (24 / 53 / 64 bits) with the rounding control, in the
+  extended exponent range; stores to float / double round again (with denormals and overflow per mode): the
+  original's double rounding. NaNs follow the x87 rules (SDM table 4-7: QNaN over SNaN, otherwise the larger
+  significand, on a tie the positive one; invalid gives the negative QNaN indefinite). Memory operands of
+  FMUL / FADD keep signalling NaNs signalling; FLD quietens them.
+- FSIN / FCOS / FPTAN reduce the operand exactly by k * P/2 (k nearest) with P Intel's 66-bit pi
+  (0x3.243F6A8885A308D3, the documented microcode constant; `bmxX87SoftSetReductionPi(1)` switches to pi to
+  128 bits for the test), then evaluate Taylor series in 128-bit floating point (~2^-120) and round to the
+  register's 64 bits, nearest. FPATAN is atan2 to 128 bits, rounded the same way. sin(r) is rounded as exact r
+  plus a tail, so a tiny r on a 64-bit midpoint rounds right. |x| >= 2^63: FSIN / FCOS return x (C2), FPTAN
+  pushes nothing (bmxX87TanFloat then stores the indefinite NaN, as its FSTP ST(0) / FSTP pair underflows).
+- The control word: on x86 `bmxX87ControlWord()` / `bmxX87SetControlWord()` (compat/x87soft.h) are FNSTCW /
+  FLDCW, so the soft path follows the real one; elsewhere a variable starting at Windows' 0x027f.
+  driver/raster.c's camera mode (24 bit, round down) goes through them now (the same instructions on x86).
+- Linux x64 (slice X4) starts its threads with the x87 at 64-bit precision (0x037f), Windows at 53 (0x027f);
+  the hw helpers would then round differently. That build needs an FLDCW 0x027f at startup (or BMX_X87_SOFT
+  with the soft variable's 0x027f).
+- compat/x87.h: the asm versions are `bmxX87Hw*` (unchanged text); the public names call them when
+  `BMX_HOOK && x86 && !BMX_X87_SOFT`, else `bmxX87Soft*`. There is no libm path any more (nothing needed one).
+  The hook build's objects of all five call-site files disassemble identically to before.
+- Cost on this Mac (M-series, -O2): FSIN ~1.3 us, MatrixMultiply ~530 ns, Rotate ~50 ns. The tables are built
+  once; Fsin runs per animated bone per key change, MatrixMultiply per frame hierarchy update in the camera.
+
+**Per helper: call sites, domain, method.**
+
+| Helper | Call site, domain | Notes |
+|---|---|---|
+| SinScaled | zmathInitTables: n = (int16)(8i), all 65536 int16, k = 2pi/65536 as float; startup cw | n*k exact (40 bits); the float results do not depend on which pi reduces (equal to CR sinf) |
+| CosScaled | winchan LFO table: n = 0..4095, k = pi/2048 double | n = 1024 / 3072 (cos ~ 7e-10) depend on the 66-bit pi in the double, not in the uint16 table entry |
+| AsinScaled, HalfPiScaled, AtanScaled | zmathInitTables: n = -4095..4094 (asin, the ends are HalfPi), -4096..4095 (atan), step 2^-12, scale 0x10000/2pi | FPATAN's 64-bit result is multiplied before the store, so a binary64 atan is not enough |
+| Fsin, Fcos | RwMatrixRotate: (double)(pi/180 as float) * angle, any float angle; the slerp (1 / fsin(angle), angle in [0, pi/2]) and animSin (angle * t, [0, pi/2]) | large angles: the 66-bit reduction matters |
+| AngleOfCosine | rpAnimSlerpCacheSetup: c in [0, 1] (NaN dots end as 1) | FSQRT + FPATAN, stored to float |
+| TanFloat | RpLightSetConeAngle: any float | out of range / NaN / inf as above |
+| Rotate | zvec3RotateX/Y/Z: any floats, table sin / cos; whatever cw is current | the camera cw if called inside a camera update |
+| MatrixMultiply | rwMatrixMultiplyX87 (the camera's RwMatrixMultiply): any floats, camera cw (24 bit, down) | loads of a row before its stores (out may alias) |
+
+Other x87 assembly in src (out of scope here): the naked i386 entries of src/rw (`BMX_X86_ENTRY`, world.c's
+`flds; call`), crtasm.S (`_ftol`, `_CIsqrt`, i386 only), the control-word save / restore in driver/driver.h
+(`DRV_FPU_GUARDED`) and rw/rwd3d.h (`rwD3DRoundBegin` copies the x87 rounding into MXCSR). On arm64 the last two
+need ports of their own: rwD3DRoundBegin must take the rounding from `bmxX87ControlWord()` into FPCR.
+
+**CORE-MATH as the base?** (asked 2026-11-06.) CORE-MATH has correctly rounded binary64 sin / cos / tan / atan2;
+its binary80 directory has atan2l only (no sinl / cosl / tanl), written for x86's `long double` and `__int128`.
+A correctly rounded binary64 result followed by the helper's own rounding steps differs from the x87 because
+(1) the x87 rounds to 64 bits first (double rounding, ~1 in 2000 near a binary64 midpoint), (2) its FSIN /
+FCOS / FPTAN reduce with the 66-bit pi, (3) AsinScaled / AtanScaled multiply FPATAN's 64-bit result before
+rounding. Measured with tests/platform/x87_mpfr.c (MPFR at 53 bits = CORE-MATH's results by definition):
+
+| Helper (real domain) | CR library + the helper's rounding vs the x87 model |
+|---|---|
+| SinScaled (65536) | equal (CR binary32 sinf) |
+| AngleOfCosine (200k c in [0, 1]) | equal (CR acos, then float) |
+| CosScaled (4096) | 3 doubles differ; the uint16 LFO table equal |
+| AsinScaled / AtanScaled (8190 each) | 29% of the doubles differ; the int16 tables equal |
+| Fsin / Fcos, RwMatrixRotate angles | 24% differ (~6 in 100k below pi/4: double rounding; the rest: the 66-bit reduction) |
+| Fsin, slerp angles | 49 in 200k differ (double rounding) |
+| TanFloat (random floats) | 11% differ |
+
+So a library would have served only SinScaled and AngleOfCosine (and the three tables' downstream integers);
+one emulation for all is simpler than a library plus exception tables, and nothing was vendored.
+
+**Verified here (macOS arm64):**
+- tests/platform/x87_mpfr.c: FSIN / FCOS (both pi models) and FPATAN register results against an independent
+  MPFR model of the same definition (exact reduction, 400-bit function, one rounding to 64 bits): 0 differences
+  in 300000 random operands per function over exponents -80..62, the slerp range and +-3 ulp around k*pi/2 for
+  k < 2000.
+- tests/platform/x87_unicorn.py: Unicorn (QEMU softfloat floatx80, which honours precision and rounding
+  control) runs the real sequences built for i386 (tests/platform/x87_hwshim.c): FADD / FSUB / FMUL / FSQRT with
+  their FSTP m80 / float / double results under all 12 control words, operands including NaNs (signalling and
+  quiet), infinities, zeros, extended denormals, the ends of the exponent range and near-cancellation, plus
+  Rotate, MatrixMultiply and HalfPiScaled on random and edge floats: 0 differences in 300000 + 75000 cases.
+  Unicorn's FSIN / FCOS / FPTAN / FPATAN call the host's double libm (checked), so it cannot judge those. One
+  Unicorn deviation found and excluded from its inputs: its FLD m32 keeps a signalling NaN signalling (QEMU 5.0
+  softfloat, fixed in later QEMU), where the SDM's x87 loads the quiet NaN (the soft path does that; only the
+  Windows run confirms it).
+- No Rosetta 2 on this Mac (x86_64 binaries: "Bad CPU type"), so nothing ran on x86 hardware semantics here.
+- The gate: hook build, tests/oracle/run.sh -n 5 (3009 / 3009), clang-format, clang-tidy on x87soft.c;
+  tests/platform/test_x87.c builds for arm64 macOS and x86_64 (-Wall -Wextra -Werror).
+
+**Only the Windows PC can verify** (real FSIN / FCOS / FPTAN / FPATAN; the NaN-tie and out-of-range FPTAN
+behaviour; whether an AMD CPU reduces with the 66-bit pi like Intel), with `bmxx87test` (tests/platform/test_x87.c:
+hw against soft for every helper, finite domains exhaustively under the default and the camera control word,
+continuous ones on random + edge inputs, Rotate / MatrixMultiply under all 12 control words; then the same
+against the 128-bit pi to show which one the CPU uses). Commands (PowerShell, repo root):
+
+    cmake --preset native64; cmake --build --preset native64 --target bmxx87test
+    build\native64\bmxx87test.exe                       # a few minutes; "all equal" expected
+    build\native64\bmxx87test.exe --all-floats fsin --threads 16    # then fcos, rotate, tan, acos (~2^32 each)
+    cmake --preset native32; cmake --build --preset native32 --target bmxx87test
+    build\native32\bmxx87test.exe
+
+Each line also prints a hash of the results; on x86 the `hw` hash of a domain must equal the `soft` hash
+macOS printed for the same arguments (below: `build/x87/test_x87` built from test_x87.c and x87soft.c with
+clang on arm64), which shows the arm64 compile gives the same answers as the x86 one:
+
+    $ build/x87/test_x87            (macOS arm64, default arguments: --random 2000000)
+    SinScaled table                           65536 cases   soft daa39d60c4e216ba
+    CosScaled LFO table                        4096 cases   soft e7a08b053b9ea4e8
+    AsinScaled table                           8190 cases   soft 8162b6323c1056b7
+    AtanScaled table                           8192 cases   soft 904e08f8a05a9e92
+    HalfPiScaled                                  2 cases   soft a648bfcacd240665
+    SinScaled table (camera cw)               65536 cases   soft 8a72a795c2d4c3fe
+    CosScaled LFO table (camera cw)            4096 cases   soft 9959ee16e8786fc1
+    AsinScaled table (camera cw)               8190 cases   soft ab3bbc858c4b750e
+    AtanScaled table (camera cw)               8192 cases   soft 29213ad75eab4f32
+    HalfPiScaled (camera cw)                      2 cases   soft 56505a8a6475e2ec
+    Fsin/Fcos RwMatrixRotate                2000026 cases   soft 9f43e7c60ea0e293
+    Fsin slerp/anim [0, pi/2]               2000000 cases   soft f641dea9b753dd16
+    Fsin/Fcos any double                    2000023 cases   soft c654458de5ed7053
+    AngleOfCosine [0, 1]                    2000000 cases   soft 41a49469a9fb70f4
+    AngleOfCosine any double                 500023 cases   soft a361c6c937115e6e
+    TanFloat                                2000026 cases   soft 73f6ecd96fc8a228
+    Rotate/MatrixMultiply default+camera       250000 cases   soft 3781e497ed32b5b0
+    Rotate/MatrixMultiply all CWs            250000 cases   soft 654e08fe59d7a76f
+    HalfPi/Asin/AtanScaled any scale         250000 cases   soft 790f7749c1eb1ca2
+
+End to end (the proof for the whole game): a soft build on x86 replays the user's recording with the same
+BMX_SIM_HASH on every tick as the normal build:
+
+    cmake --preset native64 -B build\native64-soft -DBMX_X87_SOFT=ON
+    cmake --build build\native64-soft --target bmxnative
+    py -I tools\xcheck.py --game-dir <game folder> --recording work\recordings\<file>.bmxr build\native64\bmxnative.exe build\native64-soft\bmxnative.exe
+
+(the same with native32 / `-B build\native32-soft`). Both builds must be made from the same sources.
+
+
 ## Not in scope
 
 - Running without the user's game files: the assets, movies and music stay theirs.

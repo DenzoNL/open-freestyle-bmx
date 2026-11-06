@@ -5,6 +5,7 @@
  */
 #include <string.h>
 
+#include "compat/x87soft.h"
 #include "driver/driver.h"
 #include "rw/rwd3d.h"
 #include "rw/rwmath.h"
@@ -91,16 +92,14 @@ static uint16_t savedFpuControl;
 /* 0x54b000: 24-bit precision, rounding down, for everything inside the camera update. */
 static void fpuCameraMode(void)
 {
-    uint16_t cw;
-    __asm__ volatile("fnstcw %0" : "=m"(savedFpuControl));
-    cw = (uint16_t)((savedFpuControl & 0xf0ff) | 0x0400);
-    __asm__ volatile("fldcw %0" ::"m"(cw));
+    savedFpuControl = bmxX87ControlWord();
+    bmxX87SetControlWord((uint16_t)((savedFpuControl & 0xf0ff) | 0x0400));
 }
 
 /* 0x54b02e */
 static void fpuRestore(void)
 {
-    __asm__ volatile("fldcw %0" ::"m"(savedFpuControl));
+    bmxX87SetControlWord(savedFpuControl);
 }
 
 /*

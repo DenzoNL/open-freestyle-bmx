@@ -25,6 +25,12 @@ option(BMX_CALLTRACE "Instrument game functions for the hook crash report" OFF)
 if(BMX_CALLTRACE)
   target_compile_options(bmx_game PRIVATE -finstrument-functions)
 endif()
+# The portable x87 maths (compat/x87soft.c) in place of the x87 instructions on x86 too: the end-to-end check
+# of X5 part 2 (docs/PORTING.md), a replay's BMX_SIM_HASH against the default build's.
+option(BMX_X87_SOFT "Use the portable x87 emulation on x86 as well" OFF)
+if(BMX_X87_SOFT)
+  target_compile_definitions(bmx_game PUBLIC BMX_X87_SOFT=1)
+endif()
 if(BMX_HOOK OR BMX_NATIVE32)
   target_compile_definitions(bmx_game PUBLIC BMX_HOOK=1)
   find_package(Python3 REQUIRED COMPONENTS Interpreter)
@@ -179,6 +185,12 @@ if(BMX_NATIVE32)
   add_executable(bmxhftest tests/platform/test_hf.c src/native/hfmath.c)
   target_include_directories(bmxhftest PRIVATE src)
   target_compile_options(bmxhftest PRIVATE ${BMX_WARNINGS})
+  # The portable x87 against the real instructions (docs/PORTING.md "X5 part 2 (portable x87)").
+  find_package(Threads REQUIRED)
+  add_executable(bmxx87test tests/platform/test_x87.c src/compat/x87soft.c)
+  target_include_directories(bmxx87test PRIVATE src)
+  target_compile_options(bmxx87test PRIVATE ${BMX_WARNINGS})
+  target_link_libraries(bmxx87test PRIVATE Threads::Threads)
   # SDL3.dll next to the exe (copy it into the game folder with bmxnative.exe).
   add_custom_command(TARGET bmxnative POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
     $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:bmxnative>)

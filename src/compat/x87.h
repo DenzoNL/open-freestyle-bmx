@@ -1,18 +1,29 @@
 /*
- * x87 transcendental instructions the original uses for its lookup tables (FSIN, FPATAN, and the CRT's
- * asin built on FPATAN). Plain C cannot reproduce them bit for bit, so the hook build runs the real
- * instructions; every helper covers a whole FILD..FSTP sequence so no intermediate is rounded to a
- * narrower type than in the original.
+ * x87 instruction sequences of the original that plain C cannot reproduce bit for bit: the transcendental
+ * instructions its lookup tables and a few run-time paths use (FSIN, FCOS, FPTAN, FPATAN, and the CRT's asin
+ * built on FPATAN), and two arithmetic routines whose results depend on the x87 control word (the camera
+ * update's 24-bit, round-down mode) and the x87 NaN rules. Every helper covers a whole FILD..FSTP sequence so
+ * no intermediate is rounded to a narrower type than in the original.
+ *
+ * On x86 the hook and native builds run the real instructions (bmxX87Hw*). Elsewhere (arm64), and on x86
+ * with -DBMX_X87_SOFT=1, the portable bit-exact emulation of compat/x87soft.c runs instead (bmxX87Soft*,
+ * docs/PORTING.md "X5 part 2 (portable x87)").
  */
 #ifndef BMX_COMPAT_X87_H
 #define BMX_COMPAT_X87_H
 
 #include <stdint.h>
 
-#if defined(BMX_HOOK)
+#include "compat/x87soft.h"
+
+#ifndef BMX_X87_SOFT
+#define BMX_X87_SOFT 0
+#endif
+
+#if defined(__i386__) || defined(__x86_64__)
 
 /* (float)fsin((double)n * k). */
-static inline float bmxX87SinScaled(int32_t n, float k)
+static inline float bmxX87HwSinScaled(int32_t n, float k)
 {
     float r;
     __asm__("fildl %1\n\tfmuls %2\n\tfsin\n\tfstps %0" : "=m"(r) : "m"(n), "m"(k) : "st");
@@ -20,7 +31,7 @@ static inline float bmxX87SinScaled(int32_t n, float k)
 }
 
 /* fcos((double)n * k), rounded to double. */
-static inline double bmxX87CosScaled(int32_t n, double k)
+static inline double bmxX87HwCosScaled(int32_t n, double k)
 {
     double r;
     __asm__("fildl %1\n\tfmull %2\n\tfcos\n\tfstpl %0" : "=m"(r) : "m"(n), "m"(k) : "st");
@@ -28,14 +39,14 @@ static inline double bmxX87CosScaled(int32_t n, double k)
 }
 
 /* FSIN / FCOS of a value held in a register (a double). */
-static inline double bmxX87Fsin(double a)
+static inline double bmxX87HwFsin(double a)
 {
     double r;
     __asm__("fldl %1\n\tfsin\n\tfstpl %0" : "=m"(r) : "m"(a) : "st");
     return r;
 }
 
-static inline double bmxX87Fcos(double a)
+static inline double bmxX87HwFcos(double a)
 {
     double r;
     __asm__("fldl %1\n\tfcos\n\tfstpl %0" : "=m"(r) : "m"(a) : "st");
@@ -44,7 +55,7 @@ static inline double bmxX87Fcos(double a)
 
 /* asin(n * step) * scale as the CRT computes it for |n * step| < 1: x / sqrt((1 + x) * (1 - x)) via FPATAN.
  */
-static inline double bmxX87AsinScaled(int32_t n, double step, float scale)
+static inline double bmxX87HwAsinScaled(int32_t n, double step, float scale)
 {
     double r;
     __asm__("fildl %1\n\tfmull %2\n\tfld1\n\tfadd %%st(1), %%st\n\tfld1\n\tfsub %%st(2), %%st\n\t"
@@ -56,7 +67,7 @@ static inline double bmxX87AsinScaled(int32_t n, double step, float scale)
 }
 
 /* (float)atan2(sqrt((1 + c) * (1 - c)), c) by FSQRT and FPATAN: the angle of a cosine (the slerp set-up). */
-static inline float bmxX87AngleOfCosine(double c)
+static inline float bmxX87HwAngleOfCosine(double c)
 {
     float r;
     __asm__("fldl %1\n\tfld1\n\tfadd %%st(1), %%st\n\tfld1\n\tfsub %%st(2), %%st\n\t"
@@ -68,7 +79,7 @@ static inline float bmxX87AngleOfCosine(double c)
 }
 
 /* (float)tan(a): FLD, FPTAN, drop the 1.0 it pushes, FSTP to float (the light cone angle). */
-static inline float bmxX87TanFloat(float a)
+static inline float bmxX87HwTanFloat(float a)
 {
     float r;
     __asm__("flds %1\n\tfptan\n\tfstp %%st(0)\n\tfstps %0" : "=m"(r) : "m"(a) : "st", "st(1)");
@@ -76,7 +87,7 @@ static inline float bmxX87TanFloat(float a)
 }
 
 /* The CRT's asin(+-1): +-pi/2 loaded as an 80 bit constant, times scale. */
-static inline double bmxX87HalfPiScaled(int negative, float scale)
+static inline double bmxX87HwHalfPiScaled(int negative, float scale)
 {
     static const uint8_t halfPi[10] = {0x35, 0xc2, 0x68, 0x21, 0xa2, 0xda, 0x0f, 0xc9, 0xff, 0x3f};
     double r;
@@ -89,7 +100,7 @@ static inline double bmxX87HalfPiScaled(int negative, float scale)
 }
 
 /* atan(n * step) * scale. */
-static inline double bmxX87AtanScaled(int32_t n, double step, float scale)
+static inline double bmxX87HwAtanScaled(int32_t n, double step, float scale)
 {
     double r;
     __asm__("fildl %1\n\tfmull %2\n\tfld1\n\tfpatan\n\tfmuls %3\n\tfstpl %0"
@@ -105,7 +116,7 @@ static inline double bmxX87AtanScaled(int32_t n, double step, float scale)
  * (x87 keeps the NaN with the larger significand, SSE keeps the first operand).
  */
 // NOLINTBEGIN(readability-non-const-parameter)
-static inline void bmxX87Rotate(float *r1, float *r2, float a, float b, const float *c, const float *s)
+static inline void bmxX87HwRotate(float *r1, float *r2, float a, float b, const float *c, const float *s)
 {
     __asm__("flds %2\n\tflds %3\n\tflds %4\n\tflds %5\n\t"
             "fld %%st(1)\n\tfmul %%st(4), %%st\n\tfld %%st(1)\n\tfmul %%st(4), %%st\n\t"
@@ -137,7 +148,7 @@ static inline void bmxX87Rotate(float *r1, float *r2, float a, float b, const fl
 #define X87_LEA "leal"
 #endif
 // NOLINTBEGIN(readability-non-const-parameter)
-static inline void bmxX87MatrixMultiply(float *out, const float *a, const float *b)
+static inline void bmxX87HwMatrixMultiply(float *out, const float *a, const float *b)
 {
     int rows = 3;
     __asm__ volatile("1:\n\t"
@@ -183,63 +194,69 @@ static inline void bmxX87MatrixMultiply(float *out, const float *a, const float 
 #undef X87_BX
 #undef X87_LEA
 
+#endif /* x86 */
+
+#if defined(BMX_HOOK) && (defined(__i386__) || defined(__x86_64__)) && !BMX_X87_SOFT
+#define BMX_X87_IMPL(name) bmxX87Hw##name
 #else
-#include <math.h>
+#define BMX_X87_IMPL(name) bmxX87Soft##name
+#endif
 
 static inline float bmxX87SinScaled(int32_t n, float k)
 {
-    return (float)sin((double)n * k);
+    return BMX_X87_IMPL(SinScaled)(n, k);
 }
+
 static inline double bmxX87CosScaled(int32_t n, double k)
 {
-    return cos((double)n * k);
+    return BMX_X87_IMPL(CosScaled)(n, k);
 }
+
 static inline double bmxX87Fsin(double a)
 {
-    return sin(a);
+    return BMX_X87_IMPL(Fsin)(a);
 }
+
 static inline double bmxX87Fcos(double a)
 {
-    return cos(a);
+    return BMX_X87_IMPL(Fcos)(a);
 }
+
 static inline double bmxX87AsinScaled(int32_t n, double step, float scale)
 {
-    return asin((double)n * step) * scale;
+    return BMX_X87_IMPL(AsinScaled)(n, step, scale);
 }
-static inline float bmxX87TanFloat(float a)
-{
-    return (float)tan((double)a);
-}
+
 static inline float bmxX87AngleOfCosine(double c)
 {
-    return (float)atan2(sqrt((1.0 + c) * (1.0 - c)), c);
+    return BMX_X87_IMPL(AngleOfCosine)(c);
 }
+
+static inline float bmxX87TanFloat(float a)
+{
+    return BMX_X87_IMPL(TanFloat)(a);
+}
+
 static inline double bmxX87HalfPiScaled(int negative, float scale)
 {
-    return (negative ? -1.5707963267948966 : 1.5707963267948966) * scale;
+    return BMX_X87_IMPL(HalfPiScaled)(negative, scale);
 }
+
 static inline double bmxX87AtanScaled(int32_t n, double step, float scale)
 {
-    return atan((double)n * step) * scale;
+    return BMX_X87_IMPL(AtanScaled)(n, step, scale);
 }
+
 static inline void bmxX87Rotate(float *r1, float *r2, float a, float b, const float *c, const float *s)
 {
-    const double cd = *c, sd = *s;
-
-    *r1 = (float)(cd * a - sd * b);
-    *r2 = (float)(cd * b + sd * a);
+    BMX_X87_IMPL(Rotate)(r1, r2, a, b, c, s);
 }
-/* The matrix product in the original's order of additions, every operation rounded to float. */
+
 static inline void bmxX87MatrixMultiply(float *out, const float *a, const float *b)
 {
-    for (int row = 0; row < 4; row++) {
-        const float x0 = a[row * 4], x1 = a[row * 4 + 1], x2 = a[row * 4 + 2];
-        for (int col = 0; col < 3; col++) {
-            const float rest = x1 * b[4 + col] + x2 * b[8 + col];
-            out[row * 4 + col] = row == 3 ? (x0 * b[col] + b[12 + col]) + rest : x0 * b[col] + rest;
-        }
-    }
+    BMX_X87_IMPL(MatrixMultiply)(out, a, b);
 }
-#endif
+
+#undef BMX_X87_IMPL
 
 #endif
