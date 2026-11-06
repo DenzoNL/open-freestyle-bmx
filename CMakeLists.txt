@@ -13,6 +13,16 @@ set(BMX_WORK_DIR "${CMAKE_SOURCE_DIR}/work" CACHE PATH "Directory with labels.ra
 
 set(BMX_WARNINGS -Wall -Wextra -Werror -Wno-unused-parameter -Wno-microsoft-anon-tag)
 
+# macOS / Linux (docs/PORTING.md "X5 part 1"): the host compiler with the Windows toolchains' language flags
+# (cmake/*.cmake). arm64 compilers fuse a * b + c into one rounding unless told not to (docs/PORTING.md X4); x86
+# has no FMA without -mfma, so the Windows builds need no flag.
+if(NOT WIN32)
+  add_compile_options(-fms-extensions -fno-math-errno)
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64|ARM64)$" OR CMAKE_OSX_ARCHITECTURES MATCHES "arm64")
+    add_compile_options(-ffp-contract=off)
+  endif()
+endif()
+
 file(GLOB_RECURSE BMX_GAME_SOURCES CONFIGURE_DEPENDS src/zge/*.c src/bmx/*.c src/rw/*.c)
 file(GLOB_RECURSE BMX_COMPAT_SOURCES CONFIGURE_DEPENDS src/compat/*.c)
 
@@ -93,6 +103,7 @@ if(BMX_NATIVE32)
   add_dependencies(bmx_data bmx_origmap)
   # bmxplatformtest keeps the fixed-address mode for winchan.c (the real mixer against the smooth one): range.S
   # must be the first object on its link line, its block has to start the image.
+  if(WIN32) # (not re-indented: the Windows-only part of the native build, up to the matching else)
   add_library(bmx_range OBJECT src/native/range.S)
   # The driver would put the C runtime start files (crt2.o, crtbegin.o) before it: pass them ourselves, after.
   foreach(crt crt2.o crtbegin.o)
@@ -112,6 +123,10 @@ if(BMX_NATIVE32)
   list(POP_BACK BMX_SDL3_GUESS BMX_SDL3_GUESS_LAST)
   set(BMX_SDL3_DIR "${BMX_SDL3_GUESS_LAST}" CACHE PATH "SDL3 ${BMX_MINGW_TRIPLE} prefix (bin/SDL3.dll, lib/cmake/SDL3)")
   find_package(SDL3 REQUIRED CONFIG PATHS "${BMX_SDL3_DIR}" NO_DEFAULT_PATH)
+  else()
+    # SDL3 from the system or nix (`nix develop` sets SDL3_ROOT), or -DSDL3_DIR=<prefix>/lib/cmake/SDL3.
+    find_package(SDL3 REQUIRED CONFIG)
+  endif()
   # The SDL3 render driver (src/driver): native exe only, the hook DLL keeps running the original D3D7 driver.
   # Compiled like the game objects (BMX_HOOK, BMX_IMAGE: RW globals in the relocated data copy) but hosted.
   file(GLOB BMX_DRIVER_SOURCES CONFIGURE_DEPENDS src/driver/*.c)
@@ -143,6 +158,28 @@ if(BMX_NATIVE32)
   target_include_directories(bmxnative SYSTEM PRIVATE third_party/dr_flac)
   target_compile_definitions(bmxnative PRIVATE _WIN32_WINNT=0x0A00 BMX_IMAGE=1 BMX_SOURCE_DIR="${CMAKE_SOURCE_DIR}" BMX_WORK_DIR="${BMX_WORK_DIR}")
   target_compile_options(bmxnative PRIVATE ${BMX_WARNINGS})
+  if(NOT WIN32)
+    # macOS / Linux: no fixed base (the 28-bit packet links are offsets from an anchor on 64-bit, X2d); SDL3 found
+    # through the rpath. A later slice packages bmxnative.app (docs/PORTING.md "X5 part 1").
+    set_target_properties(bmxnative PROPERTIES BUILD_RPATH "$<TARGET_FILE_DIR:SDL3::SDL3-shared>")
+    target_link_libraries(bmxnative PRIVATE SDL3::SDL3 m)
+    if(APPLE)
+      # src/data keeps the original's layout, which has pointers at odd addresses (BmxUnalignedPtr: a CRT switch
+      # table the port never reaches). Chained fixups need 8-byte aligned pointers; the classic rebase info does not.
+      target_link_options(bmxnative PRIVATE -Wl,-no_fixup_chains)
+      # bmxnative.app (not part of `all`): cmake --build --preset macos --target bmxnative_app
+      add_custom_target(bmxnative_app
+        COMMAND ${CMAKE_SOURCE_DIR}/tools/macos_bundle.sh $<TARGET_FILE:bmxnative>
+                $<TARGET_FILE:SDL3::SDL3-shared> ${CMAKE_BINARY_DIR}/bmxnative.app
+        DEPENDS bmxnative VERBATIM)
+    endif()
+    add_executable(bmxwidetest tests/platform/test_wide.c src/driver/widemath.c)
+    target_include_directories(bmxwidetest PRIVATE src)
+    target_compile_options(bmxwidetest PRIVATE ${BMX_WARNINGS})
+    add_executable(bmxhftest tests/platform/test_hf.c src/native/hfmath.c)
+    target_include_directories(bmxhftest PRIVATE src)
+    target_compile_options(bmxhftest PRIVATE ${BMX_WARNINGS})
+  else()
   # Fixed base, no ASLR (runs stay alike), away from the original's 0x400000..0x6b3000: nothing of ours may sit at an
   # original address, where a leftover raw address would silently reach it. Below 0x10000000: the original's data
   # is part of this image since X1b (src/data), and the PSX-style ordering tables (ngifpsx.c, zoverii.c, the
@@ -194,6 +231,7 @@ if(BMX_NATIVE32)
   # SDL3.dll next to the exe (copy it into the game folder with bmxnative.exe).
   add_custom_command(TARGET bmxnative POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
     $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:bmxnative>)
+  endif()
 endif()
 
 if(BMX_HOOK)

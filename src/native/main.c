@@ -6,6 +6,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if !defined(_WIN32)
+#include <unistd.h> /* _exit */
+#endif
 
 #include "compat/orig.h"
 #include "native/native.h"
@@ -120,8 +123,15 @@ static void initGlobals(void)
     ORIG_VAR(0x00697790, int, gWindow1) = 0;
 }
 
-/* The exe's own base address, which is its HINSTANCE (the linker defines the symbol). */
+/* The exe's own base address, which is its HINSTANCE (the linker defines the symbol; elsewhere the image's
+ * header, __dso_handle, stands in). */
+#if defined(_WIN32)
 extern char __ImageBase;
+#define BMX_IMAGE_BASE (&__ImageBase)
+#else
+extern char __dso_handle;
+#define BMX_IMAGE_BASE ((void *)&__dso_handle)
+#endif
 
 int main(int argc, char **argv)
 {
@@ -164,7 +174,7 @@ int main(int argc, char **argv)
     if (!gHwnd) {
         return 0;
     }
-    gHinstance = &__ImageBase;
+    gHinstance = BMX_IMAGE_BASE;
     bmxWindowSetInstance(gHinstance);
     if (!attachPlugins(gHwnd)) {
         bmxWindowDestroy(gHwnd);

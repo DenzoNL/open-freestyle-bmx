@@ -18,7 +18,7 @@ static RwFreeList *rwCameraFreeList(void)
  * perspective camera). EAX = camera.
  */
 BMX_ADDR(0x004de480)
-__attribute__((regparm(1))) void CameraUpdateZShiftScale(RwCamera *camera)
+BMX_REGPARM(1) void CameraUpdateZShiftScale(RwCamera *camera)
 {
     double farValue;
     double nearValue;
@@ -56,7 +56,7 @@ static double camMul(float a, float b)
  * into b's product, which flips the sign of a NaN b (the x87 keeps it). */
 static double camSub(double a, double b)
 {
-    __asm__("" : "+x"(b));
+    BMX_FP_OPAQUE(b);
     return a - b;
 }
 
@@ -105,7 +105,7 @@ static int32_t camFloatBits(float f)
  * with the table based 1 / sqrt. Values are kept as doubles where the original keeps them on the x87 stack.
  */
 BMX_ADDR(0x004dd4d0)
-__attribute__((regparm(1))) void CameraBuildPerspClipPlanes(RwCamera *camera)
+BMX_REGPARM(1) void CameraBuildPerspClipPlanes(RwCamera *camera)
 {
     /* No vectorising: packed code turns a - b into a + -b, which flips the sign of a NaN b. */
 #pragma clang fp exceptions(strict)
@@ -270,7 +270,7 @@ __attribute__((regparm(1))) void CameraBuildPerspClipPlanes(RwCamera *camera)
  * planes their negations.
  */
 BMX_ADDR(0x004ddeb0)
-__attribute__((regparm(1))) void CameraBuildParallelClipPlanes(RwCamera *camera)
+BMX_REGPARM(1) void CameraBuildParallelClipPlanes(RwCamera *camera)
 {
     const RwFrame *frame = (const RwFrame *)camera->object.object.parent;
     ZVec3 *corner = camera->frustumCorners;
@@ -528,7 +528,7 @@ static void camFinishViewMatrix(RwCamera *camera, const RwMatrix *ltm)
  * right, up and at). EAX = camera; returns it. Values stay doubles where the x87 keeps them on its stack.
  */
 BMX_ADDR(0x004ddd40)
-__attribute__((regparm(1))) RwCamera *CameraBuildPerspViewMatrix(RwCamera *camera)
+BMX_REGPARM(1) RwCamera *CameraBuildPerspViewMatrix(RwCamera *camera)
 {
 #pragma clang fp exceptions(strict)
     const RwMatrix *ltm = &((const RwFrame *)camera->object.object.parent)->ltm;
@@ -582,7 +582,7 @@ __attribute__((regparm(1))) RwCamera *CameraBuildPerspViewMatrix(RwCamera *camer
 
 /* The view matrix of a parallel camera: as above without the perspective shift of the view offset. */
 BMX_ADDR(0x004de2a0)
-__attribute__((regparm(1))) RwCamera *CameraBuildParallelViewMatrix(RwCamera *camera)
+BMX_REGPARM(1) RwCamera *CameraBuildParallelViewMatrix(RwCamera *camera)
 {
 #pragma clang fp exceptions(strict)
     const RwMatrix *ltm = &((const RwFrame *)camera->object.object.parent)->ltm;

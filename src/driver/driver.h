@@ -14,7 +14,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "compat/fpu.h"
 #include "compat/layout.h"
+#include "compat/x87soft.h"
 #include "hook/hook.h"
 #include "rw/rwcamera.h"
 #include "rw/rwcore.h"
@@ -40,6 +42,9 @@ static inline DrvFpuState drvFpuSave(void)
 #if defined(__i386__) || defined(__x86_64__)
     __asm__ volatile("stmxcsr %0" : "=m"(s.mxcsr)::"memory");
     __asm__ volatile("fnstcw %0" : "=m"(s.x87)::"memory");
+#elif defined(__aarch64__)
+    s.mxcsr = (uint32_t)bmxFpcrGet(); /* FPCR in the MXCSR slot (compat/fpu.h) */
+    s.x87 = bmxX87ControlWord();      /* the control word variable (compat/x87soft.h) */
 #endif
     return s;
 }
@@ -49,6 +54,9 @@ static inline void drvFpuRestore(DrvFpuState s)
 #if defined(__i386__) || defined(__x86_64__)
     __asm__ volatile("fldcw %0" ::"m"(s.x87) : "memory");
     __asm__ volatile("ldmxcsr %0" ::"m"(s.mxcsr) : "memory");
+#elif defined(__aarch64__)
+    bmxX87SetControlWord(s.x87);
+    bmxFpcrSet(s.mxcsr);
 #else
     (void)s;
 #endif

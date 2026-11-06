@@ -144,29 +144,28 @@ typedef struct RpSkinChildSearch {
 RpAnimFrameSequence *rpAnimSequenceDeinit(RpAnimFrameSequence *sequence);
 RpAnimFrameSequence *rpAnimSequenceInit(RpAnimFrameSequence *sequence, const char *name, int32_t type,
                                         int32_t numFrames, int32_t numKeys);
-__attribute__((regparm(3))) RpAnimFrameSequence *rpAnimSequenceCreate(const char *name, int32_t type,
-                                                                      int32_t numFrames, uint32_t unused0,
-                                                                      uint32_t unused1, uint32_t unused2,
-                                                                      int32_t numKeys);
-__attribute__((regparm(1))) int rpAnimSequenceRelease(RpAnimFrameSequence *sequence);
+BMX_REGPARM(3)
+RpAnimFrameSequence *rpAnimSequenceCreate(const char *name, int32_t type, int32_t numFrames, uint32_t unused0,
+                                          uint32_t unused1, uint32_t unused2, int32_t numKeys);
+BMX_REGPARM(1) int rpAnimSequenceRelease(RpAnimFrameSequence *sequence);
 
 /* The frame plugin: data, constructor / destructor / copy and the stream chunk. */
 struct RpAnimFrameData *rpAnimFrameDataCreate(void);
-__attribute__((regparm(1))) int rpAnimFrameDataDestroy(RpAnimFrameData *data);
+BMX_REGPARM(1) int rpAnimFrameDataDestroy(RpAnimFrameData *data);
 void *rpAnimFrameDeinit(void *frame);
-__attribute__((regparm(2))) void *rpAnimFrameAddSequence(void *frame, RpAnimFrameSequence *sequence);
+BMX_REGPARM(2) void *rpAnimFrameAddSequence(void *frame, RpAnimFrameSequence *sequence);
 void *rpAnimFrameCopy(void *destination, const void *source);
 void *rpAnimFrameChunkRead(void *stream, int32_t length, void *frame);
 void *rpAnimFrameChunkWrite(void *stream, int32_t length, const void *frame);
-__attribute__((regparm(1))) RpAnimFrameSequence *rpAnimSequenceRead(RwStream *stream);
-__attribute__((regparm(3))) RpAnimFrameSequence *rpAnimSequenceWrite(RpAnimFrameSequence *sequence,
-                                                                     RwStream *stream, int32_t *size);
-__attribute__((regparm(3))) void *rpAnimWriteRotations(const void *frames, int32_t count, RwStream *stream,
-                                                       uint32_t unused0, uint32_t unused1, uint32_t unused2,
-                                                       int32_t *size);
-__attribute__((regparm(3))) void *rpAnimWriteTranslations(const void *frames, int32_t count, RwStream *stream,
-                                                          uint32_t unused0, uint32_t unused1,
-                                                          uint32_t unused2, int32_t *size);
+BMX_REGPARM(1) RpAnimFrameSequence *rpAnimSequenceRead(RwStream *stream);
+BMX_REGPARM(3)
+RpAnimFrameSequence *rpAnimSequenceWrite(RpAnimFrameSequence *sequence, RwStream *stream, int32_t *size);
+BMX_REGPARM(3)
+void *rpAnimWriteRotations(const void *frames, int32_t count, RwStream *stream, uint32_t unused0,
+                           uint32_t unused1, uint32_t unused2, int32_t *size);
+BMX_REGPARM(3)
+void *rpAnimWriteTranslations(const void *frames, int32_t count, RwStream *stream, uint32_t unused0,
+                              uint32_t unused1, uint32_t unused2, int32_t *size);
 
 /* The clump plugin. */
 RpAnimNode *rpAnimNodeCreate(void);

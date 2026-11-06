@@ -136,7 +136,19 @@ typedef struct __attribute__((packed)) BmxUnalignedPtr {
 
 /* An original `jmp [import slot]` thunk that ported code calls by address: the same jump, through our slot.
  * `offset` is the 32-bit one; every member of bmxImports is a pointer, so on x86_64 it is twice that. */
-#if defined(__x86_64__)
+#if defined(__aarch64__) && defined(__APPLE__)
+/* arm64 (docs/PORTING.md "X5 part 1"): x16 is the intra-procedure-call scratch register. */
+#define BMX_IMPORT_THUNK(addr, offset)                                                                                                 \
+    __asm__(                                                                                                                           \
+        ".text\n.p2align 2\n.globl " BMX_SYM("bmxImportThunk_" #addr) "\n" BMX_SYM("bmxImportThunk_" #addr) ":\n\tadrp x16, " BMX_SYM( \
+            "bmxImports") "@PAGE\n\tadd x16, x16, " BMX_SYM("bmxImports") "@PAGEOFF\n\tldr x16, [x16, "                                \
+                                                                          "#2*" #offset "]\n\tbr x16\n")
+#elif defined(__aarch64__)
+#define BMX_IMPORT_THUNK(addr, offset)                                                                       \
+    __asm__(".text\n.p2align 2\n.globl bmxImportThunk_" #addr "\nbmxImportThunk_" #addr                      \
+            ":\n\tadrp x16, bmxImports\n\tadd x16, x16, :lo12:bmxImports\n\tldr x16, [x16, #2*" #offset      \
+            "]\n\tbr x16\n")
+#elif defined(__x86_64__)
 #define BMX_IMPORT_THUNK(addr, offset)                                                                       \
     __asm__(".globl bmxImportThunk_" #addr "\nbmxImportThunk_" #addr ":\n\tjmp *bmxImports+2*" #offset       \
             "(%rip)\n")

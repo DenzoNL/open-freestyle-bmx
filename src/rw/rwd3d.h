@@ -22,6 +22,7 @@
  * a function, so results match the original's bit for bit in whatever mode it runs (in the tests, the hook
  * DLL and the native exe). rwD3DFistp is FISTP: float to int in the current rounding mode.
  */
+#if defined(__i386__) || defined(__x86_64__)
 static inline uint32_t rwD3DRoundBegin(void)
 {
     uint16_t cw;
@@ -44,6 +45,33 @@ static inline int32_t rwD3DFistp(float value)
     __asm__ volatile("cvtss2si %1, %0" : "=r"(result) : "x"(value) : "memory");
     return result;
 }
+#elif defined(__aarch64__)
+#include "compat/fpu.h"
+#include "compat/x87soft.h"
+
+/* arm64: the x87 control word's rounding mode (the camera mode sets it, compat/x87soft.h) into FPCR
+ * (compat/fpu.h); FPCR's other bits are 0 for the game, so the low 32 bits are the whole state. */
+static inline uint32_t rwD3DRoundBegin(void)
+{
+    const uint64_t old = bmxFpcrGet();
+    bmxFpcrSet(bmxFpcrWithX87Rounding(old, bmxX87ControlWord()));
+    return (uint32_t)old;
+}
+
+static inline void rwD3DRoundEnd(uint32_t old)
+{
+    bmxFpcrSet(old);
+}
+
+/* cvtss2si: rounded in the current mode; NaN and values out of range give 0x80000000. */
+static inline int32_t rwD3DFistp(float value)
+{
+    const float r = __builtin_rintf(value);
+    return r >= -2147483648.0f && r < 2147483648.0f ? (int32_t)r : INT32_MIN;
+}
+#else
+#error "rwD3DRoundBegin: no FPU rounding control for this CPU"
+#endif
 
 static inline int32_t rwD3DBits(float value)
 {
@@ -399,16 +427,16 @@ int rwD3DDevDrawIndexedPrimitive(uint32_t type, uint32_t fvf, const void *vertic
                                  const uint16_t *indices, uint32_t numIndices, uint32_t flags);
 
 /* rw/d3dstate.c */
-__attribute__((regparm(2))) int rwD3DSetRenderState(int32_t state, intptr_t arg);
+BMX_REGPARM(2) int rwD3DSetRenderState(int32_t state, intptr_t arg);
 int rwD3DRenderStateSet(int32_t state, intptr_t value);
 int rwD3DRenderStateGet(int32_t state, void *value);
 void *rwD3DRasterHandle(const RwRaster *raster);
-__attribute__((regparm(1))) int rwD3DSetTextureRaster(RwRaster *raster);
-__attribute__((regparm(1))) int rwD3DSetSrcBlend(int32_t blend);
-__attribute__((regparm(1))) int rwD3DSetDestBlend(int32_t blend);
-__attribute__((regparm(1))) int rwD3DFogTableSelect(int32_t type);
-__attribute__((regparm(1))) int rwD3DSetFogType(int32_t type);
-__attribute__((regparm(1))) int rwD3DSetFogTable(const uint32_t *table);
+BMX_REGPARM(1) int rwD3DSetTextureRaster(RwRaster *raster);
+BMX_REGPARM(1) int rwD3DSetSrcBlend(int32_t blend);
+BMX_REGPARM(1) int rwD3DSetDestBlend(int32_t blend);
+BMX_REGPARM(1) int rwD3DFogTableSelect(int32_t type);
+BMX_REGPARM(1) int rwD3DSetFogType(int32_t type);
+BMX_REGPARM(1) int rwD3DSetFogTable(const uint32_t *table);
 
 /* rw/d3dim2d.c */
 RwD3DDeferList *rwD3DDeferCreate(void);
@@ -416,8 +444,8 @@ void *rwD3DDeferAlloc(RwD3DDeferList *list, uint32_t size, void *callback);
 RwD3DDeferList *rwD3DDeferRun(RwD3DDeferList *list, int32_t order);
 RwD3DDeferList *rwD3DDeferReset(RwD3DDeferList *list);
 int rwD3DIm2DOpen(void);
-__attribute__((regparm(1))) void rwD3DSaveState(RwD3DSavedState *state);
-__attribute__((regparm(1))) void rwD3DRestoreState(const RwD3DSavedState *saved);
+BMX_REGPARM(1) void rwD3DSaveState(RwD3DSavedState *state);
+BMX_REGPARM(1) void rwD3DRestoreState(const RwD3DSavedState *saved);
 void rwD3DDeferFlush(void);
 int rwD3DSortCompare(const RwD3DSortItem *a, const RwD3DSortItem *b);
 void rwD3DSortDraw(void);
@@ -436,7 +464,7 @@ int rwD3DIm3DEnd(void);
 void *rwD3DIm3DOpen(void *engine);
 void *rwD3DIm3DClose(void *engine);
 int rwD3DIm3DGrow(uint32_t extra);
-__attribute__((regparm(2))) int rwD3DIndexListGrow(RwD3DIndexList *list, uint32_t capacity);
+BMX_REGPARM(2) int rwD3DIndexListGrow(RwD3DIndexList *list, uint32_t capacity);
 int rwD3DIndexListResize(RwD3DIndexList *list, uint32_t capacity);
 void rwD3DIndexListCreate(RwD3DIndexList *list);
 void rwD3DIndexListDestroy(RwD3DIndexList *list);
@@ -460,8 +488,8 @@ int rwD3DIm3DPipeline(RwIm3DPipeline *pipeline);
 int rwD3DTriCullPersp(int32_t a, int32_t b, int32_t c);
 int rwD3DClipTriCullPersp(int32_t a, int32_t b, int32_t c);
 int rwD3DTriCullParallel(int32_t a, int32_t b, int32_t c);
-__attribute__((regparm(2))) void rwD3DRenderLineIndices(int32_t a, int32_t b);
-__attribute__((regparm(3))) void rwD3DRenderTriIndices(int32_t a, int32_t b, int32_t c);
+BMX_REGPARM(2) void rwD3DRenderLineIndices(int32_t a, int32_t b);
+BMX_REGPARM(3) void rwD3DRenderTriIndices(int32_t a, int32_t b, int32_t c);
 int rwD3DIm3DRenderLine(int32_t a, int32_t b);
 int rwD3DIm3DRenderTriangle(int32_t a, int32_t b, int32_t c);
 int rwD3DIm3DRenderPrimitive(int32_t primType);
@@ -478,7 +506,7 @@ struct RwSurfaceProperties;
 typedef void(BMX_CDECL *RwD3DLightFunc)(RwD3DIm3DWork *work, struct RpLight *light, const RwMatrix *inverse,
                                         float scale, const struct RwSurfaceProperties *surface);
 
-__attribute__((regparm(1))) void rwD3DAtomicMorph(struct RpAtomic *atomic);
+BMX_REGPARM(1) void rwD3DAtomicMorph(struct RpAtomic *atomic);
 RwD3DIm3DWork *rwD3DAtomicInstance(struct RpAtomic *atomic);
 RwD3DIm3DWork *rwD3DSectorInstance(struct RpWorldSector *sector);
 void rwD3DApplyLight(RwD3DIm3DWork *work, struct RpLight *light, const RwMatrix *inverse, float scale,

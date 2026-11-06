@@ -7,8 +7,8 @@ import re
 import sys
 from pathlib import Path
 
-# Optional __attribute__((...)) before the declaration (naked, regparm): those functions must be hooked too.
-ANNOT = re.compile(r"^BMX_ADDR\((0x[0-9a-fA-F]+)\)\s*\n(?:static\s+)?(?:__attribute__\(\(.*?\)\)\s*)*[\w\s\*]+?\b(\w+)\s*\(", re.M)
+# Optional __attribute__((...)) or BMX_REGPARM(n) before the declaration (naked, regparm): those functions must be hooked too.
+ANNOT = re.compile(r"^BMX_ADDR\((0x[0-9a-fA-F]+)\)\s*\n(?:static\s+)?(?:(?:__attribute__\(\(.*?\)\)|BMX_REGPARM\(\w\))\s*)*[\w\s\*]+?\b(\w+)\s*\(", re.M)
 
 
 def scan(src_dir):

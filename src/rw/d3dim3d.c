@@ -109,7 +109,7 @@ int rwD3DVertexBitsAlloc(int32_t count)
 
 /* 0x4eadc8 (list in EAX, capacity in EDX): reallocates an index list. */
 BMX_ADDR(0x004eadc8)
-__attribute__((regparm(2))) int rwD3DIndexListGrow(RwD3DIndexList *list, uint32_t capacity)
+BMX_REGPARM(2) int rwD3DIndexListGrow(RwD3DIndexList *list, uint32_t capacity)
 {
     uint16_t *indices = RwEngineInstance->memoryFuncs.rwrealloc(list->indices, capacity * 2);
 
@@ -663,7 +663,7 @@ static void growForClip(void)
 /* 0x4f5f00 (EAX, EDX): one line: dropped when both ends are outside the same plane, clipped when one is out.
  */
 BMX_ADDR(0x004f5f00)
-__attribute__((regparm(2))) void rwD3DRenderLineIndices(int32_t a, int32_t b)
+BMX_REGPARM(2) void rwD3DRenderLineIndices(int32_t a, int32_t b)
 {
     const uint8_t ca = rwD3DCamBase[a].clip, cb = rwD3DCamBase[b].clip;
 
@@ -701,7 +701,7 @@ static void renderTri(int32_t a, int32_t b, int32_t c)
 
 /* 0x4f5f80 (EAX, EDX, ECX) */
 BMX_ADDR(0x004f5f80)
-__attribute__((regparm(3))) void rwD3DRenderTriIndices(int32_t a, int32_t b, int32_t c)
+BMX_REGPARM(3) void rwD3DRenderTriIndices(int32_t a, int32_t b, int32_t c)
 {
     renderTri(a, b, c);
 }

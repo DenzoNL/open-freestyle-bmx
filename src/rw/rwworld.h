@@ -347,24 +347,26 @@ RpWorld *RpWorldForAllWorldSectors(RpWorld *world, RwObjectCallBack callback, vo
  * argument into EAX and falls into this body; hooking both would overlap, so only the body is ported.
  */
 ORIG_FN(0x004ba9c0, int, RpWorldDestroy, (RpWorld * world));
-__attribute__((regparm(1))) int rpWorldDestroyBody(RpWorld *world);
+BMX_REGPARM(1) int rpWorldDestroyBody(RpWorld *world);
 /* An empty world of one sector for the box (NULL and an error when out of memory or a mesh fails). */
 RpWorld *RpWorldCreate(const RwBBox *boundingBox);
 /* EAX = sector: frees what a sector tree owns / only releases its ties and plugin data. */
-__attribute__((regparm(1))) void rpSectorTreeDestroy(RpSector *sector);
-__attribute__((regparm(1))) void rpSectorTreeDeinit(RpSector *sector);
+BMX_REGPARM(1) void rpSectorTreeDestroy(RpSector *sector);
+BMX_REGPARM(1) void rpSectorTreeDeinit(RpSector *sector);
 
 /* Calls the callback for every sector the intersection touches (line and ray walks are still original). */
 /* EAX = world, EDX = intersection (a line / a sphere), ECX = callback; the callback's copy of the
  * intersection and its data are the 4th and 5th stack words. */
-__attribute__((regparm(3))) RpWorld *
-rpWorldForAllSectorsIntersectingLine(RpWorld *world, RpIntersection *intersection,
-                                     RpIntersectionCallBackWorldSector callback, int32_t unused0,
-                                     int32_t unused1, int32_t unused2, RpIntersection *again, void *data);
-__attribute__((regparm(3))) RpWorld *
-rpWorldForAllSectorsIntersectingSphere(RpWorld *world, RpIntersection *intersection,
-                                       RpIntersectionCallBackWorldSector callback, int32_t unused0,
-                                       int32_t unused1, int32_t unused2, RpIntersection *again, void *data);
+BMX_REGPARM(3)
+RpWorld *rpWorldForAllSectorsIntersectingLine(RpWorld *world, RpIntersection *intersection,
+                                              RpIntersectionCallBackWorldSector callback, int32_t unused0,
+                                              int32_t unused1, int32_t unused2, RpIntersection *again,
+                                              void *data);
+BMX_REGPARM(3)
+RpWorld *rpWorldForAllSectorsIntersectingSphere(RpWorld *world, RpIntersection *intersection,
+                                                RpIntersectionCallBackWorldSector callback, int32_t unused0,
+                                                int32_t unused1, int32_t unused2, RpIntersection *again,
+                                                void *data);
 RpWorld *_rpWorldForAllSectorsIntersecting(RpWorld *world, RpIntersection *intersection,
                                            RpIntersectionCallBackWorldSector callback, void *data);
 
@@ -381,7 +383,7 @@ RpWorld *RpPVSCreate(RpWorld *world, RwRaster *raster, RwRaster *zRaster, float 
                      void *callback, void *callbackData);
 int32_t rpPVSCountSectors(RpWorld *world);
 /* EAX = world: tears down the camera, rasters and image of a PVS generation. */
-__attribute__((regparm(1))) void rpPVSCameraDestroy(RpWorld *world);
+BMX_REGPARM(1) void rpPVSCameraDestroy(RpWorld *world);
 
 /* Rendering the atomics of a sector, lighting an object with the lights of the world and its sector, and the
  * world module's open/close. The lighting routine gets the object, the light, 0, 1.0 and the world's surface
@@ -395,14 +397,14 @@ typedef struct RpLightApplyArgs {
     const RwSurfaceProperties *surfaceProps;
 } RpLightApplyArgs;
 
-__attribute__((regparm(1))) void rpSectorRenderAtomics(RpWorldSector *sector);
+BMX_REGPARM(1) void rpSectorRenderAtomics(RpWorldSector *sector);
 void *rpWorldSectorRenderWithAtomics(RpWorldSector *sector);
 RpLight *rpLightApplyToObject(RpLight *light, RpLightApplyArgs *args);
-__attribute__((regparm(2))) int rpWorldForAllDirectionalLights(RwObjectCallBack callback, void *data);
+BMX_REGPARM(2) int rpWorldForAllDirectionalLights(RwObjectCallBack callback, void *data);
 int RpWorldForAllDirectionalLights(RwObjectCallBack callback, void *data);
 RpWorldSector *RpWorldSectorForAllLights(RpWorldSector *sector, RwObjectCallBack callback, void *data);
-__attribute__((regparm(3))) RpWorldSector *rpSectorForAllLights(RpWorldSector *sector,
-                                                                RwObjectCallBack callback, void *data);
+BMX_REGPARM(3)
+RpWorldSector *rpSectorForAllLights(RpWorldSector *sector, RwObjectCallBack callback, void *data);
 void *rpWorldLightObject(void *object, RpLightApplyFn apply);
 void *WorldOpen(void *engine, int32_t offset);
 void *WorldClose(void *engine);
@@ -414,7 +416,7 @@ int rpWorldExtCallSlot2(void *pipeline);
 void *pvsRenderSector(RpWorldSector *sector);
 void *pvsSectorUnload(void *sector);
 /* EAX = sector, EDX = position: the row of visibility bits of the cell holding the position. */
-__attribute__((regparm(2))) const uint8_t *pvsCellRow(const RpWorldSector *sector, const float *position);
+BMX_REGPARM(2) const uint8_t *pvsCellRow(const RpWorldSector *sector, const float *position);
 void *pvsViewSector(RpIntersection *intersection, RpWorldSector *sector, RpPVSWorldData *pvs);
 void *pvsWorldConstruct(void *world);
 void *pvsWorldDestruct(RpWorld *world);
@@ -441,22 +443,22 @@ void *_rpTieClose(void *engine);
 void *_rpMaterialOpen(void *engine, int32_t offset);
 void *_rpMaterialClose(void *engine);
 /* Bodies behind the register-argument stubs: EAX = world, EDX = camera / clump / light / atomic. */
-__attribute__((regparm(2))) RpWorld *rpWorldAddCameraBody(RpWorld *world, RwCamera *camera);
-__attribute__((regparm(2))) RpWorld *rpWorldAddClumpBody(RpWorld *world, RpClump *clump);
-__attribute__((regparm(2))) RpWorld *rpWorldAddLightBody(RpWorld *world, RpLight *light);
-__attribute__((regparm(2))) RpWorld *rpWorldAddAtomicBody(RpWorld *world, RpAtomic *atomic);
-__attribute__((regparm(2))) RpWorld *rpWorldRemoveAtomicBody(RpWorld *world, RpAtomic *atomic);
+BMX_REGPARM(2) RpWorld *rpWorldAddCameraBody(RpWorld *world, RwCamera *camera);
+BMX_REGPARM(2) RpWorld *rpWorldAddClumpBody(RpWorld *world, RpClump *clump);
+BMX_REGPARM(2) RpWorld *rpWorldAddLightBody(RpWorld *world, RpLight *light);
+BMX_REGPARM(2) RpWorld *rpWorldAddAtomicBody(RpWorld *world, RpAtomic *atomic);
+BMX_REGPARM(2) RpWorld *rpWorldRemoveAtomicBody(RpWorld *world, RpAtomic *atomic);
 void *rpWorldAddAtomicCallback(void *atomic, void *world);
 void *rpWorldRemoveAtomicCallback(void *atomic, void *world);
 /* EAX = atomic / light: destroy the ties the object has with sectors. */
-__attribute__((regparm(1))) void rpAtomicTiesDestroy(RpAtomic *atomic);
-__attribute__((regparm(1))) void rpLightTiesDestroy(RpLight *light);
+BMX_REGPARM(1) void rpAtomicTiesDestroy(RpAtomic *atomic);
+BMX_REGPARM(1) void rpLightTiesDestroy(RpLight *light);
 /* Ties an atomic to the sectors of its bounding box (EAX = world, EDX = atomic), and the sync callbacks of
  * atomics and cameras that call it. */
-__attribute__((regparm(2))) void rpAtomicAddTies(RpWorld *world, RpAtomic *atomic);
+BMX_REGPARM(2) void rpAtomicAddTies(RpWorld *world, RpAtomic *atomic);
 RpAtomic *WorldAtomicSync(RpAtomic *atomic);
 RwCamera *WorldCameraSync(RwCamera *camera);
-__attribute__((regparm(2))) RpWorld *rpWorldCameraSyncSectors(RpWorld *world, RwCamera *camera);
+BMX_REGPARM(2) RpWorld *rpWorldCameraSyncSectors(RpWorld *world, RwCamera *camera);
 RpLight *WorldLightSync(RpLight *light);
 void *WorldInitCameraExt(void *camera);
 void *WorldDeInitCameraExt(void *camera);

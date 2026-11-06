@@ -229,7 +229,9 @@ void crtFpInit(void)
     crtInstallFloatHooks();
     gCrtFpStatus = crtFpProbe();
     crtFpSetup();
+#if defined(__i386__) || defined(__x86_64__)
     __asm__ volatile("fnclex");
+#endif
 }
 
 /* 0x4a4a37: a 1 byte ret directly before crtInstallFloatHooks, too short for a hooking jmp (gen_hooks.py

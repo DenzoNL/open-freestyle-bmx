@@ -137,6 +137,8 @@ float ngiffxGetDebugFloat(void)
 BMX_ADDR(0x0045c6f0)
 void ngiffxNop(void) {}
 
+BMX_REDIRECT_SLOT(ngiffxAdaptQuality, (void)); /* [video] full_draw_distance (native/drawdist.c) */
+
 /*
  * Adapts the effect quality (60..200) to the frame rate measured over 100 ms windows: it follows the
  * rate towards 28 fps, easing back to 200 when the rate is high enough, and settles when the quality is
@@ -145,6 +147,7 @@ void ngiffxNop(void) {}
 BMX_ADDR(0x0045c710)
 void ngiffxAdaptQuality(void)
 {
+    BMX_REDIRECT_VOID(ngiffxAdaptQuality, ());
     const uint32_t now = gTimeGetTime();
     uint32_t elapsed;
     int16_t frames;

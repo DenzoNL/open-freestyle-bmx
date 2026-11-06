@@ -689,30 +689,52 @@ int drvDrawStart(void)
     SDL_GPUShaderCreateInfo info;
 
     SDL_zero(info);
+    /* Per shader: DXIL (Direct3D 12), SPIR-V (Vulkan), MSL source text (Metal; docs/PORTING.md X5-A). */
+    const unsigned char *vsCode, *psCode, *uiCode;
+    size_t vsSize, psSize, uiSize;
     if ((formats & SDL_GPU_SHADERFORMAT_DXIL) != 0) {
         info.format = SDL_GPU_SHADERFORMAT_DXIL;
+        vsCode = tl_vs_dxil;
+        vsSize = sizeof tl_vs_dxil;
+        psCode = tl_ps_dxil;
+        psSize = sizeof tl_ps_dxil;
+        uiCode = ui_ps_dxil;
+        uiSize = sizeof ui_ps_dxil;
     } else if ((formats & SDL_GPU_SHADERFORMAT_SPIRV) != 0) {
         info.format = SDL_GPU_SHADERFORMAT_SPIRV;
+        vsCode = tl_vs_spirv;
+        vsSize = sizeof tl_vs_spirv;
+        psCode = tl_ps_spirv;
+        psSize = sizeof tl_ps_spirv;
+        uiCode = ui_ps_spirv;
+        uiSize = sizeof ui_ps_spirv;
+    } else if ((formats & SDL_GPU_SHADERFORMAT_MSL) != 0) {
+        info.format = SDL_GPU_SHADERFORMAT_MSL;
+        vsCode = tl_vs_msl;
+        vsSize = sizeof tl_vs_msl;
+        psCode = tl_ps_msl;
+        psSize = sizeof tl_ps_msl;
+        uiCode = ui_ps_msl;
+        uiSize = sizeof ui_ps_msl;
     } else {
-        bmxLog("driver: no shader format for this GPU driver (MSL is not built yet)\n");
+        bmxLog("driver: no shader format for this GPU driver (formats %#x)\n", (unsigned)formats);
         return 0;
     }
-    const int dxil = info.format == SDL_GPU_SHADERFORMAT_DXIL;
     info.entrypoint = "vsMain";
-    info.code = dxil ? tl_vs_dxil : tl_vs_spirv;
-    info.code_size = dxil ? sizeof tl_vs_dxil : sizeof tl_vs_spirv;
+    info.code = vsCode;
+    info.code_size = vsSize;
     info.stage = SDL_GPU_SHADERSTAGE_VERTEX;
     info.num_uniform_buffers = 1;
     draw.vs = DRV_FPU_GUARDED(SDL_CreateGPUShader(device, &info));
     info.entrypoint = "psMain";
-    info.code = dxil ? tl_ps_dxil : tl_ps_spirv;
-    info.code_size = dxil ? sizeof tl_ps_dxil : sizeof tl_ps_spirv;
+    info.code = psCode;
+    info.code_size = psSize;
     info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
     info.num_samplers = 1;
     info.num_uniform_buffers = 1;
     draw.ps = DRV_FPU_GUARDED(SDL_CreateGPUShader(device, &info));
-    info.code = dxil ? ui_ps_dxil : ui_ps_spirv;
-    info.code_size = dxil ? sizeof ui_ps_dxil : sizeof ui_ps_spirv;
+    info.code = uiCode;
+    info.code_size = uiSize;
     draw.psUi = DRV_FPU_GUARDED(SDL_CreateGPUShader(device, &info));
     if (draw.vs == NULL || draw.ps == NULL || draw.psUi == NULL) {
         bmxLog("driver: SDL_CreateGPUShader failed: %s\n", SDL_GetError());

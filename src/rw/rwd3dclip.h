@@ -17,12 +17,12 @@ typedef void(BMX_CDECL *RwD3DClipInterpFunc)(RwD3DCamVertex *vertex, const RwD3D
                                              const RwD3DTLVertex *outTL, const RwD3DTLVertex *inTL);
 
 /* rw/d3dclip.c */
-__attribute__((regparm(3))) int32_t rwD3DClipPolyPlane(int32_t *ring, int32_t *start, int32_t *end,
-                                                       int32_t unused0, int32_t unused1, int32_t unused2,
-                                                       uint32_t plane, RwD3DClipInterpFunc interp);
-__attribute__((regparm(3))) int32_t rwD3DClipLinePlane(int32_t *ring, int32_t *start, int32_t *end,
-                                                       int32_t unused0, int32_t unused1, int32_t unused2,
-                                                       uint32_t plane, RwD3DClipInterpFunc interp);
+BMX_REGPARM(3)
+int32_t rwD3DClipPolyPlane(int32_t *ring, int32_t *start, int32_t *end, int32_t unused0, int32_t unused1,
+                           int32_t unused2, uint32_t plane, RwD3DClipInterpFunc interp);
+BMX_REGPARM(3)
+int32_t rwD3DClipLinePlane(int32_t *ring, int32_t *start, int32_t *end, int32_t unused0, int32_t unused1,
+                           int32_t unused2, uint32_t plane, RwD3DClipInterpFunc interp);
 void rwD3DInterpNearPersp(RwD3DCamVertex *vertex, const RwD3DCamVertex *out, const RwD3DCamVertex *in,
                           RwD3DTLVertex *tl, const RwD3DTLVertex *outTL, const RwD3DTLVertex *inTL);
 void rwD3DInterpFarPersp(RwD3DCamVertex *vertex, const RwD3DCamVertex *out, const RwD3DCamVertex *in,

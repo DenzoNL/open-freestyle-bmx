@@ -89,13 +89,13 @@ RwFrame *RwFrameTranslate(RwFrame *frame, const RwV3d *translation, RwOpCombineT
 RwFrame *RwFrameSetIdentity(RwFrame *frame);
 
 /* Register-argument helpers (EAX, EDX): detach a frame from its parent; set a subtree's root. */
-__attribute__((regparm(1))) RwFrame *RwFrameRemoveChild(RwFrame *child);
-__attribute__((regparm(2))) void rwFrameSetRoot(RwFrame *frame, RwFrame *root);
+BMX_REGPARM(1) RwFrame *RwFrameRemoveChild(RwFrame *child);
+BMX_REGPARM(2) void rwFrameSetRoot(RwFrame *frame, RwFrame *root);
 /* Recompute the LTMs below a frame (EAX = frame, EDX = parent changed), and from a root. */
-__attribute__((regparm(2))) void rwFrameSyncLTM(RwFrame *frame, int32_t force);
+BMX_REGPARM(2) void rwFrameSyncLTM(RwFrame *frame, int32_t force);
 void rwFrameSyncHierarchyLTM(RwFrame *root);
 /* Sync the objects of a frame subtree (EAX = frame, EDX = force) and of the engine's dirty frame list. */
-__attribute__((regparm(2))) void rwFrameSyncObjects(RwFrame *frame, uint32_t force);
+BMX_REGPARM(2) void rwFrameSyncObjects(RwFrame *frame, uint32_t force);
 int rwFrameSyncDirtyList(void);
 void *rwFrameSyncObjectCB(void *object, void *data);
 
@@ -111,13 +111,13 @@ void rwMatrixMultiplyX87(RwMatrix *out, const RwMatrix *a, const RwMatrix *b);
 RwV3d *rwV3dTransformPointsDefault(RwV3d *out, const RwV3d *in, int32_t count, const RwMatrix *matrix);
 RwV3d *rwV3dTransformVectorsDefault(RwV3d *out, const RwV3d *in, int32_t count, const RwMatrix *matrix);
 /* Installs the point and vector transforms (EAX, EDX; NULL = the defaults). */
-__attribute__((regparm(2))) int rwV3dSetTransformFuncs(RwV3dTransformFunc points, RwV3dTransformFunc vectors);
+BMX_REGPARM(2) int rwV3dSetTransformFuncs(RwV3dTransformFunc points, RwV3dTransformFunc vectors);
 void rwV3dFreeSqrtTable(void);
 void rwV3dFreeInvSqrtTable(void);
 void *rwVectorOpen(void *engine, int32_t offset);
 void *rwVectorClose(void *engine);
 /* Stores a frame hierarchy into an array (EAX = cursor, EDX = frame) and builds the frame list of a clump. */
-__attribute__((regparm(2))) int rwFrameListFill(RwFrame ***cursor, RwFrame *frame);
+BMX_REGPARM(2) int rwFrameListFill(RwFrame ***cursor, RwFrame *frame);
 RwFrameList *_rwFrameListInitialize(RwFrameList *frameList, RwFrame *root);
 
 /* In rw/clump.c: bounding boxes, matrix error measures (returned on the x87 stack), frame clones. */
@@ -127,8 +127,8 @@ double rwMatrixDeterminant(const RwMatrix *matrix);
 double rwMatrixNormalError(const RwMatrix *matrix);
 double rwMatrixOrthogonalError(const RwMatrix *matrix);
 /* Destroys a frame and, recursively, everything below it (EAX = frame). */
-__attribute__((regparm(1))) void rwFrameDestroyRecursive(RwFrame *frame);
-__attribute__((regparm(2))) RwFrame *rwFrameCloneRecursive(RwFrame *frame, RwFrame *root);
+BMX_REGPARM(1) void rwFrameDestroyRecursive(RwFrame *frame);
+BMX_REGPARM(2) RwFrame *rwFrameCloneRecursive(RwFrame *frame, RwFrame *root);
 RwFrame *RwFrameCloneHierarchy(RwFrame *frame);
 void rwFrameResetRoot(RwFrame *frame);
 RwFrame *RwFrameAddChild(RwFrame *parent, RwFrame *child);

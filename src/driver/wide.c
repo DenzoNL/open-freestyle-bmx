@@ -338,6 +338,7 @@ const BmxHook *drvWideJumps(uint32_t *count)
     gJumps[0].orig = (uintptr_t)ngifDrawList;
     gJumps[0].impl = (void *)wideDrawList;
     *count = cfg->enabled && cfg->hud == 1 ? 1u : 0u;
+    BMX_REDIRECT_SET(ngifDrawList, *count != 0 ? wideDrawList : NULL); /* no jumps (compat/orig.h) */
     return gJumps;
 }
 

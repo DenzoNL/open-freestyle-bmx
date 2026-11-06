@@ -93,7 +93,7 @@ static void frameQueueDirty(RwFrame *root)
 
 /* Destroys a frame's subtree (children first) without telling the parent's hierarchy more than needed. */
 BMX_ADDR(0x004d2530)
-__attribute__((regparm(1))) void rwFrameDestroyRecursive(RwFrame *frame)
+BMX_REGPARM(1) void rwFrameDestroyRecursive(RwFrame *frame)
 {
     RwFrame *child = frame->child;
     while (child != NULL) {
@@ -116,7 +116,7 @@ __attribute__((regparm(1))) void rwFrameDestroyRecursive(RwFrame *frame)
 
 /* Clones a frame and its children (EAX = frame, EDX = the clone hierarchy's root or NULL). */
 BMX_ADDR(0x004d2350)
-__attribute__((regparm(2))) RwFrame *rwFrameCloneRecursive(RwFrame *frame, RwFrame *root)
+BMX_REGPARM(2) RwFrame *rwFrameCloneRecursive(RwFrame *frame, RwFrame *root)
 {
     RwFrame *clone = RwEngineInstance->freeListAlloc(frameFreeList());
     if (clone == NULL) {
@@ -343,7 +343,7 @@ static RpAtomic *atomicCreate(void)
 
 /* Destroys an atomic: plugin data, render resources, geometry, frame link and memory. Always 1. */
 BMX_ADDR(0x004b1b64)
-__attribute__((regparm(1))) int RpAtomicDestroy(RpAtomic *atomic)
+BMX_REGPARM(1) int RpAtomicDestroy(RpAtomic *atomic)
 {
     _rwPluginRegistryDeInitObject(&rpAtomicRegistry, atomic);
     if (atomic->repEntry != NULL) {
@@ -364,7 +364,7 @@ __attribute__((regparm(1))) int RpAtomicDestroy(RpAtomic *atomic)
 
 /* A copy of an atomic: same flags, geometry (a new reference), interpolator and plugin data; no frame. */
 BMX_ADDR(0x004b1c74)
-__attribute__((regparm(1))) RpAtomic *RpAtomicClone(RpAtomic *source)
+BMX_REGPARM(1) RpAtomic *RpAtomicClone(RpAtomic *source)
 {
     RpAtomic *clone = atomicCreate();
     if (clone == NULL) {
@@ -391,7 +391,7 @@ __attribute__((regparm(1))) RpAtomic *RpAtomicClone(RpAtomic *source)
 
 /* Gives the atomic its frame and marks it changed (EAX = atomic, EDX = frame). */
 BMX_ADDR(0x004b3318)
-__attribute__((regparm(2))) RpAtomic *RpAtomicSetFrame(RpAtomic *atomic, RwFrame *frame)
+BMX_REGPARM(2) RpAtomic *RpAtomicSetFrame(RpAtomic *atomic, RwFrame *frame)
 {
     _rwObjectHasFrameSetFrame(&atomic->object, frame);
     atomic->object.object.privateFlags |= 1;
@@ -401,7 +401,7 @@ __attribute__((regparm(2))) RpAtomic *RpAtomicSetFrame(RpAtomic *atomic, RwFrame
 
 /* Links the atomic into the clump's atomic list (EAX = clump, EDX = atomic). */
 BMX_ADDR(0x004b2278)
-__attribute__((regparm(2))) void RpClumpAddAtomic(RpClump *clump, RpAtomic *atomic)
+BMX_REGPARM(2) void RpClumpAddAtomic(RpClump *clump, RpAtomic *atomic)
 {
     atomic->inClumpLink.prev = &clump->atomicList;
     atomic->inClumpLink.next = clump->atomicList.next;
@@ -525,7 +525,7 @@ int RpClumpDestroy(RpClump *clump)
 
 /* One atomic chunk of a clump stream (EAX = stream, EDX = the clump's frame list). */
 BMX_ADDR(0x004b2ca0)
-__attribute__((regparm(2))) RpAtomic *RpAtomicStreamRead(RwStream *stream, RwFrameList *frameList)
+BMX_REGPARM(2) RpAtomic *RpAtomicStreamRead(RwStream *stream, RwFrameList *frameList)
 {
     uint32_t length;
     uint32_t version;
@@ -826,8 +826,7 @@ static int geometryAddMorphTarget(RpGeometry *geometry)
 /* A geometry with the given counts and one (empty) morph target; EAX = vertices, EDX = triangles, ECX =
  * format. */
 BMX_ADDR(0x004b523c)
-__attribute__((regparm(3))) RpGeometry *RpGeometryCreate(int32_t numVertices, int32_t numTriangles,
-                                                         uint32_t format)
+BMX_REGPARM(3) RpGeometry *RpGeometryCreate(int32_t numVertices, int32_t numTriangles, uint32_t format)
 {
     if (rpGeometryModuleCount == 0) {
         rpReport(rwERR_NOTOPEN);
@@ -1676,7 +1675,7 @@ int32_t RwTextureStreamGetSize(const RwTexture *texture)
 
 /* Writes a string chunk padded to four bytes (EAX = string or NULL for the empty string, EDX = stream). */
 BMX_ADDR(0x004e9988)
-__attribute__((regparm(2))) const char *rwStreamWriteString(const char *string, RwStream *stream)
+BMX_REGPARM(2) const char *rwStreamWriteString(const char *string, RwStream *stream)
 {
     if (string == NULL) {
         string = &rwEmptyString;
@@ -1693,7 +1692,7 @@ __attribute__((regparm(2))) const char *rwStreamWriteString(const char *string, 
 /* Reads the next string chunk (type 2, or type 0x13 with 16 bit characters) into a new buffer (EAX = stream).
  */
 BMX_ADDR(0x004e9a14)
-__attribute__((regparm(1))) char *rwStreamReadString(RwStream *stream)
+BMX_REGPARM(1) char *rwStreamReadString(RwStream *stream)
 {
     uint32_t type;
     uint32_t length;
@@ -2409,8 +2408,7 @@ RpWorld *_rpWorldGenerateSectorMeshes(RpWorld *world)
 
 /* Bytes of a sector's vertex and triangle data for the given format flags. */
 BMX_ADDR(0x004c2c50)
-__attribute__((regparm(3))) int32_t rpSectorDataSize(const RpWorldSector *sector, const void *unused,
-                                                     uint32_t flags)
+BMX_REGPARM(3) int32_t rpSectorDataSize(const RpWorldSector *sector, const void *unused, uint32_t flags)
 {
     (void)unused;
     const uint32_t numVertices = sector->numVertices;
@@ -2434,8 +2432,7 @@ __attribute__((regparm(3))) int32_t rpSectorDataSize(const RpWorldSector *sector
 
 /* Bytes of a sector chunk: its data plus its plugin data. */
 BMX_ADDR(0x004c2ca0)
-__attribute__((regparm(3))) int32_t rpSectorStreamGetSize(const RpWorldSector *sector, const void *unused,
-                                                          uint32_t flags)
+BMX_REGPARM(3) int32_t rpSectorStreamGetSize(const RpWorldSector *sector, const void *unused, uint32_t flags)
 {
     const int32_t data = rpSectorDataSize(sector, unused, flags);
     return data + _rwPluginRegistryGetSize(&rpWorldSectorRegistry, sector) + 0x18;
@@ -2443,8 +2440,7 @@ __attribute__((regparm(3))) int32_t rpSectorStreamGetSize(const RpWorldSector *s
 
 /* Bytes of the tree of plane and sector chunks below a plane node. */
 BMX_ADDR(0x004c3490)
-__attribute__((regparm(3))) int32_t rpBspStreamGetSize(const RpPlaneSector *node, const void *unused,
-                                                       uint32_t flags)
+BMX_REGPARM(3) int32_t rpBspStreamGetSize(const RpPlaneSector *node, const void *unused, uint32_t flags)
 {
     int32_t size;
     if (node->leftSubTree->type < 0) {
@@ -2461,9 +2457,9 @@ __attribute__((regparm(3))) int32_t rpBspStreamGetSize(const RpPlaneSector *node
 
 /* Writes a sector chunk (EAX = sector, EDX = stream; the flags are the fourth stack slot). */
 BMX_ADDR(0x004c2cd0)
-__attribute__((regparm(3))) RpWorldSector *rpSectorStreamWrite(const RpWorldSector *sector, RwStream *stream,
-                                                               const void *unused, int32_t pad0, int32_t pad1,
-                                                               int32_t pad2, uint32_t flags)
+BMX_REGPARM(3)
+RpWorldSector *rpSectorStreamWrite(const RpWorldSector *sector, RwStream *stream, const void *unused,
+                                   int32_t pad0, int32_t pad1, int32_t pad2, uint32_t flags)
 {
     (void)pad0;
     (void)pad1;
@@ -2532,9 +2528,9 @@ __attribute__((regparm(3))) RpWorldSector *rpSectorStreamWrite(const RpWorldSect
 
 /* Writes a plane node chunk and, recursively, its two children (EAX = node, EDX = stream, ECX = world). */
 BMX_ADDR(0x004c34f0)
-__attribute__((regparm(3))) RpPlaneSector *rpBspStreamWrite(const RpPlaneSector *node, RwStream *stream,
-                                                            const void *world, int32_t pad0, int32_t pad1,
-                                                            int32_t pad2, uint32_t flags)
+BMX_REGPARM(3)
+RpPlaneSector *rpBspStreamWrite(const RpPlaneSector *node, RwStream *stream, const void *world, int32_t pad0,
+                                int32_t pad1, int32_t pad2, uint32_t flags)
 {
     (void)pad0;
     (void)pad1;
@@ -2589,9 +2585,9 @@ static void *worldCursorTake(uint8_t **cursor, uint32_t size, int *failed)
 
 /* Reads a sector chunk into the world's memory block (EAX = stream, EDX = block cursor, ECX = world). */
 BMX_ADDR(0x004c2f50)
-__attribute__((regparm(3))) RpWorldSector *rpSectorStreamRead(RwStream *stream, uint8_t **cursor,
-                                                              const void *world, int32_t pad0, int32_t pad1,
-                                                              int32_t pad2, uint32_t flags)
+BMX_REGPARM(3)
+RpWorldSector *rpSectorStreamRead(RwStream *stream, uint8_t **cursor, const void *world, int32_t pad0,
+                                  int32_t pad1, int32_t pad2, uint32_t flags)
 {
     (void)world;
     (void)pad0;
@@ -2727,9 +2723,9 @@ __attribute__((regparm(3))) RpWorldSector *rpSectorStreamRead(RwStream *stream, 
 
 /* Reads a plane chunk and, recursively, its children (EAX = stream, EDX = block cursor, ECX = world). */
 BMX_ADDR(0x004c36a0)
-__attribute__((regparm(3))) RpPlaneSector *rpBspStreamRead(RwStream *stream, uint8_t **cursor,
-                                                           const void *world, int32_t pad0, int32_t pad1,
-                                                           int32_t pad2, uint32_t flags)
+BMX_REGPARM(3)
+RpPlaneSector *rpBspStreamRead(RwStream *stream, uint8_t **cursor, const void *world, int32_t pad0,
+                               int32_t pad1, int32_t pad2, uint32_t flags)
 {
     (void)pad0;
     (void)pad1;
@@ -3059,7 +3055,7 @@ void *rpClumpDefaultCallback(void *clump)
 /* Releases a clump that is still alive when the module closes (EAX = clump); 1. Body at 0x4b21e4, 4 bytes
  * behind RpClumpDestroy's entry: no hook of its own (RpClumpDestroy's jmp covers it), its only caller
  * 0x4b1060 is ported. */
-__attribute__((regparm(1))) int rpClumpEntryDestroy(RpClump *clump)
+BMX_REGPARM(1) int rpClumpEntryDestroy(RpClump *clump)
 {
     clumpRelease(clump);
     return 1;
@@ -3130,7 +3126,7 @@ void *_rpClumpClose(void *engine)
  * before they are scaled. Clears the interpolator's dirty bit and marks the atomic's world sphere stale.
  */
 BMX_ADDR(0x004b1154)
-__attribute__((regparm(1))) void rpAtomicUpdateBoundingSphere(RpAtomic *atomic)
+BMX_REGPARM(1) void rpAtomicUpdateBoundingSphere(RpAtomic *atomic)
 {
     RpGeometry *geometry = atomic->geometry;
     if (geometry == NULL) {
@@ -3278,7 +3274,7 @@ int rpWorldExtAttachNothing(void)
 
 /* True for the raster formats with an alpha channel (1555, 4444, 8888: format bits 0x100, 0x300, 0x500). */
 BMX_ADDR(0x004c5ad0)
-__attribute__((regparm(1))) int rpRasterFormatHasAlpha(uint32_t format)
+BMX_REGPARM(1) int rpRasterFormatHasAlpha(uint32_t format)
 {
     return format == 0x100 || format == 0x300 || format == 0x500;
 }
@@ -3362,7 +3358,7 @@ int rpAtomicPipelineInit(RwIm3DPipeline *pipeline)
 
 /* Zeroes `size` bytes; returns the buffer. EAX = buffer, EDX is unused, ECX = size. */
 BMX_ADDR(0x004c5e10)
-__attribute__((regparm(3))) void *rwZeroBytes(void *buffer, int32_t unused, uint32_t size)
+BMX_REGPARM(3) void *rwZeroBytes(void *buffer, int32_t unused, uint32_t size)
 {
     (void)unused;
     uint8_t *bytes = buffer;

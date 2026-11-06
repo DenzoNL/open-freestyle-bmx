@@ -593,7 +593,7 @@ RwMatrix *RwFrameGetLTM(RwFrame *frame)
 
 /* Sets the root of a subtree and bumps the versions on the way (EAX = frame, EDX = root). */
 BMX_ADDR(0x004d2700)
-__attribute__((regparm(2))) void rwFrameSetRoot(RwFrame *frame, RwFrame *root)
+BMX_REGPARM(2) void rwFrameSetRoot(RwFrame *frame, RwFrame *root)
 {
     frame->root = root;
     frame->version++;
@@ -607,7 +607,7 @@ __attribute__((regparm(2))) void rwFrameSetRoot(RwFrame *frame, RwFrame *root)
  * for a sync. Returns the frame, or NULL (with an error) if it has no parent. EAX = frame.
  */
 BMX_ADDR(0x004d2c64)
-__attribute__((regparm(1))) RwFrame *RwFrameRemoveChild(RwFrame *child)
+BMX_REGPARM(1) RwFrame *RwFrameRemoveChild(RwFrame *child)
 {
     RwFrame *parent = child->object.parent;
     if (parent == NULL) {
@@ -710,7 +710,7 @@ RwFrame *RwFrameSetIdentity(RwFrame *frame)
  * force is non-zero (EAX = frame, EDX = force); siblings follow with the caller's force.
  */
 BMX_ADDR(0x004ee4b0)
-__attribute__((regparm(2))) void rwFrameSyncLTM(RwFrame *frame, int32_t force)
+BMX_REGPARM(2) void rwFrameSyncLTM(RwFrame *frame, int32_t force)
 {
     if (frame == NULL) {
         return;
@@ -754,7 +754,7 @@ void *rwFrameSyncObjectCB(void *object, void *data)
  * caller's.
  */
 BMX_ADDR(0x004ee430)
-__attribute__((regparm(2))) void rwFrameSyncObjects(RwFrame *frame, uint32_t force)
+BMX_REGPARM(2) void rwFrameSyncObjects(RwFrame *frame, uint32_t force)
 {
     if (frame == NULL) {
         return;
@@ -1004,7 +1004,7 @@ RwV3d *rwV3dTransformVectorsDefault(RwV3d *out, const RwV3d *in, int32_t count, 
 
 /* Installs the point and vector transforms (EAX, EDX; NULL = the defaults above). Always 1. */
 BMX_ADDR(0x004d3608)
-__attribute__((regparm(2))) int rwV3dSetTransformFuncs(RwV3dTransformFunc points, RwV3dTransformFunc vectors)
+BMX_REGPARM(2) int rwV3dSetTransformFuncs(RwV3dTransformFunc points, RwV3dTransformFunc vectors)
 {
     if (points == NULL) {
         points = BMX_FNPTR(RwV3dTransformFunc, 0x004d34d0, rwV3dTransformPointsDefault);
@@ -1111,7 +1111,7 @@ void *rwVectorOpen(void *engine, int32_t offset)
 /* Stores the frame and then its siblings and children, in that order, at *cursor (EAX = cursor, EDX = frame).
  */
 BMX_ADDR(0x004e8fc0)
-__attribute__((regparm(2))) int rwFrameListFill(RwFrame ***cursor, RwFrame *frame)
+BMX_REGPARM(2) int rwFrameListFill(RwFrame ***cursor, RwFrame *frame)
 {
     if (frame != NULL) {
         **cursor = frame;

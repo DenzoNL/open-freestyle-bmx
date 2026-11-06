@@ -254,10 +254,10 @@ void RpSkinFindBoneFrames(RpSkinBoneBlock *blocks, RwFrame *frame);
 /* The bone plugin's frame walk callbacks, bone data of frames and plugin callbacks (rw/plugins.c). */
 void *rpBoneFindAtomic(void *object, void *found);
 void *rpBoneFindSkinAtomic(void *object, void *found);
-__attribute__((regparm(1))) RpSkinBone *rpBoneGet(RwFrame *frame);
-__attribute__((regparm(2))) RwFrame *rpBoneSet(RwFrame *frame, RpSkinBone *bone);
+BMX_REGPARM(1) RpSkinBone *rpBoneGet(RwFrame *frame);
+BMX_REGPARM(2) RwFrame *rpBoneSet(RwFrame *frame, RpSkinBone *bone);
 RpSkinBone *rpBoneCreate(void);
-__attribute__((regparm(1))) void rpBoneDestroy(RpSkinBone *bone);
+BMX_REGPARM(1) void rpBoneDestroy(RpSkinBone *bone);
 void *rpBoneFindFrame(void *frame, void *search);
 void *rpBoneAttachFrames(void *frame, void *reference);
 void *rpBoneEngineOpen(void *engine, int32_t offset);
@@ -273,22 +273,22 @@ void *rpBoneFrameCopy(void *destination, const void *source);
 void *rpAnimInterpolatorDeinit(void *interpolator);
 void *rpAnimInterpolatorInit(void *interpolator);
 void *rpAnimFrameInit(void *frame);
-__attribute__((regparm(1))) const char *rpAnimSequenceName(const void *sequence);
+BMX_REGPARM(1) const char *rpAnimSequenceName(const void *sequence);
 uint32_t rpAnimSequenceType(const uint32_t *sequence);
-__attribute__((regparm(1))) int32_t rpAnimSequenceSize(const uint32_t *words);
+BMX_REGPARM(1) int32_t rpAnimSequenceSize(const uint32_t *words);
 int32_t rpAnimFrameChunkSize(const void *frame);
 void *rpAnimClumpAddFrameSequence(void *sequence, void *clump);
-__attribute__((regparm(2))) void *rpAnimClumpAddFrameSequences(void *frame, void *clump);
+BMX_REGPARM(2) void *rpAnimClumpAddFrameSequences(void *frame, void *clump);
 void *rpAnimClumpAddFrameSequencesCallback(void *frame, void *clump);
-__attribute__((regparm(1))) RpClump *rpAnimClumpAddAllSequences(RpClump *clump);
+BMX_REGPARM(1) RpClump *rpAnimClumpAddAllSequences(RpClump *clump);
 void *rpAnimClumpChunkRead(void *stream, int32_t length, RpClump *clump);
 void *rpAnimClumpChunkWrite(void *stream, int32_t length, const void *clump);
 int32_t rpAnimClumpChunkSize(const void *clump);
 void *rpAnimClumpCopy(void *destination, const void *source);
 
 /* Matrix inverse helpers of RwMatrixInvert (register arguments: EAX = out, EDX = in). */
-__attribute__((regparm(2))) RwMatrix *RwMatrixInvertOrthonormal(RwMatrix *out, const RwMatrix *in);
-__attribute__((regparm(2))) RwMatrix *RwMatrixInvertGeneral(RwMatrix *out, const RwMatrix *in);
+BMX_REGPARM(2) RwMatrix *RwMatrixInvertOrthonormal(RwMatrix *out, const RwMatrix *in);
+BMX_REGPARM(2) RwMatrix *RwMatrixInvertGeneral(RwMatrix *out, const RwMatrix *in);
 
 /* The animation plugin's engine module (rw/plugins.c). */
 void *WorldObjectOpen(void *engine, int32_t offset);
@@ -296,9 +296,9 @@ void *WorldObjectClose(void *engine);
 /* Adds the sequence `name` of the clump's frames to the clump (EAX = clump, EDX = name, ECX = play callback
  * or NULL, the data in the 4th stack slot). NULL when it exists already, no frame has it, or out of memory.
  */
-__attribute__((regparm(3))) RpClump *rpAnimClumpAddSequence(RpClump *clump, const char *name, void *callBack,
-                                                            uint32_t unused0, uint32_t unused1,
-                                                            uint32_t unused2, void *data);
+BMX_REGPARM(3)
+RpClump *rpAnimClumpAddSequence(RpClump *clump, const char *name, void *callBack, uint32_t unused0,
+                                uint32_t unused1, uint32_t unused2, void *data);
 
 /* ---- LOD atomic plugin (rw/plugins.c) ---------------------------------------------------------------- */
 
@@ -341,14 +341,14 @@ typedef struct RpLodAtomicData {
 BMX_LAYOUT32_ASSERT(sizeof(RpLodAtomicData) == 0x40, "RpLodAtomicData layout");
 
 int32_t rpLodAtomicSelectLevel(RpAtomic *atomic);
-__attribute__((regparm(2))) RpAtomic *rpLodAtomicApply(RpAtomic *atomic, RpLodAtomicData *lod);
+BMX_REGPARM(2) RpAtomic *rpLodAtomicApply(RpAtomic *atomic, RpLodAtomicData *lod);
 RpAtomic *rpLodAtomicRender(RpAtomic *atomic);
-__attribute__((regparm(2))) void rpLodAtomicHook(RpAtomic *atomic, RpLodAtomicData *lod);
-__attribute__((regparm(2))) void rpLodAtomicUnhook(RpAtomic *atomic, RpLodAtomicData *lod);
+BMX_REGPARM(2) void rpLodAtomicHook(RpAtomic *atomic, RpLodAtomicData *lod);
+BMX_REGPARM(2) void rpLodAtomicUnhook(RpAtomic *atomic, RpLodAtomicData *lod);
 RpLodAtomicData *rpLodAtomicDataInit(RpLodAtomicData *lod);
 RpLodAtomicData *rpLodAtomicDataCreate(void);
-__attribute__((regparm(2))) RpLodAtomicData *rpLodAtomicDataCopy(RpLodAtomicData *dst, RpLodAtomicData *src);
-__attribute__((regparm(1))) void rpLodAtomicDataDestroy(RpLodAtomicData *lod);
+BMX_REGPARM(2) RpLodAtomicData *rpLodAtomicDataCopy(RpLodAtomicData *dst, RpLodAtomicData *src);
+BMX_REGPARM(1) void rpLodAtomicDataDestroy(RpLodAtomicData *lod);
 void *LODAtomicCallBackOpen(void *engine, int32_t offset);
 void *LODAtomicCallBackClose(void *engine);
 void *LODAtomicCallBackConstructor(void *atomic, int32_t offset);

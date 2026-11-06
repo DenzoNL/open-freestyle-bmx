@@ -83,25 +83,81 @@ void *bmxOrigPtr(uint32_t addr);
  */
 #if defined(__i386__)
 #define BMX_X86_ENTRY(code) __asm__ volatile(code)
-#else
+#elif defined(__x86_64__)
 #define BMX_X86_ENTRY(code) __asm__ volatile("ud2")
+#else
+#define BMX_X86_ENTRY(code) __asm__ volatile("brk #0x1")
+#endif
+
+/*
+ * Opt-in replacements of our own functions (src/native/loader.c: smooth mixer, wide HUD, draw distance). On
+ * Windows x86 the loader writes a jump over the function's entry. Elsewhere code is not written at run time
+ * (macOS arm64 signs every code page): such a function starts with BMX_REDIRECT_VOID, a call through the slot
+ * BMX_REDIRECT_SLOT defines, which the replacement's provider fills. Void functions only (all three are).
+ */
+#if defined(BMX_IMAGE) && !(defined(_WIN32) && (defined(__i386__) || defined(__x86_64__)))
+#define BMX_REDIRECTS                   1
+#define BMX_REDIRECT_EXTERN(fn, params) extern void(*bmxRedirect_##fn) params
+#define BMX_REDIRECT_SLOT(fn, params)   void(*bmxRedirect_##fn) params
+#define BMX_REDIRECT_SET(fn, impl)      (bmxRedirect_##fn = (impl))
+#define BMX_REDIRECT_VOID(fn, args)                                                                          \
+    do {                                                                                                     \
+        if (bmxRedirect_##fn != 0) {                                                                         \
+            bmxRedirect_##fn args;                                                                           \
+            return;                                                                                          \
+        }                                                                                                    \
+    } while (0)
+#else
+#define BMX_REDIRECTS                   0
+#define BMX_REDIRECT_EXTERN(fn, params) _Static_assert(1, #fn)
+#define BMX_REDIRECT_SLOT(fn, params)   _Static_assert(1, #fn)
+#define BMX_REDIRECT_SET(fn, impl)      ((void)0)
+#define BMX_REDIRECT_VOID(fn, args)     ((void)0)
+#endif
+
+/*
+ * Keeps a floating-point value opaque to the optimiser (no folding of a negation into the next operation):
+ * an empty asm that claims to change the register holding it (an SSE register on x86, an FP / SIMD one on
+ * arm64).
+ */
+#if defined(__i386__) || defined(__x86_64__)
+#define BMX_FP_OPAQUE(v) __asm__("" : "+x"(v))
+#else
+#define BMX_FP_OPAQUE(v) __asm__("" : "+w"(v))
+#endif
+
+/*
+ * The original's calling conventions: regparm(n) (the first n arguments in EAX, EDX, ECX), cdecl and stdcall.
+ * They mean something on i386 only. The Windows targets accept the keywords on x86_64 too (and ignore them);
+ * elsewhere (macOS / Linux arm64 and x86_64, docs/PORTING.md "X5 part 1") they are empty.
+ */
+#if defined(__i386__)
+#define BMX_REGPARM(n) __attribute__((regparm(n)))
+#else
+#define BMX_REGPARM(n)
+#endif
+#if defined(__i386__) || defined(_WIN32)
+#define BMX_CC_CDECL   __cdecl
+#define BMX_CC_STDCALL __stdcall
+#else
+#define BMX_CC_CDECL
+#define BMX_CC_STDCALL
 #endif
 
 /* Macro arguments are types and parameter lists, which cannot be parenthesised. */
 // NOLINTBEGIN(bugprone-macro-parentheses)
 #if defined(BMX_IMAGE)
-#define BMX_CDECL   __cdecl
-#define BMX_STDCALL __stdcall
+#define BMX_CDECL   BMX_CC_CDECL
+#define BMX_STDCALL BMX_CC_STDCALL
 /* The generated BMX_ORIGFN_<addr> is the assembler name of the function serving addr (a port under another
  * name, the C runtime layer, the PNG reader, the driver, a trap or an import thunk stub). */
-#define ORIG_FN(addr, ret, name, params)         ret BMX_CDECL name params __asm__(BMX_ORIGFN_##addr)
-#define ORIG_FN_STDCALL(addr, ret, name, params) ret BMX_STDCALL name params __asm__(BMX_ORIGFN_##addr)
-#define ORIG_VAR(addr, type, name)               (*(type *)BMX_DATA_AT(addr))
-#define ORIG_FN_REGPARM(n, addr, ret, name, params)                                                          \
-    __attribute__((regparm(n))) ret name params __asm__(BMX_ORIGFN_##addr)
+#define ORIG_FN(addr, ret, name, params)            ret BMX_CDECL name params __asm__(BMX_ORIGFN_##addr)
+#define ORIG_FN_STDCALL(addr, ret, name, params)    ret BMX_STDCALL name params __asm__(BMX_ORIGFN_##addr)
+#define ORIG_VAR(addr, type, name)                  (*(type *)BMX_DATA_AT(addr))
+#define ORIG_FN_REGPARM(n, addr, ret, name, params) BMX_REGPARM(n) ret name params __asm__(BMX_ORIGFN_##addr)
 #elif defined(BMX_HOOK)
-#define BMX_CDECL   __cdecl
-#define BMX_STDCALL __stdcall
+#define BMX_CDECL   BMX_CC_CDECL
+#define BMX_STDCALL BMX_CC_STDCALL
 #define ORIG_FN(addr, ret, name, params)                                                                     \
     static ret(BMX_CDECL *const name) params = (ret(BMX_CDECL *) params)(addr)
 #define ORIG_FN_STDCALL(addr, ret, name, params)                                                             \
@@ -109,15 +165,14 @@ void *bmxOrigPtr(uint32_t addr);
 #define ORIG_VAR(addr, type, name) (*(type *)(uintptr_t)(addr))
 /* Original function taking its first n arguments in EAX, EDX, ECX (the rest on the stack, cdecl). */
 #define ORIG_FN_REGPARM(n, addr, ret, name, params)                                                          \
-    static ret(__attribute__((regparm(n))) *const name) params =                                             \
-        (ret(__attribute__((regparm(n))) *) params)(addr)
+    static ret(BMX_REGPARM(n) *const name) params = (ret(BMX_REGPARM(n) *) params)(addr)
 #else
 #define BMX_CDECL
 #define BMX_STDCALL
 #define ORIG_FN(addr, ret, name, params)            ret name params
 #define ORIG_FN_STDCALL(addr, ret, name, params)    ret name params
 #define ORIG_VAR(addr, type, name)                  name
-#define ORIG_FN_REGPARM(n, addr, ret, name, params) __attribute__((regparm(n))) ret name params
+#define ORIG_FN_REGPARM(n, addr, ret, name, params) BMX_REGPARM(n) ret name params
 #endif
 // NOLINTEND(bugprone-macro-parentheses)
 

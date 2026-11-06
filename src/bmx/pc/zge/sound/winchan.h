@@ -248,5 +248,6 @@ BMX_LAYOUT32_ASSERT(sizeof(WinchanInitDesc) == 0x14, "init descriptor");
 int winchanInit(WinchanInitDesc *desc);
 /* Renders `bytes` (a multiple of 4) of 16 bit stereo audio of the playing channels into `ring`. */
 void winchanMix(uint8_t *ring, uint32_t bytes);
+BMX_REDIRECT_EXTERN(winchanMix, (uint8_t *, uint32_t));
 
 #endif

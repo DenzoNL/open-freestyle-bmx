@@ -108,7 +108,7 @@ static void instanceLevel(int32_t numVertices)
  * first.
  */
 BMX_ADDR(0x004c8ba0)
-__attribute__((regparm(1))) void rwD3DAtomicMorph(RpAtomic *atomic)
+BMX_REGPARM(1) void rwD3DAtomicMorph(RpAtomic *atomic)
 {
     const int32_t start = atomic->interpolator.startMorphTarget;
     const int32_t end = atomic->interpolator.endMorphTarget;
@@ -538,9 +538,9 @@ static float negMul(float a, float b)
     float nb = -b;
     float product;
 
-    __asm__("" : "+x"(nb));
+    BMX_FP_OPAQUE(nb);
     product = a * nb;
-    __asm__("" : "+x"(product));
+    BMX_FP_OPAQUE(product);
     return product;
 }
 

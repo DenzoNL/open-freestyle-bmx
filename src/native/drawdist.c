@@ -33,6 +33,7 @@ const BmxHook *bmxDrawDistJumps(uint32_t *count)
     gJumps[0].orig = (uintptr_t)ngiffxAdaptQuality;
     gJumps[0].impl = (void *)fullDrawDistance;
     *count = on ? 1u : 0u;
+    BMX_REDIRECT_SET(ngiffxAdaptQuality, on ? fullDrawDistance : NULL); /* no jumps (compat/orig.h) */
     if (on) {
         bmxLog("video: full_draw_distance on (far clip 200)\n");
     }

@@ -327,9 +327,9 @@ void rwD3DInterpRightParallel(RwD3DCamVertex *vertex, const RwD3DCamVertex *out,
  * appended to the ring after end (indices mod 16) and becomes the new start..end; returns its vertex count.
  */
 BMX_ADDR(0x004f2f50)
-__attribute__((regparm(3))) int32_t rwD3DClipPolyPlane(int32_t *ring, int32_t *start, int32_t *end,
-                                                       int32_t unused0, int32_t unused1, int32_t unused2,
-                                                       uint32_t plane, RwD3DClipInterpFunc interp)
+BMX_REGPARM(3)
+int32_t rwD3DClipPolyPlane(int32_t *ring, int32_t *start, int32_t *end, int32_t unused0, int32_t unused1,
+                           int32_t unused2, uint32_t plane, RwD3DClipInterpFunc interp)
 {
     const int32_t last = *end;
     int32_t out = last, i = *start;
@@ -374,9 +374,9 @@ __attribute__((regparm(3))) int32_t rwD3DClipPolyPlane(int32_t *ring, int32_t *s
  * second vertex if inside, the crossing, the first if inside: the line flips) is appended after end.
  */
 BMX_ADDR(0x004f3120)
-__attribute__((regparm(3))) int32_t rwD3DClipLinePlane(int32_t *ring, int32_t *start, int32_t *end,
-                                                       int32_t unused0, int32_t unused1, int32_t unused2,
-                                                       uint32_t plane, RwD3DClipInterpFunc interp)
+BMX_REGPARM(3)
+int32_t rwD3DClipLinePlane(int32_t *ring, int32_t *start, int32_t *end, int32_t unused0, int32_t unused1,
+                           int32_t unused2, uint32_t plane, RwD3DClipInterpFunc interp)
 {
     const int32_t a = ring[*start], b = ring[(*start + 1) & 15];
     const int32_t first = *end;

@@ -4,6 +4,13 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/* The trap entries' convention: their machine-code stubs (loader.c) push the arguments on i386. */
+#if defined(__i386__)
+#define BMX_TRAP_CDECL __attribute__((cdecl))
+#else
+#define BMX_TRAP_CDECL
+#endif
+
 /* The original's link base and image size. Nothing of the original is loaded there: its data is in the source
  * (src/data) and the exe sits at 0x01000000, so an address in this range in a report is an original one that
  * was not converted. */
@@ -61,7 +68,7 @@ const void *bmxOrigFind(uint32_t orig);
  * pointer in the data that nothing serves): reports the address, its name when known and the caller, and
  * stops.
  */
-void __attribute__((noreturn, cdecl)) bmxOrigTrap(uint32_t orig, uint32_t callerRet);
+void __attribute__((noreturn)) BMX_TRAP_CDECL bmxOrigTrap(uint32_t orig, uint32_t callerRet);
 
 /* Describe an address for a report: an original one by its symbol, one of ours by the port it is in. */
 void bmxDescribeAddress(uint32_t addr, char *out, size_t size);
@@ -69,6 +76,9 @@ void bmxDescribeAddress(uint32_t addr, char *out, size_t size);
 /* Log to stderr and bmxnative.log. */
 void bmxLog(const char *fmt, ...);
 void bmxLogOpen(void);
+
+/* Ends the process at once (ExitProcess on Windows; elsewhere stdio flushed, then _exit). */
+void bmxExitProcess(int code) __attribute__((noreturn));
 
 /*
  * Fill the import slots of the original's data (stand-ins, dead-slot stubs, real Windows functions) and write

@@ -1020,6 +1020,8 @@ static void mixAdvance(WinchanChannel *ch)
     }
 }
 
+BMX_REDIRECT_SLOT(winchanMix, (uint8_t *, uint32_t)); /* [audio] smooth_resample (platform/smoothmix.c) */
+
 /*
  * Hand written x87 in the original. Per frame: the sum of every playing channel (gain * envelope level *
  * sample), its envelope and position stepped; then the flanger and the echo; then rounded, clamped to
@@ -1028,6 +1030,7 @@ static void mixAdvance(WinchanChannel *ch)
 BMX_ADDR(0x0046f5f0)
 void winchanMix(uint8_t *ring, uint32_t bytes)
 {
+    BMX_REDIRECT_VOID(winchanMix, (ring, bytes));
     int16_t *out = (int16_t *)ring;
 
     while (bytes != 0) {

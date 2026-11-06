@@ -24,6 +24,9 @@
 #include "png/png.h"
 
 #include <stddef.h>
+#if !defined(__i386__) && !defined(__x86_64__)
+#include <setjmp.h>
+#endif
 
 #include "compat/orig.h"
 
@@ -79,13 +82,17 @@ typedef struct PngInfo {
 } PngInfo;
 
 typedef struct PngStruct {
+#if defined(__i386__) || defined(__x86_64__)
     uint32_t jmpBuf[16]; /* 0x00: MSVC jmp_buf, filled by RtPNGImageRead's _setjmp3 */
-    PngErrorFn errorFn;  /* 0x40 */
-    void *warningFn;     /* 0x44 */
-    void *errorPtr;      /* 0x48 */
-    void *writeFn;       /* 0x4c */
-    PngReadFn readFn;    /* 0x50 */
-    void *ioPtr;         /* 0x54: the RwStream rwPngRead reads from */
+#else
+    jmp_buf jmpBuf; /* the C library's (rw/texture.c sets it with setjmp) */
+#endif
+    PngErrorFn errorFn; /* 0x40 */
+    void *warningFn;    /* 0x44 */
+    void *errorPtr;     /* 0x48 */
+    void *writeFn;      /* 0x4c */
+    PngReadFn readFn;   /* 0x50 */
+    void *ioPtr;        /* 0x54: the RwStream rwPngRead reads from */
     void *memPtr;
     PngMallocFn mallocFn;
     PngFreeFn freeFn;
@@ -123,9 +130,11 @@ void pngError(void *png, const char *message)
     }
 #if defined(__i386__)
     crtLongjmp(p->jmpBuf, 1);
-#else
+#elif defined(__x86_64__)
     /* x86_64: the builtin pair (rw/texture.c's RtPNGImageRead sets it with __builtin_setjmp). */
     __builtin_longjmp((void **)p->jmpBuf, 1);
+#else
+    longjmp(p->jmpBuf, 1);
 #endif
     __builtin_unreachable();
 }

@@ -703,10 +703,13 @@ void ngifDrawPrimitive(const uint8_t *prim)
     gZdebugPrint("%s %d %s\n", kNgifFile, line, what);
 }
 
+BMX_REDIRECT_SLOT(ngifDrawList, (uint32_t *)); /* [video] hud = 1 (driver/wide.c) */
+
 /* Draws the primitives of an ordering table chain, starting after `entry`, until the end marker. */
 BMX_ADDR(0x00462350)
 void ngifDrawList(uint32_t *entry)
 {
+    BMX_REDIRECT_VOID(ngifDrawList, (entry));
     uint32_t word = *entry;
 
     while ((word & kBmxPacketLinkMask) != kBmxPacketEnd) {

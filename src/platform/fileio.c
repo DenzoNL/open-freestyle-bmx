@@ -57,6 +57,13 @@ static int checking(void)
 
     if (state < 0) {
         state = envOn("BMX_FILE_CHECK");
+#if !defined(_WIN32)
+        if (state) {
+            bmxLog("BMX_FILE_CHECK compares with kernel32 (Windows only): no check; BMX_FILE_LOG=1 still "
+                   "logs\n");
+            state = 0;
+        }
+#endif
     }
     return state;
 }

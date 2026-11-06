@@ -111,15 +111,15 @@ RwCamera *RwCameraClear(RwCamera *camera, const void *color, int32_t flags);
 float RwIm2DGetFarScreenZ(void);
 
 /* Rebuild the frustum corners and clip planes in world space from the camera's frame (EAX = camera). */
-__attribute__((regparm(1))) void CameraBuildPerspClipPlanes(RwCamera *camera);
-__attribute__((regparm(1))) void CameraBuildParallelClipPlanes(RwCamera *camera);
+BMX_REGPARM(1) void CameraBuildPerspClipPlanes(RwCamera *camera);
+BMX_REGPARM(1) void CameraBuildParallelClipPlanes(RwCamera *camera);
 /* The view matrix builders (EAX = camera, which they return) and the camera sync callback. */
-__attribute__((regparm(1))) RwCamera *CameraBuildPerspViewMatrix(RwCamera *camera);
-__attribute__((regparm(1))) RwCamera *CameraBuildParallelViewMatrix(RwCamera *camera);
+BMX_REGPARM(1) RwCamera *CameraBuildPerspViewMatrix(RwCamera *camera);
+BMX_REGPARM(1) RwCamera *CameraBuildParallelViewMatrix(RwCamera *camera);
 RwCamera *CameraSync(RwCamera *camera);
 
 /* Recomputes zScale and zShift from the clip planes and the device's screen z range (EAX = camera). */
-__attribute__((regparm(1))) void CameraUpdateZShiftScale(RwCamera *camera);
+BMX_REGPARM(1) void CameraUpdateZShiftScale(RwCamera *camera);
 
 /* ---- charset (a raster holding the debug font) ------------------------------------------------------- */
 
@@ -140,14 +140,14 @@ typedef struct RtCharsetDesc {
 
 RtCharset *RtCharsetCreate(const RwRGBA *foreground, const RwRGBA *background);
 /* RtCharsetPrint's worker: EAX = charset, EDX = text, ECX = x, y is the fourth stack word. */
-__attribute__((regparm(3))) int rtCharsetPrintText(RtCharset *charset, const char *text, int32_t x,
-                                                   int32_t unused0, int32_t unused1, int32_t unused2,
-                                                   int32_t y);
+BMX_REGPARM(3)
+int rtCharsetPrintText(RtCharset *charset, const char *text, int32_t x, int32_t unused0, int32_t unused1,
+                       int32_t unused2, int32_t y);
 int RtCharsetDestroy(RtCharset *charset);
 RtCharset *RtCharsetGetDesc(RtCharset *charset, RtCharsetDesc *desc);
 /* EAX = charset, EDX = foreground, ECX = background. */
-__attribute__((regparm(3))) RtCharset *RtCharsetSetColors(RtCharset *charset, const RwRGBA *foreground,
-                                                          const RwRGBA *background);
+BMX_REGPARM(3)
+RtCharset *RtCharsetSetColors(RtCharset *charset, const RwRGBA *foreground, const RwRGBA *background);
 int RtCharsetPrint(RtCharset *charset, const char *text, int32_t x, int32_t y);
 
 int RwIm2DRenderIndexedPrimitive(int32_t primType, void *vertices, int32_t numVertices, void *indices,

@@ -142,6 +142,7 @@ float ngiffxGetDebugFloat(void);
 void ngiffxNop(void);
 /* Adapts the quality value (0x55bd08, 60..200) to the measured frame rate and applies it. */
 void ngiffxAdaptQuality(void);
+BMX_REDIRECT_EXTERN(ngiffxAdaptQuality, (void));
 void ngiffxSetQuality(float quality);
 
 /*

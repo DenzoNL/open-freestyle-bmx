@@ -24,11 +24,25 @@
       "binaryDir": "${sourceDir}/build/native64",
       "toolchainFile": "${sourceDir}/cmake/x86_64-mingw.cmake",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "BMX_HOOK": "OFF", "BMX_NATIVE32": "ON" }
+    },
+    {
+      "name": "macos",
+      "displayName": "macOS arm64 native exe (bmxnative, host clang, SDL3 from nix; docs/PORTING.md X5)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/macos",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_OSX_ARCHITECTURES": "arm64",
+        "BMX_HOOK": "OFF",
+        "BMX_NATIVE32": "ON"
+      },
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" }
     }
   ],
   "buildPresets": [
     { "name": "hook", "configurePreset": "hook" },
     { "name": "native32", "configurePreset": "native32" },
-    { "name": "native64", "configurePreset": "native64" }
+    { "name": "native64", "configurePreset": "native64" },
+    { "name": "macos", "configurePreset": "macos" }
   ]
 }

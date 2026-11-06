@@ -158,6 +158,25 @@ static void load(void)
             return;
         }
         path = own;
+#if !defined(_WIN32)
+        /* macOS / Linux: next to the executable (an app bundle's Resources folder), else the user's
+         * preference folder (macOS: ~/Library/Application Support/opendmfbmx/bmxnative/; docs/PORTING.md "X5
+         * part 1"). */
+        if (!SDL_GetPathInfo(own, NULL)) {
+            char *const pref = SDL_GetPrefPath("opendmfbmx", "bmxnative");
+            char *other = NULL;
+
+            if (pref != NULL && SDL_asprintf(&other, "%sbmxnative.ini", pref) >= 0 &&
+                SDL_GetPathInfo(other, NULL)) {
+                SDL_free(own);
+                own = other;
+                path = own;
+            } else {
+                SDL_free(other);
+            }
+            SDL_free(pref);
+        }
+#endif
     }
     text = SDL_LoadFile(path, NULL);
     if (text == NULL) {

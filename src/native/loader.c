@@ -3,12 +3,19 @@
  * (src/data/imports.c) get their functions, original code addresses that RenderWare passes around become
  * functions, and the opt-in jumps over our own functions are written. Nothing is read from NgBMX.exe: its
  * data is in the source (src/data, docs/NATIVE.md "The original's data in the source").
+ *
+ * macOS / Linux (docs/PORTING.md "X5 part 1"): no real Windows function exists, and on arm64 no code can be
+ * written at run time (macOS signs every code page). The stubs are C functions there (BMX_STUBS below), and
+ * the opt-in replacements go through the redirect slots of compat/orig.h (BMX_REDIRECT_VOID) instead of
+ * jumps.
  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(_WIN32)
 #include <windows.h>
+#endif
 
 #include "driver/wide.h"
 #include "hook/hook.h"
@@ -16,6 +23,12 @@
 #include "platform/music.h"
 #include "platform/platform.h"
 #include "platform/smoothmix.h"
+
+#if defined(_WIN32) && (defined(__i386__) || defined(__x86_64__))
+#define BMX_MACHINE_STUBS 1 /* stubs and jumps written as x86 machine code (BMX_REDIRECTS 0) */
+#else
+#define BMX_MACHINE_STUBS 0
+#endif
 
 /*
  * Dead slots (docs/PLATFORM.md 1b): the original code that calls them is not part of this exe. Each gets a
@@ -28,13 +41,14 @@ enum { kMaxDeadSlots = 160, kDeadStubSize = 16 };
 static char deadNames[kMaxDeadSlots][64];
 static int deadCount;
 
-static void __attribute__((noreturn, cdecl)) deadSlot(uint32_t index, uint32_t callerRet)
+static void __attribute__((noreturn)) BMX_TRAP_CDECL deadSlot(uint32_t index, uint32_t callerRet)
 {
     bmxLog("DEAD IMPORT called: %s (the native exe should never reach it), caller %08x\n",
            index < kMaxDeadSlots ? deadNames[index] : "?", (unsigned)callerRet);
-    ExitProcess(3);
+    bmxExitProcess(3);
 }
 
+#if BMX_MACHINE_STUBS
 static void *makeDeadStub(const char *dll, const char *name)
 {
     static uint8_t *page;
@@ -59,14 +73,79 @@ static void *makeDeadStub(const char *dll, const char *name)
     deadCount++;
     return stub;
 }
+#else
+/* S(d, k) for the indices 10 d + k: the C stubs of the dead slots and the trap addresses. */
+#define BMX_STUBS_DEF10(S, d) S(d, 0) S(d, 1) S(d, 2) S(d, 3) S(d, 4) S(d, 5) S(d, 6) S(d, 7) S(d, 8) S(d, 9)
+#define BMX_STUBS_DEF4(S, d)  S(d, 0) S(d, 1) S(d, 2) S(d, 3)
+#define BMX_STUBS_REF4(S, d)  S(d, 0), S(d, 1), S(d, 2), S(d, 3)
+#define BMX_STUBS_REF10(S, d)                                                                                \
+    S(d, 0), S(d, 1), S(d, 2), S(d, 3), S(d, 4), S(d, 5), S(d, 6), S(d, 7), S(d, 8), S(d, 9)
 
+#define DEAD_STUB_DEF(d, k)                                                                                  \
+    static void deadStub_##d##_##k(void)                                                                     \
+    {                                                                                                        \
+        deadSlot((d) * 10 + (k), (uint32_t)(uintptr_t)__builtin_return_address(0));                          \
+    }
+#define DEAD_STUB_REF(d, k) deadStub_##d##_##k
+BMX_STUBS_DEF10(DEAD_STUB_DEF, 0)
+BMX_STUBS_DEF10(DEAD_STUB_DEF, 1)
+BMX_STUBS_DEF10(DEAD_STUB_DEF, 2)
+BMX_STUBS_DEF10(DEAD_STUB_DEF, 3)
+BMX_STUBS_DEF10(DEAD_STUB_DEF, 4)
+BMX_STUBS_DEF10(DEAD_STUB_DEF, 5)
+BMX_STUBS_DEF10(DEAD_STUB_DEF, 6)
+BMX_STUBS_DEF10(DEAD_STUB_DEF, 7)
+BMX_STUBS_DEF10(DEAD_STUB_DEF, 8)
+BMX_STUBS_DEF10(DEAD_STUB_DEF, 9)
+BMX_STUBS_DEF10(DEAD_STUB_DEF, 10)
+BMX_STUBS_DEF10(DEAD_STUB_DEF, 11)
+BMX_STUBS_DEF10(DEAD_STUB_DEF, 12)
+BMX_STUBS_DEF10(DEAD_STUB_DEF, 13)
+BMX_STUBS_DEF10(DEAD_STUB_DEF, 14)
+BMX_STUBS_DEF10(DEAD_STUB_DEF, 15)
+static void (*const kDeadStubs[])(void) = {
+    BMX_STUBS_REF10(DEAD_STUB_REF, 0),  BMX_STUBS_REF10(DEAD_STUB_REF, 1),
+    BMX_STUBS_REF10(DEAD_STUB_REF, 2),  BMX_STUBS_REF10(DEAD_STUB_REF, 3),
+    BMX_STUBS_REF10(DEAD_STUB_REF, 4),  BMX_STUBS_REF10(DEAD_STUB_REF, 5),
+    BMX_STUBS_REF10(DEAD_STUB_REF, 6),  BMX_STUBS_REF10(DEAD_STUB_REF, 7),
+    BMX_STUBS_REF10(DEAD_STUB_REF, 8),  BMX_STUBS_REF10(DEAD_STUB_REF, 9),
+    BMX_STUBS_REF10(DEAD_STUB_REF, 10), BMX_STUBS_REF10(DEAD_STUB_REF, 11),
+    BMX_STUBS_REF10(DEAD_STUB_REF, 12), BMX_STUBS_REF10(DEAD_STUB_REF, 13),
+    BMX_STUBS_REF10(DEAD_STUB_REF, 14), BMX_STUBS_REF10(DEAD_STUB_REF, 15)};
+_Static_assert(sizeof kDeadStubs / sizeof kDeadStubs[0] == kMaxDeadSlots, "a C stub per dead slot");
+
+static void *makeDeadStub(const char *dll, const char *name)
+{
+    const uint32_t index = (uint32_t)deadCount;
+
+    if (deadCount == kMaxDeadSlots) {
+        return NULL;
+    }
+    snprintf(deadNames[index], sizeof deadNames[index], "%s!%s", dll, name);
+    deadCount++;
+    return (void *)(uintptr_t)kDeadStubs[index];
+}
+#endif
+
+#if defined(_WIN32)
 void *bmxRealProc(const char *dll, const char *name)
 {
     const HMODULE module = LoadLibraryA(dll);
 
     return module != NULL ? (void *)GetProcAddress(module, name) : NULL;
 }
+#else
+/* The real Windows functions exist only on Windows: the checks that compare with them (BMX_INPUT_CHECK,
+ * BMX_SOUND_CHECK, ...) report that they are not available. */
+void *bmxRealProc(const char *dll, const char *name)
+{
+    (void)dll;
+    (void)name;
+    return NULL;
+}
+#endif
 
+#if BMX_MACHINE_STUBS
 /* Writes `jmp to` at from (one of our own functions: the opt-in replacements below). */
 static void writeJump(uintptr_t from, const void *to)
 {
@@ -82,6 +161,7 @@ static void writeJump(uintptr_t from, const void *to)
     p[0] = 0xE9;
     memcpy(p + 1, &rel, 4);
 }
+#endif
 
 /* ---- original addresses
  * --------------------------------------------------------------------------------------- */
@@ -116,24 +196,48 @@ static struct {
 } gTrapStubs[kMaxTrapStubs];
 static int gTrapStubCount;
 
+#if !BMX_MACHINE_STUBS
+/* One C stub per trap slot, reporting the address recorded for its slot. */
+#define TRAP_STUB_DEF(d, k)                                                                                  \
+    static void trapStub_##d##_##k(void)                                                                     \
+    {                                                                                                        \
+        bmxOrigTrap(gTrapStubs[(d) * 10 + (k)].orig, (uint32_t)(uintptr_t)__builtin_return_address(0));      \
+    }
+#define TRAP_STUB_REF(d, k) trapStub_##d##_##k
+BMX_STUBS_DEF10(TRAP_STUB_DEF, 0)
+BMX_STUBS_DEF10(TRAP_STUB_DEF, 1)
+BMX_STUBS_DEF10(TRAP_STUB_DEF, 2)
+BMX_STUBS_DEF10(TRAP_STUB_DEF, 3)
+BMX_STUBS_DEF10(TRAP_STUB_DEF, 4)
+BMX_STUBS_DEF10(TRAP_STUB_DEF, 5)
+BMX_STUBS_DEF4(TRAP_STUB_DEF, 6)
+static void (*const kTrapStubs[])(void) = {
+    BMX_STUBS_REF10(TRAP_STUB_REF, 0), BMX_STUBS_REF10(TRAP_STUB_REF, 1), BMX_STUBS_REF10(TRAP_STUB_REF, 2),
+    BMX_STUBS_REF10(TRAP_STUB_REF, 3), BMX_STUBS_REF10(TRAP_STUB_REF, 4), BMX_STUBS_REF10(TRAP_STUB_REF, 5),
+    BMX_STUBS_REF4(TRAP_STUB_REF, 6)};
+_Static_assert(sizeof kTrapStubs / sizeof kTrapStubs[0] == kMaxTrapStubs, "a C stub per trap slot");
+#endif
+
 static void *trapStub(uint32_t orig)
 {
-    static uint8_t *page;
     uint8_t *stub;
-    int32_t rel;
 
     for (int i = 0; i < gTrapStubCount; i++) {
         if (gTrapStubs[i].orig == orig) {
             return gTrapStubs[i].stub;
         }
     }
+#if BMX_MACHINE_STUBS
+    static uint8_t *page;
+    int32_t rel;
+
     if (page == NULL) {
         page = VirtualAlloc(NULL, kMaxTrapStubs * kTrapStubSize, MEM_COMMIT | MEM_RESERVE,
                             PAGE_EXECUTE_READWRITE);
     }
     if (page == NULL || gTrapStubCount == kMaxTrapStubs) {
         bmxLog("loader: out of trap stubs at %08x\n", (unsigned)orig);
-        ExitProcess(3);
+        bmxExitProcess(3);
     }
     stub = page + gTrapStubCount * kTrapStubSize;
     rel = (int32_t)((uintptr_t)bmxOrigTrap - ((uintptr_t)stub + 10));
@@ -141,6 +245,13 @@ static void *trapStub(uint32_t orig)
     memcpy(stub + 1, &orig, 4);
     stub[5] = 0xE8; /* call rel32 */
     memcpy(stub + 6, &rel, 4);
+#else
+    if (gTrapStubCount == kMaxTrapStubs) {
+        bmxLog("loader: out of trap stubs at %08x\n", (unsigned)orig);
+        bmxExitProcess(3);
+    }
+    stub = (uint8_t *)(uintptr_t)kTrapStubs[gTrapStubCount];
+#endif
     gTrapStubs[gTrapStubCount].orig = orig;
     gTrapStubs[gTrapStubCount].stub = stub;
     gTrapStubCount++;
@@ -181,11 +292,22 @@ void *bmxDataFind(uint32_t addr)
     }
     bmxLog("original data address %08x is in none of the definitions of src/data (dropped padding?)\n",
            (unsigned)addr);
-    ExitProcess(3);
+    bmxExitProcess(3);
 }
 
 /* ---- the import slots
  * ------------------------------------------------------------------------------------------ */
+
+#if defined(_WIN32)
+typedef HMODULE BmxDll;
+#define bmxDllLoad(name)      LoadLibraryA(name)
+#define bmxDllProc(dll, name) ((void *)GetProcAddress((dll), (name)))
+#else
+/* No Windows DLLs: every slot must be a stand-in or dead (the Windows build has 0 real slots since S10). */
+typedef void *BmxDll;
+#define bmxDllLoad(name)      ((void)(name), (void *)NULL)
+#define bmxDllProc(dll, name) ((void)(dll), (void)(name), (void *)NULL)
+#endif
 
 /*
  * Fills every import slot of the original's data (bmxImportSlots, src/data/imports.c): a stand-in from
@@ -199,11 +321,11 @@ static int fillImports(void)
 
     for (uint32_t i = 0; i < bmxImportSlotCount;) {
         const char *const dllName = bmxImportSlots[i].dll;
-        HMODULE dll = NULL;
+        BmxDll dll = NULL;
         int dllStandIns = 0, dllDead = 0, dllReal = 0;
 
         if (bmxImportKeepsDll(dllName)) {
-            dll = LoadLibraryA(dllName);
+            dll = bmxDllLoad(dllName);
             if (!dll) {
                 bmxLog("import: cannot load %s\n", dllName);
                 return -1;
@@ -220,13 +342,13 @@ static int fillImports(void)
                 dllDead++;
             } else {
                 if (!dll) {
-                    dll = LoadLibraryA(dllName);
+                    dll = bmxDllLoad(dllName);
                 }
                 if (!dll) {
                     bmxLog("import: cannot load %s\n", dllName);
                     return -1;
                 }
-                fn = (void *)GetProcAddress(dll, name);
+                fn = bmxDllProc(dll, name);
                 dllReal++;
             }
             if (!fn) {
@@ -260,7 +382,8 @@ int bmxLoaderInit(void)
      * call directly: [audio] smooth_resample, the interpolating mixer over winchanMix (winchanPump calls it);
      * [video] hud = 1 (with widescreen = 1), the ngifDrawList copy that anchors the HUD (driver/wide.c;
      * ngifFlushFrame calls it); [video] full_draw_distance over ngiffxAdaptQuality (drawdist.c; ngifRunFrame
-     * calls it). */
+     * calls it). Without machine-code jumps the providers have set the functions' redirect slots
+     * (BMX_REDIRECT_VOID) instead. */
     {
         static const struct {
             const char *what;
@@ -275,6 +398,7 @@ int bmxLoaderInit(void)
             uint32_t count;
             const BmxHook *const jumps = kOptional[k].jumps(&count);
 
+#if BMX_MACHINE_STUBS
             for (uint32_t i = 0; i < count; i++) {
                 DWORD prot;
 
@@ -286,6 +410,10 @@ int bmxLoaderInit(void)
                 writeJump(jumps[i].orig, jumps[i].impl);
             }
             bmxLog("%s: %u jumps\n", kOptional[k].what, (unsigned)count);
+#else
+            (void)jumps;
+            bmxLog("%s: %u redirects\n", kOptional[k].what, (unsigned)count);
+#endif
         }
     }
     /* [video] widescreen: the hor+ wrapper in the zgl camera slot 0x561d98 (data, no jump; driver/wide.c). */
@@ -293,6 +421,8 @@ int bmxLoaderInit(void)
     bmxSimHashInstall();
     /* [audio] music_dir: the music override attaches at the DirectSound stand-in (no jump; musicgame.c). */
     bmxMusicInstall();
+#if BMX_MACHINE_STUBS
     FlushInstructionCache(GetCurrentProcess(), NULL, 0);
+#endif
     return 0;
 }

@@ -620,8 +620,14 @@ static int32_t showBox(void *owner, const char *text, const char *caption, uint3
     data.message = text != NULL ? text : "";
     data.numbuttons = count;
     data.buttons = buttons;
+    const char *const video = SDL_GetCurrentVideoDriver();
+
     if (gBoxHook != NULL) {
         answer = gBoxHook(&data);
+    } else if (video != NULL && (SDL_strcmp(video, "offscreen") == 0 || SDL_strcmp(video, "dummy") == 0)) {
+        /* Headless (SDL_VIDEODRIVER=offscreen / dummy): SDL would still show a native box (on macOS through
+         * Cocoa); answer as if it was closed. */
+        bmxLog("window: headless video driver, message box \"%s\" not shown\n", data.message);
     } else if (!SDL_ShowMessageBox(&data, &answer)) {
         bmxLog("window: SDL_ShowMessageBox failed: %s\n", SDL_GetError());
         return 0;

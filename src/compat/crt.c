@@ -9,17 +9,28 @@ int _fltused = 0;
  * exe's own probe (0x004a4d50) by returning into it; natively (BMX_IMAGE) to the function serving that
  * address.
  */
-#if defined(BMX_IMAGE)
+#if defined(BMX_IMAGE) && !defined(_WIN32)
+/* macOS / Linux: no MSVC stack probe (the compiler uses the platform's). */
+#elif defined(BMX_IMAGE)
 __asm__(".text\n.globl __chkstk\n__chkstk:\n\tjmp " BMX_ORIGFN_0x004a4d50 "\n");
 #else
 __asm__(".text\n.globl __chkstk\n__chkstk:\n\tpushl $0x004a4d50\n\tretl\n");
 #endif
 
-/* rep movsb / rep stosb: same results as byte loops, but far cheaper under the emulator. */
+/* rep movsb / rep stosb: same results as byte loops, but far cheaper under the emulator. Byte loops off x86.
+ */
 void *memcpy(void *dst, const void *src, size_t n)
 {
+#if defined(__i386__) || defined(__x86_64__)
     void *d = dst;
     __asm__ volatile("rep movsb" : "+D"(d), "+S"(src), "+c"(n) : : "memory");
+#else
+    unsigned char *d = dst;
+    const unsigned char *s = src;
+    while (n--) {
+        *d++ = *s++;
+    }
+#endif
     return dst;
 }
 
@@ -41,8 +52,15 @@ void *memmove(void *dst, const void *src, size_t n)
 
 void *memset(void *dst, int c, size_t n)
 {
+#if defined(__i386__) || defined(__x86_64__)
     void *d = dst;
     __asm__ volatile("rep stosb" : "+D"(d), "+c"(n) : "a"(c) : "memory");
+#else
+    unsigned char *d = dst;
+    while (n--) {
+        *d++ = (unsigned char)c;
+    }
+#endif
     return dst;
 }
 

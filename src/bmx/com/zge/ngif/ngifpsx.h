@@ -116,6 +116,7 @@ int ngifpsxUpdate(void);
 void ngifInitOrderTable(uint32_t *ot, int n);
 /* Draws every primitive of an ordering table, starting at its end entry. */
 void ngifDrawList(uint32_t *entry);
+BMX_REDIRECT_EXTERN(ngifDrawList, (uint32_t *));
 /* Draws one primitive (dispatch on its command byte); unsupported kinds print "Prim not coded". */
 void ngifDrawPrimitive(const uint8_t *prim);
 void ngifNop2(void);

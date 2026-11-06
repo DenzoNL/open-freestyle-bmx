@@ -1,20 +1,45 @@
 #!/usr/bin/env bash
 # Regenerates the SDL3 driver's shader headers (src/driver/shaders/*.h) from the HLSL sources: DXIL for
-# Direct3D 12 and SPIR-V for Vulkan, with DirectXShaderCompiler (docs/SDL3-DRIVER.md, D3-A). MSL (Metal) is
-# not generated yet (no SPIRV-Cross / SDL_shadercross on the Windows dev machine).
+# Direct3D 12 and SPIR-V for Vulkan with DirectXShaderCompiler (docs/SDL3-DRIVER.md, D3-A), and MSL for Metal
+# from that SPIR-V with SPIRV-Cross (docs/PORTING.md X5-A).
 #
-#   DXC=<path to dxc>  (default: the newest ~/tools/dxc-*/bin/x64/dxc.exe, else dxc on PATH)
+#   tools/shaders.sh             all three formats (needs dxc and spirv-cross)
+#   tools/shaders.sh --msl-only  only the MSL, from the SPIR-V already in the headers (no dxc; `nix develop` has
+#                                spirv-cross)
+#
+#   DXC=<path to dxc>                  (default: the newest ~/tools/dxc-*/bin/x64/dxc.exe, else dxc on PATH)
+#   SPIRV_CROSS=<path to spirv-cross>  (default: spirv-cross on PATH)
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
-dxc=${DXC:-}
-if [[ -z $dxc ]]; then
-    dxc=$(ls -d "$HOME"/tools/dxc-*/bin/x64/dxc.exe 2>/dev/null | sort | tail -n 1 || true)
-    dxc=${dxc:-dxc}
+mslOnly=0
+if [[ ${1:-} == --msl-only ]]; then
+    mslOnly=1
 fi
-"$dxc" --version | head -n 1
+spirvCross=${SPIRV_CROSS:-spirv-cross}
+"$spirvCross" --revision 2>/dev/null | head -n 1 || true
+if [[ $mslOnly == 0 ]]; then
+    dxc=${DXC:-}
+    if [[ -z $dxc ]]; then
+        dxc=$(ls -d "$HOME"/tools/dxc-*/bin/x64/dxc.exe 2>/dev/null | sort | tail -n 1 || true)
+        dxc=${dxc:-dxc}
+    fi
+    "$dxc" --version | head -n 1
+fi
 dir=$root/src/driver/shaders
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
+
+# The arrays of an existing header, back into files (--msl-only).
+extract() {
+    "${PYTHON:-python3}" -I - "$1" "$2" "$3" <<'EOF'
+import re, sys
+header, var, out = sys.argv[1:4]
+m = re.search(r'static const unsigned char ' + var + r'\[(\d+)\] = \{(.*?)\};', open(header).read(), re.S)
+data = bytes(int(x, 16) for x in re.findall(r'0x([0-9a-f]{2})', m.group(2)))
+assert len(data) == int(m.group(1)), var
+open(out, 'wb').write(data)
+EOF
+}
 
 # name  entry  profile  source (without .hlsl)  defines
 shaders=(
@@ -25,15 +50,25 @@ shaders=(
 for s in "${shaders[@]}"; do
     read -r name entry profile source defines <<<"$s"
     src=$dir/$source.hlsl
-    # shellcheck disable=SC2086 # $defines is empty or one -D option
-    "$dxc" -nologo -E "$entry" -T "$profile" -O3 -Wno-ignored-attributes -Qstrip_debug -Qstrip_reflect \
-        $defines -Fo "$tmp/$name.dxil" "$src"
-    # shellcheck disable=SC2086
-    "$dxc" -nologo -E "$entry" -T "$profile" -O3 -spirv -fspv-target-env=vulkan1.0 -fvk-use-dx-layout \
-        $defines -Fo "$tmp/$name.spv" "$src"
-    "${PYTHON:-python3}" -I - "$tmp/$name.dxil" "$tmp/$name.spv" "$dir/$name.h" "$name" "$source" <<'EOF'
+    if [[ $mslOnly == 1 ]]; then
+        extract "$dir/$name.h" "${name}_dxil" "$tmp/$name.dxil"
+        extract "$dir/$name.h" "${name}_spirv" "$tmp/$name.spv"
+    else
+        # shellcheck disable=SC2086 # $defines is empty or one -D option
+        "$dxc" -nologo -E "$entry" -T "$profile" -O3 -Wno-ignored-attributes -Qstrip_debug -Qstrip_reflect \
+            $defines -Fo "$tmp/$name.dxil" "$src"
+        # shellcheck disable=SC2086
+        "$dxc" -nologo -E "$entry" -T "$profile" -O3 -spirv -fspv-target-env=vulkan1.0 -fvk-use-dx-layout \
+            $defines -Fo "$tmp/$name.spv" "$src"
+    fi
+    # MSL 2.1 with SPIRV-Cross's default resource indices, which are SDL3 GPU's for these shaders: the one
+    # uniform buffer at [[buffer(0)]], the texture and its sampler at index 0, the vertex inputs as
+    # [[attribute(location)]] of a [[stage_in]] struct; the entry points keep their names.
+    "$spirvCross" --msl --msl-version 20100 --output "$tmp/$name.metal" "$tmp/$name.spv"
+    "${PYTHON:-python3}" -I - "$tmp/$name.dxil" "$tmp/$name.spv" "$tmp/$name.metal" "$dir/$name.h" "$name" \
+        "$source" <<'EOF'
 import sys
-dxil, spv, out, name, source = sys.argv[1:6]
+dxil, spv, msl, out, name, source = sys.argv[1:7]
 def array(var, data):
     lines = [', '.join(f'0x{b:02x}' for b in data[i:i + 16]) for i in range(0, len(data), 16)]
     return f'static const unsigned char {var}[{len(data)}] = {{\n    ' + ',\n    '.join(lines) + ',\n};\n'
@@ -42,6 +77,8 @@ with open(out, 'w', newline='\n') as f:
     f.write('// clang-format off\n')
     f.write(array(f'{name}_dxil', open(dxil, 'rb').read()))
     f.write(array(f'{name}_spirv', open(spv, 'rb').read()))
+    # MSL source text (SDL_CreateGPUShader takes it with its length; no terminating NUL).
+    f.write(array(f'{name}_msl', open(msl, 'rb').read().replace(b'\r\n', b'\n')))
     f.write('// clang-format on\n')
 EOF
     echo "wrote ${dir#"$root"/}/$name.h"

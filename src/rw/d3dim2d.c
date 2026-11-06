@@ -185,7 +185,7 @@ int rwD3DIm2DOpen(void)
 
 /* 0x4d48f0 (EAX): saves the state a deferred primitive is drawn with. */
 BMX_ADDR(0x004d48f0)
-__attribute__((regparm(1))) void rwD3DSaveState(RwD3DSavedState *state)
+BMX_REGPARM(1) void rwD3DSaveState(RwD3DSavedState *state)
 {
     const RwD3DStateCache *s = &rwD3DState;
 
@@ -211,7 +211,7 @@ __attribute__((regparm(1))) void rwD3DSaveState(RwD3DSavedState *state)
 /* 0x4d9350 (EAX): sends a saved state to the device (texture raster and vertex alpha through the state set).
  */
 BMX_ADDR(0x004d9350)
-__attribute__((regparm(1))) void rwD3DRestoreState(const RwD3DSavedState *saved)
+BMX_REGPARM(1) void rwD3DRestoreState(const RwD3DSavedState *saved)
 {
     RwD3DStateCache *s = &rwD3DState;
 

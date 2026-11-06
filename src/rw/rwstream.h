@@ -84,9 +84,9 @@ void *_rwStreamModuleOpen(void *engine, int32_t offset);
 void *_rwStreamModuleClose(void *engine);
 /* The chunk header reader's register entry (EAX = stream, EDX = type, ECX = length, version fourth stack
  * word). */
-__attribute__((regparm(3))) int rwStreamReadChunkHeaderReg(RwStream *stream, uint32_t *type, uint32_t *length,
-                                                           int32_t unused0, int32_t unused1, int32_t unused2,
-                                                           uint32_t *version);
+BMX_REGPARM(3)
+int rwStreamReadChunkHeaderReg(RwStream *stream, uint32_t *type, uint32_t *length, int32_t unused0,
+                               int32_t unused1, int32_t unused2, uint32_t *version);
 /* Constant results of a table of null device callbacks (0x4e32f2..0x4e335f). */
 int rwStubReturn0_4e32f2(void);
 int rwStubReturn0_4e32f9(void);

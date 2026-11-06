@@ -492,9 +492,9 @@ void *_rwStreamModuleClose(void *engine)
  * is the fourth stack word. Only RwStreamFindChunk's original code called it, and ours replaces that.
  */
 BMX_ADDR(0x004e2e2c)
-__attribute__((regparm(3))) int rwStreamReadChunkHeaderReg(RwStream *stream, uint32_t *type, uint32_t *length,
-                                                           int32_t unused0, int32_t unused1, int32_t unused2,
-                                                           uint32_t *version)
+BMX_REGPARM(3)
+int rwStreamReadChunkHeaderReg(RwStream *stream, uint32_t *type, uint32_t *length, int32_t unused0,
+                               int32_t unused1, int32_t unused2, uint32_t *version)
 {
     (void)unused0;
     (void)unused1;

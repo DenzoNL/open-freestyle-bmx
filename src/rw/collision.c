@@ -121,7 +121,7 @@ RwSphere *RpAtomicGetWorldBoundingSphere(RpAtomic *atomic)
 
 /* Outcodes of a point against the 12 edge bevel planes of the cube (x +- y > 1 etc.). */
 BMX_ADDR(0x004bc3c0)
-__attribute__((regparm(1))) uint32_t _rpCollBevel2d(const RwV3d *p)
+BMX_REGPARM(1) uint32_t _rpCollBevel2d(const RwV3d *p)
 {
     const double x = p->x, y = p->y, z = p->z;
     uint32_t outcode = 0;
@@ -166,7 +166,7 @@ __attribute__((regparm(1))) uint32_t _rpCollBevel2d(const RwV3d *p)
 
 /* Outcodes of a point against the 8 corner bevel planes (x +- y +- z > 1.5). */
 BMX_ADDR(0x004bc4c0)
-__attribute__((regparm(1))) uint32_t _rpCollBevel3d(const RwV3d *p)
+BMX_REGPARM(1) uint32_t _rpCollBevel3d(const RwV3d *p)
 {
     const double x = p->x, y = p->y, z = p->z;
     const double zy = z + y;
@@ -230,7 +230,7 @@ __attribute__((naked)) uint32_t _rpCollCheckPoint(void)
 
 /* Where the segment crosses each face plane in `outcodes`, test the crossing point against the cube. */
 BMX_ADDR(0x004bc630)
-__attribute__((regparm(3))) int32_t _rpCollCheckLine(const RwV3d *p1, const RwV3d *p2, uint32_t outcodes)
+BMX_REGPARM(3) int32_t _rpCollCheckLine(const RwV3d *p1, const RwV3d *p2, uint32_t outcodes)
 {
     static const struct {
         uint32_t bit;
@@ -290,10 +290,9 @@ static double rpCollCross(float a, float b, float c, float d, float e, float f, 
  * edges with the point; 1 when they share no sign, i.e. the point is outside.
  */
 BMX_ADDR(0x004bc750)
-__attribute__((regparm(3))) int32_t _rpCollPointOutsideTriangle(const RwV3d *p, const RwV3d *a,
-                                                                const RwV3d *b, uint32_t unused0,
-                                                                uint32_t unused1, uint32_t unused2,
-                                                                const RwV3d *c)
+BMX_REGPARM(3)
+int32_t _rpCollPointOutsideTriangle(const RwV3d *p, const RwV3d *a, const RwV3d *b, uint32_t unused0,
+                                    uint32_t unused1, uint32_t unused2, const RwV3d *c)
 {
     (void)unused0;
     (void)unused1;
@@ -385,11 +384,10 @@ static double rpCollAbs(double t)
  * triangle's plane. normal and distance are not written (the box query passes them on uninitialised).
  */
 BMX_ADDR(0x004bff70)
-__attribute__((regparm(3))) int32_t _rpCollTriangleBoxIntersect(const RwBBox *box, RwV3d *normal,
-                                                                const RwV3d *v0, uint32_t unused0,
-                                                                uint32_t unused1, uint32_t unused2,
-                                                                const RwV3d *v1, const RwV3d *v2,
-                                                                const float *distance, const RwMatrix *matrix)
+BMX_REGPARM(3)
+int32_t _rpCollTriangleBoxIntersect(const RwBBox *box, RwV3d *normal, const RwV3d *v0, uint32_t unused0,
+                                    uint32_t unused1, uint32_t unused2, const RwV3d *v1, const RwV3d *v2,
+                                    const float *distance, const RwMatrix *matrix)
 {
     (void)normal;
     (void)unused0;
@@ -501,11 +499,10 @@ static int rpCollEdgeSeparates(const RwV3d *u, const RwV3d *v, const RwV3d *w, d
  * Voronoi region of the nearest corner and the three edges.
  */
 BMX_ADDR(0x004bf0b0)
-__attribute__((regparm(3))) int32_t _rpCollSphereTriangleIntersect(const RwSphere *sphere, RwV3d *normal,
-                                                                   const RwV3d *v0, uint32_t unused0,
-                                                                   uint32_t unused1, uint32_t unused2,
-                                                                   const RwV3d *v1, const RwV3d *v2,
-                                                                   float *distance)
+BMX_REGPARM(3)
+int32_t _rpCollSphereTriangleIntersect(const RwSphere *sphere, RwV3d *normal, const RwV3d *v0,
+                                       uint32_t unused0, uint32_t unused1, uint32_t unused2, const RwV3d *v1,
+                                       const RwV3d *v2, float *distance)
 {
     (void)unused0;
     (void)unused1;
@@ -601,10 +598,10 @@ static double rpCollRatio(float d0, float d1)
  * distances). Each world sector gets the clipped line in query->t.line; a NULL from sectorCallBack stops.
  */
 BMX_ADDR(0x004bd400)
-__attribute__((regparm(3))) RpWorld *
-_rpCollWorldForAllLineSectors(RpWorld *world, const RwLine *line, RpSectorCallBack sectorCallBack,
-                              uint32_t unused0, uint32_t unused1, uint32_t unused2,
-                              RpIntersection *intersection, RpCollisionQuery *query)
+BMX_REGPARM(3)
+RpWorld *_rpCollWorldForAllLineSectors(RpWorld *world, const RwLine *line, RpSectorCallBack sectorCallBack,
+                                       uint32_t unused0, uint32_t unused1, uint32_t unused2,
+                                       RpIntersection *intersection, RpCollisionQuery *query)
 {
     (void)unused0;
     (void)unused1;
@@ -805,10 +802,10 @@ static void rpCollWalkAtomicSectors(RpAtomic *atomic, RpCollSectorTest test, RpI
 
 /* Point: the atomics whose spheres contain it (the walk goes on whatever the callback returns). */
 BMX_ADDR(0x004be160)
-__attribute__((regparm(3))) RpWorld *_rpCollWorldAtomicsPoint(RpWorld *world, const RwV3d *point,
-                                                              void *callBack, uint32_t unused0,
-                                                              uint32_t unused1, uint32_t unused2,
-                                                              RpIntersection *intersection, void *data)
+BMX_REGPARM(3)
+RpWorld *_rpCollWorldAtomicsPoint(RpWorld *world, const RwV3d *point, void *callBack, uint32_t unused0,
+                                  uint32_t unused1, uint32_t unused2, RpIntersection *intersection,
+                                  void *data)
 {
     (void)unused0;
     (void)unused1;
@@ -849,10 +846,9 @@ __attribute__((regparm(3))) RpWorld *_rpCollWorldAtomicsPoint(RpWorld *world, co
 }
 
 BMX_ADDR(0x004be260)
-__attribute__((regparm(3))) RpWorld *_rpCollWorldAtomicsLine(RpWorld *world, const RwLine *line,
-                                                             void *callBack, uint32_t unused0,
-                                                             uint32_t unused1, uint32_t unused2,
-                                                             RpIntersection *intersection, void *data)
+BMX_REGPARM(3)
+RpWorld *_rpCollWorldAtomicsLine(RpWorld *world, const RwLine *line, void *callBack, uint32_t unused0,
+                                 uint32_t unused1, uint32_t unused2, RpIntersection *intersection, void *data)
 {
     (void)unused0;
     (void)unused1;
@@ -867,10 +863,10 @@ __attribute__((regparm(3))) RpWorld *_rpCollWorldAtomicsLine(RpWorld *world, con
 }
 
 BMX_ADDR(0x004be2c0)
-__attribute__((regparm(3))) RpWorld *_rpCollWorldAtomicsSphere(RpWorld *world, const RwSphere *sphere,
-                                                               void *callBack, uint32_t unused0,
-                                                               uint32_t unused1, uint32_t unused2,
-                                                               RpIntersection *intersection, void *data)
+BMX_REGPARM(3)
+RpWorld *_rpCollWorldAtomicsSphere(RpWorld *world, const RwSphere *sphere, void *callBack, uint32_t unused0,
+                                   uint32_t unused1, uint32_t unused2, RpIntersection *intersection,
+                                   void *data)
 {
     (void)unused0;
     (void)unused1;
@@ -889,10 +885,9 @@ __attribute__((regparm(3))) RpWorld *_rpCollWorldAtomicsSphere(RpWorld *world, c
 }
 
 BMX_ADDR(0x004c0b00)
-__attribute__((regparm(3))) RpWorld *_rpCollWorldAtomicsBox(RpWorld *world, const RwBBox *box, void *callBack,
-                                                            uint32_t unused0, uint32_t unused1,
-                                                            uint32_t unused2, RpIntersection *intersection,
-                                                            void *data)
+BMX_REGPARM(3)
+RpWorld *_rpCollWorldAtomicsBox(RpWorld *world, const RwBBox *box, void *callBack, uint32_t unused0,
+                                uint32_t unused1, uint32_t unused2, RpIntersection *intersection, void *data)
 {
     (void)unused0;
     (void)unused1;
@@ -911,10 +906,10 @@ __attribute__((regparm(3))) RpWorld *_rpCollWorldAtomicsBox(RpWorld *world, cons
 
 /* The atomics near another atomic: its world sphere against the atomics in the sectors it is tied to. */
 BMX_ADDR(0x004be480)
-__attribute__((regparm(3))) RpWorld *_rpCollWorldAtomicsAtomic(RpWorld *world, RpAtomic *atomic,
-                                                               void *callBack, uint32_t unused0,
-                                                               uint32_t unused1, uint32_t unused2,
-                                                               RpIntersection *intersection, void *data)
+BMX_REGPARM(3)
+RpWorld *_rpCollWorldAtomicsAtomic(RpWorld *world, RpAtomic *atomic, void *callBack, uint32_t unused0,
+                                   uint32_t unused1, uint32_t unused2, RpIntersection *intersection,
+                                   void *data)
 {
     (void)unused0;
     (void)unused1;
@@ -930,10 +925,10 @@ __attribute__((regparm(3))) RpWorld *_rpCollWorldAtomicsAtomic(RpWorld *world, R
 }
 
 BMX_ADDR(0x004c05d0)
-__attribute__((regparm(3))) RpWorld *_rpCollWorldTrianglesLine(RpWorld *world, const RwLine *line,
-                                                               void *callBack, uint32_t unused0,
-                                                               uint32_t unused1, uint32_t unused2,
-                                                               RpIntersection *intersection, void *data)
+BMX_REGPARM(3)
+RpWorld *_rpCollWorldTrianglesLine(RpWorld *world, const RwLine *line, void *callBack, uint32_t unused0,
+                                   uint32_t unused1, uint32_t unused2, RpIntersection *intersection,
+                                   void *data)
 {
     (void)unused0;
     (void)unused1;
@@ -949,10 +944,10 @@ __attribute__((regparm(3))) RpWorld *_rpCollWorldTrianglesLine(RpWorld *world, c
 }
 
 BMX_ADDR(0x004c0650)
-__attribute__((regparm(3))) RpWorld *_rpCollWorldTrianglesSphere(RpWorld *world, const RwSphere *sphere,
-                                                                 void *callBack, uint32_t unused0,
-                                                                 uint32_t unused1, uint32_t unused2,
-                                                                 RpIntersection *intersection, void *data)
+BMX_REGPARM(3)
+RpWorld *_rpCollWorldTrianglesSphere(RpWorld *world, const RwSphere *sphere, void *callBack, uint32_t unused0,
+                                     uint32_t unused1, uint32_t unused2, RpIntersection *intersection,
+                                     void *data)
 {
     (void)unused0;
     (void)unused1;
@@ -971,10 +966,10 @@ __attribute__((regparm(3))) RpWorld *_rpCollWorldTrianglesSphere(RpWorld *world,
 }
 
 BMX_ADDR(0x004c0810)
-__attribute__((regparm(3))) RpWorld *_rpCollWorldTrianglesBox(RpWorld *world, const RwBBox *box,
-                                                              void *callBack, uint32_t unused0,
-                                                              uint32_t unused1, uint32_t unused2,
-                                                              RpIntersection *intersection, void *data)
+BMX_REGPARM(3)
+RpWorld *_rpCollWorldTrianglesBox(RpWorld *world, const RwBBox *box, void *callBack, uint32_t unused0,
+                                  uint32_t unused1, uint32_t unused2, RpIntersection *intersection,
+                                  void *data)
 {
     (void)unused0;
     (void)unused1;
@@ -993,10 +988,10 @@ __attribute__((regparm(3))) RpWorld *_rpCollWorldTrianglesBox(RpWorld *world, co
 
 /* The world's triangles near an atomic: its world sphere against the sectors it is tied to. */
 BMX_ADDR(0x004c0c60)
-__attribute__((regparm(3))) RpWorld *_rpCollWorldTrianglesAtomic(RpWorld *world, RpAtomic *atomic,
-                                                                 void *callBack, uint32_t unused0,
-                                                                 uint32_t unused1, uint32_t unused2,
-                                                                 RpIntersection *intersection, void *data)
+BMX_REGPARM(3)
+RpWorld *_rpCollWorldTrianglesAtomic(RpWorld *world, RpAtomic *atomic, void *callBack, uint32_t unused0,
+                                     uint32_t unused1, uint32_t unused2, RpIntersection *intersection,
+                                     void *data)
 {
     (void)unused0;
     (void)unused1;
@@ -1084,7 +1079,7 @@ static int rpCollAtomicBoxTest(const RwSphere *s, const RpCollisionQuery *query,
 /* a - b with b opaque to the optimiser (no rewrite as a + -b, which flips the sign of a NaN b). */
 static double collSub(double a, double b)
 {
-    __asm__("" : "+x"(b));
+    BMX_FP_OPAQUE(b);
     return a - b;
 }
 
@@ -1539,10 +1534,11 @@ static void rpCollAtomicInverse(RwMatrix *inverse, RpAtomic *atomic)
  * callback gets the distance along the line as a fraction of its length.
  */
 BMX_ADDR(0x004c0d40)
-__attribute__((regparm(3))) RpAtomic *
-_rpCollAtomicTrianglesLine(RpAtomic *atomic, const RwLine *line,
-                           RpIntersectionCallBackGeometryTriangle callBack, uint32_t unused0,
-                           uint32_t unused1, uint32_t unused2, RpIntersection *intersection, void *data)
+BMX_REGPARM(3)
+RpAtomic *_rpCollAtomicTrianglesLine(RpAtomic *atomic, const RwLine *line,
+                                     RpIntersectionCallBackGeometryTriangle callBack, uint32_t unused0,
+                                     uint32_t unused1, uint32_t unused2, RpIntersection *intersection,
+                                     void *data)
 {
     (void)unused0;
     (void)unused1;
@@ -1596,10 +1592,11 @@ _rpCollAtomicTrianglesLine(RpAtomic *atomic, const RwLine *line,
  * of the inverse LTM's at row); the callback gets the plane distance in world radii.
  */
 BMX_ADDR(0x004c1600)
-__attribute__((regparm(3))) RpAtomic *
-_rpCollAtomicTrianglesSphere(RpAtomic *atomic, const RwSphere *sphere,
-                             RpIntersectionCallBackGeometryTriangle callBack, uint32_t unused0,
-                             uint32_t unused1, uint32_t unused2, RpIntersection *intersection, void *data)
+BMX_REGPARM(3)
+RpAtomic *_rpCollAtomicTrianglesSphere(RpAtomic *atomic, const RwSphere *sphere,
+                                       RpIntersectionCallBackGeometryTriangle callBack, uint32_t unused0,
+                                       uint32_t unused1, uint32_t unused2, RpIntersection *intersection,
+                                       void *data)
 {
     (void)unused0;
     (void)unused1;

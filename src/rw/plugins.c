@@ -509,7 +509,7 @@ void *rpBoneFindSkinAtomic(void *object, void *found)
 
 /* The bone data of a frame (EAX = frame); NULL without a frame. */
 BMX_ADDR(0x00502ba0)
-__attribute__((regparm(1))) RpSkinBone *rpBoneGet(RwFrame *frame)
+BMX_REGPARM(1) RpSkinBone *rpBoneGet(RwFrame *frame)
 {
     if (frame == NULL) {
         return NULL;
@@ -519,7 +519,7 @@ __attribute__((regparm(1))) RpSkinBone *rpBoneGet(RwFrame *frame)
 
 /* Stores the bone data in a frame (EAX = frame, EDX = bone); the frame, NULL without one. */
 BMX_ADDR(0x00502b80)
-__attribute__((regparm(2))) RwFrame *rpBoneSet(RwFrame *frame, RpSkinBone *bone)
+BMX_REGPARM(2) RwFrame *rpBoneSet(RwFrame *frame, RpSkinBone *bone)
 {
     if (frame == NULL) {
         return NULL;
@@ -549,7 +549,7 @@ RpSkinBone *rpBoneCreate(void)
 
 /* Frees a bone (EAX = bone) and clears the frame's pointer to it. */
 BMX_ADDR(0x00502c60)
-__attribute__((regparm(1))) void rpBoneDestroy(RpSkinBone *bone)
+BMX_REGPARM(1) void rpBoneDestroy(RpSkinBone *bone)
 {
     if (bone != NULL) {
         RwFrame *frame = bone->frame;
@@ -969,7 +969,7 @@ void *rpBoneGeometryRead(void *stream, int32_t length, void *geometry)
  * result orthonormal (flags | 3), clears the identity bit and bumps the version byte.
  */
 BMX_ADDR(0x004d10e0)
-__attribute__((regparm(2))) RwMatrix *RwMatrixInvertOrthonormal(RwMatrix *out, const RwMatrix *in)
+BMX_REGPARM(2) RwMatrix *RwMatrixInvertOrthonormal(RwMatrix *out, const RwMatrix *in)
 {
     out->right.x = in->right.x;
     out->right.y = in->up.x;
@@ -999,7 +999,7 @@ __attribute__((regparm(2))) RwMatrix *RwMatrixInvertOrthonormal(RwMatrix *out, c
  * and bumps the version byte. Every output element is read back from memory where the original does.
  */
 BMX_ADDR(0x004d1190)
-__attribute__((regparm(2))) RwMatrix *RwMatrixInvertGeneral(RwMatrix *out, const RwMatrix *in)
+BMX_REGPARM(2) RwMatrix *RwMatrixInvertGeneral(RwMatrix *out, const RwMatrix *in)
 {
     out->right.x = (float)(rwMul(in->at.z, in->up.y) - rwMul(in->at.y, in->up.z));
     out->up.x = (float)(rwMul(in->at.x, in->up.z) - rwMul(in->at.z, in->up.x));
@@ -1117,7 +1117,7 @@ struct RpAnimFrameData *rpAnimFrameDataCreate(void)
 
 /* The name and the type (1: keys of 0xc bytes, 2: keys of 0x10 bytes) of a frame sequence. */
 BMX_ADDR(0x00500044)
-__attribute__((regparm(1))) const char *rpAnimSequenceName(const void *sequence)
+BMX_REGPARM(1) const char *rpAnimSequenceName(const void *sequence)
 {
     return ((const RpAnimFrameSequence *)sequence)->name;
 }
@@ -1143,7 +1143,7 @@ typedef struct RpAnimSequenceHead {
 BMX_LAYOUT32_ASSERT(offsetof(RpAnimSequenceHead, entryCount) == 0x14, "sequence head");
 
 BMX_ADDR(0x004fd710)
-__attribute__((regparm(1))) int32_t rpAnimSequenceSize(const uint32_t *words)
+BMX_REGPARM(1) int32_t rpAnimSequenceSize(const uint32_t *words)
 {
     const RpAnimSequenceHead *sequence = (const void *)words;
     BMX_LAYOUT32_ASSERT(offsetof(RwGlobals, stringFuncs) + offsetof(RwStringFunctions, rwstrlen) == 0x114,
@@ -1197,7 +1197,7 @@ void *rpAnimClumpAddFrameSequence(void *sequence, void *clump)
  * walk callback.
  */
 BMX_ADDR(0x004fd7b8)
-__attribute__((regparm(2))) void *rpAnimClumpAddFrameSequences(void *frame, void *clump)
+BMX_REGPARM(2) void *rpAnimClumpAddFrameSequences(void *frame, void *clump)
 {
     const RpAnimFrameData *data =
         *(const RpAnimFrameData *const *)((const uint8_t *)frame + rpAnimFrameOffset);
@@ -1236,7 +1236,7 @@ void *rpAnimClumpAddFrameSequencesCallback(void *frame, void *clump)
 
 /* Clump ext: adds the sequences of all frames below the clump's root frame to it (EAX = clump). */
 BMX_ADDR(0x004fd840)
-__attribute__((regparm(1))) RpClump *rpAnimClumpAddAllSequences(RpClump *clump)
+BMX_REGPARM(1) RpClump *rpAnimClumpAddAllSequences(RpClump *clump)
 {
     if (clump == NULL) {
         return NULL;
@@ -1398,9 +1398,9 @@ static double animLongest(const RpAnimFrameLink *link, const char *name, double 
  * (without memory the nodes and the sequence leak, as in the original).
  */
 BMX_ADDR(0x004fc7fc)
-__attribute__((regparm(3))) RpClump *rpAnimClumpAddSequence(RpClump *clump, const char *name, void *callBack,
-                                                            uint32_t unused0, uint32_t unused1,
-                                                            uint32_t unused2, void *data)
+BMX_REGPARM(3)
+RpClump *rpAnimClumpAddSequence(RpClump *clump, const char *name, void *callBack, uint32_t unused0,
+                                uint32_t unused1, uint32_t unused2, void *data)
 {
     (void)unused0;
     (void)unused1;
@@ -1538,7 +1538,7 @@ static size_t animStrlen(const char *s)
 /* a - b with b opaque to the optimiser (no rewrite as a + -b, which flips the sign of a NaN b). */
 static double animSub(double a, double b)
 {
-    __asm__("" : "+x"(b));
+    BMX_FP_OPAQUE(b);
     return a - b;
 }
 
@@ -1606,10 +1606,9 @@ RpAnimFrameSequence *rpAnimSequenceInit(RpAnimFrameSequence *sequence, const cha
 /* A new frame sequence (EAX = name, EDX = type, ECX = number of keyframes, the number of keys in the 4th
  * stack slot); returned even when setting it up failed. NULL only without memory for the block. */
 BMX_ADDR(0x004fffdc)
-__attribute__((regparm(3))) RpAnimFrameSequence *rpAnimSequenceCreate(const char *name, int32_t type,
-                                                                      int32_t numFrames, uint32_t unused0,
-                                                                      uint32_t unused1, uint32_t unused2,
-                                                                      int32_t numKeys)
+BMX_REGPARM(3)
+RpAnimFrameSequence *rpAnimSequenceCreate(const char *name, int32_t type, int32_t numFrames, uint32_t unused0,
+                                          uint32_t unused1, uint32_t unused2, int32_t numKeys)
 {
     (void)unused0;
     (void)unused1;
@@ -1624,7 +1623,7 @@ __attribute__((regparm(3))) RpAnimFrameSequence *rpAnimSequenceCreate(const char
 
 /* Drops a reference (EAX = sequence) and destroys the sequence with the last one; always 1. */
 BMX_ADDR(0x004fd244)
-__attribute__((regparm(1))) int rpAnimSequenceRelease(RpAnimFrameSequence *sequence)
+BMX_REGPARM(1) int rpAnimSequenceRelease(RpAnimFrameSequence *sequence)
 {
     if (--sequence->refCount == 0) {
         rpAnimSequenceDeinit(sequence);
@@ -1635,7 +1634,7 @@ __attribute__((regparm(1))) int rpAnimSequenceRelease(RpAnimFrameSequence *seque
 
 /* Releases the sequences of both lists of a frame's data, gives the links back and frees it (EAX); 1. */
 BMX_ADDR(0x004fbbc0)
-__attribute__((regparm(1))) int rpAnimFrameDataDestroy(RpAnimFrameData *data)
+BMX_REGPARM(1) int rpAnimFrameDataDestroy(RpAnimFrameData *data)
 {
     for (int list = 0; list < 2; list++) {
         RpAnimFrameLink *link = list == 0 ? data->listA : data->listB;
@@ -1671,7 +1670,7 @@ void *rpAnimFrameDeinit(void *frame)
  * without memory for the data (the link from the free list is not checked).
  */
 BMX_ADDR(0x004fbdf8)
-__attribute__((regparm(2))) void *rpAnimFrameAddSequence(void *frame, RpAnimFrameSequence *sequence)
+BMX_REGPARM(2) void *rpAnimFrameAddSequence(void *frame, RpAnimFrameSequence *sequence)
 {
     RpAnimFrameData *data = animFramePlugin(frame)->data;
     if (data == NULL) {
@@ -1889,7 +1888,7 @@ void *rpAnimClumpDeinit(void *clump)
  * original). EAX = stream.
  */
 BMX_ADDR(0x004fcf20)
-__attribute__((regparm(1))) RpAnimFrameSequence *rpAnimSequenceRead(RwStream *stream)
+BMX_REGPARM(1) RpAnimFrameSequence *rpAnimSequenceRead(RwStream *stream)
 {
     int32_t length;
     char raw[0x40];
@@ -1995,9 +1994,9 @@ void *rpAnimFrameChunkRead(void *stream, int32_t length, void *frame)
 /* Writes `count` keyframes (EAX = keyframes, EDX = count, ECX = stream, the byte count is stored through the
  * 4th stack slot): 16 bytes each (rotations) or 12 (translations). NULL when the write fails. */
 BMX_ADDR(0x004fbb30)
-__attribute__((regparm(3))) void *rpAnimWriteRotations(const void *frames, int32_t count, RwStream *stream,
-                                                       uint32_t unused0, uint32_t unused1, uint32_t unused2,
-                                                       int32_t *size)
+BMX_REGPARM(3)
+void *rpAnimWriteRotations(const void *frames, int32_t count, RwStream *stream, uint32_t unused0,
+                           uint32_t unused1, uint32_t unused2, int32_t *size)
 {
     (void)unused0;
     (void)unused1;
@@ -2011,9 +2010,9 @@ __attribute__((regparm(3))) void *rpAnimWriteRotations(const void *frames, int32
 }
 
 BMX_ADDR(0x004fbb70)
-__attribute__((regparm(3))) void *rpAnimWriteTranslations(const void *frames, int32_t count, RwStream *stream,
-                                                          uint32_t unused0, uint32_t unused1,
-                                                          uint32_t unused2, int32_t *size)
+BMX_REGPARM(3)
+void *rpAnimWriteTranslations(const void *frames, int32_t count, RwStream *stream, uint32_t unused0,
+                              uint32_t unused1, uint32_t unused2, int32_t *size)
 {
     (void)unused0;
     (void)unused1;
@@ -2029,8 +2028,8 @@ __attribute__((regparm(3))) void *rpAnimWriteTranslations(const void *frames, in
 /* Writes a frame sequence as rpAnimSequenceRead reads it; *size gets the bytes written (EAX = sequence,
  * EDX = stream, ECX = size). NULL when a write fails or the end of the keys is a NULL pointer. */
 BMX_ADDR(0x004fd400)
-__attribute__((regparm(3))) RpAnimFrameSequence *rpAnimSequenceWrite(RpAnimFrameSequence *sequence,
-                                                                     RwStream *stream, int32_t *size)
+BMX_REGPARM(3)
+RpAnimFrameSequence *rpAnimSequenceWrite(RpAnimFrameSequence *sequence, RwStream *stream, int32_t *size)
 {
     *size = 0;
     const char *name = sequence->name;
@@ -2581,7 +2580,7 @@ int32_t rpLodAtomicSelectLevel(RpAtomic *atomic)
  * geometry, NULL otherwise (and when there is no data).
  */
 BMX_ADDR(0x00505c60)
-__attribute__((regparm(2))) RpAtomic *rpLodAtomicApply(RpAtomic *atomic, RpLodAtomicData *lod)
+BMX_REGPARM(2) RpAtomic *rpLodAtomicApply(RpAtomic *atomic, RpLodAtomicData *lod)
 {
     RpAtomic *result = NULL;
     if (lod != NULL) {
@@ -2622,7 +2621,7 @@ RpAtomic *rpLodAtomicRender(RpAtomic *atomic)
 
 /* EAX = atomic, EDX = LOD data: puts the plugin's render callback on the atomic (once). */
 BMX_ADDR(0x00505d10)
-__attribute__((regparm(2))) void rpLodAtomicHook(RpAtomic *atomic, RpLodAtomicData *lod)
+BMX_REGPARM(2) void rpLodAtomicHook(RpAtomic *atomic, RpLodAtomicData *lod)
 {
     if (lod != NULL && lod->hooked == 0) {
         lod->savedRender = atomic->renderCallBack;
@@ -2634,7 +2633,7 @@ __attribute__((regparm(2))) void rpLodAtomicHook(RpAtomic *atomic, RpLodAtomicDa
 
 /* EAX = atomic, EDX = LOD data: gives the atomic its own render callback back. */
 BMX_ADDR(0x00505d40)
-__attribute__((regparm(2))) void rpLodAtomicUnhook(RpAtomic *atomic, RpLodAtomicData *lod)
+BMX_REGPARM(2) void rpLodAtomicUnhook(RpAtomic *atomic, RpLodAtomicData *lod)
 {
     if (lod != NULL && lod->hooked == 1) {
         if (lod->savedRender != NULL) {
@@ -2679,7 +2678,7 @@ RpLodAtomicData *rpLodAtomicDataCreate(void)
 /* EAX = destination, EDX = source: copies the data and takes a reference of every geometry. Returns the
  * source. */
 BMX_ADDR(0x00505db0)
-__attribute__((regparm(2))) RpLodAtomicData *rpLodAtomicDataCopy(RpLodAtomicData *dst, RpLodAtomicData *src)
+BMX_REGPARM(2) RpLodAtomicData *rpLodAtomicDataCopy(RpLodAtomicData *dst, RpLodAtomicData *src)
 {
     if (dst != NULL && src != NULL) {
         memcpy(dst, src, offsetof(RpLodAtomicData, levels));
@@ -2695,7 +2694,7 @@ __attribute__((regparm(2))) RpLodAtomicData *rpLodAtomicDataCopy(RpLodAtomicData
 
 /* EAX = data: releases the geometries, resets the data and gives it back to the free list. */
 BMX_ADDR(0x00505e10)
-__attribute__((regparm(1))) void rpLodAtomicDataDestroy(RpLodAtomicData *lod)
+BMX_REGPARM(1) void rpLodAtomicDataDestroy(RpLodAtomicData *lod)
 {
     if (lod != NULL) {
         for (int i = 0; i < 10; i++) {

@@ -14,6 +14,8 @@
  * See docs/NATIVE.md.
  */
 #include <ctype.h>
+#include <errno.h>
+#include <limits.h>
 #include <math.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -21,7 +23,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(_WIN32)
 #include <windows.h>
+#else
+#include <sys/mman.h>
+#include <unistd.h>
+#endif
 
 #include "native/native.h"
 #include "platform/platform.h"
@@ -56,6 +63,7 @@ static int guardHeapOn(void)
     return on;
 }
 
+#if defined(_WIN32)
 static void *guardAlloc(size_t size)
 {
     const size_t page = 4096;
@@ -75,6 +83,38 @@ static void *guardAlloc(size_t size)
     head->magic = kGuardMagic;
     return block;
 }
+
+static void guardRelease(GuardHead *head)
+{
+    VirtualFree(head->base, 0, MEM_RELEASE);
+}
+#else
+/* mmap / mprotect; the page size is the system's (16 KB on macOS arm64). `pad` keeps the mapping's size. */
+static void *guardAlloc(size_t size)
+{
+    const size_t page = (size_t)sysconf(_SC_PAGESIZE);
+    const size_t rounded = (size + 15) & ~(size_t)15;
+    const size_t span = (rounded + sizeof(GuardHead) + page - 1) / page * page + page;
+    uint8_t *const base = mmap(NULL, span, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+
+    if (base == MAP_FAILED) {
+        return NULL;
+    }
+    mprotect(base + span - page, page, PROT_NONE);
+    uint8_t *const block = base + span - page - rounded;
+    GuardHead *const head = (GuardHead *)block - 1;
+    head->base = base;
+    head->size = size;
+    head->magic = kGuardMagic;
+    head->pad = span;
+    return block;
+}
+
+static void guardRelease(GuardHead *head)
+{
+    munmap(head->base, head->pad);
+}
+#endif
 
 static GuardHead *guardHead(void *p)
 {
@@ -102,7 +142,7 @@ void crtFree(void *p)
         if (p != NULL) {
             GuardHead *const head = guardHead(p);
             head->magic = 0;
-            VirtualFree(head->base, 0, MEM_RELEASE);
+            guardRelease(head);
         }
         return;
     }
@@ -303,10 +343,38 @@ int crtAtoi(const char *s)
     return (int)(neg ? 0u - v : v);
 }
 
+#if ULONG_MAX == 0xffffffffu
 unsigned long crtStrtoul(const char *s, char **end, int base)
 {
     return strtoul(s, end, base);
 }
+#else
+/*
+ * LP64 (macOS, Linux): MSVC's unsigned long is 32 bits. A magnitude past 0xffffffff saturates to 0xffffffff
+ * (ERANGE); a minus sign negates in 32 bits. The game's callers keep 32 bits of the result.
+ */
+unsigned long crtStrtoul(const char *s, char **end, int base)
+{
+    const char *p = s;
+    unsigned long long v;
+    int negative;
+
+    while (isspace((unsigned char)*p)) {
+        p++;
+    }
+    negative = *p == '-';
+    errno = 0;
+    v = strtoull(s, end, base);
+    if (negative) {
+        v = 0ull - v; /* strtoull negated it in 64 bits: the magnitude */
+    }
+    if (errno == ERANGE || v > 0xffffffffull) {
+        errno = ERANGE;
+        return 0xffffffffu;
+    }
+    return negative ? (uint32_t)(0u - (uint32_t)v) : (uint32_t)v;
+}
+#endif
 
 /* ------------------------------------------------------------------------------------------------ */
 /* qsort: MSVC6's algorithm (0x4a4aa7), so that equal elements end up in the same order                */
@@ -1020,13 +1088,13 @@ void crtAssert(const char *expr, const char *file, unsigned line)
 {
     bmxLog("Assertion failed: %s, file %s, line %u\n", expr, file, line);
     fflush(NULL);
-    ExitProcess(3);
+    bmxExitProcess(3);
 }
 
 void crtExit(int code)
 {
     fflush(NULL);
-    ExitProcess((UINT)code);
+    bmxExitProcess(code);
 }
 
 /* ------------------------------------------------------------------------------------------------ */

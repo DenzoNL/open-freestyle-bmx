@@ -228,7 +228,7 @@ RwTexDictionary *RwTexDictionaryCreate(void);
 RwTexture *RwTextureDestroyAll(RwTexture *texture);
 int RwTextureDestroy(RwTexture *texture);
 /* The release body of RwTextureDestroy (EAX = texture). */
-__attribute__((regparm(1))) int rwTextureRelease(RwTexture *texture);
+BMX_REGPARM(1) int rwTextureRelease(RwTexture *texture);
 
 /* Module open/close routines the engine registry calls (plugin data at the given offset; NULL = failed). */
 void *_rwRasterOpen(void *engine, int32_t offset);
@@ -264,15 +264,15 @@ int RwImageRegisterImageFormat(const char *extension, RwImageCallBackRead read, 
 
 /* The BMP writer: the ".bmp" write callback and its pieces (register entries, see texture.c). */
 RwImage *BMPImageWrite(RwImage *image, const char *name);
-__attribute__((regparm(1))) int32_t bmpFileHeaderSize(int32_t format);
-__attribute__((regparm(1))) int32_t bmpInfoHeaderSize(int32_t format);
-__attribute__((regparm(3))) uint32_t bmpRowBytes(int32_t format, int32_t bits, int32_t width);
-__attribute__((regparm(3))) int32_t bmpWriteRows(RwStream *stream, uint32_t width, int32_t height,
-                                                 int32_t unused0, int32_t unused1, int32_t unused2,
-                                                 int32_t unused3, const RwImage *image);
-__attribute__((regparm(3))) int32_t bmpWriteImage(RwStream *stream, int32_t format, int32_t width,
-                                                  int32_t unused0, int32_t unused1, int32_t unused2,
-                                                  int32_t height, const RwImage *image);
+BMX_REGPARM(1) int32_t bmpFileHeaderSize(int32_t format);
+BMX_REGPARM(1) int32_t bmpInfoHeaderSize(int32_t format);
+BMX_REGPARM(3) uint32_t bmpRowBytes(int32_t format, int32_t bits, int32_t width);
+BMX_REGPARM(3)
+int32_t bmpWriteRows(RwStream *stream, uint32_t width, int32_t height, int32_t unused0, int32_t unused1,
+                     int32_t unused2, int32_t unused3, const RwImage *image);
+BMX_REGPARM(3)
+int32_t bmpWriteImage(RwStream *stream, int32_t format, int32_t width, int32_t unused0, int32_t unused1,
+                      int32_t unused2, int32_t height, const RwImage *image);
 
 /* Image files: the walk over the image search path and its callbacks (rw/texture.c). */
 typedef const char *(BMX_CDECL *RwImagePathCallback)(char *path, void *data);
@@ -281,19 +281,18 @@ typedef struct RwImageAttempt {
     RwImage *image;
 } RwImageAttempt;
 
-__attribute__((regparm(3))) const char *ImagePathForAllFullNames(const char *name, int32_t extra,
-                                                                 RwImagePathCallback callback,
-                                                                 int32_t unused0, int32_t unused1,
-                                                                 int32_t unused2, void *data);
+BMX_REGPARM(3)
+const char *ImagePathForAllFullNames(const char *name, int32_t extra, RwImagePathCallback callback,
+                                     int32_t unused0, int32_t unused1, int32_t unused2, void *data);
 const char *rwImageFindFormatCallback(char *path, void *data);
 const char *RwImageFindFileType(const char *name);
 const char *ImageAttempRead(char *name, void *data);
 /* Copy the pixels of one image into another (EAX = dest, EDX = source for the register entry). */
-__attribute__((regparm(2))) RwImage *rwImageCopyPixels(RwImage *dest, RwImage *source);
+BMX_REGPARM(2) RwImage *rwImageCopyPixels(RwImage *dest, RwImage *source);
 RwImage *RwImageResize(RwImage *dest, RwImage *source);
 RwImage *RwImageGammaCorrect(RwImage *image);
 /* Shrinks a 32 bit image by block averages (EAX = source, EDX = dest). */
-__attribute__((regparm(2))) int rwImageBoxShrink(const RwImage *source, RwImage *dest);
+BMX_REGPARM(2) int rwImageBoxShrink(const RwImage *source, RwImage *dest);
 void *RwRGBAFromPixel(void *rgba, uint32_t pixel, int32_t format);
 int RwImageSetGamma(float gamma);
 RwImage *RtBMPImageRead(const char *name);
@@ -306,9 +305,9 @@ RwImage *RtPNGImageRead(const char *name);
  * (RLE); the three reserved parameters stand for stack slots the original never reads. 0 on an unknown
  * combination.
  */
-__attribute__((regparm(3))) int BMPImageSetSpan(RwImage *image, int32_t row, const uint8_t *source,
-                                                int32_t reserved0, int32_t reserved1, int32_t reserved2,
-                                                int32_t srcDepth, int32_t flags);
+BMX_REGPARM(3)
+int BMPImageSetSpan(RwImage *image, int32_t row, const uint8_t *source, int32_t reserved0, int32_t reserved1,
+                    int32_t reserved2, int32_t srcDepth, int32_t flags);
 
 /* Default read callback of the texture module and the image/raster glue next to it (rw/texture.c). */
 void *rwTextureDefaultRead(const char *name, const char *maskName);
@@ -321,14 +320,14 @@ int rwImageFormatSucceed(void);
 /* Texture readers, mip level generator and image file reading (rw/texture.c). */
 /* EAX = name, EDX = mask name, ECX = width; height is the fourth stack word (three unread words before it).
  */
-__attribute__((regparm(3))) RwImage *rwTextureReadImage(const char *name, const char *maskName, int32_t width,
-                                                        int32_t unused0, int32_t unused1, int32_t unused2,
-                                                        int32_t height);
+BMX_REGPARM(3)
+RwImage *rwTextureReadImage(const char *name, const char *maskName, int32_t width, int32_t unused0,
+                            int32_t unused1, int32_t unused2, int32_t height);
 void *rwTextureReadPlain(const char *name, const char *maskName);
 void *rwTextureReadMipmapped(const char *name, const char *maskName);
 RwRaster *rwRasterGenerateMipmaps(RwRaster *raster, RwImage *image);
 /* EAX = image, EDX = mask. */
-__attribute__((regparm(2))) RwImage *RwImageApplyMask(RwImage *image, RwImage *mask);
+BMX_REGPARM(2) RwImage *RwImageApplyMask(RwImage *image, RwImage *mask);
 RwImage *RwImageRead(const char *name, const char *maskName);
 
 #endif

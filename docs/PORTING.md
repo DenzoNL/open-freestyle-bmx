@@ -25,7 +25,7 @@ What ties the game to 32-bit x86 at fixed addresses, measured in `src/`:
 | `ORIG_FN` calls by address | 186 | calls through the original's addresses (now jumps) |
 | `_Static_assert(offsetof / sizeof)` | 416 / 247 | layouts pinned to 4-byte pointers |
 | `(uint32_t)(uintptr_t)` pointer casts | 165 | pointers stored in 32-bit fields |
-| `regparm`, `__stdcall` / `BMX_STDCALL` | 251 / 132 | i386 calling conventions (no meaning on x64 / arm64) |
+| `regparm`, `__stdcall` / `BMX_STDCALL` | 251 / 132 | i386 calling conventions (no meaning on x64 / arm64; `BMX_REGPARM(n)` since X5 part 1) |
 | Inline x87 assembly | 14 files | `fsin`, `fcos`, `fptan`, `fpatan` and 80-bit sequences, for bit-exact results (src/compat/x87.h) |
 | Assets loaded straight into structs | zramdisk, ziff, zasset, RW streams, SAVE.DAT | on-disk layouts with 32-bit pointer fields (PLAN.md "64-bit hazard") |
 
@@ -631,6 +631,104 @@ overrun faults at the write; with lldb (llvm-mingw's) that gives the writer's ba
 **Where it stands (2026-11-05):** the scripted ride (1014 ticks) and the user's recording (6189 ticks) give the same
 BMX_SIM_HASH on native32 and native64 on every tick. The 32-bit reference hashes were made again after the FPU
 guard (above). Next: the user plays the 64-bit build; a release build.
+
+### X5 part 1 (macOS arm64, 2026-11-06): builds, links, starts
+
+A `macos` preset builds bmxnative for macOS arm64 with the host clang (nix's in `nix develop`) and SDL3 from nix,
+warning-free under the same `-Wall -Wextra -Werror`. The x87 sequences run on compat/x87soft.c there (X5 part 2,
+below; part of bmx_game through the src/compat glob). Whether the arm64 sim hash equals native32's is untested:
+no headless run gets past the GPU device (below).
+
+**Build** (macOS, `nix develop`, which now also provides spirv-cross and sets `SDL3_ROOT`):
+```sh
+cmake --preset macos && cmake --build --preset macos        # build/macos/bmxnative (rpath to nix's SDL3)
+cmake --build --preset macos --target bmxnative_app         # build/macos/bmxnative.app (SDL3 inside, ad-hoc signed)
+```
+Without nix: `-DSDL3_DIR=<prefix>/lib/cmake/SDL3`. Run it from the game folder (the install layout: `Scene.Txt`,
+`Assets\`, `bin\audio`, `bin\movie`, `save\`) as `bmxnative Scene.Txt`, like the Windows exe.
+
+**What changed** (Windows builds unchanged by construction: every switch is `__i386__` / `__x86_64__` / `_WIN32`):
+- Calling conventions: the 252 `__attribute__((regparm(n)))` are `BMX_REGPARM(n)` (compat/orig.h; the attribute on
+  i386 only), `BMX_CDECL` / `BMX_STDCALL` are empty off i386 and Windows, the trap entries' `cdecl` is
+  `BMX_TRAP_CDECL`. tools/gen_hooks.py, audit_common.py and void_eax_audit.py accept `BMX_REGPARM(n)` before a
+  ported function. The hook build's bmxtest.dll and dinput.dll have byte-identical `.text` and `.data` (and `.reloc`)
+  (`.rdata` differs only in the CodeView GUID of the debug directory).
+- x87 state: the x87 control word on arm64 is x87soft's variable (`bmxX87ControlWord` / `bmxX87SetControlWord`,
+  which the driver's camera mode sets: 24 bit, round down). rw/rwd3d.h copies its rounding mode into FPCR's RMode
+  (compat/fpu.h) where x86 copies it into MXCSR, so the float code inside rwD3DRoundBegin / End rounds down as the
+  SSE code does on x86 (`rwD3DFistp` = `rintf` in the current mode, 0x80000000 out of range, like cvtss2si).
+  `DRV_FPU_GUARDED` saves and restores FPCR (in the MXCSR slot) and the control word around SDL GPU calls.
+  `fnclex` (crtFpInit) is x86 only.
+  `BMX_FP_OPAQUE(v)` (the negation guards of rw/*.c) is `"+x"` on x86, `"+w"` on arm64.
+- `-ffp-contract=off` for every arm64 object (no fused multiply-adds); `-fms-extensions -fno-math-errno` like the
+  Windows toolchains. The game objects stay `-ffreestanding -fno-builtin`.
+- compat/crt.c: `rep movsb` / `rep stosb` only on x86 (byte loops elsewhere; clang vectorises them and does not
+  turn them back into memcpy calls, checked in the disassembly); no MSVC `__chkstk` off Windows.
+- The PNG reader's error jump: the png struct starts with the C library's `jmp_buf` on arm64 (`setjmp` /
+  `longjmp`, declared `returns_twice` for the `-fno-builtin` objects); x86_64 keeps `__builtin_setjmp`.
+- The naked i386 entries (`BMX_X86_ENTRY`) are `brk #1` on arm64; the import thunks of src/data/imports.c are
+  `adrp / ldr / br x16` (Mach-O and ELF spellings).
+- src/native: loader.c, trap.c and crt.c have POSIX halves (`#if defined(_WIN32)`, so a Linux build can share
+  them): `bmxExitProcess` (ExitProcess; elsewhere stdio flushed, `_exit`); the dead-slot and trap stubs are C
+  functions, one per index (no code is written at run time: macOS signs every code page), and `bmxRealProc`
+  returns NULL (the Windows-comparing checks report themselves unavailable; `BMX_FILE_CHECK` is ignored); the
+  fault handler is `sigaction` (SIGSEGV / BUS / ILL / FPE / TRAP) with pc, sp and lr from the signal context
+  (`BMX_NO_TRAP=1` leaves faults to a debugger); bmxnative.log next to the executable (`_NSGetExecutablePath`,
+  `/proc/self/exe`); `BMX_GUARD_HEAP` on mmap / mprotect with the system page size (16 KB). `__ImageBase` is
+  `__dso_handle`.
+- The opt-in replacements (smooth mixer, wide HUD, full draw distance; all on by default) are jumps written over
+  our own functions on Windows. Elsewhere winchanMix, ngifDrawList and ngiffxAdaptQuality start with
+  `BMX_REDIRECT_VOID`, a call through a slot their provider fills (`BMX_REDIRECT_SLOT` / `_SET`, compat/orig.h; no
+  code at all on Windows). The log says `N redirects` instead of `N jumps`.
+- LP64: `long` is 64 bits. No game struct holds one; the `(long)` printf arguments go through our own formatter,
+  which reads `%ld` as 32 bits (correct for the low half of a 64-bit slot); `crtStrtoul` emulates MSVC's 32-bit
+  `unsigned long` (saturates at 0xffffffff, negates in 32 bits); the game's sscanf formats are `%d` / `%X` only.
+- Linking: src/data keeps the original's layout, including a table of pointers at odd addresses (`BmxUnalignedPtr`,
+  a CRT switch table nothing reaches); Mach-O's chained fixups refuse those, so bmxnative links with
+  `-Wl,-no_fixup_chains`.
+- Shaders (X5-A): tools/shaders.sh converts the SPIR-V to MSL 2.1 with SPIRV-Cross and writes it as a third array
+  (`<name>_msl`, the source text) into src/driver/shaders/*.h; `tools/shaders.sh --msl-only` redoes only the MSL
+  from the SPIR-V already in the headers (no dxc; that is how the committed MSL was made). SPIRV-Cross's default
+  indices are SDL3's MSL layout for these shaders (uniform buffer 0 at `[[buffer(0)]]`, texture and sampler 0,
+  `[[stage_in]]` attributes by location; entry points keep their names). draw.c picks DXIL, then SPIR-V, then MSL.
+- Paths (docs/PLATFORM.md P18): `bmxPathResolve` turns `\` into `/` and, for a path that does not exist as
+  written, matches each component without regard to case (unit-checked with a case-sensitive `access` on the game
+  folder: `bin\audio\MUSIC.ZSD` -> `bin/audio/music.zsd`, `ASSETS\tables.ZAL` -> `Assets/tables.zal`; macOS's
+  default APFS is case-insensitive anyway, Linux and case-sensitive volumes need it). crt.c's fopen, the sound
+  loader's CreateFileA and the AVI reader go through it. **Locations:** saves stay in the game folder's `save\`
+  (as on Windows; the P18 profile redirect is still open); bmxnative.ini is read from `BMX_CONFIG`, else next to the
+  executable (`Contents/Resources` in the bundle), else `~/Library/Application Support/opendmfbmx/bmxnative/`
+  (SDL_GetPrefPath); bmxnative.log is written next to the executable.
+- Headless message boxes: with `SDL_VIDEODRIVER=offscreen` or `dummy` a MessageBoxA is logged and answered as
+  closed (SDL would still show a Cocoa alert).
+- CMakeLists.txt: a non-Windows branch (find_package(SDL3), rpath, bmxwidetest / bmxhftest, the bundle target);
+  bmxplatformtest and bmxmovietest stay Windows-only (they compare with Windows' DLLs).
+
+**Verified (on the Mac):** the hook build (bmxtest.dll / dinput.dll code identical to before) and
+`tests/oracle/run.sh -n 5` with the game files (3009/3009); the format check; the macos build warning-free;
+bmxwidetest (849 checks) and bmxhftest (329) pass on arm64; every source of the native build compiles
+(`-fsyntax-only`, `-Werror`) for i686-w64-mingw32 and x86_64-w64-mingw32 against the mingw-w64 headers. Headless
+start (`SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy BMX_MUTE=1 BMX_KEYS=...` in an install-layout view of the
+game folder, from build/macos and from the bundle): import slots (69 stand-ins, 68 dead, 0 real), 3061 original
+addresses served, config, the three redirects, the window, then `SDL_CreateGPUDevice failed: No supported SDL_GPU
+backend found!` and a clean exit. SDL's Metal backend needs a Cocoa (or UIKit) video driver, and the offscreen
+driver cannot make a window without EGL, so no headless run gets past device creation: rendering, the MSL shaders
+and sim-hash replays are untested.
+
+**For the Windows machine to re-check:** `native32` and `native64` build warning-free; the gate
+(tools/check.sh, including clang-tidy with `-p build/native32` on src/native, src/platform, src/driver, src/png);
+the scripted ride and the user's recording give the same BMX_SIM_HASH as before on both widths (the changes there
+are new `#if` branches, the emulated FPU word unused, `describe()` comparing with `uintptr_t`, `bmxExitProcess`
+around ExitProcess, the draw.c shader selection rewritten); `tools/shaders.sh` (with dxc and spirv-cross) still
+regenerates DXIL / SPIR-V byte-identical and the same MSL; bmxplatformtest.
+
+**Left:** the sim hash on arm64 against native32 (needs a run past the GPU device); a run with a real window on the
+Mac (the user's call: menus, a level, the MSL output against the Windows frames, audio); input on macOS (DirectInput
+stand-in on SDL3; untested), the movie path; saves in a per-user folder (P18 seam); a Universal or x86_64 macOS build
+(not needed for X5); notarisation / a proper Info.plist and icon; Linux (X4) can reuse the POSIX halves and the path
+resolver. Observed on the way: on Windows x86_64 the loader's machine-code dead-slot and trap stubs push their
+arguments i386-style while `deadSlot` / `bmxOrigTrap` read registers there, so their reports would show garbage on
+native64 (only reached in a failure; the C stubs above would fix it).
 
 
 ### X5 part 2 (portable x87, 2026-11-06)

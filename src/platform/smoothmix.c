@@ -318,5 +318,6 @@ const BmxHook *bmxSmoothJumps(uint32_t *count)
     gJumps[0].orig = (uintptr_t)winchanMix;
     gJumps[0].impl = (void *)bmxSmoothMix;
     *count = gMode != 0 ? 1u : 0u;
+    BMX_REDIRECT_SET(winchanMix, gMode != 0 ? bmxSmoothMix : NULL); /* no jumps (compat/orig.h) */
     return gJumps;
 }

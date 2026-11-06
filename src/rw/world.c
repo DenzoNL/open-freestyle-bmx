@@ -150,7 +150,7 @@ static RpPVSWorldData *pvsData(const RpWorld *world)
 
 /* Puts the camera into the world (the body of RpWorldAddCamera: EAX = world, EDX = camera). */
 BMX_ADDR(0x004b81f8)
-__attribute__((regparm(2))) RpWorld *rpWorldAddCameraBody(RpWorld *world, RwCamera *camera)
+BMX_REGPARM(2) RpWorld *rpWorldAddCameraBody(RpWorld *world, RwCamera *camera)
 {
     RpWorldCameraData *data = cameraData(camera);
     RwFrame *frame = RwCameraGetFrame(camera);
@@ -245,7 +245,7 @@ int _rpTieDestroy(RpTie *tie)
 
 /* Adds the clump to the world, ties its atomics to the sectors; 0 (error 3) if it is in a world already. */
 BMX_ADDR(0x004b86a8)
-__attribute__((regparm(2))) RpWorld *rpWorldAddClumpBody(RpWorld *world, RpClump *clump)
+BMX_REGPARM(2) RpWorld *rpWorldAddClumpBody(RpWorld *world, RpClump *clump)
 {
     RpWorld **slot = clumpWorldSlot(clump);
     if (*slot != NULL) {
@@ -304,7 +304,7 @@ RpWorld *RpClumpGetWorld(const RpClump *clump)
  * lights, whose frame is updated first, to the other.
  */
 BMX_ADDR(0x004b8af8)
-__attribute__((regparm(2))) RpWorld *rpWorldAddLightBody(RpWorld *world, RpLight *light)
+BMX_REGPARM(2) RpWorld *rpWorldAddLightBody(RpWorld *world, RpLight *light)
 {
     *lightWorldSlot(light) = world;
     if (light->object.object.subType < 0x80) {
@@ -543,7 +543,7 @@ static void sectorLeafDeinit(RpWorldSector *sector)
 
 /* Releases the ties and plugin data of every leaf below the sector (the sectors' memory stays). */
 BMX_ADDR(0x004ba760)
-__attribute__((regparm(1))) void rpSectorTreeDeinit(RpSector *sector)
+BMX_REGPARM(1) void rpSectorTreeDeinit(RpSector *sector)
 {
     if (sector->type == -1) {
         sectorLeafDeinit((RpWorldSector *)sector);
@@ -566,7 +566,7 @@ static void sectorFreeBlock(void *slot)
 
 /* Destroys the sector and everything below it: ties, plugin data, geometry arrays and the sectors. */
 BMX_ADDR(0x004ba820)
-__attribute__((regparm(1))) void rpSectorTreeDestroy(RpSector *sector)
+BMX_REGPARM(1) void rpSectorTreeDestroy(RpSector *sector)
 {
     if (sector->type == -1) {
         RpWorldSector *leaf = (RpWorldSector *)sector;
@@ -594,7 +594,7 @@ __attribute__((regparm(1))) void rpSectorTreeDestroy(RpSector *sector)
  * The original is only entered by its caller at 0x4bb080 and by that stub, so only this entry is hooked.
  */
 BMX_ADDR(0x004ba9c4)
-__attribute__((regparm(1))) int rpWorldDestroyBody(RpWorld *world)
+BMX_REGPARM(1) int rpWorldDestroyBody(RpWorld *world)
 {
     if (rpWorldModuleCount == 0) {
         reportError(kWorldPluginId, rwERR_NOTOPEN);
@@ -833,7 +833,7 @@ static int sameSign(float a, float b)
  * of a NaN b; the x87 keeps it). */
 static double subtractOpaque(double a, double b)
 {
-    __asm__("" : "+x"(b));
+    BMX_FP_OPAQUE(b);
     return a - b;
 }
 
@@ -866,10 +866,11 @@ static float planeDistance(const RwV3d *end, int32_t axisOffset, float value)
  * NULL result stops the walk. Returns the world.
  */
 BMX_ADDR(0x004bcd90)
-__attribute__((regparm(3))) RpWorld *
-rpWorldForAllSectorsIntersectingLine(RpWorld *world, RpIntersection *intersection,
-                                     RpIntersectionCallBackWorldSector callback, int32_t unused0,
-                                     int32_t unused1, int32_t unused2, RpIntersection *again, void *data)
+BMX_REGPARM(3)
+RpWorld *rpWorldForAllSectorsIntersectingLine(RpWorld *world, RpIntersection *intersection,
+                                              RpIntersectionCallBackWorldSector callback, int32_t unused0,
+                                              int32_t unused1, int32_t unused2, RpIntersection *again,
+                                              void *data)
 {
     (void)unused0;
     (void)unused1;
@@ -996,10 +997,11 @@ static float farFaceSquare(float inf, float sup, float v)
  * intersection; a NULL result stops the walk. Returns the world (NULL for a negative radius).
  */
 BMX_ADDR(0x004bda80)
-__attribute__((regparm(3))) RpWorld *
-rpWorldForAllSectorsIntersectingSphere(RpWorld *world, RpIntersection *intersection,
-                                       RpIntersectionCallBackWorldSector callback, int32_t unused0,
-                                       int32_t unused1, int32_t unused2, RpIntersection *again, void *data)
+BMX_REGPARM(3)
+RpWorld *rpWorldForAllSectorsIntersectingSphere(RpWorld *world, RpIntersection *intersection,
+                                                RpIntersectionCallBackWorldSector callback, int32_t unused0,
+                                                int32_t unused1, int32_t unused2, RpIntersection *again,
+                                                void *data)
 {
     (void)unused0;
     (void)unused1;
@@ -1295,7 +1297,7 @@ void *pvsSectorUnload(void *sector)
 /* a - b with b opaque to the optimiser (see subtractOpaque: the sign of a NaN decides). */
 static float pvsSubtract(float a, float b)
 {
-    __asm__("" : "+x"(b));
+    BMX_FP_OPAQUE(b);
     return a - b;
 }
 
@@ -1307,7 +1309,7 @@ static float pvsSubtract(float a, float b)
  * the first row.
  */
 BMX_ADDR(0x004cc3c0)
-__attribute__((regparm(2))) const uint8_t *pvsCellRow(const RpWorldSector *sector, const float *position)
+BMX_REGPARM(2) const uint8_t *pvsCellRow(const RpWorldSector *sector, const float *position)
 {
     const RwV3d *vertices = sector->vertices;
     const RpPVSWorldData *pvs = pvsData(rpWorldSectorGetWorld((RpWorldSector *)(uintptr_t)sector));
@@ -1557,7 +1559,7 @@ int32_t rpPVSCountSectors(RpWorld *world)
 /* Destroys the camera, rasters and image of a PVS generation (EAX = world; the generation's world is the
  * argument). */
 BMX_ADDR(0x004ce890)
-__attribute__((regparm(1))) void rpPVSCameraDestroy(RpWorld *world)
+BMX_REGPARM(1) void rpPVSCameraDestroy(RpWorld *world)
 {
     RwImageFreePixels(rpPVSImage);
     RwImageDestroy(rpPVSImage);
@@ -1908,7 +1910,7 @@ void *rpWorldSectorRenderCurrent(RpWorldSector *sector)
  * ties with collision first, then those without. An atomic is stamped with the render frame whether or not
  * it is inside the frustum. */
 BMX_ADDR(0x004ba360)
-__attribute__((regparm(1))) void rpSectorRenderAtomics(RpWorldSector *sector)
+BMX_REGPARM(1) void rpSectorRenderAtomics(RpWorldSector *sector)
 {
     RwLLLink *lists[2] = {&sector->collAtomicsInWorldSector, &sector->noCollAtomicsInWorldSector};
     for (int i = 0; i < 2; i++) {
@@ -1953,7 +1955,7 @@ RpLight *rpLightApplyToObject(RpLight *light, RpLightApplyArgs *args)
 /* Calls the callback on every light of the current world's ambient/directional list (EAX = callback, EDX =
  * data), until it says no; always 1. */
 BMX_ADDR(0x004b9ac8)
-__attribute__((regparm(2))) int rpWorldForAllDirectionalLights(RwObjectCallBack callback, void *data)
+BMX_REGPARM(2) int rpWorldForAllDirectionalLights(RwObjectCallBack callback, void *data)
 {
     RwLLLink *head = &((RpWorld *)RwEngineInstance->curWorld)->directionalLightList;
     RwLLLink *link = head->next;
@@ -1971,8 +1973,8 @@ __attribute__((regparm(2))) int rpWorldForAllDirectionalLights(RwObjectCallBack 
 /* Calls the callback on every light tied to the sector (EAX = sector, EDX = callback, ECX = data), until it
  * says no; the sector. */
 BMX_ADDR(0x004b9b2c)
-__attribute__((regparm(3))) RpWorldSector *rpSectorForAllLights(RpWorldSector *sector,
-                                                                RwObjectCallBack callback, void *data)
+BMX_REGPARM(3)
+RpWorldSector *rpSectorForAllLights(RpWorldSector *sector, RwObjectCallBack callback, void *data)
 {
     RwLLLink *head = &sector->lightsInWorldSector;
     RwLLLink *link = head->next;
@@ -2023,7 +2025,7 @@ static RpWorldAtomicData *atomicData(const RpAtomic *atomic)
 
 /* Records the world in the atomic and refreshes its frame's objects; no sector ties yet. */
 BMX_ADDR(0x004b82b8)
-__attribute__((regparm(2))) RpWorld *rpWorldAddAtomicBody(RpWorld *world, RpAtomic *atomic)
+BMX_REGPARM(2) RpWorld *rpWorldAddAtomicBody(RpWorld *world, RpAtomic *atomic)
 {
     RpWorldAtomicData *data = atomicData(atomic);
     RwFrame *frame = atomic->object.object.parent;
@@ -2037,7 +2039,7 @@ __attribute__((regparm(2))) RpWorld *rpWorldAddAtomicBody(RpWorld *world, RpAtom
 
 /* Frees what the atomic has cached for rendering and its ties with sectors, and leaves the world. */
 BMX_ADDR(0x004b82f8)
-__attribute__((regparm(2))) RpWorld *rpWorldRemoveAtomicBody(RpWorld *world, RpAtomic *atomic)
+BMX_REGPARM(2) RpWorld *rpWorldRemoveAtomicBody(RpWorld *world, RpAtomic *atomic)
 {
     RpWorldAtomicData *data = atomicData(atomic);
     if (atomic->repEntry != NULL) {
@@ -2076,7 +2078,7 @@ void *rpWorldRemoveAtomicCallback(void *atomic, void *world)
 
 /* Destroys the ties of the atomic (the ones with both ends set; the others stay in its list). */
 BMX_ADDR(0x004b78b0)
-__attribute__((regparm(1))) void rpAtomicTiesDestroy(RpAtomic *atomic)
+BMX_REGPARM(1) void rpAtomicTiesDestroy(RpAtomic *atomic)
 {
     RwLLLink *end = &atomic->llWorldSectorsInAtomic;
     RwLLLink *link = end->next;
@@ -2094,7 +2096,7 @@ __attribute__((regparm(1))) void rpAtomicTiesDestroy(RpAtomic *atomic)
 /* a - b with b opaque to the optimiser (no rewrite as a + -b, which flips the sign of a NaN b). */
 static double worldSub(double a, double b)
 {
-    __asm__("" : "+x"(b));
+    BMX_FP_OPAQUE(b);
     return a - b;
 }
 
@@ -2108,7 +2110,7 @@ static double worldSub(double a, double b)
  * set) and the atomic's list. EAX = world, EDX = atomic.
  */
 BMX_ADDR(0x004b7920)
-__attribute__((regparm(2))) void rpAtomicAddTies(RpWorld *world, RpAtomic *atomic)
+BMX_REGPARM(2) void rpAtomicAddTies(RpWorld *world, RpAtomic *atomic)
 {
     const RwSphere *sphere = RpAtomicGetWorldBoundingSphere(atomic);
     const float x = sphere->center.x;
@@ -2203,7 +2205,7 @@ static float worldAxis(const float *v, int32_t type)
  * integer). The array grows by 50 entries; without memory the error is set and the list keeps what it has.
  */
 BMX_ADDR(0x004b7e80)
-__attribute__((regparm(2))) RpWorld *rpWorldCameraSyncSectors(RpWorld *world, RwCamera *camera)
+BMX_REGPARM(2) RpWorld *rpWorldCameraSyncSectors(RpWorld *world, RwCamera *camera)
 {
     const int32_t offset = rpWorldCameraOffset;
     RpWorldCameraData *data = (RpWorldCameraData *)((uint8_t *)camera + offset);
@@ -2311,7 +2313,7 @@ RwCamera *WorldCameraSync(RwCamera *camera)
 
 /* Destroys the ties of the light with sectors. */
 BMX_ADDR(0x004b7b40)
-__attribute__((regparm(1))) void rpLightTiesDestroy(RpLight *light)
+BMX_REGPARM(1) void rpLightTiesDestroy(RpLight *light)
 {
     RwLLLink *end = &light->sectors;
     RwLLLink *link = end->next;

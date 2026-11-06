@@ -107,14 +107,14 @@ RpClump *RpClumpRender(RpClump *clump);
 /* Also declared in rwmath.h. */
 // NOLINTNEXTLINE(readability-redundant-declaration)
 RpClump *RpClumpForAllAtomics(RpClump *clump, RwObjectCallBack callback, void *data);
-__attribute__((regparm(1))) int RpAtomicDestroy(RpAtomic *atomic);
-__attribute__((regparm(1))) RpAtomic *RpAtomicClone(RpAtomic *source);
+BMX_REGPARM(1) int RpAtomicDestroy(RpAtomic *atomic);
+BMX_REGPARM(1) RpAtomic *RpAtomicClone(RpAtomic *source);
 RpAtomic *rwClumpCloneAtomic(RpAtomic *atomic, RwClumpCloneData *data);
 RpClump *RpClumpClone(RpClump *source);
 RpAtomic *rwClumpDestroyAtomic(RpAtomic *atomic, void *data);
 int RpClumpDestroy(RpClump *clump);
 int rpWorldExtAttachNothing(void);
-__attribute__((regparm(1))) int rpRasterFormatHasAlpha(uint32_t format);
+BMX_REGPARM(1) int rpRasterFormatHasAlpha(uint32_t format);
 int rpMeshCompareMaterials(const RpMesh *const *a, const RpMesh *const *b);
 /*
  * Vertex type and size (bytes) of the instancing pipelines' vertices, by rpGEOMETRYTEXTURED / the world's
@@ -128,10 +128,10 @@ int rpMeshCompareMaterials(const RpMesh *const *a, const RpMesh *const *b);
 int rpWorldPipelineInit(struct RwIm3DPipeline *pipeline);
 int rpAtomicPipelineInit(struct RwIm3DPipeline *pipeline);
 RpAtomic *RpAtomicSetGeometry(RpAtomic *atomic, RpGeometry *geometry, uint32_t flags);
-__attribute__((regparm(1))) void rpAtomicUpdateBoundingSphere(RpAtomic *atomic);
+BMX_REGPARM(1) void rpAtomicUpdateBoundingSphere(RpAtomic *atomic);
 RpAtomic *rpAtomicSyncCallback(RpAtomic *atomic);
 RpAtomic *rpAtomicRenderCallback(RpAtomic *atomic);
-__attribute__((regparm(1))) int rpClumpEntryDestroy(RpClump *clump);
+BMX_REGPARM(1) int rpClumpEntryDestroy(RpClump *clump);
 int rpClumpFreeListDestroyCB(void *clump, void *data);
 void rpAtomicFreeListDestroyCB(void *atomic, void *data);
 void *rpClumpDefaultCallback(void *clump);
@@ -142,10 +142,10 @@ void rpGeometryFreeListDestroyCB(void *geometry, void *data);
 void *_rpGeometryClose(void *engine);
 void *_rpMeshOpen(void *engine, int32_t offset);
 void *_rpMeshClose(void *engine);
-__attribute__((regparm(2))) void RpClumpAddAtomic(RpClump *clump, RpAtomic *atomic);
+BMX_REGPARM(2) void RpClumpAddAtomic(RpClump *clump, RpAtomic *atomic);
 RpClump *RpClumpStreamRead(RwStream *stream);
-__attribute__((regparm(2))) RpAtomic *RpAtomicStreamRead(RwStream *stream, RwFrameList *frameList);
-__attribute__((regparm(2))) RpAtomic *RpAtomicSetFrame(RpAtomic *atomic, RwFrame *frame);
+BMX_REGPARM(2) RpAtomic *RpAtomicStreamRead(RwStream *stream, RwFrameList *frameList);
+BMX_REGPARM(2) RpAtomic *RpAtomicSetFrame(RpAtomic *atomic, RwFrame *frame);
 
 /* ---- geometries ------------------------------------------------------------------------------------- */
 
@@ -159,8 +159,7 @@ RpMaterial *RpGeometryGetMaterial(RpGeometry *geometry, int32_t index);
 int32_t RpGeometryGetNumMaterials(const RpGeometry *geometry);
 RpGeometry *RpGeometryLock(RpGeometry *geometry, int32_t lockMode);
 RpGeometry *RpGeometryUnlock(RpGeometry *geometry);
-__attribute__((regparm(3))) RpGeometry *RpGeometryCreate(int32_t numVertices, int32_t numTriangles,
-                                                         uint32_t format);
+BMX_REGPARM(3) RpGeometry *RpGeometryCreate(int32_t numVertices, int32_t numTriangles, uint32_t format);
 RpGeometry *RpGeometryAddRef(RpGeometry *geometry);
 int RpGeometryDestroy(RpGeometry *geometry);
 uint32_t RpGeometryGetFlags(const RpGeometry *geometry);
@@ -190,8 +189,8 @@ int32_t _rwPluginRegistryGetSize(const RwPluginRegistry *registry, const void *o
 
 /* Textures in streams (the string chunks of a texture chunk). */
 int32_t RwTextureStreamGetSize(const RwTexture *texture);
-__attribute__((regparm(2))) const char *rwStreamWriteString(const char *string, RwStream *stream);
-__attribute__((regparm(1))) char *rwStreamReadString(RwStream *stream);
+BMX_REGPARM(2) const char *rwStreamWriteString(const char *string, RwStream *stream);
+BMX_REGPARM(1) char *rwStreamReadString(RwStream *stream);
 RwTexture *RwTextureStreamWrite(RwTexture *texture, RwStream *stream);
 RwTexture *RwTextureStreamRead(RwStream *stream);
 int32_t RwTextureGetMipmapping(void);
@@ -242,24 +241,21 @@ RpWorld *_rpWorldGenerateSectorMeshes(RpWorld *world);
 
 /* Sector and plane readers/writers: register arguments (EAX, EDX, ECX), then stack slots of which only the
  * fourth (the format flags) is read; the three pads stand for the slots the original never reads. */
-__attribute__((regparm(3))) int32_t rpSectorDataSize(const RpWorldSector *sector, const void *unused,
-                                                     uint32_t flags);
-__attribute__((regparm(3))) int32_t rpSectorStreamGetSize(const RpWorldSector *sector, const void *unused,
-                                                          uint32_t flags);
-__attribute__((regparm(3))) int32_t rpBspStreamGetSize(const RpPlaneSector *node, const void *unused,
-                                                       uint32_t flags);
-__attribute__((regparm(3))) RpWorldSector *rpSectorStreamWrite(const RpWorldSector *sector, RwStream *stream,
-                                                               const void *unused, int32_t pad0, int32_t pad1,
-                                                               int32_t pad2, uint32_t flags);
-__attribute__((regparm(3))) RpPlaneSector *rpBspStreamWrite(const RpPlaneSector *node, RwStream *stream,
-                                                            const void *world, int32_t pad0, int32_t pad1,
-                                                            int32_t pad2, uint32_t flags);
-__attribute__((regparm(3))) RpWorldSector *rpSectorStreamRead(RwStream *stream, uint8_t **cursor,
-                                                              const void *world, int32_t pad0, int32_t pad1,
-                                                              int32_t pad2, uint32_t flags);
-__attribute__((regparm(3))) RpPlaneSector *rpBspStreamRead(RwStream *stream, uint8_t **cursor,
-                                                           const void *world, int32_t pad0, int32_t pad1,
-                                                           int32_t pad2, uint32_t flags);
+BMX_REGPARM(3) int32_t rpSectorDataSize(const RpWorldSector *sector, const void *unused, uint32_t flags);
+BMX_REGPARM(3) int32_t rpSectorStreamGetSize(const RpWorldSector *sector, const void *unused, uint32_t flags);
+BMX_REGPARM(3) int32_t rpBspStreamGetSize(const RpPlaneSector *node, const void *unused, uint32_t flags);
+BMX_REGPARM(3)
+RpWorldSector *rpSectorStreamWrite(const RpWorldSector *sector, RwStream *stream, const void *unused,
+                                   int32_t pad0, int32_t pad1, int32_t pad2, uint32_t flags);
+BMX_REGPARM(3)
+RpPlaneSector *rpBspStreamWrite(const RpPlaneSector *node, RwStream *stream, const void *world, int32_t pad0,
+                                int32_t pad1, int32_t pad2, uint32_t flags);
+BMX_REGPARM(3)
+RpWorldSector *rpSectorStreamRead(RwStream *stream, uint8_t **cursor, const void *world, int32_t pad0,
+                                  int32_t pad1, int32_t pad2, uint32_t flags);
+BMX_REGPARM(3)
+RpPlaneSector *rpBspStreamRead(RwStream *stream, uint8_t **cursor, const void *world, int32_t pad0,
+                               int32_t pad1, int32_t pad2, uint32_t flags);
 RpWorld *RpWorldStreamWrite(RpWorld *world, RwStream *stream);
 RpWorld *RpWorldStreamRead(RwStream *stream);
 
@@ -271,6 +267,6 @@ typedef struct RwIndexList {
 
 RwIndexList *rpMeshSeparateTriangles(RwIndexList *list);
 /* Zeroes size bytes (EAX = buffer, EDX unused, ECX = size) and returns the buffer. */
-__attribute__((regparm(3))) void *rwZeroBytes(void *buffer, int32_t unused, uint32_t size);
+BMX_REGPARM(3) void *rwZeroBytes(void *buffer, int32_t unused, uint32_t size);
 
 #endif

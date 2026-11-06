@@ -90,8 +90,8 @@ RtCharset *RtCharsetGetDesc(RtCharset *charset, RtCharsetDesc *desc)
  * Returns the charset, 0 on failure. EAX = charset, EDX = foreground, ECX = background.
  */
 BMX_ADDR(0x004cb51c)
-__attribute__((regparm(3))) RtCharset *RtCharsetSetColors(RtCharset *charset, const RwRGBA *foreground,
-                                                          const RwRGBA *background)
+BMX_REGPARM(3)
+RtCharset *RtCharsetSetColors(RtCharset *charset, const RwRGBA *foreground, const RwRGBA *background)
 {
     if (charset == NULL || foreground == NULL || background == NULL) {
         rwReportNullError();
@@ -200,9 +200,9 @@ static void charsetCorner(RtCharsetVertex *vertex, int32_t x, int32_t y, int32_t
  * states set and restored. EAX = charset, EDX = text, ECX = x, y is the fourth stack word. Always 0.
  */
 BMX_ADDR(0x004cb860)
-__attribute__((regparm(3))) int rtCharsetPrintText(RtCharset *charset, const char *text, int32_t x,
-                                                   int32_t unused0, int32_t unused1, int32_t unused2,
-                                                   int32_t y)
+BMX_REGPARM(3)
+int rtCharsetPrintText(RtCharset *charset, const char *text, int32_t x, int32_t unused0, int32_t unused1,
+                       int32_t unused2, int32_t y)
 {
     (void)unused0;
     (void)unused1;

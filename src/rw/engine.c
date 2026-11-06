@@ -149,7 +149,7 @@ int RwEngineStart(void)
  * static instance and frees the new one.
  */
 BMX_ADDR(0x004cfe60)
-__attribute__((regparm(2))) int EngineOpen(const RwDevice *device, void *openParams)
+BMX_REGPARM(2) int EngineOpen(const RwDevice *device, void *openParams)
 {
     RwGlobals *instance = RwEngineInstance->memoryFuncs.rwmalloc((size_t)rwEngineRegistry.sizeOfStruct);
     RwEngineInstance = instance;

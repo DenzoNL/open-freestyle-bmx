@@ -82,7 +82,7 @@ void *rwD3DRasterHandle(const RwRaster *raster)
 
 /* 0x4d6840 (raster in EAX): rwRENDERSTATETEXTURERASTER. NULL draws with the vertex colours only. */
 BMX_ADDR(0x004d6840)
-__attribute__((regparm(1))) int rwD3DSetTextureRaster(RwRaster *raster)
+BMX_REGPARM(1) int rwD3DSetTextureRaster(RwRaster *raster)
 {
     RwD3DStateCache *s = &rwD3DState;
     const int32_t offset = rwD3DRasterExtOffset;
@@ -116,7 +116,7 @@ __attribute__((regparm(1))) int rwD3DSetTextureRaster(RwRaster *raster)
 
 /* 0x4d6ba0 (blend in EAX): rwRENDERSTATESRCBLEND, rwBLEND* 1..11 if the device has the matching cap. */
 BMX_ADDR(0x004d6ba0)
-__attribute__((regparm(1))) int rwD3DSetSrcBlend(int32_t blend)
+BMX_REGPARM(1) int rwD3DSetSrcBlend(int32_t blend)
 {
     if (blend < 1 || blend > 11 || (rwD3DCap(rwD3DCAPSSRCBLEND) & (1u << (blend - 1))) == 0) {
         return 0;
@@ -128,7 +128,7 @@ __attribute__((regparm(1))) int rwD3DSetSrcBlend(int32_t blend)
 
 /* 0x4d6f60 (blend in EAX): rwRENDERSTATEDESTBLEND. */
 BMX_ADDR(0x004d6f60)
-__attribute__((regparm(1))) int rwD3DSetDestBlend(int32_t blend)
+BMX_REGPARM(1) int rwD3DSetDestBlend(int32_t blend)
 {
     if (blend < 1 || blend > 11 || (rwD3DCap(rwD3DCAPSDESTBLEND) & (1u << (blend - 1))) == 0) {
         return 0;
@@ -139,7 +139,7 @@ __attribute__((regparm(1))) int rwD3DSetDestBlend(int32_t blend)
 
 /* 0x4d6530 (type in EAX): copies the fog table of a fog type (1 linear, 2 exponential, 3 squared). */
 BMX_ADDR(0x004d6530)
-__attribute__((regparm(1))) int rwD3DFogTableSelect(int32_t type)
+BMX_REGPARM(1) int rwD3DFogTableSelect(int32_t type)
 {
     const uint8_t *src;
 
@@ -166,7 +166,7 @@ static void buildFogSpecular(void)
 
 /* 0x4d6740 (type in EAX): rwRENDERSTATEFOGTYPE, if the device fogs vertices. */
 BMX_ADDR(0x004d6740)
-__attribute__((regparm(1))) int rwD3DSetFogType(int32_t type)
+BMX_REGPARM(1) int rwD3DSetFogType(int32_t type)
 {
     if ((rwD3DCap(rwD3DCAPSSHADE) & 0xc0000) == 0 || rwD3DFogTableSelect(type) == 0) {
         return 0;
@@ -178,7 +178,7 @@ __attribute__((regparm(1))) int rwD3DSetFogType(int32_t type)
 
 /* 0x4d67c0 (table in EAX): rwRENDERSTATEFOGTABLE, 256 bytes of the game's own. */
 BMX_ADDR(0x004d67c0)
-__attribute__((regparm(1))) int rwD3DSetFogTable(const uint32_t *table)
+BMX_REGPARM(1) int rwD3DSetFogTable(const uint32_t *table)
 {
     if ((rwD3DCap(rwD3DCAPSSHADE) & 0xc0000) == 0) {
         return 0;
@@ -241,7 +241,7 @@ static int setFilter(int32_t filter)
  * update, for unknown states and for values the device cannot do.
  */
 BMX_ADDR(0x004d7328)
-__attribute__((regparm(2))) int rwD3DSetRenderState(int32_t state, intptr_t arg)
+BMX_REGPARM(2) int rwD3DSetRenderState(int32_t state, intptr_t arg)
 {
     RwD3DStateCache *s = &rwD3DState;
     const int32_t value = (int32_t)arg; /* the number of the states that take one */

@@ -19,10 +19,16 @@ ORIG_FN(0x005070d0, void *, png_create_read_struct_2,
 ORIG_FN(0x00508e40, void *, png_create_info_struct, (void *png));
 /* The CRT setjmp (MSVC _setjmp3(buf, count, ...)): the original reads more stack slots than count names. */
 ORIG_FN(0x0051e008, int, _setjmp3, (void *jmpBuf, int count, ...));
-#if defined(BMX_IMAGE) && !defined(__i386__)
+#if defined(BMX_IMAGE) && defined(__x86_64__)
 /* x86_64: the CRT's setjmp is i386 code; the compiler's (5 pointer slots of the png struct's 64-byte jmp_buf;
  * png/png.c's png_error longjmps with the matching builtin). */
 #define _setjmp3(jmpBuf, count) __builtin_setjmp((void **)(jmpBuf))
+#elif defined(BMX_IMAGE) && !defined(__i386__)
+/* arm64 and others: no __builtin_setjmp; the C library's pair (the png struct starts with a jmp_buf there,
+ * png/png.c). Declared returns_twice here: the game objects are built with -fno-builtin. */
+#include <setjmp.h>
+int setjmp(jmp_buf env) __attribute__((returns_twice));
+#define _setjmp3(jmpBuf, count) setjmp(*(jmp_buf *)(jmpBuf))
 #endif
 ORIG_FN(0x005090f0, void, png_set_read_fn, (void *png, void *ioPtr, void *readFn));
 ORIG_FN(0x00507290, void, png_read_info, (void *png, void *info));
@@ -441,7 +447,7 @@ static void linkOut(RwLLLink *link)
  * own: it is 4 bytes behind RwTextureDestroy's entry (that jmp covers it) and its only caller 0x4df730 is
  * ported.
  */
-__attribute__((regparm(1))) int rwTextureRelease(RwTexture *texture)
+BMX_REGPARM(1) int rwTextureRelease(RwTexture *texture)
 {
     texture->refCount--;
     if (texture->refCount != 0) {
@@ -934,9 +940,9 @@ RwRaster *RwRasterSetFromImage(RwRaster *raster, RwImage *image)
  * 24 bit data is not swapped to RGB. 0 (and an error) for an unsupported combination.
  */
 BMX_ADDR(0x004e6440)
-__attribute__((regparm(3))) int BMPImageSetSpan(RwImage *image, int32_t row, const uint8_t *source,
-                                                int32_t reserved0, int32_t reserved1, int32_t reserved2,
-                                                int32_t srcDepth, int32_t flags)
+BMX_REGPARM(3)
+int BMPImageSetSpan(RwImage *image, int32_t row, const uint8_t *source, int32_t reserved0, int32_t reserved1,
+                    int32_t reserved2, int32_t srcDepth, int32_t flags)
 {
     (void)reserved0;
     (void)reserved1;
@@ -1735,13 +1741,13 @@ int rwImageFormatSucceed(void)
 /* Size of the file header (format 1, Windows, or 2, OS/2: 14 bytes) and of the info header (40 or 12). EAX.
  */
 BMX_ADDR(0x004e7860)
-__attribute__((regparm(1))) int32_t bmpFileHeaderSize(int32_t format)
+BMX_REGPARM(1) int32_t bmpFileHeaderSize(int32_t format)
 {
     return format == 1 || format == 2 ? 0xe : 0;
 }
 
 BMX_ADDR(0x004e7880)
-__attribute__((regparm(1))) int32_t bmpInfoHeaderSize(int32_t format)
+BMX_REGPARM(1) int32_t bmpInfoHeaderSize(int32_t format)
 {
     if (format == 1) {
         return 0x28;
@@ -1752,7 +1758,7 @@ __attribute__((regparm(1))) int32_t bmpInfoHeaderSize(int32_t format)
 /* Bytes of a row of `width` pixels of `bits` bits, padded to 32 bits (0 for another format). EAX, EDX, ECX.
  */
 BMX_ADDR(0x004e78a0)
-__attribute__((regparm(3))) uint32_t bmpRowBytes(int32_t format, int32_t bits, int32_t width)
+BMX_REGPARM(3) uint32_t bmpRowBytes(int32_t format, int32_t bits, int32_t width)
 {
     if (format != 1 && format != 2) {
         return 0;
@@ -1795,9 +1801,9 @@ static const uint8_t *bmpPixel(const RwImage *image, int32_t y, uint32_t x)
  * own failures are ignored.
  */
 BMX_ADDR(0x004e7920)
-__attribute__((regparm(3))) int32_t bmpWriteRows(RwStream *stream, uint32_t width, int32_t height,
-                                                 int32_t unused0, int32_t unused1, int32_t unused2,
-                                                 int32_t unused3, const RwImage *image)
+BMX_REGPARM(3)
+int32_t bmpWriteRows(RwStream *stream, uint32_t width, int32_t height, int32_t unused0, int32_t unused1,
+                     int32_t unused2, int32_t unused3, const RwImage *image)
 {
     (void)unused0;
     (void)unused1;
@@ -1850,9 +1856,9 @@ __attribute__((regparm(3))) int32_t bmpWriteRows(RwStream *stream, uint32_t widt
  * height and the image are the fourth and fifth stack words. Returns the bytes of the rows.
  */
 BMX_ADDR(0x004e7b60)
-__attribute__((regparm(3))) int32_t bmpWriteImage(RwStream *stream, int32_t format, int32_t width,
-                                                  int32_t unused0, int32_t unused1, int32_t unused2,
-                                                  int32_t height, const RwImage *image)
+BMX_REGPARM(3)
+int32_t bmpWriteImage(RwStream *stream, int32_t format, int32_t width, int32_t unused0, int32_t unused1,
+                      int32_t unused2, int32_t height, const RwImage *image)
 {
     (void)unused0;
     (void)unused1;
@@ -1954,10 +1960,9 @@ static char *imageNameBuffer(int32_t need)
  * is the fourth stack word.
  */
 BMX_ADDR(0x004e44f0)
-__attribute__((regparm(3))) const char *ImagePathForAllFullNames(const char *name, int32_t extra,
-                                                                 RwImagePathCallback callback,
-                                                                 int32_t unused0, int32_t unused1,
-                                                                 int32_t unused2, void *data)
+BMX_REGPARM(3)
+const char *ImagePathForAllFullNames(const char *name, int32_t extra, RwImagePathCallback callback,
+                                     int32_t unused0, int32_t unused1, int32_t unused2, void *data)
 {
     (void)unused0;
     (void)unused1;
@@ -2062,7 +2067,7 @@ const char *ImageAttempRead(char *name, void *data)
  * error (NULL). Bumps the destination's stamp. EAX = dest, EDX = source.
  */
 BMX_ADDR(0x004e3c08)
-__attribute__((regparm(2))) RwImage *rwImageCopyPixels(RwImage *dest, RwImage *source)
+BMX_REGPARM(2) RwImage *rwImageCopyPixels(RwImage *dest, RwImage *source)
 {
     const int32_t destDepth = dest->depth;
     const int32_t sourceDepth = source->depth;
@@ -2172,7 +2177,7 @@ RwImage *RwImageGammaCorrect(RwImage *image)
  * fault, as in the original. EAX = source, EDX = dest. Returns 1.
  */
 BMX_ADDR(0x004e0f10)
-__attribute__((regparm(2))) int rwImageBoxShrink(const RwImage *source, RwImage *dest)
+BMX_REGPARM(2) int rwImageBoxShrink(const RwImage *source, RwImage *dest)
 {
     const int32_t sourceWidth = source->width;
     const int32_t destWidth = dest->width;
@@ -2394,9 +2399,9 @@ static RwImage *imageResizeTo(RwImage *image, int32_t width, int32_t height)
  * before it are not read).
  */
 BMX_ADDR(0x004e0b10)
-__attribute__((regparm(3))) RwImage *rwTextureReadImage(const char *name, const char *maskName, int32_t width,
-                                                        int32_t unused0, int32_t unused1, int32_t unused2,
-                                                        int32_t height)
+BMX_REGPARM(3)
+RwImage *rwTextureReadImage(const char *name, const char *maskName, int32_t width, int32_t unused0,
+                            int32_t unused1, int32_t unused2, int32_t height)
 {
     (void)unused0;
     (void)unused1;
@@ -2731,7 +2736,7 @@ RwRaster *rwRasterGenerateMipmaps(RwRaster *raster, RwImage *image)
  * error) for a depth other than 4, 8 or 32; NULL when memory runs out. EAX = image, EDX = mask.
  */
 BMX_ADDR(0x004e3eb8)
-__attribute__((regparm(2))) RwImage *RwImageApplyMask(RwImage *image, RwImage *mask)
+BMX_REGPARM(2) RwImage *RwImageApplyMask(RwImage *image, RwImage *mask)
 {
     const int32_t depth = image->depth;
     if (depth == 4 || depth == 8) {
