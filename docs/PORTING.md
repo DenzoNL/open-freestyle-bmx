@@ -590,7 +590,7 @@ tick 1. It also means the 32-bit reference replays depended on the GPU driver.
    intends, on any driver and width. The 32-bit replays change once (new reference hashes).
 2. Imitate the accident on 64-bit (round down after the first pipeline): keeps the old reference hashes, but
    encodes this driver's quirk; another driver gives other results.
-Decision (2026-11-05, proposed, for the user to confirm): option 1.
+Decision (2026-11-05, confirmed by the user 2026-11-07): option 1.
 
 #### The engine instance's plugin data
 
@@ -602,7 +602,7 @@ start in seven: the shadow texture, then a crash in LoadTexture). The original h
    where the original read uninitialised memory.
 2. Initialise just the image module's two fields in `_rwImageOpen`: narrower, but any other module with the
    same assumption stays exposed.
-Decision (2026-11-05, proposed, for the user to confirm): option 1.
+Decision (2026-11-05, confirmed by the user 2026-11-07): option 1.
 
 **tools/data_size64.py** looks for the src/data class above: every `ORIG_VAR` site whose type, on 64-bit, reaches
 past the definition (or group member) that src/data gives its address, while it fits on 32-bit. It compiles a probe
