@@ -15,6 +15,64 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   workflow), not on push: run `tools/check.sh` locally before pushing. It has no assets, so
   the differential cases are skipped there and run locally.
 
+## Windows handover (2026-11-06, Mac session)
+
+The Mac session (12:30-17:00) added four platforms' worth of code. All of it builds; nothing new has run
+with a visible window yet. Details per slice in docs/PORTING.md: "X5 part 1" (macOS arm64), "X5 part 2"
+(portable x87), "X5 part 3" (headless null GPU), "X4 (Linux x64)", "X6 step 1 (Android arm64)".
+
+What changed that touches the Windows builds (all behind `#if` / new code paths, but unverified there):
+- `BMX_REGPARM(n)` / `BMX_CDECL` / `BMX_STDCALL` replace the raw i386 attributes (252 regparm sites). The hook
+  build's objects were compared byte for byte on the Mac (identical); native32/native64 not built.
+- `compat/x87.h` dispatches: the x87 asm (`bmxX87Hw*`) on x86 hook/native builds unless `BMX_X87_SOFT`, else
+  `compat/x87soft.c` (integer emulation of the x87). Control word through `bmxX87ControlWord()`.
+- New headless mode `BMX_GPU=null` (or `[video] backend = null`) in src/driver.
+- 64-bit bug fixed in game.c: the goal markers read `PhysFace` at 32-bit offsets (crashed on arm64 with a face
+  goal; native64 has the same bug, it only didn't show with your save).
+- src/native: POSIX halves; `bmxLog` declared once; tidy fixes in crt.c / trap.c / hfinterp.c; draw.c's shader
+  selection rewritten (DXIL, then SPIR-V, then MSL).
+
+**To do on the Windows PC, in this order** (PowerShell, repo root, after `git pull`):
+
+1. Build and gate: `cmake --build --preset native32`, `cmake --build --preset native64` (warning-free), then
+   `PYTHON=py tools/check.sh` (Git Bash) with native32 built. Fix anything Windows-only that broke.
+2. Shaders: `tools/shaders.sh` (dxc + spirv-cross) must regenerate the DXIL / SPIR-V headers byte-identically
+   and the same MSL.
+3. Replays unchanged on Windows: `tools/xcheck.py` with your recording and the scripted ride on native32 vs
+   native64, as before (same hashes as the X3 reference).
+4. Real x87 vs the portable emulation (only real hardware can say; PORTING.md "X5 part 2"):
+   `cmake --build --preset native64 --target bmxx87test`, run `build\native64\bmxx87test.exe`, and the same
+   for native32. Already run on nixbox's Intel i5-13400 (Linux): every game table, tan, AngleOfCosine, Rotate
+   and MatrixMultiply equal; **Fsin/Fcos on arbitrary run-time angles differ in ~1 of 100k cases**
+   (15-26 per 2M) and the scaled asin/atan with arbitrary scales in 54 of 250k (Intel's FSIN isn't exactly the
+   correctly rounded 66-bit-pi result the model computes). Your PC tells whether AMD/your CPU agrees with
+   Intel; then decide whether those last-bit cases matter (see 6).
+5. Headless vs windowed, and arm64 vs x86 end to end (PORTING.md "X5 part 3", needs an empty `save\` copy of
+   the game and an empty ini):
+   `py -I tools\xcheck.py --game-dir <game> --keys tools\scripts\ride.keys --args=-r640.480.16 --ini empty.ini --ref-hash data\simhash\ride.arm64.hash --out <abs path> build\native64\bmxnative.exe BMX_GPU=null build\native64\bmxnative.exe`
+   Expected: windowed, null and the arm64 reference identical (2973 ticks). Repeat with native32. Then the
+   end-to-end soft check: build `-DBMX_X87_SOFT=ON` into `build\native64-soft` and xcheck your recording on
+   both exes.
+6. nixbox finding (real Intel, Linux, headless): the same ride **trapped at frame ~900** ("There is already
+   a scene open", zscene.c:525 from ngifRunFrame) while macOS arm64 and Linux under Rosetta ran it fully. Being
+   investigated at hand-over time; see "nixbox ride" below for the result.
+
+**Mac (when at home, the user's call):** `nix develop -c cmake --preset macos && cmake --build --preset macos`
+(or `--target bmxnative_app`), run from a copy of the game folder: menus, a level, the MSL output against the
+Windows frames, input with a pad, a movie, audio. Untested so far: everything past GPU device creation.
+
+**Android (the Thor):** `nix develop .#android`, `tools/android_sdl3.sh`, `android/build.sh`; install
+`android/app/build/outputs/apk/debug/app-debug.apk`, `adb push <game>/. /sdcard/Android/data/org.opendmfbmx.app/files/game/`,
+then the 5-step list in PORTING.md "X6 step 1"; logcat tag `opendmfbmx`.
+
+**Linux:** `cmake --preset linux && cmake --build --preset linux` (built on nixbox and in an OrbStack Fedora
+amd64 VM `bmx-linux` on the Mac; delete it with `orb delete bmx-linux` when no longer needed). A windowed run
+and the Steam Deck are open.
+
+### nixbox ride
+
+(filled in below when the investigation reports)
+
 ## Next up (2026-10-31)
 
 - Game: 2117/2120 (WinMain, the EpicFail trap and the 1-byte crtNop stay original on purpose).

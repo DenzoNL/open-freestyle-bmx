@@ -68,7 +68,7 @@ def parse_runs(items):
 
 
 def run(exe, extra_env, game_dir, inputs, save, ini, out_dir, label, timeout, shots, exe_args):
-    hash_path = os.path.join(out_dir, f'{label}.hash')
+    hash_path = os.path.join(os.path.abspath(out_dir), f'{label}.hash')
     save_path = os.path.join(game_dir, 'save', 'SAVE.DAT')
     env = dict(os.environ)
     for k in ('BMX_KEYS', 'BMX_REPLAY', 'BMX_RECORD', 'BMX_SHOT', 'BMX_SHOT_FRAME', 'BMX_QUIT_FRAMES', 'BMX_GPU'):
