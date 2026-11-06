@@ -25,12 +25,27 @@ static const char kNotInitialized[] = "Not initialized";
 static const char kUnknownParameter[] = "Unknown parameter:%d";
 
 /* Statically linked RenderWare and engine routines this module calls (not ported). */
+/*
+ * zrwCameraSetClip (0x4929f0) and zrwCameraSetClipOffset (0x493100) take floats. The hook build calls the
+ * original by address and passes the same 32-bit words as the original (int 0 for the near clip, the offset's
+ * bits as an int), which on x86 cdecl is the same stack word as the float. The native exe calls the ports
+ * (zrwcam.c), so there the prototypes must say float: on x86_64 and arm64 an int argument goes to an integer
+ * register and the callee would read its floats from vector registers (near clip = the far value, far clip =
+ * garbage: no world sector or model in the frustum, a level showed only the fog / clear colour).
+ */
+#ifdef BMX_IMAGE
+ORIG_FN(0x004929f0, void, zrwSetClipPlane, (const void *camera, float nearClip, float farClip));
+ORIG_FN(0x00493100, void, zrwSetClipOffset, (const void *camera, float offset));
+#define ZRW_FLOAT_WORD(p) (*(const float *)(p))
+#else
 ORIG_FN(0x004929f0, void, zrwSetClipPlane, (const void *plane, int zero, float value));
+ORIG_FN(0x00493100, void, zrwSetClipOffset, (const void *a, int flags));
+#define ZRW_FLOAT_WORD(p) (*(const int *)(p))
+#endif
 ORIG_FN(0x004930a0, void, zrwSetViewport, (const void *camera, uint32_t value));
 ORIG_FN(0x004930b0, void, zrwSetViewWindow, (const void *a, const void *b));
 ORIG_FN(0x004930c0, void, zrwSetCameraPlane, (const void *camera, uint32_t flag));
 ORIG_FN(0x004930e0, void, zrwSetCameraOffset, (const void *a, const void *b));
-ORIG_FN(0x00493100, void, zrwSetCameraFlags, (const void *a, int flags));
 /* Ported in zrwtxr.c (its header cannot be included here: it clashes with the macros of zrwzgl.h). */
 void zrwSetMaterialParam(const void *value);
 void zrwSetMaterialValue(int value);
@@ -316,7 +331,7 @@ int zrwSetParameter(int id, const void *value, const void *extra)
         zrwSetCameraOffset(value, extra);
         return 1;
     case 9:
-        zrwSetCameraFlags(value, *(const int *)extra);
+        zrwSetClipOffset(value, ZRW_FLOAT_WORD(extra));
         return 1;
     case 0xc:
         gZrwFlags ^= (gZrwFlags ^ (uint32_t)(uintptr_t)value) & 1;

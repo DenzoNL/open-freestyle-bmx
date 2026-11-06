@@ -8,6 +8,7 @@
  * camera's end update, clears, the present and texture changes flush. Fans and strips become lists (SDL3 GPU
  * has no fans). Colour writes keep the target's alpha at 1 (the original's camera surfaces have no alpha).
  */
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -376,6 +377,87 @@ static SDL_GPUSampler *samplerFor(int forceLinear)
  * ------------------------------------------------------------------------------------------------- */
 
 /* D3DPRIMITIVETYPE: 2 line list, 3 line strip, 4 triangle list, 5 strip, 6 fan. */
+/* BMX_VTX_DUMP=<file>,<frame>: a text dump of every draw of one shown frame (the frame after `frame`
+ * presents): primitive type, the render / texture stage states the backend reads, the bound texture, the
+ * pixel shader uniforms the draw would get, every TL vertex (raw bits) and the indices. Written before the
+ * batch (also under BMX_GPU=null), so dumps of two builds can be diffed to find CPU-side differences.
+ * `<frame>` = `*`: one summary line (frame, type, vertex / index count, fog) per draw of the whole run
+ * instead. */
+static void dumpDraw(uint32_t type, const RwD3DTLVertex *vertices, uint32_t numVertices,
+                     const uint16_t *indices, uint32_t numIndices)
+{
+    static int state; /* 0 unparsed, 1 off, 2 on */
+    static FILE *out;
+    static int frame;
+    static uint32_t seq;
+
+    if (state == 1) {
+        return;
+    }
+    if (state == 0) {
+        const char *env = SDL_getenv("BMX_VTX_DUMP");
+        const char *comma = env != NULL ? SDL_strrchr(env, ',') : NULL;
+        char path[1024];
+
+        state = 1;
+        if (comma == NULL || (size_t)(comma - env) >= sizeof path) {
+            return;
+        }
+        SDL_memcpy(path, env, (size_t)(comma - env));
+        path[comma - env] = 0;
+        frame = comma[1] == '*' ? -1 : SDL_atoi(comma + 1);
+        out = fopen(path, "w");
+        if (out == NULL) {
+            bmxLog("driver: BMX_VTX_DUMP: cannot open %s\n", path);
+            return;
+        }
+        state = 2;
+    }
+    if (frame < 0) {
+        fprintf(out, "f%d %u %u %u fog %x\n", drvGpuShownFrames(), type, numVertices, numIndices,
+                rs[kRsFogEnable]);
+        return;
+    }
+    if (drvGpuShownFrames() != frame) {
+        if (drvGpuShownFrames() > frame && out != NULL) {
+            fclose(out);
+            out = NULL;
+            state = 1;
+        }
+        return;
+    }
+    fprintf(out, "draw %u type %u nv %u ni %u tex %d ui %d\n", seq++, type, numVertices, numIndices,
+            boundTexture != NULL, uiMode);
+    fprintf(out,
+            " rs z %x zw %x at %x src %x dst %x cull %x zf %x aref %x af %x ab %x fog %x spec %x fogc %08x\n",
+            rs[kRsZEnable], rs[kRsZWriteEnable], rs[kRsAlphaTestEnable], rs[kRsSrcBlend], rs[kRsDestBlend],
+            rs[kRsCullMode], rs[kRsZFunc], rs[kRsAlphaRef], rs[kRsAlphaFunc], rs[kRsAlphaBlendEnable],
+            rs[kRsFogEnable], rs[kRsSpecularEnable], rs[kRsFogColor]);
+    fprintf(out, " tss cop %x aop %x addr %x mag %x min %x\n", tss[kTssColorOp], tss[kTssAlphaOp],
+            tss[kTssAddress], tss[kTssMagFilter], tss[kTssMinFilter]);
+    for (uint32_t i = 0; i < numVertices; i++) {
+        const RwD3DTLVertex *v = &vertices[i];
+        uint32_t f[6];
+
+        SDL_memcpy(&f[0], &v->sx, 4);
+        SDL_memcpy(&f[1], &v->sy, 4);
+        SDL_memcpy(&f[2], &v->sz, 4);
+        SDL_memcpy(&f[3], &v->rhw, 4);
+        SDL_memcpy(&f[4], &v->u, 4);
+        SDL_memcpy(&f[5], &v->v, 4);
+        fprintf(out, " v %08x %08x %08x %08x c %08x s %08x uv %08x %08x  (%g %g %g %g %g %g)\n", f[0], f[1],
+                f[2], f[3], v->color, v->specular, f[4], f[5], (double)v->sx, (double)v->sy, (double)v->sz,
+                (double)v->rhw, (double)v->u, (double)v->v);
+    }
+    if (indices != NULL) {
+        fprintf(out, " i");
+        for (uint32_t i = 0; i < numIndices; i++) {
+            fprintf(out, " %u", indices[i]);
+        }
+        fprintf(out, "\n");
+    }
+}
+
 static void appendDraw(uint32_t type, const RwD3DTLVertex *vertices, uint32_t numVertices,
                        const uint16_t *indices, uint32_t numIndices)
 {
@@ -386,6 +468,7 @@ static void appendDraw(uint32_t type, const RwD3DTLVertex *vertices, uint32_t nu
     DrawCmd *cmd;
     int mode;
 
+    dumpDraw(type, vertices, numVertices, indices, numIndices);
     if (draw.color == NULL || n == 0 || numVertices == 0 || numVertices > 0x10000) {
         return;
     }

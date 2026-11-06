@@ -195,6 +195,25 @@ void *_rpLightClose(void *engine)
 }
 
 /*
+ * Calls the visitor's callback. The hook build passes the five words as the original does. The callbacks are
+ * the device's light routines (rwD3DApplyLight: work, light, matrix, float scale, surface), so the native exe
+ * calls them with that prototype: on x86_64 / arm64 the scale (`tail`, a float's bits) must go in a vector
+ * register, else the callee takes the float's bits for the surface pointer (crash in rwD3DLightDirectional).
+ */
+static void visitCall(RpLight *light, RpLightVisit *visit)
+{
+#ifdef BMX_IMAGE
+    float scale;
+
+    __builtin_memcpy(&scale, &visit->tail, sizeof scale);
+    ((void(BMX_CDECL *)(void *, RpLight *, void *, float, void *))visit->callback)(
+        visit->context, light, visit->block, scale, visit->extra);
+#else
+    visit->callback(visit->context, light, visit->block, visit->tail, visit->extra);
+#endif
+}
+
+/*
  * Visits a light once per light frame: when the light is enabled (flag bit 0) the callback of `visit` is
  * called with the visitor's context, the light, a copy of the visitor's matrix block and two more values;
  * the light is then stamped with the current frame (a halfword in the engine instance at 0x0c).
@@ -205,7 +224,7 @@ RpLight *rpLightVisitOnce(RpLight *light, RpLightVisit *visit)
     const uint16_t frame = RwEngineInstance->lightVisit;
     if (light->lightFrame != frame) {
         if ((light->object.object.flags & 1) != 0) {
-            visit->callback(visit->context, light, visit->block, visit->tail, visit->extra);
+            visitCall(light, visit);
         }
         light->lightFrame = frame;
     }
@@ -217,7 +236,7 @@ BMX_ADDR(0x004b17c0)
 RpLight *rpLightVisitEnabled(RpLight *light, RpLightVisit *visit)
 {
     if ((light->object.object.flags & 1) != 0) {
-        visit->callback(visit->context, light, visit->block, visit->tail, visit->extra);
+        visitCall(light, visit);
     }
     return light;
 }

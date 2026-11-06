@@ -2416,13 +2416,13 @@ static void setup_sector_render_atomics(DtCtx *c)
 }
 
 /* Lights: the routine of the light walks logs its arguments (the float by bits). */
-static void *BMX_CDECL cbLightApply(void *object, RpLight *light, int32_t zero, float one,
+static void *BMX_CDECL cbLightApply(void *object, RpLight *light, const void *zero, float one,
                                     const RwSurfaceProperties *props)
 {
     rwtLog(0x11a7);
     rwtLogPtr(object);
     rwtLogPtr(light);
-    rwtLog((uint32_t)zero);
+    rwtLog((uint32_t)(uintptr_t)zero);
     rwtLogFloatBits(one);
     rwtLogPtr(props);
     return object;

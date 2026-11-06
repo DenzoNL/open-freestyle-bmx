@@ -386,9 +386,9 @@ int32_t rpPVSCountSectors(RpWorld *world);
 BMX_REGPARM(1) void rpPVSCameraDestroy(RpWorld *world);
 
 /* Rendering the atomics of a sector, lighting an object with the lights of the world and its sector, and the
- * world module's open/close. The lighting routine gets the object, the light, 0, 1.0 and the world's surface
- * properties. */
-typedef void *(BMX_CDECL *RpLightApplyFn)(void *object, RpLight *light, int32_t zero, float one,
+ * world module's open/close. The lighting routine gets the object, the light, no matrix (NULL: a pointer, not
+ * an int32, so that 64-bit callees read a clean null), 1.0 and the world's surface properties. */
+typedef void *(BMX_CDECL *RpLightApplyFn)(void *object, RpLight *light, const void *noMatrix, float one,
                                           const RwSurfaceProperties *surfaceProps);
 
 typedef struct RpLightApplyArgs {
