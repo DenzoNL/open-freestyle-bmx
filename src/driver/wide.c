@@ -239,10 +239,11 @@ static int inside(const void *p, const void *base, const void *end)
     return (uintptr_t)p >= (uintptr_t)base && (uintptr_t)p < (uintptr_t)end;
 }
 
-/* The 3D list's buffer: from gNgifPrim3DBuffer up to the pointer gNgifPrim3D, which follows it. */
+/* The 3D list's buffer: from gNgifPrim3DBuffer up to gNgifOrderTable, the next member of its data group (the
+ * pointer gNgifPrim3D follows the group only in the original's layout, not on 64-bit). */
 static int inPrim3D(const void *p)
 {
-    return inside(p, gNgifPrim3DBuffer, (const uint8_t *)&gNgifPrim3D);
+    return inside(p, gNgifPrim3DBuffer, (const uint8_t *)&gNgifOrderTable);
 }
 
 /* The next packet of the ordering table chain after p (NULL at the end marker). */
