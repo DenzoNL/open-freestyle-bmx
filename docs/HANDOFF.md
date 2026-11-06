@@ -58,9 +58,17 @@ What changed that touches the Windows builds (all behind `#if` / new code paths,
    and soft hash files byte-identical). So the rare last-bit FSIN / atan differences of step 4 do not reach this
    ride. Your recording (longer, more levels) on native64 vs a native64 soft build is the stronger check.
 
+**64-bit level rendering (fixed 2026-11-06, check on native64 first):** floats passed through int / pointer
+prototypes (zrwSetClipPlane, the fog distance 0x493100, the light routines in rw/light.c) broke every 64-bit build:
+in a level no 3D geometry was drawn (one flat fog colour) and lights crashed. Windows x64 passes floats in XMM
+registers too, so **native64 almost certainly showed the same green level** before this fix: play a level on
+native64 now. Also compare the hint icon in "tap [icon] to turn the bike around": it is missing on the Mac (no pad).
+
+**Mac:** a windowed run (muted) shows menus, movies and a level correctly on Metal (2026-11-06, Greenville start).
+
 **Mac (when at home, the user's call):** `nix develop -c cmake --preset macos && cmake --build --preset macos`
 (or `--target bmxnative_app`), run from a copy of the game folder: menus, a level, the MSL output against the
-Windows frames, input with a pad, a movie, audio. Untested so far: everything past GPU device creation.
+Windows frames, input with a pad, a movie, audio. Untested so far: input with a pad, audio, long sessions, the .app bundle.
 
 **Android (the Thor):** `nix develop .#android`, `tools/android_sdl3.sh`, `android/build.sh`; install
 `android/app/build/outputs/apk/debug/app-debug.apk`, `adb push <game>/. /sdcard/Android/data/org.opendmfbmx.app/files/game/`,
