@@ -100,7 +100,7 @@ the same per-tick BMX_SIM_HASH.
 | X3 | Windows x64 (llvm-mingw x86_64, SDL3 x64) | sim hash equal to native32; the user plays it |
 | X4 | Linux x64: case-insensitive file lookup, `/` paths, the save / config locations, packaging (AppImage or a tarball) (2026-11-06: builds, headless ride hash equal to arm64 under Rosetta) | sim hash equal; runs on the Steam Deck |
 | X5 | Portable x87 maths (X4-A, exhaustive tests); MSL shaders (X5-A); macOS arm64 app bundle | sim hash equal on arm64 |
-| X6 | Android arm64: SDL3 Android project, game files chosen through the system file picker, controller (the Thor's built-in pad), 1920x1080 widescreen | plays on the Thor |
+| X6 | Android arm64: SDL3 Android project, game files chosen through the system file picker, controller (the Thor's built-in pad), 1920x1080 widescreen (2026-11-06: step 1, libmain.so and a debug APK build; not run on a device yet) | plays on the Thor |
 
 ### X0 (done 2026-11-01)
 
@@ -1066,6 +1066,109 @@ movies, a save, and the tarball on another distribution / the Steam Deck.
 
 **Left:** the sim hash and bmxx87test on real x86 hardware; a windowed run: the Vulkan path, audio (PipeWire / PulseAudio through
 SDL), input, the Steam Deck; a release build in the sniper container; an AppImage if wanted; GCC (not planned).
+
+
+### X6 step 1 (Android arm64, 2026-11-06): libmain.so and an APK build, not run yet
+
+An `android` preset builds bmxnative for Android arm64-v8a as `libmain.so` (SDL3's Android convention: SDL's Java
+activity loads `libSDL3.so` and `libmain.so` and calls `SDL_main` on its own thread), warning-free under the same
+`-Wall -Wextra -Werror`, with the NDK r29 from nixpkgs. `android/` is a Gradle project after SDL3's
+android-project template that packs both libraries into an APK; `android/build.sh` builds it. Nothing has run on
+a device or an emulator yet (no Android runtime on the Mac; the Thor is the user's step, below).
+
+**Build** (macOS arm64 or x86_64 Linux, repo root):
+```sh
+nix develop .#android          # NDK r29, SDK platform 35, build-tools 35, gradle 8.14, JDK 17, SDL3_SRC
+android/build.sh               # SDL3 (once), libmain.so, then the APK:
+                               #   android/app/build/outputs/apk/debug/app-debug.apk
+```
+or the parts: `tools/android_sdl3.sh` (SDL3 3.4.16 from nixpkgs' `sdl3.src`, the desktop builds' version, built
+with the NDK's CMake toolchain as a shared library into build/android-sdl3/prefix; SDL's one C++ file, hidapi, takes
+the static C++ runtime), then `cmake --preset android && cmake --build --preset android` (build/android/libmain.so).
+The shell's package set allows unfree packages and accepts the Android SDK licence for itself only (flake.nix; no
+global nix config). The first `gradle` run fetches the Android Gradle plugin 8.7.3 (SDL's template's) from
+Google's Maven repository. `android/build.sh release` gives a release APK signed with the debug key (no release key
+yet).
+
+**What changed** (other builds unchanged: everything is `__ANDROID__` or `if(ANDROID)`, plus `.hidden` on the arm64
+ELF import thunks):
+- cmake/aarch64-android.cmake: the NDK's android.toolchain.cmake (from `ANDROID_NDK_ROOT`) with arm64-v8a, API 26
+  (Android 8; SDL3 needs 21, its Vulkan GPU backend 24+; the Thor runs Android 13) and no C++ runtime. Android is
+  `__linux__` and `__aarch64__`, so the POSIX halves of X5 part 1 / X4 apply as they are: x87soft (no x87 on arm64),
+  `-ffp-contract=off` (CMakeLists.txt, every non-Windows build; checked in the compile database: all 171 units),
+  FPCR rounding for the camera mode, the redirects, the sigaction fault handler with pc / sp / lr from bionic's
+  arm64 `ucontext_t`, the case-insensitive path resolver. Shaders: SDL GPU's Vulkan backend takes the SPIR-V
+  (draw.c's DXIL / SPIR-V / MSL choice), no MSL needed.
+- CMakeLists.txt: under `ANDROID` bmxnative is `add_library(SHARED)` named `main`, linked to SDL3, libm and liblog
+  with `--no-undefined`. All C symbols default to hidden there (`CMAKE_C_VISIBILITY_PRESET`), so the library's own
+  symbols bind locally: the arm64 import thunks reach `bmxImports` with `adrp`, which a preemptible symbol in a
+  shared object does not allow; `SDL_main` stays exported (SDL_main.h declares it visible). The thunks themselves
+  are `.hidden` on ELF now (data/data.h), so the dynamic table exports only `SDL_main` (and compiler-rt's weak
+  `__emutls_get_address`, TLS below API 29).
+- main.c includes `<SDL3/SDL_main.h>` on Android (main becomes SDL_main) and first calls `bmxAndroidPrepare`
+  (src/native/android.c): the app's external files folder (`SDL_GetAndroidExternalStoragePath`) is the place for
+  everything; its `game/` is made the working directory (no game folder: an SDL message box with the adb command,
+  then SDL_main returns 1 and SDL ends the activity); `BMX_CONFIG` points at its bmxnative.ini unless set.
+- trap.c: bmxnative.log in that folder (an app's /proc/self/exe is app_process); every bmxLog line also goes to
+  logcat (`__android_log_vprint`, tag `opendmfbmx`; stderr goes nowhere in an app). The fault handler is installed
+  with `sigaction` as on Linux; ART's libsigchain sits in front of it and keeps its own SIGSEGV uses (Java null
+  checks) to itself, so only native faults reach the report.
+- android/: Gradle project (settings / build.gradle, AGP 8.7.3; app/build.gradle: `org.opendmfbmx.app`, minSdk 26,
+  target / compile 35, build-tools 35.0.0, arm64-v8a only, no native build: app/libs/arm64-v8a gets the two .so
+  from android/build.sh; SDL's Java sources come from `$SDL3_SRC/android-project/app/src/main/java`, so they always
+  match the SDL3 the library was built from; debug symbols kept in the APK); `BmxActivity` (SDLActivity with
+  libraries `SDL3`, `main` and the argument `Scene.Txt`); AndroidManifest.xml after SDL's: sensorLandscape,
+  `android.hardware.vulkan.version` 1.0 required, gamepad / touchscreen / leanback not required (LEANBACK_LAUNCHER
+  category too), `isGame`, VIBRATE, no storage permission (none needed for the app's own external folder). No icon
+  yet.
+- flake.nix: the `android` shell (aarch64-darwin and x86_64-linux; nixpkgs has no Android SDK for aarch64-linux).
+
+**Verified here** (macOS arm64):
+- `cmake --build --preset android`: warning-free, links. `file`: `ELF 64-bit LSB shared object, ARM aarch64`;
+  `llvm-nm -D --defined-only`: `SDL_main` (and `__emutls_get_address`); `NEEDED` libSDL3.so, libm, liblog, libdl,
+  libc; no `TEXTREL`; LOAD segments 16 KB aligned (Android 15's page size; NDK r29 default). The SDL JNI entry points
+  are in libSDL3.so (SDL's Java side calls `nativeRunMain`, which finds `SDL_main` in libmain.so by name).
+- Undefined symbols of libmain.so: 260, all resolved at link time (`--no-undefined`): 179 SDL_*, the rest bionic
+  libc / libm (incl. the `_FORTIFY_SOURCE` `__*_chk` ones; the newest is `LIBC_N`, API 24) and liblog's
+  `__android_log_print` / `__android_log_vprint`. None outside the NDK and SDL3.
+- `android/build.sh`: app-debug.apk (19 MB) with lib/arm64-v8a/libSDL3.so and libmain.so stored uncompressed and
+  16 KB aligned (`zipalign -c -P 16 4`: OK); `aapt2 dump badging`: package org.opendmfbmx.app, minSdk 26, target 35,
+  launchable `org.opendmfbmx.app.BmxActivity`, native-code arm64-v8a.
+- The other builds: the hook build and `tests/oracle/run.sh -n 5` (3009/3009), clang-format on all sources, the
+  macos build warning-free. The `linux` preset is unchanged (its configure needs a Linux host; the CMake changes
+  are `if(ANDROID)` only, and the one source change outside `__ANDROID__`, `.hidden` on the arm64 ELF thunks, is
+  compiled by this Android build).
+
+**On the Thor** (the user's step; developer options with USB debugging on, `adb` from the android shell's
+platform-tools or any SDK). `<game>` is the game folder in the install layout (Scene.Txt, Assets/, bin/audio,
+bin/movie, save/; an empty save/ starts fresh):
+
+    adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+    adb shell am start -n org.opendmfbmx.app/.BmxActivity     # once: creates the app's folder; shows "No game folder"
+    adb push <game>/. /sdcard/Android/data/org.opendmfbmx.app/files/game/
+    adb push bmxnative.ini /sdcard/Android/data/org.opendmfbmx.app/files/      # optional
+    adb logcat -s opendmfbmx SDL SDL/APP AndroidRuntime DEBUG                  # in a second terminal
+    adb shell am start -n org.opendmfbmx.app/.BmxActivity
+
+(`/sdcard/Android/data/org.opendmfbmx.app/files` is `/storage/emulated/0/Android/data/...`; adb can write there
+without root; the log is also at `.../files/bmxnative.log`, `adb pull` it.) What to test, in this order:
+1. It starts: logcat shows the import slots / config / redirects lines as on the desktop and no trap; a fault
+   report names the address (logcat and bmxnative.log).
+2. The GPU: `SDL_CreateGPUDevice` on Vulkan (the Adreno driver), the menu draws (SPIR-V shaders), full screen,
+   landscape. If not: `[video] backend = null` in bmxnative.ini (the null GPU of X5 part 3) runs it without
+   drawing, to separate the GPU from the rest.
+3. The pad: the built-in controls through the DirectInput stand-in (SDL gamepad); whether B / Back ends the
+   activity (SDL's back-button handling; `SDL_ANDROID_TRAP_BACK_BUTTON` if so); the menus by pad only.
+4. Sound (SDL on AAudio), a movie (or `BMX_NO_MOVIES`), a level, a save (game/save/SAVE.DAT appears), quitting
+   (main's `_exit` ends the process; Android shows nothing), pausing via the home button and coming back.
+5. The sim hash: the headless ride of X5 part 3 with `[video] backend = null` and the script in the environment is
+   not possible from the launcher; an `adb shell` run of the same libmain.so through a small executable would be
+   the next tool if the Thor's hash is wanted (expected equal to data/simhash/ride.arm64.hash, same code as macOS).
+
+**Left** (X6 steps 2+): the device run above; game files through the system file picker (SAF) instead of adb; the
+1920x1080 config defaults for the Thor (widescreen, hud, interpolate at 60 / 120 Hz); suspend / resume (SDL's
+`SDL_EVENT_WILL_ENTER_BACKGROUND`: the GPU swapchain and audio); an icon and a release key; a sim-hash run on
+the device.
 
 
 ## Not in scope

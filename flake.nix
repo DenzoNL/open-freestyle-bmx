@@ -66,6 +66,39 @@
             // crossEnv
           );
         }
+        # The Android build (docs/PORTING.md "X6 step 1 (Android arm64)"): `nix develop .#android`. The SDK and NDK
+        # are unfree and need the Android SDK licence accepted; that is set for this shell's package set only.
+        // pkgs.lib.optionalAttrs (pkgs.stdenv.hostPlatform.system != "aarch64-linux") {
+          android =
+            let
+              apkgs = import nixpkgs {
+                inherit (pkgs.stdenv.hostPlatform) system;
+                config = {
+                  allowUnfree = true;
+                  android_sdk.accept_license = true;
+                };
+              };
+              sdk = apkgs.androidenv.composeAndroidPackages {
+                includeNDK = true;
+                platformVersions = [ "35" ];
+                buildToolsVersions = [ "35.0.0" ];
+              };
+              home = "${sdk.androidsdk}/libexec/android-sdk";
+            in
+            pkgs.mkShellNoCC {
+              packages = core ++ [
+                sdk.androidsdk
+                apkgs.gradle
+                apkgs.jdk17
+              ];
+              ANDROID_HOME = home;
+              ANDROID_SDK_ROOT = home;
+              ANDROID_NDK_ROOT = "${home}/ndk-bundle";
+              JAVA_HOME = "${apkgs.jdk17.home}";
+              # SDL3's source (tools/android_sdl3.sh; its Java side goes into the APK): the desktop builds' version.
+              SDL3_SRC = "${pkgs.sdl3.src}";
+            };
+        }
       );
     };
 }

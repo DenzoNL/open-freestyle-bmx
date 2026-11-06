@@ -1,0 +1,48 @@
+// The APK: SDL3's Java side (from the SDL3 source the native libraries were built from) plus BmxActivity, and
+// the prebuilt libmain.so / libSDL3.so that android/build.sh copies into app/libs/arm64-v8a (no native build here).
+plugins {
+    id 'com.android.application'
+}
+
+// SDL3's Java sources: -PsdlJava=<dir>, else $SDL3_SRC/android-project/app/src/main/java (nix develop .#android).
+def sdlJava = project.findProperty('sdlJava') ?: "${System.getenv('SDL3_SRC')}/android-project/app/src/main/java"
+
+android {
+    namespace = 'org.opendmfbmx.app'
+    compileSdk = 35
+    buildToolsVersion = '35.0.0' // the one nix develop .#android provides (AGP 8.7 would fetch 34)
+    defaultConfig {
+        applicationId = 'org.opendmfbmx.app'
+        minSdk = 26
+        targetSdk = 35
+        versionCode = 1
+        versionName = '0.1'
+        ndk {
+            abiFilters 'arm64-v8a'
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled = false
+            // No release key yet: the debug key, so `adb install` takes the release APK too.
+            signingConfig = signingConfigs.debug
+        }
+    }
+    sourceSets.main {
+        java.srcDirs += [sdlJava]
+        jniLibs.srcDirs = ['libs']
+    }
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = false
+            keepDebugSymbols += ['**/libmain.so', '**/libSDL3.so']
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    lint {
+        abortOnError = false
+    }
+}

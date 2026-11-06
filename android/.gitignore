@@ -1,0 +1,6 @@
+# android/build.sh output
+/app/libs/
+/app/build/
+/build/
+/.gradle/
+/local.properties

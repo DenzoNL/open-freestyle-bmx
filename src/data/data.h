@@ -144,8 +144,10 @@ typedef struct __attribute__((packed)) BmxUnalignedPtr {
             "bmxImports") "@PAGE\n\tadd x16, x16, " BMX_SYM("bmxImports") "@PAGEOFF\n\tldr x16, [x16, "                                \
                                                                           "#2*" #offset "]\n\tbr x16\n")
 #elif defined(__aarch64__)
+/* ELF (Linux, Android): hidden, so Android's libmain.so does not export them. */
 #define BMX_IMPORT_THUNK(addr, offset)                                                                       \
-    __asm__(".text\n.p2align 2\n.globl bmxImportThunk_" #addr "\nbmxImportThunk_" #addr                      \
+    __asm__(".text\n.p2align 2\n.globl bmxImportThunk_" #addr "\n.hidden bmxImportThunk_" #addr              \
+            "\nbmxImportThunk_" #addr                                                                        \
             ":\n\tadrp x16, bmxImports\n\tadd x16, x16, :lo12:bmxImports\n\tldr x16, [x16, #2*" #offset      \
             "]\n\tbr x16\n")
 #elif defined(__x86_64__)

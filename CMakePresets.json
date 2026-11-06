@@ -46,6 +46,19 @@
       "toolchainFile": "${sourceDir}/cmake/x86_64-linux.cmake",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "BMX_HOOK": "OFF", "BMX_NATIVE32": "ON" },
       "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" }
+    },
+    {
+      "name": "android",
+      "displayName": "Android arm64-v8a libmain.so (NDK, SDL3 from tools/android_sdl3.sh; docs/PORTING.md X6)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/android",
+      "toolchainFile": "${sourceDir}/cmake/aarch64-android.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "BMX_HOOK": "OFF",
+        "BMX_NATIVE32": "ON",
+        "SDL3_DIR": "${sourceDir}/build/android-sdl3/prefix/lib/cmake/SDL3"
+      }
     }
   ],
   "buildPresets": [
@@ -53,6 +66,7 @@
     { "name": "native32", "configurePreset": "native32" },
     { "name": "native64", "configurePreset": "native64" },
     { "name": "macos", "configurePreset": "macos" },
-    { "name": "linux", "configurePreset": "linux" }
+    { "name": "linux", "configurePreset": "linux" },
+    { "name": "android", "configurePreset": "android" }
   ]
 }

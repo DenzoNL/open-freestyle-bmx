@@ -77,6 +77,17 @@ void bmxDescribeAddress(uint32_t addr, char *out, size_t size);
 void bmxLog(const char *fmt, ...);
 void bmxLogOpen(void);
 
+#if defined(__ANDROID__)
+#include <stdarg.h>
+/* Android (src/native/android.c): bmxAndroidPrepare, first thing in main, finds the app's external files
+ * folder, points BMX_CONFIG at its bmxnative.ini (unless set) and makes its game/ the working directory (-1:
+ * no such folder, reported). bmxAndroidFolder is that folder (the log's); bmxAndroidLog copies a log line to
+ * logcat. */
+int bmxAndroidPrepare(void);
+const char *bmxAndroidFolder(void);
+void bmxAndroidLog(const char *fmt, va_list ap);
+#endif
+
 /* Ends the process at once (ExitProcess on Windows; elsewhere stdio flushed, then _exit). */
 void bmxExitProcess(int code) __attribute__((noreturn));
 

@@ -76,6 +76,9 @@ void bmxLogOpen(void)
     if (_NSGetExecutablePath(path, &size) == 0) {
         n = (ssize_t)strlen(path);
     }
+#elif defined(__ANDROID__)
+    /* No executable folder (/proc/self/exe is app_process): the app's external files folder (android.c). */
+    n = snprintf(path, sizeof path, "%s/", bmxAndroidFolder());
 #else
     n = readlink("/proc/self/exe", path, sizeof path - 1);
 #endif
@@ -96,6 +99,12 @@ void bmxLog(const char *fmt, ...)
     va_start(ap, fmt);
     vfprintf(stderr, fmt, ap);
     va_end(ap);
+#if defined(__ANDROID__)
+    /* stderr goes nowhere in an app: logcat (adb logcat -s opendmfbmx). */
+    va_start(ap, fmt);
+    bmxAndroidLog(fmt, ap);
+    va_end(ap);
+#endif
     if (logFile) {
         va_start(ap, fmt);
         vfprintf(logFile, fmt, ap);

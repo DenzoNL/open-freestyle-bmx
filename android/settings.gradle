@@ -1,0 +1,15 @@
+// The Android app (docs/PORTING.md "X6 step 1 (Android arm64)"): build with android/build.sh.
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = 'opendmfbmx'
+include ':app'

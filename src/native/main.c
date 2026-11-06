@@ -9,6 +9,10 @@
 #if !defined(_WIN32)
 #include <unistd.h> /* _exit */
 #endif
+#if defined(__ANDROID__)
+/* libmain.so: SDL's Java activity calls main as SDL_main (docs/PORTING.md "X6 step 1 (Android arm64)"). */
+#include <SDL3/SDL_main.h>
+#endif
 
 #include "compat/fpu.h"
 #include "compat/orig.h"
@@ -140,6 +144,11 @@ int main(int argc, char **argv)
     BmxMsg msg;
     int background;
 
+#if defined(__ANDROID__)
+    if (bmxAndroidPrepare() != 0) { /* the game folder as the working directory, BMX_CONFIG: android.c */
+        return 1;
+    }
+#endif
     bmxFpuWindowsDefaults(); /* x87 at 53 bits as on Windows (Linux starts at 64): compat/fpu.h */
     bmxLogOpen();
     bmxPlatformInit();

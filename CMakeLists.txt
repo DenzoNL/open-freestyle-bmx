@@ -20,6 +20,10 @@ set(BMX_WARNINGS -Wall -Wextra -Werror -Wno-unused-parameter -Wno-microsoft-anon
 if(NOT WIN32)
   add_compile_options(-fms-extensions -fno-math-errno -ffp-contract=off)
 endif()
+# Android: bmxnative is a shared library (libmain.so); its symbols stay hidden (see the bmxnative target below).
+if(ANDROID)
+  set(CMAKE_C_VISIBILITY_PRESET hidden)
+endif()
 
 file(GLOB_RECURSE BMX_GAME_SOURCES CONFIGURE_DEPENDS src/zge/*.c src/bmx/*.c src/rw/*.c)
 file(GLOB_RECURSE BMX_COMPAT_SOURCES CONFIGURE_DEPENDS src/compat/*.c)
@@ -148,10 +152,16 @@ if(BMX_NATIVE32)
   if(CMAKE_SIZEOF_VOID_P EQUAL 4)
     set(BMX_CRT_ASM src/native/crtasm.S)
   endif()
-  add_executable(bmxnative $<TARGET_OBJECTS:bmx_game> $<TARGET_OBJECTS:bmx_data> $<TARGET_OBJECTS:bmx_driver>
+  set(BMX_NATIVE_ALL $<TARGET_OBJECTS:bmx_game> $<TARGET_OBJECTS:bmx_data> $<TARGET_OBJECTS:bmx_driver>
     $<TARGET_OBJECTS:bmx_png>
     ${BMX_NATIVE_SOURCES} ${BMX_CRT_ASM} ${CMAKE_BINARY_DIR}/gen/origmap.c
     third_party/dr_flac/dr_flac.c ${CMAKE_BINARY_DIR}/music_edits.c)
+  if(ANDROID)
+    # Android (docs/PORTING.md "X6 step 1 (Android arm64)"): libmain.so, whose SDL_main SDL's Java activity calls.
+    add_library(bmxnative SHARED ${BMX_NATIVE_ALL})
+  else()
+    add_executable(bmxnative ${BMX_NATIVE_ALL})
+  endif()
   target_include_directories(bmxnative PRIVATE src ${CMAKE_BINARY_DIR}/gen)
   target_include_directories(bmxnative SYSTEM PRIVATE third_party/dr_flac)
   target_compile_definitions(bmxnative PRIVATE _WIN32_WINNT=0x0A00 BMX_IMAGE=1 BMX_SOURCE_DIR="${CMAKE_SOURCE_DIR}" BMX_WORK_DIR="${BMX_WORK_DIR}")
@@ -159,9 +169,18 @@ if(BMX_NATIVE32)
   if(NOT WIN32)
     # macOS / Linux: no fixed base (the 28-bit packet links are offsets from an anchor on 64-bit, X2d); SDL3 found
     # through the rpath. A later slice packages bmxnative.app (docs/PORTING.md "X5 part 1").
-    set_target_properties(bmxnative PROPERTIES BUILD_RPATH "$<TARGET_FILE_DIR:SDL3::SDL3-shared>")
+    if(NOT ANDROID)
+      set_target_properties(bmxnative PROPERTIES BUILD_RPATH "$<TARGET_FILE_DIR:SDL3::SDL3-shared>")
+    endif()
     target_link_libraries(bmxnative PRIVATE SDL3::SDL3 m)
-    if(APPLE)
+    if(ANDROID)
+      # libmain.so next to libSDL3.so in the APK (android/). Every object hidden but SDL_main (SDL_main.h exports
+      # it), so the library's own symbols bind locally: the arm64 import thunks (data/data.h) reach bmxImports with
+      # adrp, which a preemptible symbol would not allow. logcat through liblog (src/native/android.c).
+      set_target_properties(bmxnative PROPERTIES OUTPUT_NAME main)
+      target_link_libraries(bmxnative PRIVATE log)
+      target_link_options(bmxnative PRIVATE -Wl,--no-undefined -Wl,--fatal-warnings)
+    elseif(APPLE)
       # src/data keeps the original's layout, which has pointers at odd addresses (BmxUnalignedPtr: a CRT switch
       # table the port never reaches). Chained fixups need 8-byte aligned pointers; the classic rebase info does not.
       target_link_options(bmxnative PRIVATE -Wl,-no_fixup_chains)
