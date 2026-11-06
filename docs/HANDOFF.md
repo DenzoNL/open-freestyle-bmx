@@ -15,6 +15,34 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
   workflow), not on push: run `tools/check.sh` locally before pushing. It has no assets, so
   the differential cases are skipped there and run locally.
 
+## Windows results (2026-11-07, for the Mac session)
+
+Commit "X3: 64-bit level load and rendering fixes" (made on Windows the night of 2026-11-05, rebased onto the Mac
+work; the clip-plane part merged into the Mac's `BMX_IMAGE` version of the same fix). It fixes three more 64-bit
+bugs that very likely explain the Mac playtest findings:
+- **T-posed rider: fixed by this commit.** `ZrwPartDef` (zrwmodel.h) and `ZSkeletonNode` (ziff.h) are two views
+  of one record; the node holds a pointer, so on 64-bit it is 0x50 bytes while `ZrwPartDef` stayed 0x44.
+  zrwModelMatchParts stepped through the skeleton with the wrong stride, matched only the first part, and every
+  other limb kept its rest pose (bone matrices identity, RpSkin flags 2 instead of 6). Static asserts in ziff.c
+  now tie the two together. native64 showed the same T-pose; after the fix a Greenville frame equals native32
+  except for scattered 1-shade pixels (x87 vs SSE rounding; two native32 runs differ by ~2k bytes, 64 vs 32 by
+  ~18k bytes of 1.2M).
+- **Quit while loading Greenville (native64):** ngappUpdateSun and zcollideProbeHeight passed fixed-size byte
+  buffers (0x5c / 0x58) to the line test, whose `ZrwColLineHit` is 0x68 bytes on 64-bit: the overflow clobbered a
+  saved register and ngifRunFrame returned 0. Now typed `ZrwColLineHit` locals.
+- **Movie loop (zrwPlayMovie):** the MSG buffer was `uint8_t[0x1c]` with the message read at +4; on 64-bit MSG is
+  0x30 bytes with the message at +8 (stack overflow, wrong message). Now a typed `ZrwMsg`. **Retest the USB
+  keyboard movie skip on the Mac with this**: on Windows the keyboard state is global (SDL_GetKeyboardState), so
+  a per-device filter is unlikely; the broken message loop is the better suspect.
+- The device-dialog label sprintf goes through `RwEngineInstance->stringFuncs.rwsprintf` (was RwGlobals +0xe8).
+
+Steps from the list below, on Windows (2026-11-07):
+1. native32 and native64 build warning-free (the only linker warning, "/align specified without /driver", is
+   the old bmxplatformtest one). Gate: see the commit that pushes this.
+2. Shaders: DXIL and SPIR-V of all three shaders regenerate byte-identically with dxc 1.9.2609. MSL not checked
+   (no spirv-cross on the PC).
+3.-5. Not run yet: they start bmxnative or long CPU runs and the user was gaming.
+
 ## Windows handover (2026-11-06, Mac session)
 
 The Mac session (12:30-17:00) added four platforms' worth of code. All of it builds; nothing new has run
