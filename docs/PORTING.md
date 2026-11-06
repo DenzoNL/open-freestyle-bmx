@@ -1051,6 +1051,11 @@ the x87 is Rosetta's emulation, not hardware):
   the ride's hash. The soft hashes equal the arm64 ones printed in X5 part 2 (same answers on both
   architectures). Real x86 hardware still has to show `all equal` (Windows PC, nixbox).
 
+**Game folder layout:** the scenes name `ASSETS\<LEVEL>\...`; a CD install that keeps the levels as top-level
+`Level_-_XX` folders needs `Assets/<Level>` links to them (and `bin/audio` -> `Audio`, `bin/movie` -> `Movies`),
+otherwise the level load fails in zsceneOpen (2026-11-06 on nixbox). With that, nixbox's real x87 and a
+`BMX_X87_SOFT=ON` build both give data/simhash/ride.arm64.hash exactly (2973 ticks).
+
 **For the nixbox** (x86_64 NixOS, real hardware; from a copy of the game in the install layout with an empty `save/` and an empty
 ini; headless, no window or sound):
 ```sh

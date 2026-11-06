@@ -53,9 +53,10 @@ What changed that touches the Windows builds (all behind `#if` / new code paths,
    Expected: windowed, null and the arm64 reference identical (2973 ticks). Repeat with native32. Then the
    end-to-end soft check: build `-DBMX_X87_SOFT=ON` into `build\native64-soft` and xcheck your recording on
    both exes.
-6. nixbox finding (real Intel, Linux, headless): the same ride **trapped at frame ~900** ("There is already
-   a scene open", zscene.c:525 from ngifRunFrame) while macOS arm64 and Linux under Rosetta ran it fully. Being
-   investigated at hand-over time; see "nixbox ride" below for the result.
+6. Done on nixbox already (real Intel i5-13400, Linux x86_64, headless null GPU): the ride gives the
+   **same BMX_SIM_HASH as the arm64 reference on the real x87 and with `BMX_X87_SOFT=ON`** (2973 ticks; the hw
+   and soft hash files byte-identical). So the rare last-bit FSIN / atan differences of step 4 do not reach this
+   ride. Your recording (longer, more levels) on native64 vs a native64 soft build is the stronger check.
 
 **Mac (when at home, the user's call):** `nix develop -c cmake --preset macos && cmake --build --preset macos`
 (or `--target bmxnative_app`), run from a copy of the game folder: menus, a level, the MSL output against the
@@ -71,7 +72,14 @@ and the Steam Deck are open.
 
 ### nixbox ride
 
-(filled in below when the investigation reports)
+A first run trapped at frame ~900 ("There is already a scene open"). Cause: the game copy
+(`~/bmx/ridecopy`, from the CD install) had the levels only as top-level `Level_-_XX` folders, while the scene
+names `ASSETS\<LEVEL>\...`: the install layout the game expects has `Assets/<Level>` (and `bin/audio`,
+`bin/movie`). Fixed on nixbox with relative symlinks `Assets/<Level> -> ../Level_-_XX`. The assert text was
+misleading: clang merged zsceneOpen's zdebugFail calls into one call site, so gdb shows line 525 for all of
+them; the real failure was the scene file load. Follow-ups: log the path when a scene / level file fails to load,
+and have xcheck check the `Assets/<Level>` layout. Results and the run commands: `~/xc-hw`, `~/xc-soft`,
+`~/gdbride.sh` on nixbox (python3 via `nix shell nixpkgs#python3`).
 
 ## Next up (2026-10-31)
 
