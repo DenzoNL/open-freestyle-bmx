@@ -141,6 +141,7 @@ int main(int argc, char **argv)
 
     bmxLogOpen();
     bmxPlatformInit();
+    bmxGpuNull(); /* BMX_GPU=null: picks SDL's dummy drivers before any subsystem starts (headless) */
     if (bmxLoaderInit() != 0) {
         return 1;
     }

@@ -1240,30 +1240,31 @@ static float rdFloat(const void *base, uint32_t offset)
     return v;
 }
 
-/* A pulsing double sided triangle that grows over 30 frames (the marker of a point in the world). */
+/* A pulsing double sided triangle that grows over 30 frames (the marker of a point in the world). The marker
+ * is a face record (PhysFace: the normal, then the corners p0..p2, 0x30 / 0x40 / 0x50 on 32-bit). */
 BMX_ADDR(0x00411270)
 void gameDrawPlaneMarker(const void *marker, uint32_t color)
 {
+    const PhysFace *const face = marker;
+    const ZVec3 *const corner[3] = {&face->p0, &face->p1, &face->p2};
     const uint32_t brightness = markerBrightness();
     const int32_t steps = (int32_t)(400 - brightness) / 30;
     const float step = (float)steps;
-    const float dir[3] = {rdFloat(marker, 0), rdFloat(marker, 4), rdFloat(marker, 8)};
+    const float dir[3] = {face->normal.x, face->normal.y, face->normal.z};
     NgifVert3 v[3] = {0};
 
     for (uint32_t i = 0; i < 3; i++) {
-        const uint32_t at = 0x30 + i * 16;
-        v[i].x = (float)((double)step * (double)dir[0] + (double)rdFloat(marker, at));
-        v[i].y = (float)((double)step * (double)dir[1] + (double)rdFloat(marker, at + 4));
-        v[i].z = (float)((double)step * (double)dir[2] + (double)rdFloat(marker, at + 8));
+        v[i].x = (float)((double)step * (double)dir[0] + (double)corner[i]->x);
+        v[i].y = (float)((double)step * (double)dir[1] + (double)corner[i]->y);
+        v[i].z = (float)((double)step * (double)dir[2] + (double)corner[i]->z);
         markerRgb(&v[i], color, brightness);
     }
     ngifDrawPoly3D(10, 3, v, 0);
     for (uint32_t i = 0; i < 3; i++) {
-        const uint32_t at = 0x30 + i * 16;
         NgifVert3 *out = &v[2 - i];
-        out->x = (float)((double)rdFloat(marker, at) - (double)step * (double)dir[0]);
-        out->y = (float)((double)rdFloat(marker, at + 4) - (double)step * (double)dir[1]);
-        out->z = (float)((double)rdFloat(marker, at + 8) - (double)step * (double)dir[2]);
+        out->x = (float)((double)corner[i]->x - (double)step * (double)dir[0]);
+        out->y = (float)((double)corner[i]->y - (double)step * (double)dir[1]);
+        out->z = (float)((double)corner[i]->z - (double)step * (double)dir[2]);
         markerRgb(out, color, brightness);
     }
     ngifDrawPoly3D(10, 3, v, 0);
@@ -1474,11 +1475,11 @@ int gameDrawGoalMarkers(void)
                 case 6:
                 case 0x15:
                     for (uint32_t i = 0; gGameMarkersA[i] != NULL; i++) {
-                        const uint8_t *marker = gGameMarkersA[i];
-                        if (*(const void *const *)(marker + 0x2c) == NULL) {
+                        const PhysFace *marker = gGameMarkersA[i];
+                        if (marker->object == NULL) {
                             gameDrawPlaneMarker(marker, color);
                         } else {
-                            gameDrawEdgeMarker(*(const void *const *)(marker + 0x2c), color);
+                            gameDrawEdgeMarker(marker->object, color);
                         }
                     }
                     break;

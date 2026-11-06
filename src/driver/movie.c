@@ -143,6 +143,11 @@ static int prepare(SDL_GPUDevice *device, int32_t frameWidth, int32_t frameHeigh
 {
     int32_t width, height;
 
+    if (drvGpuNull()) {
+        /* BMX_GPU=null: no textures, only the target size the destination is clipped against. */
+        presentedSize(&gTargetWidth, &gTargetHeight);
+        return 1;
+    }
     if (gFrame == NULL || gFrameWidth != frameWidth || gFrameHeight != frameHeight) {
         if (gFrame != NULL) {
             SDL_ReleaseGPUTexture(device, gFrame);
@@ -281,8 +286,8 @@ int32_t BMX_WINAPI bmxStandDrawDibDraw(void *drawDib, void *dc, int32_t x, int32
 
     (void)drawDib;
     (void)flags;
-    if (h == NULL || dc != (void *)(uintptr_t)kTokenDc || device == NULL || h->size < kDibHeader ||
-        h->bitCount != 24 || h->compression != 0 || h->width <= 0 || h->height <= 0) {
+    if (h == NULL || dc != (void *)(uintptr_t)kTokenDc || (device == NULL && !drvGpuNull()) ||
+        h->size < kDibHeader || h->bitCount != 24 || h->compression != 0 || h->width <= 0 || h->height <= 0) {
         if (!gWarned) {
             gWarned = 1;
             bmxLog("movie: DrawDibDraw: unsupported call (DC %p, device %p, %d bits, compression %u)\n", dc,
@@ -316,6 +321,10 @@ int32_t BMX_WINAPI bmxStandDrawDibDraw(void *drawDib, void *dc, int32_t x, int32
     }
     /* [video] widescreen, movies = 0: the 4:3 picture pillarboxed (the target starts black). */
     drvWideMovieRect(dst, gTargetWidth, gTargetHeight);
+    if (drvGpuNull()) {
+        gDraws++;
+        return 1; /* BMX_GPU=null: accepted and dropped, as a presented frame (no movie screenshots) */
+    }
     if (!drawFrame(device, h, bits != NULL ? (const uint8_t *)bits : (const uint8_t *)(h + 1), src, dst)) {
         return 0;
     }

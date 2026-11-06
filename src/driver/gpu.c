@@ -24,6 +24,12 @@ static int shownFrames;
 static int uncounted;
 static int measureAcquire;
 static uint64_t acquireNs;
+static char nullTarget; /* BMX_GPU=null: the handle every render target gets (never dereferenced) */
+
+int drvGpuNull(void)
+{
+    return bmxGpuNull();
+}
 
 int drvGpuShownFrames(void)
 {
@@ -156,6 +162,10 @@ int drvGpuStart(void *window)
         bmxLog("driver: the window handle %p is not the game's SDL window\n", window);
         return 0;
     }
+    if (drvGpuNull()) {
+        bmxLog("driver: null GPU: no device; draws dropped, presents counted, no screenshots\n");
+        return drvDrawStart();
+    }
     gpuDevice = DRV_FPU_GUARDED(SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL |
                                                         SDL_GPU_SHADERFORMAT_DXBC | SDL_GPU_SHADERFORMAT_MSL,
                                                     false, NULL));
@@ -204,6 +214,9 @@ struct SDL_GPUTexture *drvGpuCreateTarget(int32_t width, int32_t height, int dep
     SDL_GPUTextureCreateInfo info;
     SDL_GPUTexture *texture;
 
+    if (drvGpuNull() && width > 0 && height > 0) {
+        return (struct SDL_GPUTexture *)(void *)&nullTarget;
+    }
     if (gpuDevice == NULL || width <= 0 || height <= 0) {
         return NULL;
     }
@@ -247,6 +260,9 @@ int drvGpuClear(struct SDL_GPUTexture *color, struct SDL_GPUTexture *depth, cons
         return 1;
     }
     drvDrawFlush();
+    if (drvGpuNull()) {
+        return 1;
+    }
     cmd = SDL_AcquireGPUCommandBuffer(gpuDevice);
     if (cmd == NULL) {
         return sdlFail("SDL_AcquireGPUCommandBuffer");
@@ -284,6 +300,15 @@ static void saveShot(SDL_GPUTexture *texture, int32_t width, int32_t height, con
     SDL_GPUFence *fence;
     void *pixels;
 
+    if (drvGpuNull()) {
+        static int warned;
+
+        if (!warned) {
+            warned = 1;
+            bmxLog("driver: null GPU: no screenshots (%s)\n", path);
+        }
+        return;
+    }
     SDL_zero(info);
     info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;
     info.size = (Uint32)(width * height * 4);
@@ -347,6 +372,9 @@ static int presentTarget(struct SDL_GPUTexture *color, int32_t x, int32_t y, int
     Uint64 start;
 
     drvDrawFlush();
+    if (drvGpuNull()) {
+        return 1;
+    }
     cmd = SDL_AcquireGPUCommandBuffer(gpuDevice);
     if (cmd == NULL) {
         return sdlFail("SDL_AcquireGPUCommandBuffer");

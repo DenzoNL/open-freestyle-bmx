@@ -194,6 +194,12 @@ void drvGpuReleaseTexture(struct SDL_GPUTexture *texture);
 int drvGpuClear(struct SDL_GPUTexture *color, struct SDL_GPUTexture *depth, const uint8_t rgba[4], int flags);
 int drvGpuPresent(struct SDL_GPUTexture *color, int32_t x, int32_t y, int32_t width, int32_t height);
 struct SDL_GPUDevice *drvGpuDevice(void);
+/*
+ * BMX_GPU=null (docs/PORTING.md "X5 part 3"): no GPU device. Targets are a placeholder handle (non-NULL, as a
+ * created one), clears, draws and presents are dropped after the same CPU work, presents still count shown
+ * frames (BMX_KEYS, BMX_QUIT_FRAMES), screenshots are skipped. Nothing the game reads back changes.
+ */
+int drvGpuNull(void);
 int drvGpuShownFrames(void);     /* frames presented so far (RwRasterShowRaster) */
 void drvGpuSetUncounted(int on); /* 1: presents do not count (the high frame rate mode's extra draws) */
 /* BMX_HF_GUARD: after drvGpuMeasureAcquire, the ns spent waiting for swapchain textures so far. */

@@ -161,6 +161,14 @@ struct SDL_Window *bmxWindowSdl(void *window);
 typedef int (*BmxMessageBoxHook)(const struct SDL_MessageBoxData *box);
 void bmxWindowSetMessageBoxHook(BmxMessageBoxHook hook);
 
+/*
+ * Headless: `BMX_GPU=null` (or `[video] backend = null`) runs the whole game with no GPU work and no visible
+ * window (docs/PORTING.md "X5 part 3"). The first call decides; when it says null and the environment names
+ * no SDL video / audio driver, it selects SDL's dummy drivers (before any subsystem starts: main.c calls it
+ * first). Only src/driver changes behaviour, below RenderWare's device cut.
+ */
+int bmxGpuNull(void);
+
 /* ---- paths (paths.c) ---- */
 
 /* The host path for a path as the game spells it (relative to the install folder, backslashes). Identity

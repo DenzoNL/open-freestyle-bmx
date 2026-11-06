@@ -295,6 +295,39 @@ void bmxVideoSize(int *width, int *height, int fallbackW, int fallbackH)
     }
 }
 
+/* Whether the driver named by the environment variable `name` (or its SDL3 spelling `name3`) is set. */
+static int envSet(const char *name, const char *name3)
+{
+    const char *const a = SDL_getenv(name);
+    const char *const b = SDL_getenv(name3);
+
+    return (a != NULL && *a != 0) || (b != NULL && *b != 0);
+}
+
+int bmxGpuNull(void)
+{
+    static int decided = -1;
+
+    if (decided < 0) {
+        const char *env = SDL_getenv("BMX_GPU");
+        const char *const value = env != NULL && *env != 0 ? env : bmxConfigString("video.backend");
+
+        decided = value != NULL && SDL_strcasecmp(value, "null") == 0;
+        if (decided) {
+            if (!envSet("SDL_VIDEODRIVER", "SDL_VIDEO_DRIVER")) {
+                SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");
+            }
+            if (!envSet("SDL_AUDIODRIVER", "SDL_AUDIO_DRIVER")) {
+                SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "dummy");
+            }
+            bmxLog("platform: null GPU (headless): no GPU device, video driver %s, audio driver %s\n",
+                   SDL_GetHint(SDL_HINT_VIDEO_DRIVER) != NULL ? SDL_GetHint(SDL_HINT_VIDEO_DRIVER) : "(env)",
+                   SDL_GetHint(SDL_HINT_AUDIO_DRIVER) != NULL ? SDL_GetHint(SDL_HINT_AUDIO_DRIVER) : "(env)");
+        }
+    }
+    return decided;
+}
+
 void *bmxWindowCreate(const char *title, int width, int height, BmxWndProc proc, int background)
 {
     SDL_WindowFlags flags = SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE;

@@ -7,6 +7,7 @@
 
 #include "compat/x87soft.h"
 #include "driver/driver.h"
+#include "native/native.h"
 #include "rw/rwd3d.h"
 #include "rw/rwmath.h"
 
@@ -73,6 +74,17 @@ static struct SDL_GPUTexture *rasterTexture(RwRaster *raster)
     }
     top = drvTopRaster(raster);
     ext = drvRasterExt(top);
+    if (drvGpuNull() && top->type != rwRASTERTYPECAMERA && top->type != rwRASTERTYPEZBUFFER) {
+        static int warned;
+
+        /* The one place a GPU object's existence reaches back above the cut: a texture raster's GPU copy
+         * exists only after a flush drew with it. The game never targets one (docs/PORTING.md "X5 part 3").
+         */
+        if (!warned) {
+            warned = 1;
+            bmxLog("driver: null GPU: camera update / clear / show on a raster of type %d\n", (int)top->type);
+        }
+    }
     if (ext->texture == NULL && (top->type == rwRASTERTYPECAMERA || top->type == rwRASTERTYPEZBUFFER)) {
         ext->texture = drvGpuCreateTarget(top->width, top->height, top->type == rwRASTERTYPEZBUFFER ? -1 : 0);
     }

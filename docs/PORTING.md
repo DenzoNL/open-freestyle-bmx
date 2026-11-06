@@ -865,6 +865,110 @@ BMX_SIM_HASH on every tick as the normal build:
 (the same with native32 / `-B build\native32-soft`). Both builds must be made from the same sources.
 
 
+### X5 part 3 (headless null GPU, arm64 sim hash, 2026-11-06)
+
+`BMX_GPU=null` (or `[video] backend = null` in bmxnative.ini) runs the complete game without GPU work and without
+a visible window: the simulation, and the whole CPU side of drawing (the game's draw lists, RenderWare's pipelines,
+instancing and lighting, Im2D / Im3D, the D3D7 driver's CPU code in src/rw/d3d*.c with its alpha sort, the
+widescreen funnel, the shadow probes) up to the five cut functions of rw/rwd3d.h. That got the first sim hash on
+arm64 (SDL's Metal backend needs a Cocoa window, part 1), and gives CI-style headless runs on any OS.
+
+**What it changes** (all below the cut, src/driver and one platform function):
+- `bmxGpuNull()` (src/platform/window.c), called first thing in main: decides once (env `BMX_GPU`, else the
+  config) and, when null, selects SDL's `dummy` video and audio drivers unless `SDL_VIDEODRIVER` /
+  `SDL_AUDIODRIVER` name one. The window is a dummy window of the same size; message boxes are logged and
+  answered as closed (part 1).
+- gpu.c: no device, no swapchain claim, no present mode. `drvGpuCreateTarget` returns one placeholder handle
+  (non-NULL, never dereferenced) for any non-empty size; clears and presents flush (drop) the batch and return 1;
+  `drvGpuPresent` still counts shown frames, so `BMX_KEYS`, `BMX_QUIT_FRAMES`, BMX_REPLAY's frame keys and the
+  high frame rate mode's uncounted presents behave as windowed; screenshots (`BMX_SHOT`) are skipped (logged).
+- draw.c: the cut functions keep their state (render states, texture stage states, bound texture) exactly as
+  before; a draw is dropped where it would be appended to the batch (after the same checks), so no pipelines,
+  samplers, buffers or texture uploads exist. `drvDrawStart` makes no shaders.
+- movie.c: DrawDibDraw accepts and drops the frame after the same argument and rectangle checks (returns TRUE).
+- raster.c: one log line if a camera update / clear / show ever names a raster that is not a camera or z raster
+  (see below); none in the runs.
+- texture.c (raster lock / unlock, the CPU copies the game reads back, image to raster) is untouched: those copies
+  are made and kept as before; only their GPU upload never happens.
+
+**Why the simulation cannot differ.** Everything above the cut runs the same code with the same inputs; only
+what crosses the cut upwards could make a difference, and it is the same in both modes:
+1. Return values: the five cut functions return 0 (D3D_OK) in both modes; the standards return what they did
+   (begin update, clear and show 1, since a camera or z raster's target is non-NULL in both). A failed SDL call
+   in windowed mode would be the only difference: it is logged, and the reference runs have none.
+2. Data the game reads back: the raster plugin fields the ported render states read (colour key, texture handle,
+   format info) are set by drvRasterCreate on the CPU; locks return the CPU copies (texture.c, unchanged). The
+   only GPU-dependent field above the cut is the NULL-ness of `ext->texture`, through rasterTexture; for camera
+   and z rasters it is non-NULL in both modes, and a texture raster is never a camera's target (that would be the
+   raster.c log line).
+3. Shown-frame count and window size: counted per RwRasterShowRaster in both; the dummy window has the size the
+   game asked for, as the background window has under Windows (the mode is fixed by `-r640.480.16`).
+4. FPU state: every SDL GPU call is inside `DRV_FPU_GUARDED`, which puts MXCSR / FPCR and the x87 control word
+   back; in null mode the calls are not made. Either way the game's float state after a driver call equals the
+   state before it (on native32 that is exactly what the guard was made for, X3).
+5. Time: the game's limiter (main.c, hfinterp.c) waits on `bmxTimeGetTime` in both modes; a present without vsync
+   only makes the loop spin instead of block. The simulation advances one fixed tick per onIdle and reads no clock
+   (the one wall-clock adapter, ngiffxAdaptQuality, is replaced by `full_draw_distance`, on by default; with
+   `full_draw_distance = 0` the far clip is wall-clock driven in both modes and neither is reproducible). BMX_KEYS
+   and BMX_REPLAY key on shown frames, not time. The number of extra interpolated draws per tick depends on the
+   display refresh (dummy: 60) and the clock, as it does between two windowed runs: HF1-HF3 showed that the
+   extra draws restore all simulation state they touch (shadow probes included).
+6. Window focus: the dummy driver may report focus where a background window gets none; scripted and replayed
+   input ignore the focus, and the game does not pause on WM_ACTIVATE (only DirectSound's focus muting, which is
+   audio).
+
+**Bug found on the way (64-bit, all non-32-bit builds):** the goal markers (game.c `gameDrawGoalMarkers` /
+`gameDrawPlaneMarker`) read face records (`PhysFace`) at the 32-bit offsets +0x2c (the prop's collision object)
+and +0x30 / +0x40 / +0x50 (the corners). On 64-bit the pointers before them move the fields, so a ProQuest level
+with an active face goal (type 1, 6 or 0x15: the fresh save's Vail Trails goals) read garbage as an object
+pointer and crashed on the first draw (SIGSEGV in gameDrawEdgeMarker); native64 with the user's save had no
+such goal active. Now typed field accesses (`face->object`, `p0..p2`); 32-bit offsets unchanged (asserted in
+physics_types.h).
+
+**The scripted ride.** tools/scripts/ride.keys is the HF4 script (docs/HIGHFPS.md "HF4 runs"; the X3 "scripted
+ride" of 1014 ticks lives only on the Windows machine): ten Enters into ProQuest / Vail Trails, riding with
+steering, hops and E/S/F/D tricks from frame 1500, Esc at 2700 (PAUSE), end run, RUN FINISHED, view replay; 4000
+shown frames. It starts from **no save** (an empty `save\` folder) so every machine starts from the same state.
+On the Mac (from a copy of the game in the install layout; `bmxnative.ini` empty, i.e. the defaults):
+
+    cd <game copy> && rm -f save/SAVE.DAT
+    BMX_GPU=null BMX_MUTE=1 BMX_NO_MOVIES=1 BMX_CONFIG=<empty.ini> BMX_QUIT_FRAMES=4000 \
+      BMX_KEYS="$(cat tools/scripts/ride.keys)" BMX_SIM_HASH=ride.arm64.hash \
+      build/macos/bmxnative Scene.Txt -r640.480.16
+
+or `python3 -I tools/xcheck.py --game-dir <game copy> --keys tools/scripts/ride.keys --args=-r640.480.16
+--ini <empty.ini> BMX_GPU=null build/macos/bmxnative BMX_GPU=null build/macos/bmxnative`.
+
+**Results (macOS arm64, x87soft, 2026-11-06):**
+- The ride runs headless to the end without a trap (after the goal marker fix): 4000 shown frames, **2973 ticks**,
+  ~123 s (the game's own 30 Hz pacing), no "raster of type" line. The hash file is
+  data/simhash/ride.arm64.hash, sha256 `b60f0dfd98ac9a6997a3e8a97fef476814584b77c245c5dcc7793218ec60aedc`.
+  (2973 ticks is also what HF4 logged for this script on Windows with the user's save.)
+- Two runs: byte-identical hash files (the second while a hook build loaded the machine).
+- `[general] vanilla = 1` (no widescreen, no HUD anchoring, no interpolation; through xcheck `--ref-hash`):
+  identical to the default-config file, so the draw-side options stay visual-only on arm64 too.
+- Perturbed build (air gravity in physVelocityAir scaled by 1.0001, reverted afterwards): same tick count,
+  differs from **tick 535** (the first jump) on.
+- Not possible here: a windowed run on the Mac (no visible windows on this machine during work), hence no
+  null-vs-windowed comparison on arm64; that is the Windows step below.
+
+**For the Windows machine** (PowerShell, repo root; `<game>` = a copy of the install with an empty `save\`, e.g.
+`native-run2` with its SAVE.DAT moved away; xcheck removes SAVE.DAT for each run and puts the folder's own back
+afterwards). An empty ini makes both runs use the defaults (`ni empty.ini`):
+
+    cmake --build --preset native64 --target bmxnative
+    py -I tools\xcheck.py --game-dir <game> --keys tools\scripts\ride.keys --args=-r640.480.16 --ini empty.ini `
+       --ref-hash data\simhash\ride.arm64.hash --out xcheck-null `
+       build\native64\bmxnative.exe BMX_GPU=null build\native64\bmxnative.exe
+
+That runs native64 windowed (in the background, never focused) as `run0` and headless as `run1`, and compares
+both with the arm64 file: `run0` vs `ref` is arm64 against x86_64 (X5's goal), `run1` vs `ref` the null mode.
+Expected: `ref`, `run0` and `run1` identical (2973 ticks). If only `run1` differs from `run0`, the null mode
+leaks (the first differing tick names when); if `run0` differs from `ref` but not from `run1`, it is an arm64 /
+x87soft difference (then the same against native32 and a `BMX_X87_SOFT=ON` x86 build narrows it down). The same
+with `build\native32\bmxnative.exe` in place of native64 checks the 32-bit build.
+
+
 ## Not in scope
 
 - Running without the user's game files: the assets, movies and music stay theirs.

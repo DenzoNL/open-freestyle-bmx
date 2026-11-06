@@ -60,6 +60,7 @@ static const char *const kKnownKeys[] = {
     "video.interpolate", /* 1 (default): extra draws between the 30 Hz ticks in levels, one tick behind */
     "video.max_fps",     /* draws per second with interpolate = 1 (0: the display's refresh rate) */
     "video.vsync",       /* 1: present with vsync (default), 0: immediate (mailbox when not supported) */
+    "video.backend",     /* "null": no GPU device, no visible window (headless; BMX_GPU=null does the same) */
     /* src/native/drawdist.c */
     "video.full_draw_distance", /* 1 (default): far clip and fog at their maximum, no frame rate adapter */
 };

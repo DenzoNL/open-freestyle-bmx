@@ -389,6 +389,9 @@ static void appendDraw(uint32_t type, const RwD3DTLVertex *vertices, uint32_t nu
     if (draw.color == NULL || n == 0 || numVertices == 0 || numVertices > 0x10000) {
         return;
     }
+    if (drvGpuNull()) {
+        return; /* BMX_GPU=null: the draw is dropped (nothing below the cut reads the batch back) */
+    }
     draw.vertices =
         grow(draw.vertices, &draw.capVertices, draw.numVertices + numVertices, sizeof *draw.vertices);
     memcpy(draw.vertices + draw.numVertices, vertices, numVertices * sizeof *vertices);
@@ -685,9 +688,13 @@ void drvDrawForgetRaster(RwRaster *raster)
 int drvDrawStart(void)
 {
     SDL_GPUDevice *device = drvGpuDevice();
-    const SDL_GPUShaderFormat formats = SDL_GetGPUShaderFormats(device);
+    SDL_GPUShaderFormat formats;
     SDL_GPUShaderCreateInfo info;
 
+    if (drvGpuNull()) {
+        return 1; /* BMX_GPU=null: no device, no shaders */
+    }
+    formats = SDL_GetGPUShaderFormats(device);
     SDL_zero(info);
     /* Per shader: DXIL (Direct3D 12), SPIR-V (Vulkan), MSL source text (Metal; docs/PORTING.md X5-A). */
     const unsigned char *vsCode, *psCode, *uiCode;
