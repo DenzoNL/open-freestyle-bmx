@@ -3,6 +3,9 @@
  * Names come from data/functions.csv and work/labels.raw when they can be found (development convenience, not
  * required).
  */
+#if defined(__linux__)
+#define _GNU_SOURCE /* glibc under -std=c17: sigaction, siginfo_t, REG_RIP, readlink, strsignal */
+#endif
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -104,8 +107,14 @@ void bmxLog(const char *fmt, ...)
 static void addSym(uint32_t addr, const char *name)
 {
     if (symCount == symCap) {
-        symCap = symCap ? symCap * 2 : 4096;
-        syms = realloc(syms, symCap * sizeof *syms);
+        const size_t cap = symCap ? symCap * 2 : 4096;
+        Sym *const grown = realloc(syms, cap * sizeof *syms);
+
+        if (!grown) {
+            return; /* names are a convenience: keep the ones we have */
+        }
+        syms = grown;
+        symCap = cap;
     }
     syms[symCount].addr = addr;
     syms[symCount].seq = (uint32_t)symCount;
@@ -159,9 +168,14 @@ static void loadSymbols(void)
             char *tab = strchr(line, '\t');
 
             if (tab) {
+                char *const name = tab + 1;
+                char *const end = strpbrk(name, "\r\n");
+
                 *tab = 0;
-                tab[strcspn(tab + 1, "\r\n") + 1] = 0;
-                addSym((uint32_t)strtoul(line, NULL, 16), tab + 1);
+                if (end) {
+                    *end = 0;
+                }
+                addSym((uint32_t)strtoul(line, NULL, 16), name);
             }
         }
         fclose(f);

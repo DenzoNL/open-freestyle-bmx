@@ -10,6 +10,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "native/native.h" /* bmxLog (src/native/trap.c) */
+
 #if defined(__i386__)
 #define BMX_WINAPI __attribute__((stdcall))
 #else
@@ -40,8 +42,6 @@ int bmxImportKeepsDll(const char *dll);
 
 /* The real dll!name (loads the DLL when needed), for stand-ins that forward or check against Windows. */
 void *bmxRealProc(const char *dll, const char *name);
-/* Log to stderr and bmxnative.log (src/native/trap.c). */
-void bmxLog(const char *fmt, ...);
 
 /* BMX_KEYS (src/native/keys.c): 1 when the keyboard is scripted; the script's DIK state at the current shown
  * frame (state is zeroed by the caller). */

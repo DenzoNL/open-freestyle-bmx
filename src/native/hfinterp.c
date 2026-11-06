@@ -498,6 +498,17 @@ static void logSnap(const char *what, int index, const char *name, int reason, d
     }
 }
 
+/* Whether two float pairs differ bit for bit (as stored: -0 against +0 and NaN payloads count, like the
+ * memcmp this replaces). */
+static int hfPairDiffers(const void *a, const void *b)
+{
+    uint32_t x[2], y[2];
+
+    memcpy(x, a, sizeof x);
+    memcpy(y, b, sizeof y);
+    return x[0] != y[0] || x[1] != y[1];
+}
+
 /* Matches tick N against N - 1 and applies the skip rules (H6). `global`: the previous capture is unusable.
  */
 static void classify(HfCapture *c, const HfCapture *prev, int global)
@@ -561,7 +572,7 @@ static void classify(HfCapture *c, const HfCapture *prev, int global)
     }
     /* HF5: the FOV follows the camera's rules, plus its own ratio limit */
     c->fovSnap = c->camSnap;
-    if (c->camSnap == kHfSnapNone && memcmp(prev->window, c->window, sizeof c->window) != 0) {
+    if (c->camSnap == kHfSnapNone && hfPairDiffers(prev->window, c->window)) {
         const double ratio = (double)c->window[0] / (double)prev->window[0];
         const double grow = ratio < 1.0 ? 1.0 / ratio : ratio;
 
@@ -720,7 +731,7 @@ static void setFov(const HfCapture *c, const HfCapture *prev, double alpha, int 
     } else {
         memcpy(window, c->window, sizeof window);
     }
-    if (memcmp(window, &rw->viewWindow, sizeof window) != 0) {
+    if (hfPairDiffers(window, &rw->viewWindow)) {
         const RwV2d v = {window[0], window[1]};
 
         RwCameraSetViewWindow(rw, &v);
@@ -743,7 +754,7 @@ static void setShake(double alpha)
         return;
     }
     hfLerpN(offset, gHf.shakeFrom, gHf.shakeTo, 2, alpha);
-    if (memcmp(offset, &gHf.shakeCamera->viewOffset, sizeof offset) != 0) {
+    if (hfPairDiffers(offset, &gHf.shakeCamera->viewOffset)) {
         const RwV2d v = {offset[0], offset[1]};
 
         RwCameraSetViewOffset(gHf.shakeCamera, &v);
@@ -1172,7 +1183,7 @@ static int tick(uint64_t nowNs)
     drawFrame();
     if (gHf.shakeCamera != NULL) {
         memcpy(gHf.shakeTo, &gHf.shakeCamera->viewOffset, sizeof gHf.shakeTo);
-        gHf.shake = memcmp(gHf.shakeFrom, gHf.shakeTo, sizeof gHf.shakeTo) != 0;
+        gHf.shake = hfPairDiffers(gHf.shakeFrom, gHf.shakeTo);
     }
     if (gHf.inLevel) {
         const uint64_t end = bmxTimeNs();

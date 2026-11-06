@@ -33,4 +33,24 @@ static inline uint64_t bmxFpcrWithX87Rounding(uint64_t fpcr, uint16_t cw)
 }
 #endif
 
+/*
+ * The floating-point state a Windows thread starts with, for x86 builds on other systems (docs/PORTING.md "X4
+ * (Linux x64)"): x87 control word 0x027f (53-bit precision, round to nearest, exceptions masked) and MXCSR
+ * 0x1f80 (round to nearest, exceptions masked, no flush-to-zero or denormals-are-zero). Linux starts the x87
+ * at 0x037f, 64-bit precision, with which the x87 helpers of compat/x87.h would round differently from
+ * Windows. Called first in main and in our own threads; SDL's threads copy the state of the thread that
+ * creates them (Linux clone). Nothing on Windows (already its state) or without an x87 (x87soft's control
+ * word starts at 0x027f).
+ */
+static inline void bmxFpuWindowsDefaults(void)
+{
+#if (defined(__i386__) || defined(__x86_64__)) && !defined(_WIN32)
+    const uint16_t cw = 0x027f;
+    const uint32_t mxcsr = 0x1f80;
+
+    __asm__ volatile("fldcw %0" ::"m"(cw) : "memory");
+    __asm__ volatile("ldmxcsr %0" ::"m"(mxcsr) : "memory");
+#endif
+}
+
 #endif

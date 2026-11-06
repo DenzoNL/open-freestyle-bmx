@@ -13,14 +13,12 @@ set(BMX_WORK_DIR "${CMAKE_SOURCE_DIR}/work" CACHE PATH "Directory with labels.ra
 
 set(BMX_WARNINGS -Wall -Wextra -Werror -Wno-unused-parameter -Wno-microsoft-anon-tag)
 
-# macOS / Linux (docs/PORTING.md "X5 part 1"): the host compiler with the Windows toolchains' language flags
-# (cmake/*.cmake). arm64 compilers fuse a * b + c into one rounding unless told not to (docs/PORTING.md X4); x86
-# has no FMA without -mfma, so the Windows builds need no flag.
+# macOS / Linux (docs/PORTING.md "X5 part 1", "X4 (Linux x64)"): the host compiler with the Windows toolchains'
+# language flags (cmake/*.cmake). arm64 compilers fuse a * b + c into one rounding unless told not to
+# (docs/PORTING.md X4); x86 has no FMA without -mfma, so the Windows builds need no flag, and on Linux x86_64 it
+# only guards against an -march in CFLAGS that brings FMA in.
 if(NOT WIN32)
-  add_compile_options(-fms-extensions -fno-math-errno)
-  if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64|ARM64)$" OR CMAKE_OSX_ARCHITECTURES MATCHES "arm64")
-    add_compile_options(-ffp-contract=off)
-  endif()
+  add_compile_options(-fms-extensions -fno-math-errno -ffp-contract=off)
 endif()
 
 file(GLOB_RECURSE BMX_GAME_SOURCES CONFIGURE_DEPENDS src/zge/*.c src/bmx/*.c src/rw/*.c)
@@ -172,6 +170,13 @@ if(BMX_NATIVE32)
         COMMAND ${CMAKE_SOURCE_DIR}/tools/macos_bundle.sh $<TARGET_FILE:bmxnative>
                 $<TARGET_FILE:SDL3::SDL3-shared> ${CMAKE_BINARY_DIR}/bmxnative.app
         DEPENDS bmxnative VERBATIM)
+    else()
+      # Linux (docs/PORTING.md "X4 (Linux x64)"). The tarball (not part of `all`):
+      # cmake --build --preset linux --target bmxnative_tarball -> build/linux/opendmfbmx-linux-x86_64.tar.gz
+      add_custom_target(bmxnative_tarball
+        COMMAND ${CMAKE_SOURCE_DIR}/tools/linux_package.sh $<TARGET_FILE:bmxnative>
+                $<TARGET_FILE:SDL3::SDL3-shared> ${CMAKE_BINARY_DIR}/opendmfbmx-linux-x86_64
+        DEPENDS bmxnative VERBATIM)
     endif()
     add_executable(bmxwidetest tests/platform/test_wide.c src/driver/widemath.c)
     target_include_directories(bmxwidetest PRIVATE src)
@@ -179,6 +184,17 @@ if(BMX_NATIVE32)
     add_executable(bmxhftest tests/platform/test_hf.c src/native/hfmath.c)
     target_include_directories(bmxhftest PRIVATE src)
     target_compile_options(bmxhftest PRIVATE ${BMX_WARNINGS})
+    # libm is its own library on Linux (part of libSystem on macOS).
+    target_link_libraries(bmxwidetest PRIVATE m)
+    target_link_libraries(bmxhftest PRIVATE m)
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64)$" AND NOT APPLE)
+      # Linux x86_64 has the real x87: the portable x87 against it (docs/PORTING.md "X5 part 2", "X4").
+      find_package(Threads REQUIRED)
+      add_executable(bmxx87test tests/platform/test_x87.c src/compat/x87soft.c)
+      target_include_directories(bmxx87test PRIVATE src)
+      target_compile_options(bmxx87test PRIVATE ${BMX_WARNINGS})
+      target_link_libraries(bmxx87test PRIVATE Threads::Threads)
+    endif()
   else()
   # Fixed base, no ASLR (runs stay alike), away from the original's 0x400000..0x6b3000: nothing of ours may sit at an
   # original address, where a leftover raw address would silently reach it. Below 0x10000000: the original's data

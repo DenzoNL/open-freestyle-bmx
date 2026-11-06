@@ -53,8 +53,14 @@
                 ]
                 ++ pkgs.lib.optional (pkgs.stdenv.hostPlatform.isDarwin || pkgs.stdenv.hostPlatform.isx86_64) pkgs.ghidra
                 # The macOS / Linux native build (docs/PORTING.md "X5 part 1"): SPIR-V -> MSL in tools/shaders.sh.
-                ++ [ pkgs.spirv-cross ];
-              # find_package(SDL3) of the macOS / Linux native build (the `macos` preset).
+                ++ [ pkgs.spirv-cross ]
+                # The Linux native build (docs/PORTING.md "X4 (Linux x64)", the `linux` preset): a wrapped clang
+                # for the host (the shell's stdenv compiler is gcc there) and patchelf for the tarball.
+                ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [
+                  llvm.clang
+                  pkgs.patchelf
+                ];
+              # find_package(SDL3) of the macOS / Linux native build (the `macos` / `linux` presets).
               SDL3_ROOT = "${pkgs.sdl3.dev}";
             }
             // crossEnv

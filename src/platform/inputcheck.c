@@ -34,13 +34,13 @@ struct BmxCheckDevice {
     int used, keyboard, index;
     int32_t maxStickDiff;
     uint32_t infoSeen; /* info fields already logged once */
+    int repeats;       /* how often the last HRESULT difference (lastMethod) repeated */
     int lastRealSign[2], lastOurSign[2];
     BmxHresult lastResult[2]; /* previous (ours, real) of GetDeviceState */
     Threshold realLimit[2][2], ourLimit[2][2];
     uint64_t stableReads, stableDiffs; /* lX / lY reads with raw value and DirectInput's value unchanged */
     const char *lastMethod;            /* the last HRESULT difference and how often it repeated */
     BmxHresult lastOurs, lastTheirs;
-    int repeats;
     int32_t prevRaw[2], prevReal[2];
     int16_t stableValue[2][256]; /* 8-bit sticks: DirectInput's value per raw value on still reads */
     uint8_t stableSeen[2][256];

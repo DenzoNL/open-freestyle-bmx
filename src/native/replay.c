@@ -68,7 +68,7 @@ static int get(void *p, size_t n)
 
 static uint8_t *loadSave(uint32_t *size)
 {
-    FILE *f = fopen("save/SAVE.DAT", "rb");
+    FILE *f = fopen(bmxPathResolve("save\\SAVE.DAT"), "rb"); /* the folder's own case on Linux */
     uint8_t *bytes = malloc(kSaveMax);
     size_t n = 0;
 

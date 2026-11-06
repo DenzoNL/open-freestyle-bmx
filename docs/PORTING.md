@@ -98,7 +98,7 @@ the same per-tick BMX_SIM_HASH.
 | X1 | The layout flip on 32-bit Windows: native32 built without fixed addresses. Globals become C variables with initialisers in the source (X2-A), function pointers in the data become function names, `ORIG_FN` calls direct; no image at 0x400000, no code range, no NgBMX.exe | sim hash equal to today's native32; the hook build and oracle unchanged |
 | X2 | Pointer-size cleanliness, still 32-bit: on-disk types and readers for the asset loaders, RW streams and SAVE.DAT; the pointer casts removed | sim hash equal; old saves load |
 | X3 | Windows x64 (llvm-mingw x86_64, SDL3 x64) | sim hash equal to native32; the user plays it |
-| X4 | Linux x64: case-insensitive file lookup, `/` paths, the save / config locations, packaging (AppImage or a tarball) | sim hash equal; runs on the Steam Deck |
+| X4 | Linux x64: case-insensitive file lookup, `/` paths, the save / config locations, packaging (AppImage or a tarball) (2026-11-06: builds, headless ride hash equal to arm64 under Rosetta) | sim hash equal; runs on the Steam Deck |
 | X5 | Portable x87 maths (X4-A, exhaustive tests); MSL shaders (X5-A); macOS arm64 app bundle | sim hash equal on arm64 |
 | X6 | Android arm64: SDL3 Android project, game files chosen through the system file picker, controller (the Thor's built-in pad), 1920x1080 widescreen | plays on the Thor |
 
@@ -967,6 +967,105 @@ Expected: `ref`, `run0` and `run1` identical (2973 ticks). If only `run1` differ
 leaks (the first differing tick names when); if `run0` differs from `ref` but not from `run1`, it is an arm64 /
 x87soft difference (then the same against native32 and a `BMX_X87_SOFT=ON` x86 build narrows it down). The same
 with `build\native32\bmxnative.exe` in place of native64 checks the 32-bit build.
+
+
+### X4 (Linux x64, 2026-11-06): builds, runs headless, sim hash equal (under Rosetta)
+
+A `linux` preset (cmake/x86_64-linux.cmake: the host's clang, SSE2, no FMA contraction) builds bmxnative for
+x86_64 Linux on the POSIX halves and the path resolver of X5 part 1; SDL3 comes through its CMake config. Linux
+x86_64 keeps the x87 inline assembly like Windows x64 (compat/x87.h's hardware helpers, not x87soft). Built and run
+in an OrbStack Fedora 44 amd64 machine on this Mac, i.e. x86_64 under Rosetta 2 (below); real hardware (the user's
+nixbox, the Steam Deck) is still to do.
+
+**Build** (Linux, repo root):
+```sh
+nix develop                                         # clang (wrapped), SDL3 (SDL3_ROOT), patchelf, cmake, ninja
+cmake --preset linux && cmake --build --preset linux             # build/linux/bmxnative (rpath to nix's SDL3)
+cmake --build --preset linux --target bmxnative_tarball          # build/linux/opendmfbmx-linux-x86_64{,.tar.gz}
+```
+Without nix: clang, cmake >= 3.28, ninja, python3 and the distribution's SDL3 development package (or SDL3 built
+from source, `-DSDL3_DIR=<prefix>/lib/cmake/SDL3`); `OPENDMFBMX_LINUX_CLANG=clang-21` names another clang. GCC is
+not supported (the sources use clang's diagnostic pragmas and warning names under `-Werror`). Run it from the game
+folder in the install layout (`Scene.Txt`, `Assets/`, `bin/audio`, `bin/movie`, `save/`), any case of the names:
+`cd <game> && <build>/bmxnative Scene.Txt`.
+
+**What changed** (Windows builds unchanged: every change is `__linux__`, `!_WIN32` or a no-op there):
+- x87 state: Linux starts a process with the x87 control word at 0x037f (64-bit precision), Windows at 0x027f
+  (53-bit); the hardware x87 helpers would round differently. `bmxFpuWindowsDefaults()` (compat/fpu.h) loads
+  0x027f and MXCSR 0x1f80 (Windows' and Linux's default anyway: nearest, masked, no FTZ / DAZ) first thing in
+  main and in the winmm timer thread; other threads (SDL's audio, the music worker) copy the creating thread's state
+  (Linux's clone does) and are made outside camera mode. A no-op on Windows and arm64 (x87soft's variable starts at
+  0x027f). Also on an x86_64 macOS build, should one ever be made.
+- trap.c defines `_GNU_SOURCE` on Linux: glibc under `-std=c17` hides `sigaction`, `siginfo_t`, `REG_RIP`,
+  `readlink` and `strsignal` (the only file that failed the Linux compile).
+- CMakeLists.txt: `-ffp-contract=off` for every non-Windows build (x86_64 has no FMA without `-mfma`; this guards
+  against an `-march` in CFLAGS); bmxwidetest / bmxhftest link libm (its own library on Linux; the link found it);
+  the `bmxnative_tarball` target (tools/linux_package.sh); bmxx87test on Linux x86_64 too (hardware against soft).
+- replay.c reads the recording's starting SAVE.DAT through `bmxPathResolve` (a `Save/` folder on a case-sensitive
+  file system).
+- flake.nix: on Linux the default shell adds a wrapped clang (its stdenv compiler is gcc) and patchelf.
+- Reused unchanged from X5 part 1: the redirects instead of runtime jumps (`BMX_REDIRECTS` is 1 off Windows), the
+  x86_64 import thunks (RIP-relative `jmp`, ELF spelling), the fault handler (`REG_RIP` / `REG_RSP` from the
+  signal context), `/proc/self/exe` for the log, `__dso_handle` as the instance, LP64 handling.
+
+**Locations** (the macOS policy): bmxnative.ini from `BMX_CONFIG`, else next to the executable, else SDL's pref path
+(`$XDG_DATA_HOME/opendmfbmx/bmxnative/`, by default `~/.local/share/opendmfbmx/bmxnative/`); saves in the game
+folder's `save/` (the working directory's, as on Windows); bmxnative.log next to the executable. The game's paths
+(`Assets\Tables.ZAL`, `bin\audio\MUSIC.ZSD`) are resolved case-insensitively per component (`bmxPathResolve`),
+which Linux needs: its file systems are case-sensitive.
+
+**Packaging.** The tarball holds `bmxnative` and `lib/libSDL3.so.0`, the executable's rpath `$ORIGIN/lib`; the
+user unpacks it anywhere and runs it with the game folder as the working directory. A build in `nix develop`
+links against the nix store's glibc and loader, so its tarball runs only where nix is (NixOS). For other
+distributions and the Steam Deck, build outside nix on an old enough glibc: the Steam Runtime 3 "sniper" SDK
+container (Debian 11, glibc 2.31; SDL3 built from source there, it has only SDL2), then the same target. An
+AppImage (not made): `linuxdeploy --appdir AppDir -e build/linux/bmxnative -l <libSDL3.so.0> -d bmxnative.desktop
+-i <icon> --output appimage`; SDL3 opens X11 / Wayland / PipeWire / Vulkan from the system at run time, so nothing
+else goes in; it runs with the caller's working directory, i.e. `cd <game> && opendmfbmx.AppImage Scene.Txt`. On
+the Steam Deck: add it as a non-Steam game with the game folder as "Start in" and `Scene.Txt` as the launch
+option; Steam Input presents the Deck's controls as an Xbox pad, which the DirectInput stand-in reads.
+
+**Verified on the Mac** (nix's binary cache substitutes x86_64-linux packages without a Linux builder: glibc 2.44
+headers and libraries, linux-headers 7.2, SDL3 3.4.18, gcc 16's crtbegin / libgcc):
+- Every source of the native build (170 units of the macos compile database) compiles `-fsyntax-only -Werror`
+  for `x86_64-unknown-linux-gnu` against those headers (before the trap.c fix: trap.c failed, nothing else).
+- A full cross build of the `linux` configuration (clang 21 `--target=x86_64-unknown-linux-gnu`, ld.lld, a
+  scratch toolchain file with `-nostdlibinc -isystem <glibc>/include -isystem <linux-headers>/include
+  --gcc-toolchain=<gcc>` and `-B/-L <glibc>/lib`, `-DSDL3_DIR=<sdl3-dev>/lib/cmake/SDL3`) compiles warning-free
+  and links bmxnative, bmxwidetest and bmxhftest: a PIE, `NEEDED` libSDL3.so.0 / libm.so.6 / libc.so.6, no
+  `TEXTREL`, non-executable stack; main and the timer thread start with the `fldcw 0x27f`.
+- The same 170 units also for i686-w64-mingw32 and x86_64-w64-mingw32 (mingw-w64 14 headers), `-Werror`.
+
+**Run on Linux x86_64 under Rosetta** (OrbStack `bmx-linux`: Fedora 44 amd64, clang 22.1.8, SDL3-devel 3.4.18;
+the x87 is Rosetta's emulation, not hardware):
+- `cmake --preset linux && cmake --build --preset linux`: warning-free (`-Werror`), links.
+- bmxhftest (329 checks) and bmxwidetest (849) pass.
+- **The headless ride** (`BMX_GPU=null`, dummy video / audio, `BMX_MUTE=1`, empty ini, no save, the X5 part 3
+  command with build/linux/bmxnative): 4000 shown frames, 2973 ticks, no trap, ~124 s; the BMX_SIM_HASH file is
+  **byte-identical to data/simhash/ride.arm64.hash**. So Linux x86_64 with the x87 instructions gives arm64 /
+  x87soft's simulation tick for tick.
+- bmxx87test: Rotate / MatrixMultiply under all 12 control words, the SinScaled / AsinScaled tables,
+  AngleOfCosine equal; Rosetta's FSIN / FCOS / FPTAN / FPATAN differ from the model in the last bits (e.g. 2 of
+  8192 AtanScaled doubles, 1 CosScaled under the camera cw, ~1% of TanFloat, more for huge arguments), and also
+  from the 128-bit-pi model, i.e. Rosetta does not reproduce the x87's transcendental results. They did not reach
+  the ride's hash. The soft hashes equal the arm64 ones printed in X5 part 2 (same answers on both
+  architectures). Real x86 hardware still has to show `all equal` (Windows PC, nixbox).
+
+**For the nixbox** (x86_64 NixOS, real hardware; from a copy of the game in the install layout with an empty `save/` and an empty
+ini; headless, no window or sound):
+```sh
+cmake --preset linux && cmake --build --preset linux
+build/linux/bmxhftest && build/linux/bmxwidetest && build/linux/bmxx87test     # x87: "all equal" expected
+python3 -I tools/xcheck.py --game-dir <game copy> --keys tools/scripts/ride.keys --args=-r640.480.16 \
+  --ini <empty.ini> --ref-hash data/simhash/ride.arm64.hash BMX_GPU=null build/linux/bmxnative
+```
+Expected: the run and `ref` identical (2973 ticks; Linux x86_64 with the hardware x87 against arm64 with
+x87soft). If not, the same with a `-DBMX_X87_SOFT=ON` build (`cmake --preset linux -B build/linux-soft
+-DBMX_X87_SOFT=ON`) tells the x87 from the rest. Then a windowed run (Vulkan, SPIR-V shaders), sound, the pad,
+movies, a save, and the tarball on another distribution / the Steam Deck.
+
+**Left:** the sim hash and bmxx87test on real x86 hardware; a windowed run: the Vulkan path, audio (PipeWire / PulseAudio through
+SDL), input, the Steam Deck; a release build in the sniper container; an AppImage if wanted; GCC (not planned).
 
 
 ## Not in scope

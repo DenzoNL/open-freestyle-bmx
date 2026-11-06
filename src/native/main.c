@@ -10,6 +10,7 @@
 #include <unistd.h> /* _exit */
 #endif
 
+#include "compat/fpu.h"
 #include "compat/orig.h"
 #include "native/native.h"
 #include "platform/platform.h"
@@ -139,6 +140,7 @@ int main(int argc, char **argv)
     BmxMsg msg;
     int background;
 
+    bmxFpuWindowsDefaults(); /* x87 at 53 bits as on Windows (Linux starts at 64): compat/fpu.h */
     bmxLogOpen();
     bmxPlatformInit();
     bmxGpuNull(); /* BMX_GPU=null: picks SDL's dummy drivers before any subsystem starts (headless) */

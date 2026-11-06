@@ -575,7 +575,7 @@ static int fixedF(char *out, const char *d, int exp, int prec, int alt)
 }
 
 /* Removes trailing fraction zeros (and a bare point) for %g without '#'. */
-static int stripZeros(char *s, int n)
+static int stripZeros(const char *s, int n)
 {
     int dot = 0;
 
@@ -609,7 +609,7 @@ static void doubleDigits(double v, char d[17], int *exp)
     d[0] = tmp[0];
     memcpy(d + 1, tmp + 2, 16);
     e = strchr(tmp, 'e');
-    *exp = atoi(e + 1);
+    *exp = (int)strtol(e + 1, NULL, 10);
 }
 
 /* Formats |v| for conversion conv (e E f g G) into body; returns the length. body must hold 1100 bytes. */
@@ -707,7 +707,8 @@ static void emit(Out *o, const char *prefix, int prefixLen, const char *body, in
     }
 }
 
-static void formatCore(Out *o, const char *fmt, va_list ap)
+/* va_arg changes ap (clang-tidy takes arm64 macOS's char * va_list for a read-only buffer). */
+static void formatCore(Out *o, const char *fmt, va_list ap) // NOLINT(readability-non-const-parameter)
 {
     for (; *fmt; fmt++) {
         int flags = 0, width = 0, prec = -1, size = 0; /* size: 1 h, 2 l, 3 64-bit */

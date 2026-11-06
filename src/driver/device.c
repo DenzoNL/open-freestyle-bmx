@@ -477,7 +477,7 @@ int drvSystem(int32_t request, void *out, void *inOut, int32_t in)
         *(int32_t *)out = drvState.currentMode;
         return 1;
     case rwDEVICESYSTEMSTANDARDS:
-        systemStandards(out, in);
+        systemStandards((void **)out, in);
         return 1;
     case 12: /* free texture memory (0x4edf60) */
         *(uint32_t *)out = 64u << 20;

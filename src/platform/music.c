@@ -726,8 +726,8 @@ int bmxMusicFindFile(const char *dir, const BmxMusicEdit *edit, char *out, size_
 typedef struct Track {
     BmxMusicPiece pieces[kBmxMusicMaxPieces];
     const BmxMusicEdit *edit;
-    int ok, failed, pieceCount;
     int16_t *head; /* the first kHeadFrames, rendered up to headFrames */
+    int ok, failed, pieceCount;
     SDL_AtomicInt headFrames;
     BmxMusicZsdEntry zsd; /* the game's ADPCM data (size 0: none) */
     char path[kPathBytes];

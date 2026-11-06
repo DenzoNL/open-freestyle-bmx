@@ -21,6 +21,7 @@
 #include <SDL3/SDL.h>
 #include <math.h>
 
+#include "compat/fpu.h"
 #include "platform/standins.h"
 
 /* TIMERR_NOCANDO: what winmm's timeKillEvent returns for an unknown, killed or fired one-shot id (measured).
@@ -104,6 +105,7 @@ static int SDLCALL timerThread(void *arg)
     const uint64_t period = (uint64_t)(t->delay ? t->delay : 1) * 1000000ull;
     uint64_t deadline;
 
+    bmxFpuWindowsDefaults(); /* a new Windows thread's FPU state, whatever the creator's (compat/fpu.h) */
     SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_TIME_CRITICAL);
     deadline = SDL_GetTicksNS() + period;
     while (!SDL_GetAtomicInt(&t->stop)) {
