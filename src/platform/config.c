@@ -43,6 +43,7 @@ static const char *const kKnownKeys[] = {
     "input.stick_8way",    /* P7-B: the left stick snaps to 8 directions */
     "audio.smooth_resample", /* P9 note: 0 original mixer, 1 linear, 2 cubic resampling (smoothmix.c) */
     "audio.music_dir",       /* the music override: a folder with the user's FLACs (docs/MUSIC.md) */
+    "audio.mute",            /* 1: no sound at all (the same as BMX_MUTE=1) */
     "video.width", /* P16: the mode without the device dialog (default 0 x 0 x 16 full screen, 0: the desktop
                       size) */
     "video.height",
@@ -149,6 +150,63 @@ void bmxConfigLoadText(const char *text, const char *origin)
     }
 }
 
+/* The settings file a first start writes: every option commented out at its default, so it changes nothing
+ * until the player removes a ';'. Keep the values in step with the bmxConfig* calls' defaults. */
+static const char kTemplate[] =
+    "; Open Freestyle BMX settings.\n"
+    "; Remove the ';' at the start of a line to change that setting. The values shown are the defaults.\n"
+    "\n"
+    "[general]\n"
+    "; vanilla = 0             ; 1: the original game's look and behaviour for every option not set below\n"
+    "; game_dir =              ; the game folder, when this program is not in it (the folder picker sets "
+    "it)\n"
+    "\n"
+    "[video]\n"
+    "; fullscreen = 1          ; 0: a window of width x height\n"
+    "; width = 0               ; 0: the screen's size\n"
+    "; height = 0\n"
+    "; widescreen = 1          ; 0: 4:3, stretched on a wide screen\n"
+    "; hud = 1                 ; 0: the HUD in the 4:3 middle, 1: at the screen's edges, 2: stretched\n"
+    "; hud_aspect = 178        ; with hud = 1: how wide the HUD spreads, aspect ratio x 100 (0: the whole "
+    "screen)\n"
+    "; menus = 2               ; 0: black bars beside the menus, 1: stretched, 2: blurred sides\n"
+    "; movies = 0              ; 0: black bars beside the movies, 1: stretched\n"
+    "; ui_filter = 2           ; 0: pixelated 2D as the original, 1: smooth, 2: sharp and smooth\n"
+    "; interpolate = 1         ; 1: smooth motion above the game's 30 frames per second, 0: 30 like the "
+    "original\n"
+    "; max_fps = 0             ; with interpolate = 1: frames per second at most (0: the display's refresh "
+    "rate)\n"
+    "; vsync = 1               ; 0: no vertical sync (may tear)\n"
+    "; full_draw_distance = 1  ; 0: the original's shorter draw distance and fog\n"
+    "; fov_scale = 100         ; field of view in percent\n"
+    "\n"
+    "[audio]\n"
+    "; mute = 0                ; 1: no sound\n"
+    "; music_dir =             ; a folder with your own music as FLAC files (see the README)\n"
+    "\n"
+    "[input]\n"
+    "; dpad_steering = 1       ; 1: the d-pad steers like the stick\n"
+    "; stick_8way = 1          ; 1: the stick snaps to 8 directions, as the original's d-pad did\n"
+    "\n"
+    "[ui]\n"
+    "; confirm_quit = 0        ; 1: the main menu's QUIT asks first\n";
+
+/* A first start (no settings file at path): the commented template, so players find the options. */
+static void writeTemplate(const char *path)
+{
+    SDL_IOStream *const io = SDL_IOFromFile(path, "wb");
+
+    if (io == NULL) {
+        bmxLog("config: cannot write a settings template to %s: %s\n", path, SDL_GetError());
+        return;
+    }
+    const size_t written = SDL_WriteIO(io, kTemplate, sizeof kTemplate - 1);
+
+    if (SDL_CloseIO(io) && written == sizeof kTemplate - 1) {
+        bmxLog("config: wrote the settings template %s\n", path);
+    }
+}
+
 static void load(void)
 {
     const char *path = SDL_getenv("BMX_CONFIG");
@@ -197,6 +255,7 @@ static void load(void)
     text = SDL_LoadFile(path, NULL);
     if (text == NULL) {
         bmxLog("config: no %s, every option at its default\n", path);
+        writeTemplate(path);
     } else {
         bmxLog("config: %s\n", path);
         bmxConfigLoadText(text, path);
@@ -274,4 +333,14 @@ int bmxConfigAppend(const char *section, const char *key, const char *value)
     }
     bmxLog("config: %s.%s = %s written to %s\n", section, key, value, path);
     return ok;
+}
+
+int bmxAudioMuted(void)
+{
+    const char *const env = SDL_getenv("BMX_MUTE");
+
+    if (env != NULL && *env != 0) {
+        return *env != '0';
+    }
+    return bmxConfigInt("audio.mute", 0) != 0;
 }

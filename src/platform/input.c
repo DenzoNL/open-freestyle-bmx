@@ -259,6 +259,7 @@ int bmxPadApplyStick8Way(const BmxPadSnapshot *pad, const BmxDiAxisProps props[k
 
 static const uint8_t kDik[SDL_SCANCODE_COUNT] = {
     [SDL_SCANCODE_ESCAPE] = 0x01,
+    [SDL_SCANCODE_AC_BACK] = 0x01, /* Android's Back button: Escape (android.c keeps it from Android) */
     [SDL_SCANCODE_1] = 0x02,
     [SDL_SCANCODE_2] = 0x03,
     [SDL_SCANCODE_3] = 0x04,

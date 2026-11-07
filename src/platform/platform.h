@@ -109,6 +109,8 @@ const char *bmxConfigPath(void);
 /* Appends `[section] key = value` to the config file (creating it) and to the loaded options. 1 when written.
  */
 int bmxConfigAppend(const char *section, const char *key, const char *value);
+/* 1: the audio stand-ins output silence: BMX_MUTE (when set, also to 0) or else `[audio] mute`. */
+int bmxAudioMuted(void);
 /* Replaces the configuration by the text (tests; `origin` names it in the log). */
 void bmxConfigLoadText(const char *text, const char *origin);
 

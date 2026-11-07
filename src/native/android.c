@@ -91,6 +91,9 @@ int bmxAndroidPrepare(void)
         return -1;
     }
     snprintf(gFolder, sizeof gFolder, "%s", files);
+    /* Back is the game's Escape (back in the menus, pause in a ride; input.c), not Android's "leave the app".
+     */
+    SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
     snprintf(path, sizeof path, "%s/" BMX_PRODUCT_INI, gFolder);
     setenv("BMX_CONFIG", path, 0);
     snprintf(path, sizeof path, "%s/game", gFolder);

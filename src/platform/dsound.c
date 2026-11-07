@@ -22,8 +22,8 @@
  * Focus: buffers without DSBCAPS_GLOBALFOCUS / STICKYFOCUS are silent while the game's window does not have
  * the focus (measured: dsound.dll mutes them), but their cursors run on.
  *
- * BMX_MUTE=1: the mixer outputs silence (everything else unchanged). BMX_SOUND_CHECK=1: every call is
- * repeated on the real dsound.dll and compared (soundcheck.c).
+ * BMX_MUTE=1 or `[audio] mute = 1`: the mixer outputs silence (everything else unchanged). BMX_SOUND_CHECK=1:
+ * every call is repeated on the real dsound.dll and compared (soundcheck.c).
  *
  * The override seam (sound.h, the music override): a registered BmxSoundOverride may take over what a buffer
  * plays from its Play on; the mixer then feeds the override's stereo frames for the same frame range into a
@@ -346,7 +346,7 @@ static int openDevice(void)
             "%d channels, %d-frame periods)%s\n",
             SDL_GetCurrentAudioDriver(), SDL_GetAudioDeviceName(SDL_GetAudioStreamDevice(gDevice)),
             (unsigned)gRate, (unsigned)gQuantum, spec.freq, spec.channels, frames,
-            gMute ? "; BMX_MUTE: output silent" : "");
+            gMute ? "; muted: output silent" : "");
     }
     SDL_ResumeAudioStreamDevice(gDevice);
     return 1;
@@ -355,14 +355,12 @@ static int openDevice(void)
 /* At the first DirectSoundCreate: the audio device (or the offline mixer of the tests). */
 static void mixerStart(void)
 {
-    const char *mute = SDL_getenv("BMX_MUTE");
-
     if (gStarted) {
         return;
     }
     gStarted = 1;
     gMutex = SDL_CreateMutex();
-    gMute = mute != NULL && *mute != 0 && *mute != '0';
+    gMute = bmxAudioMuted();
     if (gOfflineRate != 0) {
         gRate = gOfflineRate;
         gQuantum = gRate / 100;

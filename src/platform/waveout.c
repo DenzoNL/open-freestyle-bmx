@@ -9,9 +9,9 @@
  * has gone is marked WHDR_DONE and MM_WOM_DONE is posted to the window, as winmm does. MM_WOM_OPEN /
  * MM_WOM_CLOSE are posted too, into the game's message queue (window.c, slice S10).
  *
- * BMX_MUTE=1: the bytes are consumed at the same pace but SDL gets silence. Each close logs the bytes
- * written, played and dropped by a reset, with FNV-1a 64 hashes (to compare with what AVIStreamRead returned,
- * avi.c).
+ * BMX_MUTE=1 or `[audio] mute = 1`: the bytes are consumed at the same pace but SDL gets silence. Each close
+ * logs the bytes written, played and dropped by a reset, with FNV-1a 64 hashes (to compare with what
+ * AVIStreamRead returned, avi.c).
  */
 #include <SDL3/SDL.h>
 #include <string.h>
@@ -175,7 +175,6 @@ uint32_t BMX_WINAPI bmxStandWaveOutOpen(uintptr_t *out, int32_t device, const vo
                                         uintptr_t callback, uintptr_t instance, uint32_t flags)
 {
     const WaveFormat *const f = format;
-    const char *mute = SDL_getenv("BMX_MUTE");
     SDL_AudioSpec spec;
     WaveOut *w;
 
@@ -213,7 +212,7 @@ uint32_t BMX_WINAPI bmxStandWaveOutOpen(uintptr_t *out, int32_t device, const vo
     w->magic = kWaveMagic;
     w->mutex = SDL_CreateMutex();
     w->window = (flags & kCallbackTypeMask) == kCallbackWindow ? callback : 0;
-    w->mute = mute != NULL && *mute != 0 && *mute != '0';
+    w->mute = bmxAudioMuted();
     w->writtenHash = w->playedHash = 0xcbf29ce484222325ull;
     w->stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, feed, w);
     if (w->stream == NULL) {
@@ -224,7 +223,7 @@ uint32_t BMX_WINAPI bmxStandWaveOutOpen(uintptr_t *out, int32_t device, const vo
         return kMmsyserrError;
     }
     bmxLog("waveout: open %u Hz, %u channels, %u bits on SDL \"%s\"%s\n", f->samplesPerSec, f->channels,
-           f->bitsPerSample, SDL_GetCurrentAudioDriver(), w->mute ? "; BMX_MUTE: output silent" : "");
+           f->bitsPerSample, SDL_GetCurrentAudioDriver(), w->mute ? "; muted: output silent" : "");
     w->openTime = bmxTimeGetTime();
     *out = (uintptr_t)w;
     SDL_ResumeAudioStreamDevice(w->stream); /* a wave device plays as soon as it has buffers */
