@@ -90,7 +90,8 @@ void bmxPlatformShutdown(void);
 /* ---- the config file (config.c, P19) ---- */
 
 /*
- * bmxnative.ini next to the exe (BMX_CONFIG=<path> names another), read on first use: `key = value` lines,
+ * OpenFreestyleBMX.ini next to the exe (BMX_CONFIG=<path> names another), read on first use: `key = value`
+ * lines,
  * `[section]` headers prefix the keys ("input.dpad_steering"), `#` and `;` start comments; unknown keys are
  * logged. bmxConfigInt: the key's value, or `fallback` when unset.
  */
@@ -103,6 +104,11 @@ int bmxConfigInt(const char *key, int fallback);
 int bmxConfigOption(const char *key, int enhanced, int vanilla);
 /* A text value (paths), NULL when unset or empty. */
 const char *bmxConfigString(const char *key);
+/* The config file's path (the one read, or the one that would have been read: next to the exe), or NULL. */
+const char *bmxConfigPath(void);
+/* Appends `[section] key = value` to the config file (creating it) and to the loaded options. 1 when written.
+ */
+int bmxConfigAppend(const char *section, const char *key, const char *value);
 /* Replaces the configuration by the text (tests; `origin` names it in the log). */
 void bmxConfigLoadText(const char *text, const char *origin);
 

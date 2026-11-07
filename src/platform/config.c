@@ -1,5 +1,6 @@
 /*
- * The config file (docs/PLATFORM.md P19, S6): bmxnative.ini next to the exe, or the file BMX_CONFIG names.
+ * The config file (docs/PLATFORM.md P19, S6): OpenFreestyleBMX.ini next to the exe (bmxnative.ini, its name
+ * before the rename, when that one is missing), or the file BMX_CONFIG names.
  *
  *   # comment            ; comment
  *   [input]
@@ -20,6 +21,7 @@
  */
 #include <SDL3/SDL.h>
 
+#include "compat/product.h"
 #include "platform/platform.h"
 
 enum { kMaxEntries = 64, kKeyLen = 64, kValueLen = 512 };
@@ -31,12 +33,14 @@ typedef struct Entry {
 
 static Entry gEntries[kMaxEntries];
 static int gCount, gLoaded;
+static char gPath[1024]; /* the file load() read or would have read */
 
 /* The keys this build knows. */
 static const char *const kKnownKeys[] = {
-    "general.vanilla",       /* 1: every option without a value in the file at the original's behaviour */
-    "input.dpad_steering",   /* P7: the d-pad also sets the stick axes */
-    "input.stick_8way",      /* P7-B: the left stick snaps to 8 directions */
+    "general.vanilla",     /* 1: every option without a value in the file at the original's behaviour */
+    "general.game_dir",    /* the game folder, when the program is not started in it (src/native/gamedir.c) */
+    "input.dpad_steering", /* P7: the d-pad also sets the stick axes */
+    "input.stick_8way",    /* P7-B: the left stick snaps to 8 directions */
     "audio.smooth_resample", /* P9 note: 0 original mixer, 1 linear, 2 cubic resampling (smoothmix.c) */
     "audio.music_dir",       /* the music override: a folder with the user's FLACs (docs/MUSIC.md) */
     "video.width", /* P16: the mode without the device dialog (default 0 x 0 x 16 full screen, 0: the desktop
@@ -155,19 +159,29 @@ static void load(void)
     if (path == NULL || *path == 0) {
         const char *base = SDL_GetBasePath();
 
-        if (base == NULL || SDL_asprintf(&own, "%sbmxnative.ini", base) < 0) {
+        if (base == NULL || SDL_asprintf(&own, "%s" BMX_PRODUCT_INI, base) < 0) {
             return;
+        }
+        if (!SDL_GetPathInfo(own, NULL)) {
+            char *old = NULL;
+
+            if (SDL_asprintf(&old, "%s" BMX_PRODUCT_OLD_INI, base) >= 0 && SDL_GetPathInfo(old, NULL)) {
+                SDL_free(own);
+                own = old;
+            } else {
+                SDL_free(old);
+            }
         }
         path = own;
 #if !defined(_WIN32)
         /* macOS / Linux: next to the executable (an app bundle's Resources folder), else the user's
-         * preference folder (macOS: ~/Library/Application Support/opendmfbmx/bmxnative/; docs/PORTING.md "X5
+         * preference folder (macOS: ~/Library/Application Support/OpenFreestyleBMX/; docs/PORTING.md "X5
          * part 1"). */
         if (!SDL_GetPathInfo(own, NULL)) {
-            char *const pref = SDL_GetPrefPath("opendmfbmx", "bmxnative");
+            char *const pref = SDL_GetPrefPath(NULL, BMX_PRODUCT_FILE);
             char *other = NULL;
 
-            if (pref != NULL && SDL_asprintf(&other, "%sbmxnative.ini", pref) >= 0 &&
+            if (pref != NULL && SDL_asprintf(&other, "%s" BMX_PRODUCT_INI, pref) >= 0 &&
                 SDL_GetPathInfo(other, NULL)) {
                 SDL_free(own);
                 own = other;
@@ -179,6 +193,7 @@ static void load(void)
         }
 #endif
     }
+    SDL_snprintf(gPath, sizeof gPath, "%s", path);
     text = SDL_LoadFile(path, NULL);
     if (text == NULL) {
         bmxLog("config: no %s, every option at its default\n", path);
@@ -228,4 +243,35 @@ int bmxConfigOption(const char *key, int enhanced, int vanilla)
     const int fallback = bmxConfigInt("general.vanilla", 0) == 1 ? vanilla : enhanced;
 
     return bmxConfigInt(key, fallback);
+}
+
+const char *bmxConfigPath(void)
+{
+    if (!gLoaded) {
+        load();
+    }
+    return gPath[0] != 0 ? gPath : NULL;
+}
+
+int bmxConfigAppend(const char *section, const char *key, const char *value)
+{
+    const char *const path = bmxConfigPath();
+    SDL_IOStream *io;
+    int ok;
+
+    if (path == NULL || (io = SDL_IOFromFile(path, "ab")) == NULL) {
+        bmxLog("config: cannot write %s: %s\n", path != NULL ? path : "(no file)", SDL_GetError());
+        return 0;
+    }
+    /* A section header of its own: the later entry wins over an earlier one of the same key
+     * (bmxConfigString). */
+    ok = SDL_IOprintf(io, "\n[%s]\n%s = %s\n", section, key, value) > 0;
+    ok = SDL_CloseIO(io) && ok;
+    if (ok && gCount < kMaxEntries) {
+        SDL_snprintf(gEntries[gCount].key, sizeof gEntries[gCount].key, "%s.%s", section, key);
+        SDL_snprintf(gEntries[gCount].value, sizeof gEntries[gCount].value, "%s", value);
+        gCount++;
+    }
+    bmxLog("config: %s.%s = %s written to %s\n", section, key, value, path);
+    return ok;
 }

@@ -8,11 +8,11 @@ plugins {
 def sdlJava = project.findProperty('sdlJava') ?: "${System.getenv('SDL3_SRC')}/android-project/app/src/main/java"
 
 android {
-    namespace = 'org.opendmfbmx.app'
+    namespace = 'org.openfreestylebmx.app'
     compileSdk = 35
     buildToolsVersion = '35.0.0' // the one nix develop .#android provides (AGP 8.7 would fetch 34)
     defaultConfig {
-        applicationId = 'org.opendmfbmx.app'
+        applicationId = 'org.openfreestylebmx.app'
         minSdk = 26
         targetSdk = 35
         versionCode = 1

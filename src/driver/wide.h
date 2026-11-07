@@ -31,7 +31,7 @@ typedef struct DrvWideConfig {
                         widescreen) */
 } DrvWideConfig;
 
-/* The configuration from bmxnative.ini (read once). */
+/* The configuration from OpenFreestyleBMX.ini (read once). */
 const DrvWideConfig *drvWideConfig(void);
 
 /* ---- widemath.c: pure maths ---- */

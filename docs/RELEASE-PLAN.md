@@ -4,7 +4,7 @@ Goal: a first public release that someone who owns the game can play without rea
 a Windows `.exe` and an Android `.apk` on a GitHub release, a short README for players, and a repo whose front page
 is about playing, with the developer material one level down.
 
-Nothing here is started. The decisions (D1-D8) are the user's; each has a recommendation. Decided so far: D3, D8. Name: see D5 (open).
+Nothing here is started. The decisions (D1-D8) are the user's; each has a recommendation. Decided so far: D1, D2 (the recommendations, 2026-11-07), D3, D5, D8.
 
 ## Decisions
 
@@ -14,7 +14,7 @@ Nothing here is started. The decisions (D1-D8) are the user's; each has a recomm
   `SDL_ShowOpenFolderDialog`), remember it in the ini.
 - C. B plus a settings window for the ini options.
 
-Rec: **B for the first release, C later.** B is A plus one dialog: the drop-in way keeps working, and the exe can
+Rec: **B for the first release, C later.** **Decided (user, 2026-11-07): B.** B is A plus one dialog: the drop-in way keeps working, and the exe can
 live anywhere. A settings window is real UI work (its own toolkit or an in-game screen); until then the README
 documents the handful of ini keys people want (resolution, widescreen, framerate, music folder).
 
@@ -24,7 +24,7 @@ documents the handful of ini keys people want (resolution, widescreen, framerate
 - B. Read through the picked folder's `content://` URIs every time (no copy, but slower and every file path in the
   platform layer goes through a different API).
 
-Rec: **A.** The code points are known: `bmxAndroidPrepare` (src/native/android.c) and the Java activity
+Rec: **A.** **Decided (user, 2026-11-07): A.** The code points are known: `bmxAndroidPrepare` (src/native/android.c) and the Java activity
 (android/app/src/main/java/org/opendmfbmx/app/BmxActivity.java). A PS1 disc image is not an option: the PlayStation
 version stores its models and textures in different formats.
 
@@ -50,15 +50,16 @@ on it.
 Rec: **A.** Deleting it throws away the strongest evidence that this is a faithful port, and the claim the README
 wants to make ("fully recompiled, verified") rests on it. Release artifacts contain none of it.
 
-**D5. Name and version.** Rule: no brand names in the project name or release titles. "opendmfbmx" doesn't roll
-off the tongue and its "dm" still points at the rider's name; the user wants a better one (open, 2026-11-07).
-- User's idea: **Open Freestyle BMX**. Drops the rider's name entirely: that part may still be protected, and out
-  of respect after his death. "Freestyle BMX" on its own is a generic sport name.
-- Version: v0.1.0 (the 0.x says "first public release, expect rough edges").
-- A rename touches more than the README, so do it once, before the first release: the repo name (Forgejo and the
-  GitHub mirror), the exe name (`bmxnative.exe`), the Android application id (`org.opendmfbmx.app`: it cannot
-  change after a public release without users losing their install and saves), the window title, the ini and log
-  file names, and the docs. Code identifiers (`bmx*`) can stay.
+**D5. Name and version. Decided (user, 2026-11-07): Open Freestyle BMX**, v0.1.0 for the first release.
+Drops the rider's name entirely (it may still be protected, and out of respect after his death); "Freestyle BMX"
+on its own is the sport. Done the same day (src/compat/product.h):
+- window title and Android app name "Open Freestyle BMX"; program `OpenFreestyleBMX.exe` (the CMake target stays
+  `bmxnative`); settings `OpenFreestyleBMX.ini` (an existing `bmxnative.ini` next to the program is still read
+  when the new one is missing) and log `OpenFreestyleBMX.log`; macOS bundle / Linux tarball named alike;
+- Android application id **`org.openfreestylebmx.app`** (final from the first public release on: a change would
+  be a different app, losing installs and saves);
+- still to do by the user: rename the repository on Forgejo (and the GitHub mirror's name, D6). The local folder,
+  code identifiers (`bmx*`, `BMX_*` environment variables) and the history keep the old name.
 
 **D6. Where the release lives.** The repo's origin is the Forgejo server (switchbyte.dev). Rec: a public GitHub repo
 that mirrors `main` only (never the `oracle` branch), the release made there with `gh release create`.

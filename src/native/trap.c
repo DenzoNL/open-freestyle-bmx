@@ -24,6 +24,7 @@
 #endif
 #endif
 
+#include "compat/product.h"
 #include "native/native.h"
 
 enum { kImageEnd = 0x6b3000 };
@@ -52,7 +53,7 @@ void bmxLogOpen(void)
 
     GetModuleFileNameA(NULL, path, sizeof path);
     slash = strrchr(path, '\\');
-    strcpy(slash ? slash + 1 : path, "bmxnative.log");
+    strcpy(slash ? slash + 1 : path, BMX_PRODUCT_LOG);
     logFile = fopen(path, "w");
 }
 #else
@@ -63,7 +64,7 @@ void bmxExitProcess(int code)
     _exit(code);
 }
 
-/* bmxnative.log next to the executable, as on Windows. */
+/* The log (BMX_PRODUCT_LOG) next to the executable, as on Windows. */
 void bmxLogOpen(void)
 {
     char path[4096];
@@ -82,12 +83,12 @@ void bmxLogOpen(void)
 #else
     n = readlink("/proc/self/exe", path, sizeof path - 1);
 #endif
-    if (n < 0 || (size_t)n + sizeof "bmxnative.log" > sizeof path) {
+    if (n < 0 || (size_t)n + sizeof BMX_PRODUCT_LOG > sizeof path) {
         n = 0;
     }
     path[n] = 0;
     slash = strrchr(path, '/');
-    strcpy(slash ? slash + 1 : path, "bmxnative.log");
+    strcpy(slash ? slash + 1 : path, BMX_PRODUCT_LOG);
     logFile = fopen(path, "w");
 }
 #endif
@@ -100,7 +101,7 @@ void bmxLog(const char *fmt, ...)
     vfprintf(stderr, fmt, ap);
     va_end(ap);
 #if defined(__ANDROID__)
-    /* stderr goes nowhere in an app: logcat (adb logcat -s opendmfbmx). */
+    /* stderr goes nowhere in an app: logcat (adb logcat -s OpenFreestyleBMX). */
     va_start(ap, fmt);
     bmxAndroidLog(fmt, ap);
     va_end(ap);

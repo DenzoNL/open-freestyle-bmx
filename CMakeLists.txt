@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(opendmfbmx C)
+project(openfreestylebmx C)
 
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -8,7 +8,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(BMX_HOOK "Build against the original NgBMX.exe (i686 hook/oracle phase)" ON)
 
-option(BMX_NATIVE32 "Build bmxnative.exe, our own exe (32- or 64-bit, by the toolchain: presets native32 / native64)" OFF)
+option(BMX_NATIVE32 "Build OpenFreestyleBMX.exe (target bmxnative), our own exe (32- or 64-bit, by the toolchain: presets native32 / native64)" OFF)
 set(BMX_WORK_DIR "${CMAKE_SOURCE_DIR}/work" CACHE PATH "Directory with labels.raw (names in trap reports)")
 
 set(BMX_WARNINGS -Wall -Wextra -Werror -Wno-unused-parameter -Wno-microsoft-anon-tag)
@@ -161,6 +161,8 @@ if(BMX_NATIVE32)
     add_library(bmxnative SHARED ${BMX_NATIVE_ALL})
   else()
     add_executable(bmxnative ${BMX_NATIVE_ALL})
+    # The players' name for it (docs/RELEASE-PLAN.md D5, src/compat/product.h): OpenFreestyleBMX.exe.
+    set_target_properties(bmxnative PROPERTIES OUTPUT_NAME OpenFreestyleBMX)
   endif()
   target_include_directories(bmxnative PRIVATE src ${CMAKE_BINARY_DIR}/gen)
   target_include_directories(bmxnative SYSTEM PRIVATE third_party/dr_flac)
@@ -184,17 +186,17 @@ if(BMX_NATIVE32)
       # src/data keeps the original's layout, which has pointers at odd addresses (BmxUnalignedPtr: a CRT switch
       # table the port never reaches). Chained fixups need 8-byte aligned pointers; the classic rebase info does not.
       target_link_options(bmxnative PRIVATE -Wl,-no_fixup_chains)
-      # bmxnative.app (not part of `all`): cmake --build --preset macos --target bmxnative_app
+      # OpenFreestyleBMX.app (not part of `all`): cmake --build --preset macos --target bmxnative_app
       add_custom_target(bmxnative_app
         COMMAND ${CMAKE_SOURCE_DIR}/tools/macos_bundle.sh $<TARGET_FILE:bmxnative>
-                $<TARGET_FILE:SDL3::SDL3-shared> ${CMAKE_BINARY_DIR}/bmxnative.app
+                $<TARGET_FILE:SDL3::SDL3-shared> ${CMAKE_BINARY_DIR}/OpenFreestyleBMX.app
         DEPENDS bmxnative VERBATIM)
     else()
       # Linux (docs/PORTING.md "X4 (Linux x64)"). The tarball (not part of `all`):
-      # cmake --build --preset linux --target bmxnative_tarball -> build/linux/opendmfbmx-linux-x86_64.tar.gz
+      # cmake --build --preset linux --target bmxnative_tarball -> build/linux/OpenFreestyleBMX-linux-x86_64.tar.gz
       add_custom_target(bmxnative_tarball
         COMMAND ${CMAKE_SOURCE_DIR}/tools/linux_package.sh $<TARGET_FILE:bmxnative>
-                $<TARGET_FILE:SDL3::SDL3-shared> ${CMAKE_BINARY_DIR}/opendmfbmx-linux-x86_64
+                $<TARGET_FILE:SDL3::SDL3-shared> ${CMAKE_BINARY_DIR}/OpenFreestyleBMX-linux-x86_64
         DEPENDS bmxnative VERBATIM)
     endif()
     add_executable(bmxwidetest tests/platform/test_wide.c src/driver/widemath.c)
@@ -263,7 +265,7 @@ if(BMX_NATIVE32)
   target_include_directories(bmxx87test PRIVATE src)
   target_compile_options(bmxx87test PRIVATE ${BMX_WARNINGS})
   target_link_libraries(bmxx87test PRIVATE Threads::Threads)
-  # SDL3.dll next to the exe (copy it into the game folder with bmxnative.exe).
+  # SDL3.dll next to the exe (copy it into the game folder with OpenFreestyleBMX.exe).
   add_custom_command(TARGET bmxnative POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
     $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:bmxnative>)
   endif()

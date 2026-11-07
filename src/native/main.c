@@ -16,6 +16,7 @@
 
 #include "compat/fpu.h"
 #include "compat/orig.h"
+#include "compat/product.h"
 #include "native/native.h"
 #include "platform/platform.h"
 #include "platform/standins.h"
@@ -118,7 +119,7 @@ static void initGlobals(void)
     gHwnd = NULL;
     gHinstance = NULL;
     ORIG_VAR(0x006977b0, int, gZrwKeysLocked) = 0;
-    gAppTitle = (const char *)BMX_ORIG(0x0056137c);
+    gAppTitle = BMX_PRODUCT_NAME; /* the original: "RenderWare Application" (0x56137c) */
     gWidth = 0x280;
     gHeight = 0x1e0;
     gResX = gResY = gResZ = 0;
@@ -152,6 +153,11 @@ int main(int argc, char **argv)
     bmxFpuWindowsDefaults(); /* x87 at 53 bits as on Windows (Linux starts at 64): compat/fpu.h */
     bmxLogOpen();
     bmxPlatformInit();
+#if !defined(__ANDROID__)
+    if (bmxGameDirPrepare() != 0) { /* the game folder as the working directory: gamedir.c */
+        return 1;
+    }
+#endif
     bmxGpuNull(); /* BMX_GPU=null: picks SDL's dummy drivers before any subsystem starts (headless) */
     if (bmxLoaderInit() != 0) {
         return 1;

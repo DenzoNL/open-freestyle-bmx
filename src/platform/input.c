@@ -12,7 +12,7 @@
  *
  * BMX_KEYS (src/native/keys.c) is a source of the same keyboard: the script's keys, focus ignored, no pad.
  * BMX_INPUT_CHECK=1 mirrors every call on the real DirectInput and compares (inputcheck.c).
- * Option `input.dpad_steering` (bmxnative.ini, P7): the d-pad also sets lX / lY.
+ * Option `input.dpad_steering` (OpenFreestyleBMX.ini, P7): the d-pad also sets lX / lY.
  * Option `input.stick_8way` (P7-B): the left stick snaps to 8 directions (radial dead zone, full deflection).
  */
 #include <SDL3/SDL.h>

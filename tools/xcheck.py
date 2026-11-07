@@ -6,7 +6,7 @@ compare their per-tick BMX_SIM_HASH files.
     py -I tools/xcheck.py --game-dir <game folder> --keys tools/scripts/ride.keys <run> [<run> ...]
 
 A <run> is an exe, optionally preceded by KEY=VALUE environment settings for that run only, e.g.
-`build/native64/bmxnative.exe BMX_GPU=null build/native64/bmxnative.exe` compares the windowed and the headless
+`build/native64/OpenFreestyleBMX.exe BMX_GPU=null build/native64/OpenFreestyleBMX.exe` compares the windowed and the headless
 null-GPU mode of one build (docs/PORTING.md "X5 part 3").
 
 --recording: each run gets the recording's starting SAVE.DAT in <game folder>/save and BMX_REPLAY.
@@ -88,7 +88,7 @@ def run(exe, extra_env, game_dir, inputs, save, ini, out_dir, label, timeout, sh
             f.write(save)
     subprocess.run([os.path.abspath(exe), 'Scene.Txt'] + exe_args, cwd=game_dir, env=env, timeout=timeout,
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
-    log = os.path.join(os.path.dirname(os.path.abspath(exe)), 'bmxnative.log')
+    log = os.path.join(os.path.dirname(os.path.abspath(exe)), 'OpenFreestyleBMX.log')
     if os.path.exists(log):
         shutil.copy(log, os.path.join(out_dir, f'{label}.log'))
     return read_hash(hash_path)
@@ -104,7 +104,7 @@ def main():
     ap.add_argument('--quit-frames', type=int, default=4000, help='with --keys: BMX_QUIT_FRAMES (default 4000)')
     ap.add_argument('--args', default='', help='command-line arguments after Scene.Txt, e.g. "-r640.480.16"')
     ap.add_argument('--ref-hash', help='a precomputed BMX_SIM_HASH file as the reference (compared first)')
-    ap.add_argument('--ini', help='bmxnative.ini for every run (default: each exe\'s own)')
+    ap.add_argument('--ini', help='OpenFreestyleBMX.ini for every run (default: each exe\'s own)')
     ap.add_argument('--out', help='folder for the hash files and logs (default: a temporary one)')
     ap.add_argument('--timeout', type=int, default=3600)
     ap.add_argument('--shots', help='shown frames to save and compare, e.g. 300,900,1500')
