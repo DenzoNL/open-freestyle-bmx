@@ -1254,6 +1254,7 @@
 #undef rwD3DFogStart
 #undef rwD3DIm3DDepth
 #undef rwD3DIm3DLevel
+#undef rwD3DIm3DLevels
 #undef rwD3DIm3DWork
 #undef rwD3DIndexFlush
 #undef rwD3DIndexLine
@@ -13009,10 +13010,7 @@ extern RwD3DCamVertex *rwD3DCamBase;                          /* 0x0069695c */
 extern int32_t rwIm3DGouraud;                                 /* 0x00696960 */
 extern uint32_t rwD3DIm3DDepth;                               /* 0x00696964 */
 extern RwD3DIm3DLevel *rwD3DIm3DLevel;                        /* 0x00696968 */
-extern unsigned char d_0069696c[12];                          /* 0x0069696c */
-extern unsigned char d_00696978[4];                           /* 0x00696978 */
-extern unsigned char d_0069697c[4];                           /* 0x0069697c */
-extern unsigned char d_00696980[220];                         /* 0x00696980 */
+extern RwD3DIm3DLevelStack rwD3DIm3DLevels;                   /* 0x0069696c */
 extern uint32_t *rwD3DVertexBits;                             /* 0x00696a5c */
 extern uint32_t rwD3DVertexBitsSize;                          /* 0x00696a60 */
 extern RwD3DIndexList rwD3DTriIndices;                        /* 0x00696a64 */

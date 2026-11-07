@@ -173,6 +173,10 @@ typedef struct RwD3DIm3DLevel {
 
 BMX_LAYOUT32_ASSERT(sizeof(RwD3DIm3DLevel) == 0x18, "RwD3DIm3DLevel layout");
 
+/* The level stack (0x69696c, 10 levels; rwD3DIm3DBegin refuses an 11th). One typed global: as four untyped
+ * placeholders it overran them on 64-bit, where they are not adjacent and a level is 0x20 bytes. */
+typedef RwD3DIm3DLevel RwD3DIm3DLevelStack[10];
+
 /* A growable index list of the Im3D draw calls: triangles (0x696a64) and lines (0x696a70). */
 typedef struct RwD3DIndexList {
     uint16_t *indices; /* 0x00 */
@@ -208,7 +212,7 @@ typedef struct RwD3DIndexList {
 #define rwD3DCamBase     ORIG_VAR(0x0069695c, RwD3DCamVertex *, rwD3DCamBase)
 #define rwD3DIm3DDepth   ORIG_VAR(0x00696964, uint32_t, rwD3DIm3DDepth)
 #define rwD3DIm3DLevel   ORIG_VAR(0x00696968, RwD3DIm3DLevel *, rwD3DIm3DLevel)
-#define rwD3DIm3DLevels  ((RwD3DIm3DLevel *)BMX_ORIG(0x0069696c))
+#define rwD3DIm3DLevels  ORIG_VAR(0x0069696c, RwD3DIm3DLevelStack, rwD3DIm3DLevels)
 #define rwD3DTriIndices  ORIG_VAR(0x00696a64, RwD3DIndexList, rwD3DTriIndices)
 #define rwD3DLineIndices ORIG_VAR(0x00696a70, RwD3DIndexList, rwD3DLineIndices)
 #define rwD3DTLBuffer    ORIG_VAR(0x00696a7c, RwD3DTLVertex *, rwD3DTLBuffer)

@@ -1693,16 +1693,7 @@ uint32_t rwD3DIm3DDepth;
 RwD3DIm3DLevel *rwD3DIm3DLevel;
 
 /* 0x0069696c */
-unsigned char d_0069696c[12];
-
-/* 0x00696978 */
-unsigned char d_00696978[4];
-
-/* 0x0069697c */
-unsigned char d_0069697c[4];
-
-/* 0x00696980 */
-unsigned char d_00696980[220];
+RwD3DIm3DLevelStack rwD3DIm3DLevels;
 
 /* 0x00696a5c */
 uint32_t *rwD3DVertexBits;

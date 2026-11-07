@@ -1124,7 +1124,7 @@ extern struct BmxDataOpaque bmxAt_rwD3DCamBase __asm__(BMX_SYM("rwD3DCamBase"));
 extern struct BmxDataOpaque bmxAt_rwIm3DGouraud __asm__(BMX_SYM("rwIm3DGouraud"));
 extern struct BmxDataOpaque bmxAt_rwD3DIm3DDepth __asm__(BMX_SYM("rwD3DIm3DDepth"));
 extern struct BmxDataOpaque bmxAt_rwD3DIm3DLevel __asm__(BMX_SYM("rwD3DIm3DLevel"));
-extern struct BmxDataOpaque bmxAt_d_0069696c __asm__(BMX_SYM("d_0069696c"));
+extern struct BmxDataOpaque bmxAt_rwD3DIm3DLevels __asm__(BMX_SYM("rwD3DIm3DLevels"));
 extern struct BmxDataOpaque bmxAt_rwD3DVertexBits __asm__(BMX_SYM("rwD3DVertexBits"));
 extern struct BmxDataOpaque bmxAt_rwD3DVertexBitsSize __asm__(BMX_SYM("rwD3DVertexBitsSize"));
 extern struct BmxDataOpaque bmxAt_rwD3DTriIndices __asm__(BMX_SYM("rwD3DTriIndices"));
@@ -2536,7 +2536,7 @@ extern struct BmxDataOpaque bmxAt_rpAnimHeadNameGroup __asm__(BMX_SYM("rpAnimHea
 #define BMX_DATA_0x00696960 ((char *)&bmxAt_rwIm3DGouraud)
 #define BMX_DATA_0x00696964 ((char *)&bmxAt_rwD3DIm3DDepth)
 #define BMX_DATA_0x00696968 ((char *)&bmxAt_rwD3DIm3DLevel)
-#define BMX_DATA_0x0069696c ((char *)&bmxAt_d_0069696c)
+#define BMX_DATA_0x0069696c ((char *)&bmxAt_rwD3DIm3DLevels)
 #define BMX_DATA_0x00696a5c ((char *)&bmxAt_rwD3DVertexBits)
 #define BMX_DATA_0x00696a60 ((char *)&bmxAt_rwD3DVertexBitsSize)
 #define BMX_DATA_0x00696a64 ((char *)&bmxAt_rwD3DTriIndices)
