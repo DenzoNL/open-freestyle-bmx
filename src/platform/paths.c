@@ -57,14 +57,25 @@ static int appendMatch(char *out, size_t outLen, const char *name)
 const char *bmxPathResolve(const char *gamePath)
 {
     static _Thread_local char path[kPathMax], out[kPathMax];
-    size_t n = strlen(gamePath), len = 0;
+    size_t n = strlen(gamePath), len = 0, start = 0;
     char *component, *next;
 
-    if (n >= kPathMax) {
+#if defined(__ANDROID__)
+    /* SDL_IOFromFile on Android opens a relative path in the app's internal storage (then the APK's assets),
+     * not in the working directory (the game folder, src/native/android.c): game paths become absolute. */
+    if (gamePath[0] != '/' && gamePath[0] != '\\') {
+        if (getcwd(path, kPathMax) == NULL) {
+            return gamePath;
+        }
+        start = strlen(path);
+        path[start++] = '/';
+    }
+#endif
+    if (start + n >= kPathMax) {
         return gamePath;
     }
     for (size_t i = 0; i <= n; i++) {
-        path[i] = gamePath[i] == '\\' ? '/' : gamePath[i];
+        path[start + i] = gamePath[i] == '\\' ? '/' : gamePath[i];
     }
     if (access(path, F_OK) == 0) {
         return path;

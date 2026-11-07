@@ -633,6 +633,16 @@ static void padRead(BmxPadSnapshot *s)
         s->buttons[i] = SDL_GetJoystickButton(gPad.joystick, i) ? 1 : 0;
     }
     s->hat = SDL_GetNumJoystickHats(gPad.joystick) > 0 ? SDL_GetJoystickHat(gPad.joystick, 0) : 0;
+    /* A pad SDL knows as a gamepad of no known family (the AYN Thor's built-in pad on Android, type
+     * STANDARD): Android's joysticks have no hat, the d-pad arrives as gamepad buttons only. */
+    if (s->hat == 0 && gPad.gamepad != NULL) {
+        SDL_Gamepad *const g = gPad.gamepad;
+
+        s->hat = (uint8_t)((SDL_GetGamepadButton(g, SDL_GAMEPAD_BUTTON_DPAD_UP) ? SDL_HAT_UP : 0) |
+                           (SDL_GetGamepadButton(g, SDL_GAMEPAD_BUTTON_DPAD_RIGHT) ? SDL_HAT_RIGHT : 0) |
+                           (SDL_GetGamepadButton(g, SDL_GAMEPAD_BUTTON_DPAD_DOWN) ? SDL_HAT_DOWN : 0) |
+                           (SDL_GetGamepadButton(g, SDL_GAMEPAD_BUTTON_DPAD_LEFT) ? SDL_HAT_LEFT : 0));
+    }
 }
 
 /* ---- the device objects ---- */

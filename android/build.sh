@@ -13,6 +13,15 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 type=${1:-debug}
 : "${ANDROID_NDK_ROOT:?run in nix develop .#android (or set ANDROID_NDK_ROOT, ANDROID_HOME, SDL3_SRC)}"
 : "${SDL3_SRC:?SDL3 source (the version the native libraries were built from)}"
+# Git Bash on Windows (no nix; ANDROID_HOME, ANDROID_NDK_ROOT, SDL3_SRC, JAVA_HOME and gradle on PATH set by hand):
+# CMake and Gradle are Windows programs and need C:/... paths, not MSYS /c/... ones.
+if command -v cygpath >/dev/null 2>&1; then
+  for var in ANDROID_NDK_ROOT ANDROID_HOME SDL3_SRC; do
+    if [ -n "${!var:-}" ]; then
+      export "$var=$(cygpath -m "${!var}")"
+    fi
+  done
+fi
 
 cd "$root"
 if [ ! -f build/android-sdl3/prefix/lib/libSDL3.so ]; then

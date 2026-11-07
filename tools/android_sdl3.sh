@@ -13,6 +13,14 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 src=${1:-${SDL3_SRC:?"SDL3 source: pass it or set SDL3_SRC (nix develop .#android)"}}
 prefix=${2:-$root/build/android-sdl3/prefix}
 build=$root/build/android-sdl3/build
+# Git Bash on Windows: CMake is a Windows program and needs C:/... paths, not MSYS /c/... ones.
+if command -v cygpath >/dev/null 2>&1; then
+  src=$(cygpath -m "$src")
+  prefix=$(cygpath -m "$prefix")
+  if [ -n "${ANDROID_NDK_ROOT:-}" ]; then
+    export ANDROID_NDK_ROOT="$(cygpath -m "$ANDROID_NDK_ROOT")"
+  fi
+fi
 
 cmake -S "$src" -B "$build" -G Ninja \
   -DCMAKE_TOOLCHAIN_FILE="$root/cmake/aarch64-android.cmake" \

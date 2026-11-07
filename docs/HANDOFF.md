@@ -87,7 +87,7 @@ What changed that touches the Windows builds (all behind `#if` / new code paths,
    Intel; then decide whether those last-bit cases matter (see 6).
 5. Headless vs windowed, and arm64 vs x86 end to end (PORTING.md "X5 part 3", needs an empty `save\` copy of
    the game and an empty ini):
-   `py -I tools\xcheck.py --game-dir <game> --keys tools\scripts\ride.keys --args=-r640.480.16 --ini empty.ini --ref-hash data\simhash\ride.arm64.hash --out <abs path> build\native64\bmxnative.exe BMX_GPU=null build\native64\bmxnative.exe`
+   `py -I tools\xcheck.py --game-dir <game> --keys tools\scripts\ride.keys --args=-r640.480.16 --ini empty.ini --ref-hash data\simhash\ride.hash --out <abs path> build\native64\bmxnative.exe BMX_GPU=null build\native64\bmxnative.exe`
    Expected: windowed, null and the arm64 reference identical (2973 ticks). Repeat with native32. Then the
    end-to-end soft check: build `-DBMX_X87_SOFT=ON` into `build\native64-soft` and xcheck your recording on
    both exes.

@@ -944,6 +944,11 @@ or `python3 -I tools/xcheck.py --game-dir <game copy> --keys tools/scripts/ride.
   ~123 s (the game's own 30 Hz pacing), no "raster of type" line. The hash file is
   data/simhash/ride.arm64.hash, sha256 `b60f0dfd98ac9a6997a3e8a97fef476814584b77c245c5dcc7793218ec60aedc`.
   (2973 ticks is also what HF4 logged for this script on Windows with the user's save.)
+  **Replaced 2026-11-07 by data/simhash/ride.hash** (sha256 `bafee79e...`, made on native32 and identical on
+  native64 and `BMX_GPU=null`): AddressSanitizer showed that the hash read riders 2 and 3 past the end of
+  gPlayerRecs (other globals on 32-bit, unrelated memory on 64-bit); it now hashes the two riders the data holds,
+  so every hash file made before differs. The old arm64 file equalled the 32-bit and 64-bit Windows ones, so
+  arm64 should give the new file too (unchecked).
 - Two runs: byte-identical hash files (the second while a hook build loaded the machine).
 - `[general] vanilla = 1` (no widescreen, no HUD anchoring, no interpolation; through xcheck `--ref-hash`):
   identical to the default-config file, so the draw-side options stay visual-only on arm64 too.
@@ -958,7 +963,7 @@ afterwards). An empty ini makes both runs use the defaults (`ni empty.ini`):
 
     cmake --build --preset native64 --target bmxnative
     py -I tools\xcheck.py --game-dir <game> --keys tools\scripts\ride.keys --args=-r640.480.16 --ini empty.ini `
-       --ref-hash data\simhash\ride.arm64.hash --out xcheck-null `
+       --ref-hash data\simhash\ride.hash --out xcheck-null `
        build\native64\bmxnative.exe BMX_GPU=null build\native64\bmxnative.exe
 
 That runs native64 windowed (in the background, never focused) as `run0` and headless as `run1`, and compares
@@ -1062,7 +1067,7 @@ ini; headless, no window or sound):
 cmake --preset linux && cmake --build --preset linux
 build/linux/bmxhftest && build/linux/bmxwidetest && build/linux/bmxx87test     # x87: "all equal" expected
 python3 -I tools/xcheck.py --game-dir <game copy> --keys tools/scripts/ride.keys --args=-r640.480.16 \
-  --ini <empty.ini> --ref-hash data/simhash/ride.arm64.hash BMX_GPU=null build/linux/bmxnative
+  --ini <empty.ini> --ref-hash data/simhash/ride.hash BMX_GPU=null build/linux/bmxnative
 ```
 Expected: the run and `ref` identical (2973 ticks; Linux x86_64 with the hardware x87 against arm64 with
 x87soft). If not, the same with a `-DBMX_X87_SOFT=ON` build (`cmake --preset linux -B build/linux-soft
@@ -1094,6 +1099,12 @@ The shell's package set allows unfree packages and accepts the Android SDK licen
 global nix config). The first `gradle` run fetches the Android Gradle plugin 8.7.3 (SDL's template's) from
 Google's Maven repository. `android/build.sh release` gives a release APK signed with the debug key (no release key
 yet).
+
+On Windows (Git Bash, no nix; checked 2026-11-07) the same script runs with the tools set by hand: `ANDROID_HOME`
+(an SDK with platforms;android-35, build-tools;35.0.0, platform-tools), `ANDROID_NDK_ROOT` (ndk;29.0.14206865,
+r29), `SDL3_SRC` (the SDL3-3.4.16 source release), `JAVA_HOME` (JDK 21 works for AGP 8.7.3) and gradle 8.14's
+`bin` on `PATH`; the scripts turn MSYS `/c/...` paths into `C:/...` (cygpath) for CMake and Gradle. Calling
+`cmake --preset android` directly needs `ANDROID_NDK_ROOT` in the `C:/...` form.
 
 **What changed** (other builds unchanged: everything is `__ANDROID__` or `if(ANDROID)`, plus `.hidden` on the arm64
 ELF import thunks):
@@ -1168,7 +1179,7 @@ without root; the log is also at `.../files/bmxnative.log`, `adb pull` it.) What
    (main's `_exit` ends the process; Android shows nothing), pausing via the home button and coming back.
 5. The sim hash: the headless ride of X5 part 3 with `[video] backend = null` and the script in the environment is
    not possible from the launcher; an `adb shell` run of the same libmain.so through a small executable would be
-   the next tool if the Thor's hash is wanted (expected equal to data/simhash/ride.arm64.hash, same code as macOS).
+   the next tool if the Thor's hash is wanted (expected equal to data/simhash/ride.hash, same code as macOS).
 
 **Left** (X6 steps 2+): the device run above; game files through the system file picker (SAF) instead of adb; the
 1920x1080 config defaults for the Thor (widescreen, hud, interpolate at 60 / 120 Hz); suspend / resume (SDL's

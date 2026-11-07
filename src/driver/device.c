@@ -100,13 +100,21 @@ static void buildModeList(void)
     int32_t sizes[96][2];
     int count;
     DrvVideoMode desktop;
+    const int haveDesktop = drvGpuDesktopMode(&desktop);
 
     drvState.numModes = 0;
     drvState.currentMode = -1;
-    if (drvGpuDesktopMode(&desktop)) {
+    if (haveDesktop) {
         addMode(desktop.width, desktop.height, desktop.depth, 0);
     }
-    count = drvGpuFullscreenSizes(sizes, (int)(sizeof sizes / sizeof sizes[0]) - 5);
+    count = drvGpuFullscreenSizes(sizes, (int)(sizeof sizes / sizeof sizes[0]) - 6);
+    /* The desktop size is always a full screen size: Android lists no full screen modes at all (SDL3), so
+     * `width = height = 0` (the desktop size) found no mode there and fell back to 640x480. */
+    if (haveDesktop) {
+        sizes[count][0] = desktop.width;
+        sizes[count][1] = desktop.height;
+        count++;
+    }
     for (size_t i = 0; i < sizeof kClassicSizes / sizeof kClassicSizes[0]; i++) {
         sizes[count][0] = kClassicSizes[i][0];
         sizes[count][1] = kClassicSizes[i][1];
