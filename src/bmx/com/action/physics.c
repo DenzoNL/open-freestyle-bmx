@@ -295,9 +295,12 @@ PhysFace *physFindRespawnFace(const ZVec3 *pos, uint32_t flags)
                     const unsigned kind = face->tag >> 12;
                     if (!(face->flags & 0x10) && (kind == 0 || (kind > 3 && kind <= 8)) &&
                         (*(const uint32_t *)hit.material & 0xf) != 6) {
-                        const uint8_t *near = zbspFindFaceNear(&v, 50.0f, (float)zmathCos(0x2aaa));
-                        const int32_t *props = near ? *(const int32_t *const *)(near + 0x3c) : NULL;
-                        if (props == NULL || *props == 0) {
+                        /* The query's hit list (32-bit offset 0x3c, 0x40 on 64-bit: a raw +0x3c read there
+                         * took half a pointer and crashed on respawn) and its first entry's face, the
+                         * original's int32 at the list (NULL: the list is empty). */
+                        const ZbspFaceQuery *near = zbspFindFaceNear(&v, 50.0f, (float)zmathCos(0x2aaa));
+                        const ZbspFaceHit *hits = near != NULL ? near->hits : NULL;
+                        if (hits == NULL || hits->face == NULL) {
                             best = hit.face;
                             found = hit.face;
                         }

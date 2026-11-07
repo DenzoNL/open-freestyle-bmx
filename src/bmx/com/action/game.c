@@ -2066,8 +2066,11 @@ void gameEndCombo(int player, int landed)
             bmxSoundPlayEvent(kSoundComboScore, 1, c->points, 0, 0);
         }
     }
-    uint32_t zero = 0;
-    ovlSetElementA(kElementValue, &zero);
+    /* ovlHeightSet reads {height, target, extra}: the original passed one zero word and the other two came
+     * from the stack (AddressSanitizer, 2026-11-07); they only matter once the meter shows again, which sets
+     * them. */
+    uint32_t zero[3] = {0, 0, 0};
+    ovlSetElementA(kElementValue, zero);
     c->runState = 0;
     c->count = 0;
 }

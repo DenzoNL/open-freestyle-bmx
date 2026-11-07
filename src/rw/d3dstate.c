@@ -106,7 +106,8 @@ BMX_REGPARM(1) int rwD3DSetTextureRaster(RwRaster *raster)
         key = ext->colorKey != 0;
         if (key != s->colorKey) {
             rwD3DDevSetRenderState(kRsColorKeyEnable, (uint32_t)key);
-            s->colorKey = *(const int32_t *)((const uint8_t *)raster + offset + 4) != 0;
+            s->colorKey =
+                ext->colorKey != 0; /* the original's raw +4: the upper half of `texture` on 64-bit */
         }
     }
     s->textureRaster = raster;
