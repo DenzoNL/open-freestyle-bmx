@@ -160,10 +160,12 @@ void bmxPadToJoyState(const BmxPadSnapshot *pad, const BmxDiAxisProps props[kDiA
     out->pov[1] = out->pov[2] = out->pov[3] = 0xffffffffu;
     switch (pad->family) {
     case kBmxPadPlayStation:
-    case kBmxPadDualSense: {
-        /* HID usages of the Sony pads: X/Y left stick, Z/Rz right stick, Rx/Ry the triggers (all 8-bit). */
+    case kBmxPadDualSense:
+    case kBmxPadPositional: {
+        /* HID usages of the Sony pads: X/Y left stick, Z/Rz right stick, Rx/Ry the triggers (all 8-bit; a
+         * positional pad's sticks go through cookStick's 16-bit path). */
         const size_t n = sizeof kPlayStationButtons / sizeof kPlayStationButtons[0] -
-                         (pad->family == kBmxPadPlayStation ? 1 : 0);
+                         (pad->family != kBmxPadDualSense ? 1 : 0);
 
         out->axis[kDiAxisX] = cookStick(pad->family, pad->leftX, &props[kDiAxisX]);
         out->axis[kDiAxisY] = cookStick(pad->family, pad->leftY, &props[kDiAxisY]);
@@ -259,7 +261,6 @@ int bmxPadApplyStick8Way(const BmxPadSnapshot *pad, const BmxDiAxisProps props[k
 
 static const uint8_t kDik[SDL_SCANCODE_COUNT] = {
     [SDL_SCANCODE_ESCAPE] = 0x01,
-    [SDL_SCANCODE_AC_BACK] = 0x01, /* Android's Back button: Escape (android.c keeps it from Android) */
     [SDL_SCANCODE_1] = 0x02,
     [SDL_SCANCODE_2] = 0x03,
     [SDL_SCANCODE_3] = 0x04,
@@ -524,7 +525,11 @@ static int padOpen(SDL_JoystickID id)
             gPad.family = kBmxPadXbox;
             break;
         default:
-            gPad.family = kBmxPadGeneric;
+            /* A pad SDL maps but whose make it does not know (the AYN Thor's built-in pad on Android, which
+             * calls itself an Xbox controller with its own VID; Switch-style pads): its buttons by position,
+             * in the PlayStation order the game's profile for unknown pads expects (south = Cross: jump,
+             * Start = Options: the menu). SDL's raw order put the menu on L1 and Back on a trick input. */
+            gPad.family = kBmxPadPositional;
             break;
         }
     } else {
@@ -565,7 +570,8 @@ static int padConnected(void)
 
 static const char *familyName(BmxPadFamily family)
 {
-    static const char *const kNames[] = {"generic (SDL order)", "Xbox", "PlayStation 4", "DualSense"};
+    static const char *const kNames[] = {"generic (SDL order)", "Xbox", "PlayStation 4", "DualSense",
+                                         "PlayStation by position"};
 
     return kNames[family];
 }

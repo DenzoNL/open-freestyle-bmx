@@ -38,6 +38,10 @@ player build either: every cross-platform build is 64-bit anyway. What stays 32-
 the differential tests, because the original executable they compare against is 32-bit (part of D4, not a player
 build). Dropping native32 means moving the checks that use it (the gate's "native32 imports" and "native32 data"
 steps, the replay references) to native64 first.
+  Done / revised 2026-11-07: the gate's import check covers native64 (and native32); the replay references are
+  build-independent (data/simhash/ride.hash and the recording's hash are equal on both). The data check
+  (`tools/gen_data.py --check`) compares the source's data byte for byte with the 32-bit original, so it needs a
+  32-bit build by nature: **native32 stays as a test-only build** (never shipped), like the hook build.
 
 **D4. The hook / differential-test machinery.** It is no longer needed to *play*: since X1b the native exe reads
 nothing from NgBMX.exe. But it is still how correctness is proven: the gate's 2964 differential cases run the
@@ -49,6 +53,9 @@ on it.
 
 Rec: **A.** Deleting it throws away the strongest evidence that this is a faithful port, and the claim the README
 wants to make ("fully recompiled, verified") rests on it. Release artifacts contain none of it.
+Revised 2026-11-07: leave the developer docs where they are instead of moving them to `docs/dev/`. The code
+cites them by path in 151 places (`docs/PORTING.md X3`, ...); a move means rewriting all of those for no gain
+to players. The README (players first, a short "For developers" section with the links) is what changes.
 
 **D5. Name and version. Decided (user, 2026-11-07): Open Freestyle BMX**, v0.1.0 for the first release.
 Drops the rider's name entirely (it may still be protected, and out of respect after his death); "Freestyle BMX"
@@ -76,6 +83,13 @@ the README says what the warning looks like.
   player's own game folder, and `[audio] music_dir` plays the player's own files. Before release, check that no
   track data, names or audio slipped in anywhere (docs/MUSIC.md, tools/gen_music_edits.py and its output), and
   keep screenshots / videos for the README free of the songs.
+  **Found 2026-11-07, for the user to decide:** no audio is in the repo, but `data/music-edits.json` and
+  docs/MUSIC.md hold the ten songs' artists, titles and albums and the game's edit timings (sample positions,
+  gains), and the timings are compiled into the program (music_edits.c, the override needs them). Options:
+  A. keep as is (facts about the songs, no audio; the override cannot work without the timings);
+  B. keep the timings, drop artist / title / album names (match files by track number instead);
+  C. take the music override out of the release.
+  Rec: A, it is the kind of information a track list in a manual holds; the user's call.
 
 ## Before release: work to finish
 
@@ -91,6 +105,12 @@ Windows: D1-B folder picker; default ini written on first start with comments; `
 
 Android: D2-A picker; a mute / volume ini key (as above); Back button and quitting behave; check pad-only menus;
 release signing.
+- Pad (2026-11-08): the Thor's built-in pad is a type SDL maps but does not know, so it read in SDL's raw order
+  (the menu on L1, Back on a trick input). It now reads as `kBmxPadPositional`: PlayStation order by position,
+  south jumps, Start opens the menu, Back (the Android key under the right stick and Select both arrive as SDL's
+  Back) is Select. Commit 5bea270's message says the user pressed B for Back; it was the Android Back key, and
+  its AC_BACK→Escape key mapping was taken out again (SDL already delivers that key as the gamepad's Back).
+  Still to test on the Thor.
 
 Repo:
 - README for players (outline below); move PLAN.md, HANDOFF.md, agent-brief.md, notes and the porting docs to

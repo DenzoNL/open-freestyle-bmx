@@ -30,31 +30,35 @@ echo "== pointer widths (${SECONDS} s)"
 # Declarations that pass a pointer where the ported function takes a 32-bit integer (docs/PORTING.md "X2e"), or
 # an integer / pointer where it takes a float (X3: 64-bit passes floats in vector registers).
 "${PYTHON:-python3}" -I tools/width_audit.py . | tail -n 20
-echo "== native32 imports (${SECONDS} s)"
+echo "== native imports (${SECONDS} s)"
 # The native exe's import table must stay free of the Windows DLLs the platform layer replaced (docs/PLATFORM.md
-# 4f). Only when build/native32 exists (CI without it is unaffected); needs llvm-objdump (llvm-mingw has it).
-if [[ -e build/native32/OpenFreestyleBMX.exe ]]; then
-    # sdl3: window, input, audio, GPU. kernel32: the loader / trap machinery and the thin CRT layer
-    # (VirtualProtect, AddVectoredExceptionHandler, LoadLibrary for the dev checks, ...). api-ms-win-crt-*: the
-    # UCRT's forwarders, which the mingw CRT imports.
-    allowed='^(sdl3\.dll|kernel32\.dll|api-ms-win-crt-[a-z0-9-]+\.dll)$'
-    mapfile -t imported < <("${OBJDUMP:-llvm-objdump}" -p build/native32/OpenFreestyleBMX.exe | sed -n 's/^[[:space:]]*DLL Name: //p' | tr -d '\r')
+# 4f): native64 (the release build) and native32 (the test build, docs/RELEASE-PLAN.md D3), whichever exist (CI
+# without them is unaffected); needs llvm-objdump (llvm-mingw has it).
+# sdl3: window, input, audio, GPU. kernel32: the loader / trap machinery and the thin CRT layer (VirtualProtect,
+# AddVectoredExceptionHandler, LoadLibrary for the dev checks, ...). api-ms-win-crt-*: the UCRT's forwarders,
+# which the mingw CRT imports.
+allowed='^(sdl3\.dll|kernel32\.dll|api-ms-win-crt-[a-z0-9-]+\.dll)$'
+checked=0
+for build in native64 native32; do
+    exe=build/$build/OpenFreestyleBMX.exe
+    [[ -e $exe ]] || continue
+    mapfile -t imported < <("${OBJDUMP:-llvm-objdump}" -p "$exe" | sed -n 's/^[[:space:]]*DLL Name: //p' | tr -d '')
     if [[ ${#imported[@]} -eq 0 ]]; then
-        echo "import check: no DLL names found in build/native32/OpenFreestyleBMX.exe (llvm-objdump missing?)" >&2
+        echo "import check: no DLL names found in $exe (llvm-objdump missing?)" >&2
         exit 1
     fi
     bad=0
     for dll in "${imported[@]}"; do
         if [[ ! ${dll,,} =~ $allowed ]]; then
-            echo "import check: OpenFreestyleBMX.exe imports $dll, which is not on the allowlist (tools/check.sh)" >&2
+            echo "import check: $exe imports $dll, which is not on the allowlist (tools/check.sh)" >&2
             bad=1
         fi
     done
     [[ $bad -eq 0 ]] || exit 1
-    echo "ok: ${#imported[@]} imported DLLs, all allowed"
-else
-    echo "skipped: build/native32 not available"
-fi
+    echo "ok: $build: ${#imported[@]} imported DLLs, all allowed"
+    checked=1
+done
+[[ $checked -eq 1 ]] || echo "skipped: no build/native64 or build/native32"
 echo "== native32 data (${SECONDS} s)"
 # The original's data in the source (src/data, docs/NATIVE.md): every byte and pointer of the compiled blocks
 # against NgBMX.exe's. Needs build/native32's objects and the exe.

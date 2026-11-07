@@ -580,6 +580,25 @@ static void testPadTables(void)
     p = padWith(kBmxPadXbox, 1ull << SDL_GAMEPAD_BUTTON_GUIDE);
     bmxPadToJoyState(&p, props, &s);
     CHECK(pressedButtons(&s, got) == 0, "Xbox guide: %s", got);
+    /* a pad of unknown make (the AYN Thor): the PlayStation order by position; Start = Options (9, the menu),
+     * Back (also Android's Back key) = Create (8), south = Cross (1, jump) */
+    {
+        static const struct {
+            uint8_t sdl, di;
+        } kPositional[] = {{SDL_GAMEPAD_BUTTON_SOUTH, 1}, {SDL_GAMEPAD_BUTTON_WEST, 0},
+                           {SDL_GAMEPAD_BUTTON_EAST, 2},  {SDL_GAMEPAD_BUTTON_NORTH, 3},
+                           {SDL_GAMEPAD_BUTTON_START, 9}, {SDL_GAMEPAD_BUTTON_BACK, 8}};
+
+        for (size_t i = 0; i < sizeof kPositional / sizeof kPositional[0]; i++) {
+            p = padWith(kBmxPadPositional, 1ull << kPositional[i].sdl);
+            bmxPadToJoyState(&p, props, &s);
+            CHECK(pressedButtons(&s, got) == 1 && (int)strtol(got, NULL, 10) == kPositional[i].di,
+                  "positional SDL %d -> %s", kPositional[i].sdl, got);
+        }
+        p = padWith(kBmxPadPositional, 1ull << SDL_GAMEPAD_BUTTON_MISC1);
+        bmxPadToJoyState(&p, props, &s);
+        CHECK(pressedButtons(&s, got) == 0, "positional: no mute button: %s", got);
+    }
     /* generic: raw order, hat 0 */
     p = padWith(kBmxPadGeneric, 0);
     p.buttonCount = 12;
@@ -2695,7 +2714,8 @@ static void testWindow(void)
               strcmp(SDL_GetWindowTitle(bmxWindowSdl(window)), "Dave Mirra Freestyle BMX") == 0,
           "title");
     bmxWindowSetInstance((void *)GetModuleHandleA(NULL));
-    CHECK(bmxStandGetWindowLongA(window, GWLP_HINSTANCE) == (intptr_t)GetModuleHandleA(NULL), "GWL_HINSTANCE");
+    CHECK(bmxStandGetWindowLongA(window, GWLP_HINSTANCE) == (intptr_t)GetModuleHandleA(NULL),
+          "GWL_HINSTANCE");
     CHECK(bmxStandShowCursor(0) == -1 && bmxStandShowCursor(1) == 0, "ShowCursor counter");
     {
         int32_t rect[4] = {0, 0, 640, 480};

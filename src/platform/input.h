@@ -39,6 +39,8 @@ typedef enum BmxPadFamily {
     kBmxPadXbox,        /* XInput-class pads under DirectInput */
     kBmxPadPlayStation, /* DualShock 4 / DualSense */
     kBmxPadDualSense,   /* as PlayStation, plus the mute button */
+    kBmxPadPositional, /* a gamepad SDL knows but not its make (the AYN Thor): PlayStation buttons by position
+                        */
 } BmxPadFamily;
 
 /* SDL gamepad buttons used by the tables (SDL_GamepadButton values, so input.h needs no SDL header). */
