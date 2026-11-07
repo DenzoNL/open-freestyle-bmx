@@ -1319,6 +1319,7 @@ extern struct BmxDataOpaque bmxAt_rpAnimHeadNameGroup __asm__(BMX_SYM("rpAnimHea
 #define BMX_DATA_0x005572cb ((char *)&bmxAt_gIndicatorTextGroup + 0x1b)
 #define BMX_DATA_0x005572d4 ((char *)&bmxAt_gIndicatorTextGroup + BMX_DATA_OFF(0x24, 0x28))
 #define BMX_DATA_0x005572e8 ((char *)&bmxAt_gIndicatorTextGroup + BMX_DATA_OFF(0x38, 0x50))
+#define BMX_DATA_0x005572fc ((char *)&bmxAt_gIndicatorTextGroup + BMX_DATA_OFF(0x4c, 0x64))
 #define BMX_DATA_0x00557308 ((char *)&bmxAt_gIndicatorTextGroup + BMX_DATA_OFF(0x58, 0x70))
 #define BMX_DATA_0x005577ec ((char *)&bmxAt_gPhysRollFriction)
 #define BMX_DATA_0x005577f0 ((char *)&bmxAt_gPhysRollFriction + 0x4)

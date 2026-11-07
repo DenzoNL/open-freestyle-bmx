@@ -161,6 +161,7 @@ typedef uint8_t OvlBytes16[16];
 typedef uint8_t OvlBytes32[0x20];
 typedef uint8_t OvlBytes128[0x80];
 typedef uint8_t OvlBytes256[0x100];
+typedef uint32_t OvlHintLetters[3];
 typedef OvlElement OvlElementTable[17];
 typedef OvlScreen *OvlScreenTable[0x1b];
 typedef OvlScreen OvlScreenRecords[18];
@@ -236,10 +237,13 @@ typedef uint32_t OvlSize2[2];
 #define gGoalColumns       ORIG_VAR(0x00556998, OvlBytes256, gGoalColumns)
 #define gButtonGlyphs      ORIG_VAR(0x005572cb, OvlBytes16, gButtonGlyphs)
 #define gHintGlyphs        ORIG_VAR(0x005572bb, OvlBytes256, gHintGlyphs)
-#define gIndicatorText     ORIG_VAR(0x005572d4, OvlStrTable5, gIndicatorText)
-#define gIndicatorColor    ORIG_VAR(0x005572e8, OvlColors5, gIndicatorColor)
-#define gOvlBarSize        ORIG_VAR(0x00557260, OvlSize2, gOvlBarSize)
-#define gOvlFadeSize       ORIG_VAR(0x00557298, OvlSize2, gOvlFadeSize)
+/* What gHintGlyphs['A'..'L'] reaches in the original: the button font glyphs of the hint letters, 12 bytes.
+ */
+#define gHintGlyphLetters ORIG_VAR(0x005572fc, OvlHintLetters, gHintGlyphLetters)
+#define gIndicatorText    ORIG_VAR(0x005572d4, OvlStrTable5, gIndicatorText)
+#define gIndicatorColor   ORIG_VAR(0x005572e8, OvlColors5, gIndicatorColor)
+#define gOvlBarSize       ORIG_VAR(0x00557260, OvlSize2, gOvlBarSize)
+#define gOvlFadeSize      ORIG_VAR(0x00557298, OvlSize2, gOvlFadeSize)
 
 /* Fonts and their image references. */
 #define gOvlFontSmall  ORIG_VAR(0x0056bf38, OvlFont, gOvlFontSmall)

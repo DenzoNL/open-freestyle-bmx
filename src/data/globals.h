@@ -240,6 +240,7 @@
 #undef gHiscoreTimes
 #undef gHiscoreWait
 #undef gIndicatorColor
+#undef gHintGlyphLetters
 #undef gIndicatorText
 #undef gInfoHeadIds
 #undef gInfoLineIds
@@ -4238,7 +4239,7 @@ struct BmxGroup_gIndicatorTextGroup {
     unsigned char gButtonGlyphs[9];  /* 0x005572cb */
     OvlStrTable5 gIndicatorText;     /* 0x005572d4 */
     OvlColors5 gIndicatorColor;      /* 0x005572e8 */
-    uint32_t d_005572fc[3];          /* 0x005572fc */
+    uint32_t gHintGlyphLetters[3];   /* 0x005572fc */
     OvlStrTable4 gTrickDoubleNames;  /* 0x00557308 */
     unsigned char pad_00557318[212]; /* 0x00557318 */
 };
@@ -4250,7 +4251,7 @@ AT(d_005572bb, 0x005572bb, 0xb);
 AT(gButtonGlyphs, 0x005572cb, 0x1b);
 AT(gIndicatorText, 0x005572d4, 0x28);
 AT(gIndicatorColor, 0x005572e8, 0x50);
-AT(d_005572fc, 0x005572fc, 0x64);
+AT(gHintGlyphLetters, 0x005572fc, 0x64);
 AT(gTrickDoubleNames, 0x00557308, 0x70);
 AT(pad_00557318, 0x00557318, 0x90);
 #undef AT

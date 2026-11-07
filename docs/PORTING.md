@@ -632,6 +632,30 @@ overrun faults at the write; with lldb (llvm-mingw's) that gives the writer's ba
 BMX_SIM_HASH on native32 and native64 on every tick. The 32-bit reference hashes were made again after the FPU
 guard (above). Next: the user plays the 64-bit build; a release build.
 
+#### X3 verification (2026-11-07)
+
+Bugs found after the level fixes, all 64-bit layout bugs that the replay hashes cannot see:
+- found by playing: the height meter's scale beside its bar (src/driver/wide.c bounded the 3D list by a global
+  that only follows it in the original layout); a crash on respawn in ProQuest on the Thor (physics.c read the
+  face query's hit list at the 32-bit offset 0x3c, 0x40 on 64-bit).
+- found by AddressSanitizer (`-fsanitize=address -fsanitize-recover=address
+  -fsanitize-address-use-after-return=never` on native64; trap.c leaves faults to it): the Im3D level stack
+  overran four untyped placeholders (now one typed global); the sim hash read riders 2-3 past gPlayerRecs; the
+  echo buffer and ovlHeightSet's argument (both the original's too). The use-after-return mode is off because
+  clang miscompiles a prologue with it on mingw (movaps to a misaligned slot in RtPNGImageRead).
+- found by the screenshot comparison: the hint lines' button icons were blank (gHintGlyphs['A'..'L'] reaches
+  12 bytes past the table, which moved on 64-bit; now read by name, gHintGlyphLetters).
+- found by reading: the texture state's colour key flag (raw +4 into RwD3DRasterExt).
+
+**Screenshot comparison** (native32 vs native64, desktop settings at 1920x1080 windowed, `interpolate = 0`
+because blending by wall-clock time makes every frame differ): `tools/xcheck.py --shots <frames>` for the user
+recording (25 shots), ride.keys (19) and one freeride run into each of the 7 levels (5 each), then
+`tools/bmpdiff.py` on the two folders. After the fixes: identical or within rounding (a few thousand pixels
+off by a shade or two, a polygon edge 2-3 pixels apart), the physics hashes identical everywhere.
+
+A probe of every ORIG_VAR view's size against the data it lands on (32-bit and 64-bit compiles of all headers)
+found no further view that runs into data that moves on 64-bit, beyond the hint table and gPhysRiders.
+
 ### X5 part 1 (macOS arm64, 2026-11-06): builds, links, starts
 
 A `macos` preset builds bmxnative for macOS arm64 with the host clang (nix's in `nix develop`) and SDL3 from nix,

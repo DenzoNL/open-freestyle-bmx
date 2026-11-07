@@ -3645,6 +3645,24 @@ void ovlHintShow(int show)
 }
 
 /*
+ * The button font glyph of hint letter c. The original indexes gHintGlyphs (0x5572bb) by the letter, which
+ * for 'A'..'L' lands in the 12 bytes at 0x5572fc, past the table's own 16 bytes. On 64-bit the globals in
+ * between are larger (pointers), so that sum lands elsewhere and the icon came out blank: read the 12 bytes
+ * by name. Other capitals reach pointer bytes in the original; 64-bit builds draw no icon for them.
+ */
+static uint16_t hintGlyph(char c)
+{
+    if (c >= 'A' && c <= 'L') {
+        return ((const uint8_t *)gHintGlyphLetters)[c - 'A'];
+    }
+#if BMX_LAYOUT32
+    return gHintGlyphs[(uint8_t)c];
+#else
+    return 0;
+#endif
+}
+
+/*
  * Shows hint string `id` (3 lines of 0x114a + id * 3): capital letters A..Z in the text are replaced by
  * blanks of the right width and a button glyph overlay is placed over each. id 0xff clears the hint.
  */
@@ -3687,7 +3705,7 @@ void ovlHintSet(const uint32_t *value)
                 *out++ = *s;
                 continue;
             }
-            const uint16_t glyph = gHintGlyphs[(uint8_t)*s];
+            const uint16_t glyph = hintGlyph(*s);
             *out = '\0';
             const uint16_t before = (uint16_t)zoverTextWidth(buf, &gOvlFontSmall);
             *out++ = ' ';

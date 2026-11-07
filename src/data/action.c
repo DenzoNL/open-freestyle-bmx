@@ -3205,7 +3205,7 @@ struct BmxGroup_gIndicatorTextGroup gIndicatorTextGroup __attribute__((aligned(1
             gGameRoundStatesGroup.gOvlEmpty,
         },
     .gIndicatorColor = {0x2808080, 0x2800000, 0x2008000, 0x2000080, 0x2800000},
-    .d_005572fc = {0x78776461, 0x43545358, 0x33343132},
+    .gHintGlyphLetters = {0x78776461, 0x43545358, 0x33343132},
     .gTrickDoubleNames =
         {
             sDouble,
