@@ -27,7 +27,8 @@ echo "== functions.csv (${SECONDS} s)"
 "${PYTHON:-python3}" -I tools/progress.py --check >/dev/null
 "${PYTHON:-python3}" -I -m py_compile tools/*.py tests/oracle/*.py
 echo "== pointer widths (${SECONDS} s)"
-# Declarations that pass a pointer where the ported function takes a 32-bit integer (docs/PORTING.md "X2e").
+# Declarations that pass a pointer where the ported function takes a 32-bit integer (docs/PORTING.md "X2e"), or
+# an integer / pointer where it takes a float (X3: 64-bit passes floats in vector registers).
 "${PYTHON:-python3}" -I tools/width_audit.py . | tail -n 20
 echo "== native32 imports (${SECONDS} s)"
 # The native exe's import table must stay free of the Windows DLLs the platform layer replaced (docs/PLATFORM.md

@@ -7,9 +7,9 @@
  *
  * The hash covers the golden-trace recorder's state fields (src/hook/trace.c: the random seed, both pads, the
  * selected camera's eye and look-at, every rider's state, surface, state levels, flags, timer, position,
- * velocity, forward, up, rotation and spin), plus each rider's run score (combo.score) and the run timer
- * gGameTimer. (A hash of the whole rider array was tried and dropped: it differs between two runs of the same
- * build from the first tick, so the struct holds process-specific bytes.)
+ * velocity, forward, up, rotation and spin; riders 0 and 1), plus each rider's run score (combo.score) and
+ * the run timer gGameTimer. (A hash of the whole rider array was tried and dropped: it differs between two
+ * runs of the same build from the first tick, so the struct holds process-specific bytes.)
  *
  * Two runs of the same BMX_KEYS script with the option off and on must give the same file. Native exe only;
  * it uses the trace hook point in contrlerPoll (compat/trace.h), which the hook DLL's recorder also uses.
@@ -63,7 +63,11 @@ uint64_t bmxSimStateHash(void)
     mix32(gCameraPlayer);
     mix(&cam->eye, sizeof cam->eye);
     mix(&cam->lookAt, sizeof cam->lookAt);
-    for (int i = 0; i < 4; i++) {
+    /* The two riders the data holds (gPlayerRecs; the game loops to gPlayerCount <= 2). gPhysRiders is
+     * declared with 4, but riders 2 and 3 lie past the group: other globals on 32-bit, unrelated memory on
+     * 64-bit (found by AddressSanitizer, 2026-11-07). Hash files made before that hashed 4 and differ from
+     * today's. */
+    for (int i = 0; i < 2; i++) {
         const PhysRider *const r = &gPhysRiders[i];
 
         mix32(r->state);

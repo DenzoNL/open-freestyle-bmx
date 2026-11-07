@@ -310,8 +310,14 @@ void bmxTrapInstall(void)
         loadSymbols();
     }
     /* Under a debugger the debugger reports the fault (with a backtrace); the handler would end the process
-     * before it sees it. */
-    if (!IsDebuggerPresent()) {
+     * before it sees it. AddressSanitizer builds (-fsanitize=address) map their shadow memory on first touch
+     * through an access violation that its own handler must see first, and it reports real faults itself. */
+#if defined(__SANITIZE_ADDRESS__)
+    const int sanitizer = 1;
+#else
+    const int sanitizer = 0;
+#endif
+    if (!sanitizer && !IsDebuggerPresent()) {
         AddVectoredExceptionHandler(1, trapHandler);
     }
 }

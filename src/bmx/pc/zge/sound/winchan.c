@@ -882,8 +882,10 @@ int winchanInit(WinchanInitDesc *desc)
     gWinchanMixOffset = 0;
     gWinchanCopyOffset = gWinchanRingBytes - gWinchanChunkBytes;
     gWinchanEffectMaxFrames = (uint32_t)bmxFtol((double)desc->rate * (double)desc->echoSeconds);
-    /* A failure here keeps the ring buffer. */
-    gWinchanEchoBuffer = malloc(gWinchanEffectMaxFrames * sizeof(WinchanFrame));
+    /* A failure here keeps the ring buffer. With no echo time (0 frames) the mixer still writes frame 0 into
+     * it (the original's malloc(0) block had room for it by chance): at least one frame. */
+    gWinchanEchoBuffer =
+        malloc((gWinchanEffectMaxFrames != 0 ? gWinchanEffectMaxFrames : 1u) * sizeof(WinchanFrame));
     if (gWinchanEchoBuffer == 0) {
         return 0x108;
     }

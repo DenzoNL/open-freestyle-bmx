@@ -15,7 +15,7 @@ default 4000) and the save given by --save (default `none`: no SAVE.DAT, a fresh
 The folder's own SAVE.DAT is put back afterwards (or removed again if there was none). Every run also gets
 BMX_SIM_HASH, BMX_MUTE and BMX_NO_MOVIES; runs are sequential, in the background (the window never takes the
 focus). --args adds command-line arguments after Scene.Txt (e.g. "-r640.480.16"). --ref-hash <file> adds a
-precomputed hash file (another machine's, e.g. data/simhash/ride.arm64.hash) as the reference before the
+precomputed hash file (another machine's, e.g. data/simhash/ride.hash) as the reference before the
 runs. The reference (or else the first run) is compared with the others; the report names the first tick where
 another differs. Exit status 0 when all hash files are identical.
 

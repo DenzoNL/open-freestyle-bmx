@@ -6,6 +6,12 @@ type a table or caller wants, so the compiler never compares those parameter lis
 integer side cuts the pointer to its low half (docs/PORTING.md "X2e"). This lists every parameter (and
 return value) that is a pointer on one side and a 32-bit integer on the other.
 
+It also lists every parameter (and return value) that is floating point on one side and an integer or pointer on
+the other: x86_64 and arm64 pass floats in vector registers, so such a call hands the callee a register the caller
+never set (docs/PORTING.md X3, the clip-plane and light bugs). Declarations only the 32-bit hook build compiles
+(the `#else` of `#ifdef BMX_IMAGE`, or `#ifndef BMX_IMAGE`) are exempt from that check: on i386 a float and a
+32-bit integer travel alike on the stack, and the hook build passes some floats as their bit pattern on purpose.
+
 Classes: ptr (pointers, arrays, function pointers, pointer typedefs), word (pointer-sized integers:
 intptr_t, uintptr_t, size_t, ptrdiff_t), int (other integers, enums), fp, other (structs by value, void).
 ptr/word against int is reported; everything else is the argcount audit's business.
@@ -137,8 +143,30 @@ def params_of(s):
     return [p for p in ac.split_args(s)]
 
 
-def clash(a, b):
-    return {a, b} in ({"ptr", "int"}, {"word", "int"})
+def clash(a, b, hook_only=False):
+    if {a, b} in ({"ptr", "int"}, {"word", "int"}):
+        return True
+    return not hook_only and (a == "fp") != (b == "fp") and {a, b} <= {"fp", "int", "ptr", "word"}
+
+
+def hook_only_lines(text):
+    """Line numbers (1-based) that only the hook build compiles: the #else of #ifdef BMX_IMAGE, #ifndef BMX_IMAGE."""
+    lines, stack = set(), []  # stack: None (unrelated #if) or True / False (this branch is hook-only)
+    for no, line in enumerate(text.splitlines(), 1):
+        d = line.strip()
+        if re.match(r"#\s*ifdef\s+BMX_IMAGE\b|#\s*if\s+defined\s*\(?\s*BMX_IMAGE\b", d):
+            stack.append(False)
+        elif re.match(r"#\s*ifndef\s+BMX_IMAGE\b|#\s*if\s+!\s*defined\s*\(?\s*BMX_IMAGE\b", d):
+            stack.append(True)
+        elif re.match(r"#\s*if", d):
+            stack.append(None)
+        elif re.match(r"#\s*el", d) and stack:
+            stack[-1] = None if stack[-1] is None else not stack[-1]
+        elif re.match(r"#\s*endif", d) and stack:
+            stack.pop()
+        elif any(stack):
+            lines.add(no)
+    return lines
 
 
 ported = ac.load_ported(repo)
@@ -150,13 +178,13 @@ findings = []
 unresolved = []
 
 
-def compare(where, decl_ret, decl_params, f):
+def compare(where, decl_ret, decl_params, f, hook_only=False):
     dps, fps = params_of(decl_params), params_of(f["params"])
     if "..." in decl_params or "..." in f["params"]:
         return
     if decl_ret is not None:
         a, b = cls(decl_ret), cls(f["ret"])
-        if a and b and clash(a, b):
+        if a and b and clash(a, b, hook_only):
             findings.append(f"{where}: returns {decl_ret.strip()} ({a}), {f['name']} returns {f['ret']} ({b})")
     for i, (dp, fp) in enumerate(zip(dps, fps)):
         a, b = cls(dp), cls(fp)
@@ -164,7 +192,7 @@ def compare(where, decl_ret, decl_params, f):
             if verbose:
                 unresolved.append(f"{where}: argument {i + 1}: {dp!r} vs {fp!r}")
             continue
-        if clash(a, b):
+        if clash(a, b, hook_only):
             findings.append(f"{where}: argument {i + 1} is {dp.strip()} ({a}), {f['name']} takes {fp.strip()} ({b})"
                             f"  [{f['path']}:{f['line']}]")
 
@@ -179,6 +207,7 @@ for path in sorted((repo / "src").rglob("*")):
         continue
     text = ac.strip_c(path.read_text(errors="replace"))
     rel = path.relative_to(repo).as_posix()
+    hook_lines = hook_only_lines(text)
     for rx in (ORIG, ORIG_RP):
         for m in rx.finditer(text):
             close = ac.match_close(text, m.start() + text[m.start():].index("("), "(", ")")
@@ -194,7 +223,7 @@ for path in sorted((repo / "src").rglob("*")):
                     unresolved.append(f"{rel}:{line}: ORIG_FN {name} at {addr:#x} is not a ported function")
                 continue
             if params.startswith("(") and params.endswith(")"):
-                compare(f"{rel}:{line}: ORIG_FN {name}", ret, params[1:-1], f)
+                compare(f"{rel}:{line}: ORIG_FN {name}", ret, params[1:-1], f, line in hook_lines)
     for m in VAR.finditer(text):
         typ = " ".join(m.group(2).split())
         if "define ORIG_VAR" in text[max(0, m.start() - 20) : m.start()]:
@@ -218,7 +247,7 @@ for path in sorted((repo / "src").rglob("*")):
             if verbose and tm != "ptr" and typ not in ("void *", "const void *"):
                 unresolved.append(f"{rel}:{line}: BMX_FNPTR type {typ!r} not a function pointer")
             continue
-        compare(f"{rel}:{line}: BMX_FNPTR {fn}", fm.group(1), fm.group(2), f)
+        compare(f"{rel}:{line}: BMX_FNPTR {fn}", fm.group(1), fm.group(2), f, line in hook_lines)
 
 # the function src/data stores in a function pointer ORIG_VAR: `Type gName = (Type)fn;` or `.gName = fn,`
 name_addr = {}
