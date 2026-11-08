@@ -1,4 +1,4 @@
-# Hosted 32-bit Windows target for the native build (bmxnative.exe): llvm-mingw provides the C library
+# Hosted 32-bit Windows target for the native build (OpenFreestyleBMX.exe): llvm-mingw provides the C library
 # and Windows headers. Game objects add the freestanding flags themselves (see CMakeLists.txt).
 set(CMAKE_SYSTEM_NAME Windows)
 set(CMAKE_SYSTEM_PROCESSOR x86)

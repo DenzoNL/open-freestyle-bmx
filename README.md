@@ -3,8 +3,17 @@
 A native, open-source port of the 2000 PC BMX game *Dave Mirra Freestyle BMX*: rebuilt from the ground up for
 today's Windows PCs and Android handhelds, at any resolution and frame rate.
 
-<!-- Screenshots to add before the release: 21:9 desktop in a level, the AYN Thor, a menu with the blurred sides.
-     Keep the soundtrack out of any video. -->
+![A tabletop at Woodward, 3440x1440](docs/images/ultrawide-tabletop.jpg)
+
+<p>
+  <img src="docs/images/ultrawide-cancan.jpg" width="49%" alt="A can-can to fast plant on a 21:9 screen">
+  <img src="docs/images/ultrawide-menu.jpg" width="49%" alt="The level select at 21:9, with the blurred sides">
+</p>
+<p>
+  <img src="docs/images/handheld-1080p.jpg" width="49%" alt="1920x1080, the AYN Thor's resolution">
+</p>
+
+*At 3440×1440 (21:9) and at 1920×1080, the AYN Thor's screen resolution.*
 
 ## What you need
 
@@ -17,7 +26,7 @@ today's Windows PCs and Android handhelds, at any resolution and frame rate.
 
 **Windows**
 
-1. Download `OpenFreestyleBMX-windows-x64.zip` from the [Releases](../../releases) page and unzip it anywhere.
+1. Download `OpenFreestyleBMX-<version>-windows-x64.zip` from the [Releases](../../releases) page and unzip it anywhere.
 2. Run `OpenFreestyleBMX.exe`. The first time, it asks for your game folder (the one with `Scene.Txt` and the
    `Assets` folder in it) and remembers it. You can also copy the two files into the game folder and run it
    from there.
@@ -28,7 +37,7 @@ Windows may warn that the program is from an unknown publisher (it is not signed
 **Android**
 
 1. Copy your game folder to the device (for example into `Download`).
-2. Install `OpenFreestyleBMX-android.apk` from the [Releases](../../releases) page.
+2. Install `OpenFreestyleBMX-<version>-android.apk` from the [Releases](../../releases) page.
 3. Start it and choose the game folder. It is copied into the app once (about 250 MB); after that the copy in
    `Download` can go.
 

@@ -393,7 +393,7 @@ an opt-in (power) seam in main.c, not in ported code.
 | S11 (done, 4f) | Remove the remaining Win32 from main.c / keys.c / driver (WASAPI mute -> no audio device), import check in tools/check.sh | ~100 | Sonnet | `llvm-objdump -p bmxnative.exe`: only SDL3, UCRT, KERNEL32 (+ BCRYPT until an own SHA-256) |
 | S12 | Opt-in seams: profile saves + asset folder (P18), hot-plug (P5), remap (P8), window modes (P17) | ~400 | Sonnet | Each option off: S1..S10 checks unchanged; on: feature test |
 
-### 4a. Status of S1-S4 (2026-10-31, native-only, not committed)
+### 4a. Status of S1-S4 (2026-10-31, native-only, committed since)
 
 Code: `src/platform/` (hosted C, SDL3, no windows.h): `imports.c` (the table), `kernel.c` (S2), `winmm.c` (S3),
 `fileio.c` + `paths.c` (S4), `avi.c` (the AVISaveOptionsFree shim, moved out of loader.c), `standins.h` (the
@@ -456,7 +456,7 @@ tidy list like src/native (tidy it with `-p build/native32`). Tests: `tests/plat
   threads killing the same id (20 rounds, exactly one succeeds, nothing joined twice), the three return codes against
   the real winmm.
 
-### 4b. Status of S5 and S6 (2026-10-31, native-only, not committed; the real-pad check needs the user)
+### 4b. Status of S5 and S6 (2026-10-31, native-only, committed since; the real-pad check needs the user)
 
 Code: `src/platform/input.c` (the stand-in DirectInput and the conversions), `inputcheck.c` (BMX_INPUT_CHECK),
 `diface.h` (the DirectInput 7 interfaces in our own types: src/platform still has no windows.h), `input.h`,
@@ -553,7 +553,7 @@ process, so P2's hook use is not needed for it).
 
 S1-S6 are done apart from the user's real-pad check.
 
-### 4c. Status of S7 (2026-10-31, native-only, not committed; the listening test is the user's)
+### 4c. Status of S7 (2026-10-31, native-only, committed since; the listening test is the user's)
 
 Code: `src/platform/dsound.c` (the stand-ins and the mixer), `soundcheck.c` (BMX_SOUND_CHECK), `dsface.h` (IDirectSound /
 IDirectSoundBuffer in full, WAVEFORMATEX, DSBUFFERDESC, DSBCAPS, the HRESULTs, in our own types), `sound.h` (test and
@@ -642,7 +642,7 @@ Release. No DuplicateSoundBuffer, SetFrequency, GetCaps or QueryInterface; they 
 - Open: the user's listening test (docs/NATIVE.md "DirectSound on SDL3"), including whether the original also goes
   silent behind the QUIT message box (ours does: the box takes the focus) and on alt-tab.
 
-### 4d. Status of S8 and S9 (2026-10-31, native-only, not committed; the watch test is the user's)
+### 4d. Status of S8 and S9 (2026-10-31, native-only, committed since; the watch test is the user's)
 
 Code: `src/platform/avi.c` (the AVIFIL32 stand-ins: RIFF/AVI reader), `cinepak.c` / `cinepak.h` (the decoder),
 `avi.h` (AVIERR codes), `waveout.c` (WINMM waveOut on SDL3 audio), `src/driver/movie.c` (DrawDib, GetDC / ReleaseDC
@@ -768,7 +768,7 @@ Open: the user's watch test (docs/NATIVE.md "Movies on our decoder and SDL3"): p
 main.c's WASAPI session mute (BMX_MUTE) became redundant for the movies (both stand-ins output silence); removed in
 S11 (4f).
 
-### 4e. Status of S10 (2026-10-31, native-only, not committed; the focus test is the user's)
+### 4e. Status of S10 (2026-10-31, native-only, committed since; the focus test is the user's)
 
 Code: `src/platform/window.c` (the window, the message queue, the USER32 stand-ins, message boxes), the
 DialogBoxParamA stand-in in `src/driver/device.c` (it needs the driver's mode list), `src/native/main.c` (WinMain's
@@ -867,7 +867,7 @@ become WM_KEYDOWN / WM_KEYUP; PeekMessage pumps SDL at most once per millisecond
 WA_CLICKACTIVE: the procedure treats it as a deactivation, and the game's poll re-acquires anyway); log lines for
 focus changes, the close and the chosen mode; the `-r` pick bug kept.
 
-### 4f. Status of S11 (2026-10-31, native-only, not committed; the focus test is the user's)
+### 4f. Status of S11 (2026-10-31, native-only, committed since; the focus test is the user's)
 
 The import table of `bmxnative.exe` is now SDL3.dll, bcrypt.dll, KERNEL32.dll and the UCRT's api-ms-win-crt-* sets
 (13 DLLs; no ole32, no WINMM, no USER32 of ours). **The hook DLL is unchanged.**
@@ -891,8 +891,8 @@ The import table of `bmxnative.exe` is now SDL3.dll, bcrypt.dll, KERNEL32.dll an
   GetProcAddress, the .orig section: KERNEL32); bcrypt for the SHA-256 of NgBMX.exe until X1b (docs/PORTING.md), which
   stopped reading the exe. USER32.dll is in the process
   because SDL3.dll imports it.
-- **Import check (tools/check.sh).** After the build, when `build/native32/bmxnative.exe` exists (CI without
-  native32 skips it), `llvm-objdump -p` lists the imported DLLs (`OBJDUMP` overrides the tool) and any outside this
+- **Import check (tools/check.sh).** After the build, for each of `build/native64/OpenFreestyleBMX.exe` and `build/native32/OpenFreestyleBMX.exe`
+  that exists (originally native32's `bmxnative.exe` only), `llvm-objdump -p` lists the imported DLLs (`OBJDUMP` overrides the tool) and any outside this
   allowlist fails the gate (also when no DLL name can be read):
 
   | DLL | Why |

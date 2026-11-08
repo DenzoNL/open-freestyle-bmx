@@ -1,5 +1,8 @@
 # Native build, step 1: our own 32-bit exe (P4, option A)
 
+> The first native step, as it was done (October 2026). The exe is `OpenFreestyleBMX.exe` now (`bmxnative.exe`
+> below), and the 64-bit build (docs/PORTING.md X3) is the release build.
+
 Goal: an exe of our own that runs the ported game code without the original's code, on 32-bit Windows,
 as the first step of the platform flip. 64-bit cleanliness (Mac, Android, Linux x64) comes after, as a
 separate step.

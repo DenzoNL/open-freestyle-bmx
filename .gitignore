@@ -1,6 +1,5 @@
 # build output
 /build/
-/out/
 # generated from the user's own NgBMX.exe; derived from copyrighted code, never commit
 /work/
 # original game files must never be committed

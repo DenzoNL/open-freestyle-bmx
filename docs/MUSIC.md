@@ -46,7 +46,7 @@ regions), `corr` and `snr_db` (~19-23 dB is the ADPCM noise floor, i.e. the same
 
 ## Override
 
-Opt-in, native exe only: with `[audio] music_dir = <folder>` in bmxnative.ini the game's music plays from the
+Opt-in, native exe only: with `[audio] music_dir = <folder>` in OpenFreestyleBMX.ini the game's music plays from the
 user's own FLAC files, each track cut with the game's edit from this list, in CD quality and stereo, instead of the
 4-bit ADPCM mono stream. Unset (the default) is the original. Code: `src/platform/music.c` (no game state: plan,
 renderer, sources, file matching, render thread), `src/platform/musicgame.c` (ties it to the game's stream),

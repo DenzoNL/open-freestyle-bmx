@@ -10,7 +10,7 @@
  * Three modes:
  * - BMX_HOOK (hook DLL, oracle test DLL): the original's code and data at their addresses; ORIG_FN and
  *   BMX_FNPTR are those addresses, ORIG_VAR reads the global there.
- * - BMX_IMAGE (bmxnative.exe, docs/NATIVE.md "The original's data in the source"): no original code or data
+ * - BMX_IMAGE (the native exe, docs/NATIVE.md "The original's data in the source"): no original code or data
  *   is loaded; the original's globals are C definitions of ours (src/data). ORIG_VAR and BMX_ORIG name the
  *   definition at that address (BMX_DATA_<addr>, src/data/addrs.h, plus the offset in it); ORIG_FN calls the
  *   function serving that address (the generated origmap.h, tools/gen_origmap.py); BMX_FNPTR is the function

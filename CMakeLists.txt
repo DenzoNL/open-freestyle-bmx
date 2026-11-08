@@ -170,7 +170,7 @@ if(BMX_NATIVE32)
   target_compile_options(bmxnative PRIVATE ${BMX_WARNINGS})
   if(NOT WIN32)
     # macOS / Linux: no fixed base (the 28-bit packet links are offsets from an anchor on 64-bit, X2d); SDL3 found
-    # through the rpath. A later slice packages bmxnative.app (docs/PORTING.md "X5 part 1").
+    # through the rpath. The bmxnative_app target packages OpenFreestyleBMX.app (docs/PORTING.md "X5 part 1").
     if(NOT ANDROID)
       set_target_properties(bmxnative PROPERTIES BUILD_RPATH "$<TARGET_FILE_DIR:SDL3::SDL3-shared>")
     endif()

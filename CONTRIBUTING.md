@@ -89,7 +89,7 @@ value held in an x87 register behaves exactly like a C `double`. A value the ori
   found") and files, and anything else traps loudly.
 - File code can and should be tested on **real game files**. Paths are relative to the install root
   (`Assets\Tables.ZAL`, `bin\audio\...`) and resolved case-insensitively. Writes stay in memory and
-  are compared like memory. Mark such cases `DT_NEEDS_ASSETS`, because CI has the exe but no assets.
+  are compared like memory. Mark such cases `DT_NEEDS_ASSETS`, because a checkout without the game folder has no assets.
 
 ## Style
 

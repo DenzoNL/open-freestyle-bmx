@@ -103,7 +103,7 @@ NAME_RULES = [
 
 # Reclassification of `orig` functions after the pointer pass (checked by hand on the pseudo-C, 2026-10-28): what only
 # puts pixels on screen, or builds the pixel data a driver-chosen raster format needs, goes to the SDL3 driver set
-# (`lib/d3d7driver`); what the CRT layer of bmxnative.exe (src/native/crt.c) already provides goes to `lib/crt`.
+# (`lib/d3d7driver`); what the CRT layer of the native exe (src/native/crt.c) already provides goes to `lib/crt`.
 # (lo, hi, file, why); lo <= addr < hi. Ported rows are never touched.
 RECLASS = [
     # Instancing pipelines of world sectors and atomics (resource arena entries, vertex buffers in the D3D vertex

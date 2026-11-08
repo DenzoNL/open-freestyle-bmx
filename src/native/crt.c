@@ -1,10 +1,10 @@
 /*
- * C runtime layer of bmxnative.exe. The original NgBMX.exe links MSVC6's C runtime statically, and none of
- * its code is loaded here, so every CRT entry the game or RenderWare reaches has an implementation in this
- * file (or in crtasm.S for the compiler helpers with special calling conventions). The table below lists each
- * original address and its replacement: tools/gen_origmap.py reads it, so ORIG_FN declarations of those
- * addresses call these functions and the CRT pointers in the original's data (RenderWare's string and file
- * tables) are relocated to them. The functions are global for that reason.
+ * C runtime layer of the native exe (OpenFreestyleBMX.exe). The original NgBMX.exe links MSVC6's C runtime
+ * statically, and none of its code is loaded here, so every CRT entry the game or RenderWare reaches has an
+ * implementation in this file (or in crtasm.S for the compiler helpers with special calling conventions). The
+ * table below lists each original address and its replacement: tools/gen_origmap.py reads it, so ORIG_FN
+ * declarations of those addresses call these functions and the CRT pointers in the original's data
+ * (RenderWare's string and file tables) are relocated to them. The functions are global for that reason.
  *
  * Where the game can observe a difference from the host's C library the MSVC6 behaviour is reproduced:
  * string compares return -1/0/1, qsort is MSVC's algorithm (not stable, so the order of equal elements

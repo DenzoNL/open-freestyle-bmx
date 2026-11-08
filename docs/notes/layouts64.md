@@ -14,7 +14,7 @@ for x86_64, why its layout matters. Classes:
 
 ## How the list was made
 
-`tools/probe64.py` (a copy with 3 workers, under `nice -n 19`) with llvm-mingw 20261020 x86_64 clang:
+`tools/probe64.py` (removed since; a copy with 3 workers, under `nice -n 19`) with llvm-mingw 20261020 x86_64 clang:
 **1750 distinct failing asserts in 75 files**; without src/data/layout.h (1311) and src/data/imports.c (21, both
 going away in X2a) that leaves **418 asserts in 73 files**, which group into **169 (header, struct) rows, 167
 distinct structs** (ZbspLevelFace fails in ngifzbsp.h and ztaginf.c, RwGlobals in rwcore.h and plugins.c).

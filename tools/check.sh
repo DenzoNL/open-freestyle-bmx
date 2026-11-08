@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Everything CI checks, runnable locally: format, build, clang-tidy, CSV freshness, differential tests.
+# The gate, run before every push: format, build, clang-tidy, CSV freshness, differential tests.
 # Differential tests are skipped when the original NgBMX.exe is not available.
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)

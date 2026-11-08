@@ -1,6 +1,7 @@
 # 64-bit and cross-platform builds (P4 / P5)
 
-Status 2026-11-01: design; decisions taken (the user): X1-A, X2-A (data in the source), X4-A (bit-exact x87
+Status 2026-11-08: X0-X6 done (the 64-bit Windows build is the release build; Android runs on the AYN Thor).
+Originally (2026-11-01) a design; decisions taken (the user): X1-A, X2-A (data in the source), X4-A (bit-exact x87
 emulation); X3-A and X5-A as recommended. Goal (the user's): 64-bit builds and builds for other platforms. The
 targets are Windows x64 (the user's 3440x1440 desktop), Linux x64 (and the Steam Deck), macOS arm64 and
 Android arm64 (an AYN Thor, 1920x1080; its Snapdragon has no 32-bit mode, so 32-bit Android is out).
@@ -255,7 +256,7 @@ once X2 is done. X5 and X6 are moderate. The order puts the user's own desktop (
 
 ### X2 plan (2026-11-01)
 
-Inventory: the native build compiled for x86_64 with `-fsyntax-only` (scratchpad probe, to become tools/probe64.py):
+Inventory: the native build compiled for x86_64 with `-fsyntax-only` (scratchpad probe, later tools/probe64.py; removed in the release cleanup, the `-Werror` native64 build does its job):
 - **1750 distinct layout asserts fail.** 1311 are the section blocks' offset asserts in src/data/layout.h (they go
   as globals leave the blocks); ~440 are in 73 hand-written headers, structs that hold pointers (physics_types.h
   65, rwworld.h 30, zrwmodel.h 24, rwcore.h 21, rwplugins.h 19, zactor.h 15, rwtexture.h 15, ...).
@@ -330,7 +331,7 @@ mechanical commits leave bmxtest.dll, dinput.dll and bmxnative.exe .text/.data/.
   ZObj.data, ZrwCamera fields, Im3D work record, PhysRider stride, physObjectProp). Type pairs merged:
   PhysCollObject = PhysPropObject, ZsndSeqHeader = ZsdTrackDef, RwMatrixGlobals = RwMatrixModule;
   ZtaginfNode / ZrwRenderColNode asserted to agree. compat/layout.h: BMX_LAYOUT32_ASSERT; the 409
-  failing in-memory asserts converted. tools/probe64.py (--list, other errors): **418 -> 0 failing asserts
+  failing in-memory asserts converted. tools/probe64.py (since removed; --list, other errors): **418 -> 0 failing asserts
   outside src/data** (src/data: 1780, generator).
 - **Found after the merge (2026-11-02):** X2a's adjacency check looked at memset / memcpy only; four `zmemFill`
   calls cleared runs of globals that X2a had made separate definitions (zrwInitApp 0x88 from gZrwRaster and
@@ -721,7 +722,7 @@ Without nix: `-DSDL3_DIR=<prefix>/lib/cmake/SDL3`. Run it from the game folder (
   default APFS is case-insensitive anyway, Linux and case-sensitive volumes need it). crt.c's fopen, the sound
   loader's CreateFileA and the AVI reader go through it. **Locations:** saves stay in the game folder's `save\`
   (as on Windows; the P18 profile redirect is still open); bmxnative.ini is read from `BMX_CONFIG`, else next to the
-  executable (`Contents/Resources` in the bundle), else `~/Library/Application Support/opendmfbmx/bmxnative/`
+  executable (`Contents/Resources` in the bundle), else `~/Library/Application Support/OpenFreestyleBMX/`
   (SDL_GetPrefPath); bmxnative.log is written next to the executable.
 - Headless message boxes: with `SDL_VIDEODRIVER=offscreen` or `dummy` a MessageBoxA is logged and answered as
   closed (SDL would still show a Cocoa alert).
@@ -1010,7 +1011,7 @@ nixbox, the Steam Deck) is still to do.
 ```sh
 nix develop                                         # clang (wrapped), SDL3 (SDL3_ROOT), patchelf, cmake, ninja
 cmake --preset linux && cmake --build --preset linux             # build/linux/bmxnative (rpath to nix's SDL3)
-cmake --build --preset linux --target bmxnative_tarball          # build/linux/opendmfbmx-linux-x86_64{,.tar.gz}
+cmake --build --preset linux --target bmxnative_tarball          # build/linux/OpenFreestyleBMX-linux-x86_64{,.tar.gz}
 ```
 Without nix: clang, cmake >= 3.28, ninja, python3 and the distribution's SDL3 development package (or SDL3 built
 from source, `-DSDL3_DIR=<prefix>/lib/cmake/SDL3`); `OPENDMFBMX_LINUX_CLANG=clang-21` names another clang. GCC is
@@ -1038,7 +1039,7 @@ folder in the install layout (`Scene.Txt`, `Assets/`, `bin/audio`, `bin/movie`, 
   signal context), `/proc/self/exe` for the log, `__dso_handle` as the instance, LP64 handling.
 
 **Locations** (the macOS policy): bmxnative.ini from `BMX_CONFIG`, else next to the executable, else SDL's pref path
-(`$XDG_DATA_HOME/opendmfbmx/bmxnative/`, by default `~/.local/share/opendmfbmx/bmxnative/`); saves in the game
+(`$XDG_DATA_HOME/OpenFreestyleBMX/`, by default `~/.local/share/OpenFreestyleBMX/`); saves in the game
 folder's `save/` (the working directory's, as on Windows); bmxnative.log next to the executable. The game's paths
 (`Assets\Tables.ZAL`, `bin\audio\MUSIC.ZSD`) are resolved case-insensitively per component (`bmxPathResolve`),
 which Linux needs: its file systems are case-sensitive.
@@ -1050,7 +1051,7 @@ distributions and the Steam Deck, build outside nix on an old enough glibc: the 
 container (Debian 11, glibc 2.31; SDL3 built from source there, it has only SDL2), then the same target. An
 AppImage (not made): `linuxdeploy --appdir AppDir -e build/linux/bmxnative -l <libSDL3.so.0> -d bmxnative.desktop
 -i <icon> --output appimage`; SDL3 opens X11 / Wayland / PipeWire / Vulkan from the system at run time, so nothing
-else goes in; it runs with the caller's working directory, i.e. `cd <game> && opendmfbmx.AppImage Scene.Txt`. On
+else goes in; it runs with the caller's working directory, i.e. `cd <game> && OpenFreestyleBMX.AppImage Scene.Txt`. On
 the Steam Deck: add it as a non-Steam game with the game folder as "Start in" and `Scene.Txt` as the launch
 option; Steam Input presents the Deck's controls as an Xbox pad, which the DirectInput stand-in reads.
 
@@ -1102,7 +1103,7 @@ movies, a save, and the tarball on another distribution / the Steam Deck.
 SDL), input, the Steam Deck; a release build in the sniper container; an AppImage if wanted; GCC (not planned).
 
 
-### X6 step 1 (Android arm64, 2026-11-06): libmain.so and an APK build, not run yet
+### X6 step 1 (Android arm64, 2026-11-06): libmain.so and an APK build (runs on the Thor since 2026-11-07)
 
 An `android` preset builds bmxnative for Android arm64-v8a as `libmain.so` (SDL3's Android convention: SDL's Java
 activity loads `libSDL3.so` and `libmain.so` and calls `SDL_main` on its own thread), warning-free under the same
@@ -1150,10 +1151,10 @@ ELF import thunks):
   everything; its `game/` is made the working directory (no game folder: an SDL message box with the adb command,
   then SDL_main returns 1 and SDL ends the activity); `BMX_CONFIG` points at its bmxnative.ini unless set.
 - trap.c: bmxnative.log in that folder (an app's /proc/self/exe is app_process); every bmxLog line also goes to
-  logcat (`__android_log_vprint`, tag `opendmfbmx`; stderr goes nowhere in an app). The fault handler is installed
+  logcat (`__android_log_vprint`, tag `OpenFreestyleBMX` (BMX_PRODUCT_FILE; `opendmfbmx` before the rename); stderr goes nowhere in an app). The fault handler is installed
   with `sigaction` as on Linux; ART's libsigchain sits in front of it and keeps its own SIGSEGV uses (Java null
   checks) to itself, so only native faults reach the report.
-- android/: Gradle project (settings / build.gradle, AGP 8.7.3; app/build.gradle: `org.opendmfbmx.app`, minSdk 26,
+- android/: Gradle project (settings / build.gradle, AGP 8.7.3; app/build.gradle: `org.openfreestylebmx.app`, minSdk 26,
   target / compile 35, build-tools 35.0.0, arm64-v8a only, no native build: app/libs/arm64-v8a gets the two .so
   from android/build.sh; SDL's Java sources come from `$SDL3_SRC/android-project/app/src/main/java`, so they always
   match the SDL3 the library was built from; debug symbols kept in the APK); `BmxActivity` (SDLActivity with
@@ -1172,8 +1173,8 @@ ELF import thunks):
   libc / libm (incl. the `_FORTIFY_SOURCE` `__*_chk` ones; the newest is `LIBC_N`, API 24) and liblog's
   `__android_log_print` / `__android_log_vprint`. None outside the NDK and SDL3.
 - `android/build.sh`: app-debug.apk (19 MB) with lib/arm64-v8a/libSDL3.so and libmain.so stored uncompressed and
-  16 KB aligned (`zipalign -c -P 16 4`: OK); `aapt2 dump badging`: package org.opendmfbmx.app, minSdk 26, target 35,
-  launchable `org.opendmfbmx.app.BmxActivity`, native-code arm64-v8a.
+  16 KB aligned (`zipalign -c -P 16 4`: OK); `aapt2 dump badging`: package org.openfreestylebmx.app, minSdk 26, target 35,
+  launchable `org.openfreestylebmx.app.BmxActivity`, native-code arm64-v8a.
 - The other builds: the hook build and `tests/oracle/run.sh -n 5` (3009/3009), clang-format on all sources, the
   macos build warning-free. The `linux` preset is unchanged (its configure needs a Linux host; the CMake changes
   are `if(ANDROID)` only, and the one source change outside `__ANDROID__`, `.hidden` on the arm64 ELF thunks, is
@@ -1184,13 +1185,13 @@ platform-tools or any SDK). `<game>` is the game folder in the install layout (S
 bin/movie, save/; an empty save/ starts fresh):
 
     adb install -r android/app/build/outputs/apk/debug/app-debug.apk
-    adb shell am start -n org.opendmfbmx.app/.BmxActivity     # once: creates the app's folder; shows "No game folder"
-    adb push <game>/. /sdcard/Android/data/org.opendmfbmx.app/files/game/
-    adb push bmxnative.ini /sdcard/Android/data/org.opendmfbmx.app/files/      # optional
-    adb logcat -s opendmfbmx SDL SDL/APP AndroidRuntime DEBUG                  # in a second terminal
-    adb shell am start -n org.opendmfbmx.app/.BmxActivity
+    adb shell am start -n org.openfreestylebmx.app/.BmxActivity     # once: creates the app's folder; shows "No game folder"
+    adb push <game>/. /sdcard/Android/data/org.openfreestylebmx.app/files/game/
+    adb push OpenFreestyleBMX.ini /sdcard/Android/data/org.openfreestylebmx.app/files/      # optional
+    adb logcat -s OpenFreestyleBMX SDL SDL/APP AndroidRuntime DEBUG                  # in a second terminal
+    adb shell am start -n org.openfreestylebmx.app/.BmxActivity
 
-(`/sdcard/Android/data/org.opendmfbmx.app/files` is `/storage/emulated/0/Android/data/...`; adb can write there
+(`/sdcard/Android/data/org.openfreestylebmx.app/files` is `/storage/emulated/0/Android/data/...`; adb can write there
 without root; the log is also at `.../files/bmxnative.log`, `adb pull` it.) What to test, in this order:
 1. It starts: logcat shows the import slots / config / redirects lines as on the desktop and no trap; a fault
    report names the address (logcat and bmxnative.log).

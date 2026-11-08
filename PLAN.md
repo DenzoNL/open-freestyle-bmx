@@ -1,4 +1,9 @@
-# Dave Mirra Freestyle BMX — port plan
+# Open Freestyle BMX — port plan
+
+> **Status (2026-11-08):** the plan as it was made in October 2026, kept because the code cites its
+> Decisions. P0-P4 are done, P5 (Android, Windows x64) is done up to the release (docs/RELEASE-PLAN.md), and
+> parts of P6 are in (widescreen, high frame rates, gamepads). Hosting, CI and the machines named below are
+> out of date: docs/HANDOFF.md has the current setup.
 
 Goal: a C17 + SDL3 reimplementation of `NgBMX.exe` (sha256 in `tools/known_exe.txt`) that plays identically to the
 original, then gains ultrawide / high-fps / gamepad / renderer upgrades behind options. No original code or
@@ -114,8 +119,8 @@ round floats (so the hook build uses SSE2, not x87). Rules are in CONTRIBUTING.m
 ## Decisions
 
 - Renderer: SDL3 GPU API.
-- Hosting: Forgejo on nixbox (`denzo/opendmfbmx`), with a Linux docker runner. Pushes to main are fine,
-  but batch them.
+- Hosting: GitHub (`DenzoNL/open-freestyle-bmx`, public) since 2026-11-08; before that Forgejo on nixbox.
+  Pushes to main are fine, but batch them.
 - Target exe: the one we have (sha256 `97aa9077…`), from the DEViANCE repack.
 - No game video or audio is launched without explicit permission. Emulator tests are headless and silent.
 - **Vanilla stays vanilla.** Every enhancement is opt-in and defaults off. With all options off, the build
@@ -250,10 +255,4 @@ round floats (so the hook build uses SSE2, not x87). Rules are in CONTRIBUTING.m
   zrwmodelcreate.c, belongs in ngifzroller.c); asset decompressors 0x49bd10/0x49c080 (zasset);
   0x49c570 zobjDispatchEvents (zobj). zrwzgl.h and zrwmodel.h name 0x697720/0x697724 the other way
   round (gZrwScale/gZrwInvScale) and can't be included together: settle which is which.
-- **What's left (97.1%, 2026-10-26):** zrwprim/zrwmodelrender/zrwcol/zrwtxr/zprofile big functions, plus the ngifzbsp/ngifzcollide slice in progress. Earlier note (86.4%, 2026-10-24): every function still `orig` in data/functions.csv except
-  WinMain (0x48a460) and the zdebugFail abort trap (0x47ed10): ~40 functions of 1 KB or more,
-  mostly x87-heavy (camera, rider, overlay/zoverii, ngifpsx, ngifzcollide, prop, sound, zrwprim/col).
-  All Opus work, a few at a time.
 - `zquatNormalize` doesn't assert on a NaN length like the original (x87 FCOM unordered).
-
-- How CI gets the original exe for the differential tests. Until then CI skips them and they run locally.

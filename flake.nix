@@ -1,5 +1,5 @@
 {
-  description = "opendmfbmx - Dave Mirra Freestyle BMX reimplementation";
+  description = "Open Freestyle BMX: a native rewrite of a 2000 PC BMX game";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
@@ -40,9 +40,6 @@
           ];
         in
         {
-          # Lean shell for CI: hook build, lint, differential tests.
-          ci = pkgs.mkShellNoCC ({ packages = core; } // crossEnv);
-
           default = pkgs.mkShell (
             {
               packages =

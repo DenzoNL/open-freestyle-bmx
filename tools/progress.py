@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Update the function CSVs from BMX_ADDR annotations and print per-file progress.
 
-Usage: tools/progress.py [--check]   (--check: fail if a CSV is out of date, for CI)
+Usage: tools/progress.py [--check]   (--check: fail if a CSV is out of date, for tools/check.sh)
 
 Two lists: data/functions.csv (the game) and data/functions-rw.csv (the RenderWare library, from
 tools/rwmap.py; files rw/<group>.c). A BMX_ADDR belongs to the list that has its address. Progress is

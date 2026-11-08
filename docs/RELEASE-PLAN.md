@@ -4,7 +4,8 @@ Goal: a first public release that someone who owns the game can play without rea
 a Windows `.exe` and an Android `.apk` on a GitHub release, a short README for players, and a repo whose front page
 is about playing, with the developer material one level down.
 
-Nothing here is started. The decisions (D1-D8) are the user's; each has a recommendation. Decided so far: D1, D2 (the recommendations, 2026-11-07), D3, D5, D8.
+The decisions (D1-D8) are the user's; each has a recommendation. All are decided (2026-11-08); what's left is
+under "Before release" and "Release steps".
 
 ## Decisions
 
@@ -25,7 +26,7 @@ documents the handful of ini keys people want (resolution, widescreen, framerate
   platform layer goes through a different API).
 
 Rec: **A.** **Decided (user, 2026-11-07): A.** The code points are known: `bmxAndroidPrepare` (src/native/android.c) and the Java activity
-(android/app/src/main/java/org/opendmfbmx/app/BmxActivity.java). A PS1 disc image is not an option: the PlayStation
+(android/app/src/main/java/org/openfreestylebmx/app/BmxActivity.java, after the rename). A PS1 disc image is not an option: the PlayStation
 version stores its models and textures in different formats.
 
 **D3. Which Windows build to ship.**
@@ -113,26 +114,26 @@ release signing.
   south jumps, Start opens the menu, Back (the Android key under the right stick and Select both arrive as SDL's
   Back) is Select. Commit 5bea270's message says the user pressed B for Back; it was the Android Back key, and
   its AC_BACK→Escape key mapping was taken out again (SDL already delivers that key as the gamepad's Back).
-  Still to test on the Thor.
+  Tested on the Thor 2026-11-08: Start opens the menu and pauses (the user); the face buttons not reported yet.
 
-Repo:
-- README for players (outline below); move PLAN.md, HANDOFF.md, agent-brief.md, notes and the porting docs to
-  `docs/dev/`, keep a short "for developers" section linking there.
-- A LICENSE file (there is none yet: the user picks one) plus the third-party notices that must ship (SDL3: zlib;
-  dr_flac: public domain / MIT-0).
-- Cleanup candidates (each checked before deleting, nothing removed blindly): the Mac/Linux packaging scripts stay
-  (they work); tools that were one-off migrations (`data_off64.py`, `data_size64.py`, `probe64.py`, `extend_audit.py`?)
-  move to `tools/dev/` or go if nothing calls them; `docs/HANDOFF.md` sections older than the current state.
+Repo (done 2026-11-08):
+- README for players with screenshots (docs/images/); developer docs stay where they are (D4 revised).
+- MIT `LICENSE`; `tools/package_windows.py` puts the third-party notices in the zip (SDL3: zlib; dr_flac: public
+  domain / MIT-0).
+- Cleanup: the Forgejo CI config, `tools/probe64.py`, `tools/x87sym.py` and `docs/agent-brief.md` removed;
+  HANDOFF.md cut to the current state; old names and the old app id fixed in docs and comments. Everything
+  else was checked and is still used (the hook build, native32, the audit tools, `data_off64.py`).
 
 ## Release steps (once the above is done)
 
 1. Tag `v0.1.0` on main after a full gate.
 2. Build: `cmake --build --preset native64` (release flags), `android/build.sh release` with the release key.
 3. Package (`tools/package_windows.py`): `OpenFreestyleBMX-0.1.0-windows-x64.zip` = exe, `SDL3.dll`, README, LICENSE, third-party notices, a sample
-   ini. `opendmfbmx-v0.1.0-android.apk`. SHA-256 sums for both.
+   ini. The APK (android/build.sh writes `app-release.apk`) uploaded as `OpenFreestyleBMX-0.1.0-android.apk`. SHA-256
+   sums for both.
 4. Check the zip on a clean Windows user account (no dev tools on PATH: catches missing DLLs, like the
    libwinpthread one bmxx87test needed) and the APK fresh-installed on the Thor.
-5. `gh release create` on the GitHub mirror with short notes; never upload game files.
+5. A GitHub release on `DenzoNL/open-freestyle-bmx` with short notes; never upload game files.
 
 ## README outline (players first)
 
