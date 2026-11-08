@@ -65,13 +65,15 @@ on its own is the sport. Done the same day (src/compat/product.h):
   when the new one is missing) and log `OpenFreestyleBMX.log`; macOS bundle / Linux tarball named alike;
 - Android application id **`org.openfreestylebmx.app`** (final from the first public release on: a change would
   be a different app, losing installs and saves);
-- still to do by the user: rename the repository on Forgejo (and the GitHub mirror's name, D6). The local folder,
+- the repository moved to GitHub under the new name (D6). The local folder,
   code identifiers (`bmx*`, `BMX_*` environment variables) and the history keep the old name.
 
-**D6. Where the release lives.** The repo's origin is the Forgejo server (switchbyte.dev). Rec: a public GitHub repo
-that mirrors `main` only (never the `oracle` branch), the release made there with `gh release create`.
+**D6. Where the release lives. Decided (user, 2026-11-08):** the repository moves to GitHub entirely,
+`https://github.com/DenzoNL/open-freestyle-bmx` (public, no mirror). Only `main` goes there, its history rewritten to
+the GitHub noreply author address first; old commits keep their mentions of the old server. The `oracle` branch
+(only the original exe) stays on the private Forgejo server. Releases are made on GitHub.
 
-**D7. Signing.** Android: a release key (keep it out of the repo, back it up). Windows: unsigned, so SmartScreen
+**D7. Signing. Decided (user, 2026-11-08): as recommended.** Android: a release key (keep it out of the repo, back it up). Windows: unsigned, so SmartScreen
 warns on first start. Rec: Android release key now; Windows code signing not worth the cost for a hobby release,
 the README says what the warning looks like.
 
@@ -89,7 +91,8 @@ the README says what the warning looks like.
   A. keep as is (facts about the songs, no audio; the override cannot work without the timings);
   B. keep the timings, drop artist / title / album names (match files by track number instead);
   C. take the music override out of the release.
-  Rec: A, it is the kind of information a track list in a manual holds; the user's call.
+  Rec: A, it is the kind of information a track list in a manual holds. **Decided (user, 2026-11-08): A.**
+- **Licence. Decided (user, 2026-11-08): MIT** (`LICENSE`); SDL3 (zlib) and dr_flac ship their notices.
 
 ## Before release: work to finish
 
@@ -125,7 +128,7 @@ Repo:
 
 1. Tag `v0.1.0` on main after a full gate.
 2. Build: `cmake --build --preset native64` (release flags), `android/build.sh release` with the release key.
-3. Package: `opendmfbmx-v0.1.0-windows-x64.zip` = exe, `SDL3.dll`, README, LICENSE, third-party notices, a sample
+3. Package (`tools/package_windows.py`): `OpenFreestyleBMX-0.1.0-windows-x64.zip` = exe, `SDL3.dll`, README, LICENSE, third-party notices, a sample
    ini. `opendmfbmx-v0.1.0-android.apk`. SHA-256 sums for both.
 4. Check the zip on a clean Windows user account (no dev tools on PATH: catches missing DLLs, like the
    libwinpthread one bmxx87test needed) and the APK fresh-installed on the Thor.

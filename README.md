@@ -102,3 +102,5 @@ Open Freestyle BMX is an independent fan project, not affiliated with or endorse
 developer. It contains none of the game's files; you need your own copy of the game. The source includes the
 original program's built-in text and tables (menu strings, physics and scoring tables), which the rewritten code
 needs to behave identically. The names of the game and its soundtrack belong to their owners.
+
+The source code is released under the [MIT licence](LICENSE).

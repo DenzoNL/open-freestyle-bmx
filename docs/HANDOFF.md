@@ -7,11 +7,13 @@ Then read `PLAN.md` (strategy, decisions, open items) and `CONTRIBUTING.md` (por
 
 - Hook phase. Ported functions are verified bit for bit against the original `NgBMX.exe` in an emulator.
   Progress: `python3 -I tools/progress.py` (functions and bytes per source file).
-- `main` on `ssh://forgejo@switchbyte.dev/denzo/opendmfbmx.git` is the truth. Commit and push to main
-  directly, but batch pushes (CI runs on main).
+- `main` on GitHub, `https://github.com/DenzoNL/open-freestyle-bmx` (public), is the truth since 2026-11-08.
+  Commit and push to main directly, but batch pushes. The history was rewritten to the GitHub noreply author
+  address when it moved, so older clones do not share hashes with it.
 - The original exe lives **only** on the orphan branch `oracle`. Never merge it into main. Never push
-  `oracle` to a public host. If the repo ever moves to GitHub, push main only and delete `oracle`.
-- CI (Forgejo, Linux docker runner) runs only on pull requests and manually (Actions → ci → Run
+  `oracle` to a public host: it stays on the owner's private Forgejo server (git remote `forgejo`), and the
+  `origin` remote pushes main only. Anyone else uses the exe from their own copy of the game.
+- CI (Forgejo, Linux docker runner; not set up on GitHub yet) ran only on pull requests and manually (Actions → ci → Run
   workflow), not on push: run `tools/check.sh` locally before pushing. It has no assets, so
   the differential cases are skipped there and run locally.
 
@@ -292,8 +294,8 @@ capstone, clang-tools, Ghidra) comes from `flake.nix`.
 - **Windows via WSL2:** Ubuntu in WSL2 plus multi-user Nix with flakes, then `nix develop` as on Linux.
 
 ```sh
-git clone ssh://forgejo@switchbyte.dev/denzo/opendmfbmx.git && cd opendmfbmx
-git fetch origin oracle && mkdir -p work && git show origin/oracle:NgBMX.exe > work/NgBMX.exe
+git clone https://github.com/DenzoNL/open-freestyle-bmx.git && cd open-freestyle-bmx
+mkdir -p work && cp <your game folder>/NgBMX.exe work/  # the owner: git show forgejo/oracle:NgBMX.exe
 nix develop                                  # (skip on native Windows)
 tools/setup-work.sh work/NgBMX.exe          # verify hash; Ghidra export -> work/bundles (~10 min)
 cmake --preset hook && cmake --build --preset hook
