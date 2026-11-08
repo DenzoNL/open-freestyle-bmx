@@ -43,16 +43,17 @@ enum {
 
 };
 
-/* WAVEHDR */
+/* WAVEHDR, with Windows' own layout on 64-bit too (dwUser and reserved are DWORD_PTR), the same as
+ * ZMovieWaveHeader: the platform test hands these functions real WAVEHDRs. */
 typedef struct WaveHeader {
     uint8_t *data;
     uint32_t length;
     uint32_t recorded;
-    uint32_t user;
+    uintptr_t user;
     uint32_t flags;
     uint32_t loops;
     void *next;
-    uint32_t reserved;
+    uintptr_t reserved;
 } WaveHeader;
 
 BMX_LAYOUT32_ASSERT(sizeof(WaveHeader) == 0x20, "WAVEHDR");

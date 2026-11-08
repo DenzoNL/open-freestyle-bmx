@@ -39,14 +39,14 @@ typedef struct ZMovieRect {
 
 /* The part of WAVEHDR this code touches (0x20 bytes, followed by the 0x8000 byte data). */
 typedef struct ZMovieWaveHeader {
-    uint8_t *data;     /* 0x00 lpData */
-    uint32_t length;   /* 0x04 dwBufferLength */
-    uint32_t recorded; /* 0x08 */
-    uint32_t user;     /* 0x0c */
-    uint32_t flags;    /* 0x10 dwFlags */
-    uint32_t loops;    /* 0x14 */
-    void *next;        /* 0x18 */
-    uint32_t reserved; /* 0x1c */
+    uint8_t *data;      /* 0x00 lpData */
+    uint32_t length;    /* 0x04 dwBufferLength */
+    uint32_t recorded;  /* 0x08 */
+    uintptr_t user;     /* 0x0c dwUser (DWORD_PTR: Windows' 64-bit layout too) */
+    uint32_t flags;     /* 0x10 dwFlags */
+    uint32_t loops;     /* 0x14 */
+    void *next;         /* 0x18 */
+    uintptr_t reserved; /* 0x1c */
 } ZMovieWaveHeader;
 
 BMX_LAYOUT32_ASSERT(sizeof(ZMovieWaveHeader) == 0x20, "WAVEHDR size");
