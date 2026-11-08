@@ -74,7 +74,11 @@ on its own is the sport. Done the same day (src/compat/product.h):
 the GitHub noreply author address first; old commits keep their mentions of the old server. The `oracle` branch
 (only the original exe) stays on the private Forgejo server. Releases are made on GitHub.
 
-**D7. Signing. Decided (user, 2026-11-08): as recommended.** Android: a release key (keep it out of the repo, back it up). Windows: unsigned, so SmartScreen
+**D7. Signing. Decided (user, 2026-11-08): as recommended.** The Android release key exists since 2026-11-08 (RSA 4096, valid
+to 2126, `CN=Open Freestyle BMX, O=Open Freestyle BMX`), kept by the owner outside the repo; android/app/build.gradle
+finds it through a properties file (see there). Certificate SHA-256, to check a download with
+`apksigner verify --print-certs`:
+`46:54:28:DD:44:48:FA:F1:E8:FC:4D:A9:AE:91:D4:B4:F7:23:0B:E4:1B:A0:F1:E3:FD:06:BA:14:CE:F9:50:B1`. Android: a release key (keep it out of the repo, back it up). Windows: unsigned, so SmartScreen
 warns on first start. Rec: Android release key now; Windows code signing not worth the cost for a hobby release,
 the README says what the warning looks like.
 

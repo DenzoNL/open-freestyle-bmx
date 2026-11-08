@@ -21,11 +21,33 @@ android {
             abiFilters 'arm64-v8a'
         }
     }
+    // The release key never goes in the repo (docs/RELEASE-PLAN.md D7). Its storeFile / storePassword / keyAlias /
+    // keyPassword come from a properties file: -PsigningProperties=<file>, else $OFBMX_SIGNING, else
+    // ~/.android-keys/openfreestylebmx-release.properties. Without one, release builds are debug-signed (fine for
+    // testing; not an update of the published app).
+    def signingFile = file(project.findProperty('signingProperties') ?: System.getenv('OFBMX_SIGNING') ?:
+            "${System.getProperty('user.home')}/.android-keys/openfreestylebmx-release.properties")
+    signingConfigs {
+        if (signingFile.exists()) {
+            def p = new Properties()
+            signingFile.withInputStream { p.load(it) }
+            release {
+                storeFile = file(p.storeFile)
+                storePassword = p.storePassword
+                keyAlias = p.keyAlias
+                keyPassword = p.keyPassword
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled = false
-            // No release key yet: the debug key, so `adb install` takes the release APK too.
-            signingConfig = signingConfigs.debug
+            if (signingFile.exists()) {
+                signingConfig = signingConfigs.release
+            } else {
+                logger.warn("no release key (${signingFile}): the release APK is debug-signed")
+                signingConfig = signingConfigs.debug
+            }
         }
     }
     sourceSets.main {
