@@ -118,7 +118,8 @@ release signing.
   south jumps, Start opens the menu, Back (the Android key under the right stick and Select both arrive as SDL's
   Back) is Select. Commit 5bea270's message says the user pressed B for Back; it was the Android Back key, and
   its AC_BACK→Escape key mapping was taken out again (SDL already delivers that key as the gamepad's Back).
-  Tested on the Thor 2026-11-08: Start opens the menu and pauses (the user); the face buttons not reported yet.
+  Tested on the Thor 2026-11-08: Start opens the menu and pauses, the face buttons play as on the
+  desktop (the user).
 
 Repo (done 2026-11-08):
 - README for players with screenshots (docs/images/); developer docs stay where they are (D4 revised).
