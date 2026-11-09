@@ -44,8 +44,11 @@ VSOutput vsMain(VSInput input)
 cbuffer PSUniforms : register(b0, space3)
 {
     int4 ops;        // colour op, alpha op (D3DTOP: 2 arg1 = texture, 3 arg2 = diffuse, 4 modulate), texture, alpha func
-    float4 params;   // alpha ref (0..1), fog on, specular on, sampling mode (0 as bound, 2 sharp, 3 blur)
+    float4 params;   // alpha ref (0..1), fog on, specular on, sampling mode (0 as bound, 1 linear, 2 sharp, 3 blur)
     float4 fogColor; // alpha: brightness of the blur mode
+#ifdef UI
+    float4 uvBox;    // the draw's texture coordinates: min u, min v, max u, max v (draw.c)
+#endif
 };
 
 // The UI variant (compiled with -DUI, used for the 2D funnel's draws when ui_filter or menus = 2 asks for it; the
@@ -64,6 +67,19 @@ float2 sharpUv(float2 uv)
     s = max(s, 1.0);
     float2 centre = floor(t) + 0.5;
     return (centre + clamp((t - centre) * s, -0.5, 0.5)) / size;
+}
+
+// Linear and sharp sampling read up to half a texel beyond the texel the pixel lies in; at the edge of a glyph or
+// sprite that is its neighbour in the atlas (stray marks under digits, cut outlines). The game's nearest sampling
+// never leaves the draw's texture box, so filtered samples are kept half a texel inside it.
+float2 insideBox(float2 uv)
+{
+    uint tw, th;
+    tex.GetDimensions(tw, th);
+    float2 size = float2(tw, th);
+    float2 lo = uvBox.xy * size + 0.5, hi = uvBox.zw * size - 0.5;
+    float2 mid = (lo + hi) * 0.5;
+    return clamp(uv * size, min(lo, mid), max(hi, mid)) / size;
 }
 
 // The fill behind a pillarboxed backdrop (menus = 2): 5 x 5 taps four texels apart on the linear sampler.
@@ -92,6 +108,10 @@ float4 psMain(VSOutput input) : SV_Target0
     float4 diffuse = input.color;
 #ifdef UI
     float2 uv = params.w == 2.0 ? sharpUv(input.uv) : input.uv;
+    if (params.w == 1.0 || params.w == 2.0)
+    {
+        uv = insideBox(uv);
+    }
     float4 texel = float4(1.0, 1.0, 1.0, 1.0);
     if (ops.z != 0)
     {

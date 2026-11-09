@@ -430,7 +430,10 @@ with `widetest.ps1 -Hud 1`. Default stays `hud = 0` (W9) until then.
 (nearest for PSX quads, render flag 4). 1 = linear. 2 = sharp bilinear: nearest inside a texel and a linear ramp one
 output pixel wide at its edges (the pixel shader computes the pixels-per-texel from the screen space derivatives of
 the texel coordinate, so it needs no size from the CPU and works for glyphs, sprites and the 512 wide backdrops alike;
-a scale below 1 counts as 1). Only draws the game samples with nearest are changed (a draw the game already samples
+a scale below 1 counts as 1). Both filtered modes keep their samples half a texel inside the draw's texture box
+(the min / max of its vertices' u, v; tl.hlsl `insideBox`, 2026-11-09): without it a glyph's edge pixels blended in
+its neighbour in the atlas (stray marks under HUD digits, cut outlines), which the game's nearest sampling never
+reads. Marks inside a glyph's own box (one under the HUD's 6) are the original data and stay. Only draws the game samples with nearest are changed (a draw the game already samples
 linearly stays); untextured draws and everything outside the funnel (3D, movies) are untouched. It is independent of
 `widescreen`: the funnel wrapper is also installed for `ui_filter != 0` (with `widescreen = 0` it only sets the
 sampling mode), and it applies at 4:3 too. At the exact 4:3 raster of the original (640x480) 1 and 2 are therefore not

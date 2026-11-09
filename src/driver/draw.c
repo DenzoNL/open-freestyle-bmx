@@ -57,7 +57,7 @@ typedef struct PipelineKey {
     uint8_t blend, src, dst;
     uint8_t zTest, zWrite, zFunc, cull;
     uint8_t depth; /* the target has a z buffer */
-    uint8_t ui;    /* the UI pixel shader (sharp bilinear, blurred fill) */
+    uint8_t ui;    /* the UI pixel shader (linear and sharp bilinear inside the texture box, blurred fill) */
     uint8_t pad[2];
 } PipelineKey;
 
@@ -65,6 +65,7 @@ typedef struct PsUniforms {
     int32_t ops[4];
     float params[4];
     float fogColor[4];
+    float uvBox[4]; /* the UI shader only: min u, min v, max u, max v of the draw's vertices */
 } PsUniforms;
 
 typedef struct DrawCmd {
@@ -533,7 +534,7 @@ static void appendDraw(uint32_t type, const RwD3DTLVertex *vertices, uint32_t nu
 
         mode = boundTexture == NULL ? 0 : uiMode == 3 ? 3 : nearest ? uiMode : 0;
     }
-    key.ui = mode == 2 || mode == 3;
+    key.ui = mode != 0;
     if (mode == 3) {
         key.blend = 0; /* the blurred fill replaces what was there (a stale frame must not show through) */
     }
@@ -544,6 +545,19 @@ static void appendDraw(uint32_t type, const RwD3DTLVertex *vertices, uint32_t nu
     cmd->texture = boundTexture;
     cmd->sampler = samplerFor(mode != 0);
     cmd->ps.params[3] = key.ui ? (float)mode : 0.0f;
+    if (mode == 1 || mode == 2) {
+        /* The texture box the filtered samples stay inside (tl.hlsl insideBox): one glyph or sprite per
+         * Im2D primitive, so its vertices' extent is the glyph's box in the atlas. */
+        float box[4] = {vertices[0].u, vertices[0].v, vertices[0].u, vertices[0].v};
+
+        for (uint32_t i = 1; i < numVertices; i++) {
+            box[0] = SDL_min(box[0], vertices[i].u);
+            box[1] = SDL_min(box[1], vertices[i].v);
+            box[2] = SDL_max(box[2], vertices[i].u);
+            box[3] = SDL_max(box[3], vertices[i].v);
+        }
+        SDL_memcpy(cmd->ps.uvBox, box, sizeof box);
+    }
     cmd->ps.fogColor[3] = mode == 3 ? 0.5f : 1.0f;
     cmd->ps.ops[0] = (int32_t)tss[kTssColorOp];
     cmd->ps.ops[1] = (int32_t)tss[kTssAlphaOp];
