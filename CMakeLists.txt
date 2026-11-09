@@ -1,17 +1,41 @@
 cmake_minimum_required(VERSION 3.28)
 project(openfreestylebmx C)
 
+# clang only, every target: the sources use clang's diagnostic pragmas and warning names (GCC stops on them under
+# -Werror and warns about them otherwise), and the hook and Windows toolchains are clang anyway.
+if(NOT CMAKE_C_COMPILER_ID MATCHES "Clang")
+  message(FATAL_ERROR "Open Freestyle BMX builds with clang only; this configuration uses ${CMAKE_C_COMPILER_ID} "
+    "(${CMAKE_C_COMPILER}). Install your distribution's clang package, then configure with a preset "
+    "(cmake --preset linux, which selects clang) or with CC=clang.")
+endif()
+
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(BMX_HOOK "Build against the original NgBMX.exe (i686 hook/oracle phase)" ON)
+# The presets (CMakePresets.json) set both. Without a preset, a Windows target configures the hook build (the
+# gate's, tools/check.sh); macOS and Linux configure the native build, the one players want (docs/PORTING.md
+# "X4 (Linux x64)"), so a plain `cmake -B build` is not the i686 Windows DLL against the original exe.
+if(WIN32)
+  set(BMX_DEFAULT_HOOK ON)
+  set(BMX_DEFAULT_NATIVE OFF)
+else()
+  set(BMX_DEFAULT_HOOK OFF)
+  set(BMX_DEFAULT_NATIVE ON)
+endif()
+option(BMX_HOOK "Build against the original NgBMX.exe (i686 hook/oracle phase)" ${BMX_DEFAULT_HOOK})
 
-option(BMX_NATIVE32 "Build OpenFreestyleBMX.exe (target bmxnative), our own exe (32- or 64-bit, by the toolchain: presets native32 / native64)" OFF)
+option(BMX_NATIVE32 "Build OpenFreestyleBMX.exe (target bmxnative), our own exe (32- or 64-bit, by the toolchain: presets native32 / native64)" ${BMX_DEFAULT_NATIVE})
 set(BMX_WORK_DIR "${CMAKE_SOURCE_DIR}/work" CACHE PATH "Directory with labels.raw (names in trap reports)")
 
-set(BMX_WARNINGS -Wall -Wextra -Werror -Wno-unused-parameter -Wno-microsoft-anon-tag)
+# Warnings are errors in the presets (the gate and the release builds); off in a plain configure, so a newer
+# compiler's new warnings do not stop an outside build (docs/HANDOFF.md, the Linux build from a plain distro).
+option(BMX_WERROR "Treat warnings as errors (on in the presets)" OFF)
+set(BMX_WARNINGS -Wall -Wextra -Wno-unused-parameter -Wno-microsoft-anon-tag)
+if(BMX_WERROR)
+  list(APPEND BMX_WARNINGS -Werror)
+endif()
 
 # macOS / Linux (docs/PORTING.md "X5 part 1", "X4 (Linux x64)"): the host compiler with the Windows toolchains'
 # language flags (cmake/*.cmake). arm64 compilers fuse a * b + c into one rounding unless told not to

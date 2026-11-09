@@ -1014,10 +1014,16 @@ cmake --preset linux && cmake --build --preset linux             # build/linux/b
 cmake --build --preset linux --target bmxnative_tarball          # build/linux/OpenFreestyleBMX-linux-x86_64{,.tar.gz}
 ```
 Without nix: clang, cmake >= 3.28, ninja, python3 and the distribution's SDL3 development package (or SDL3 built
-from source, `-DSDL3_DIR=<prefix>/lib/cmake/SDL3`); `OPENDMFBMX_LINUX_CLANG=clang-21` names another clang. GCC is
-not supported (the sources use clang's diagnostic pragmas and warning names under `-Werror`). Run it from the game
-folder in the install layout (`Scene.Txt`, `Assets/`, `bin/audio`, `bin/movie`, `save/`), any case of the names:
-`cd <game> && <build>/bmxnative Scene.Txt`.
+from source, `-DSDL3_DIR=<prefix>/lib/cmake/SDL3`); the package names per distribution are in the README's
+"Linux" section. `OPENDMFBMX_LINUX_CLANG=clang-21` names another clang. GCC is not supported: the sources use
+clang's diagnostic pragmas and warning names (129 errors in 27 files with gcc 16, 2026-11-09), so CMakeLists.txt
+stops at configure with a message when the compiler is not clang. `-Werror` is the `BMX_WERROR` option: on in
+every preset, off in a plain configure, so a newer compiler's new warnings do not stop an outside build. Without
+a preset, a non-Windows configure defaults to the native build (`BMX_HOOK` off, `BMX_NATIVE32` on); a plain
+`cmake -B build` used to configure the i686 hook DLL, the first thing an outside Linux builder ran into. Run it
+from the game folder in the install layout (`Scene.Txt`, `Assets/`, `bin/audio`, `bin/movie`, `save/`), any case
+of the names: `cd <game> && <build>/OpenFreestyleBMX Scene.Txt`, or from anywhere (it asks for the game folder,
+src/native/gamedir.c).
 
 **What changed** (Windows builds unchanged: every change is `__linux__`, `!_WIN32` or a no-op there):
 - x87 state: Linux starts a process with the x87 control word at 0x037f (64-bit precision), Windows at 0x027f

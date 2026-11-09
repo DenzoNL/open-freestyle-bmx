@@ -7,7 +7,7 @@
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/hook",
       "toolchainFile": "${sourceDir}/cmake/i686-windows-freestanding.cmake",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "BMX_HOOK": "ON" }
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "BMX_HOOK": "ON", "BMX_WERROR": "ON" }
     },
     {
       "name": "native32",
@@ -15,7 +15,7 @@
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/native32",
       "toolchainFile": "${sourceDir}/cmake/i686-mingw.cmake",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "BMX_HOOK": "OFF", "BMX_NATIVE32": "ON" }
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "BMX_HOOK": "OFF", "BMX_NATIVE32": "ON", "BMX_WERROR": "ON" }
     },
     {
       "name": "native64",
@@ -23,28 +23,29 @@
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/native64",
       "toolchainFile": "${sourceDir}/cmake/x86_64-mingw.cmake",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "BMX_HOOK": "OFF", "BMX_NATIVE32": "ON" }
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "BMX_HOOK": "OFF", "BMX_NATIVE32": "ON", "BMX_WERROR": "ON" }
     },
     {
       "name": "macos",
-      "displayName": "macOS arm64 native exe (bmxnative, host clang, SDL3 from nix; docs/PORTING.md X5)",
+      "displayName": "macOS arm64 native exe (OpenFreestyleBMX, host clang, SDL3 from nix; docs/PORTING.md X5)",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/macos",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "CMAKE_OSX_ARCHITECTURES": "arm64",
         "BMX_HOOK": "OFF",
-        "BMX_NATIVE32": "ON"
+        "BMX_NATIVE32": "ON",
+        "BMX_WERROR": "ON"
       },
       "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" }
     },
     {
       "name": "linux",
-      "displayName": "Linux x86_64 native exe (bmxnative, host clang, SDL3 via CMake config; docs/PORTING.md X4)",
+      "displayName": "Linux x86_64 native exe (OpenFreestyleBMX, host clang, the distribution's or nix's SDL3; docs/PORTING.md X4)",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/linux",
       "toolchainFile": "${sourceDir}/cmake/x86_64-linux.cmake",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "BMX_HOOK": "OFF", "BMX_NATIVE32": "ON" },
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "BMX_HOOK": "OFF", "BMX_NATIVE32": "ON", "BMX_WERROR": "ON" },
       "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" }
     },
     {
@@ -57,6 +58,7 @@
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "BMX_HOOK": "OFF",
         "BMX_NATIVE32": "ON",
+        "BMX_WERROR": "ON",
         "SDL3_DIR": "${sourceDir}/build/android-sdl3/prefix/lib/cmake/SDL3"
       }
     }

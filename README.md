@@ -20,7 +20,7 @@ today's Windows PCs and Android handhelds, at any resolution and frame rate.
 - **The PC version of the game**, installed or copied from your own disc. This project contains none of the
   game's files (models, textures, levels, sounds, music, movies): it reads them from your copy.
 - **Windows 10 or 11 (64-bit)**, or an **Android 8+ handheld or phone** with an arm64 processor and Vulkan
-  (tested on the AYN Thor).
+  (tested on the AYN Thor). On **Linux** (x86-64) you build it yourself; see [Linux](#linux).
 
 ## Install
 
@@ -40,6 +40,14 @@ Windows may warn that the program is from an unknown publisher (it is not signed
 2. Install `OpenFreestyleBMX-<version>-android.apk` from the [Releases](../../releases) page.
 3. Start it and choose the game folder. It is copied into the app once (about 250 MB); after that the copy in
    `Download` can go.
+
+**Linux**
+
+There is no Linux download: distributions differ too much for one binary, and the build takes a few minutes. Build
+it as described under [Linux](#linux) below, then run `build/linux/OpenFreestyleBMX` from anywhere. The first time
+it asks for your game folder (the one with `Scene.Txt` and the `Assets` folder in it) and remembers it in
+`OpenFreestyleBMX.ini`; you can also start it from inside the game folder, or set `[general] game_dir` in the ini
+by hand if the folder dialog does not open on your desktop. Case does not matter in the game folder.
 
 Saves live in the game folder's `save` folder, as in the original, so a save from the PC works on Android and
 the other way around.
@@ -89,8 +97,8 @@ identical results down to the last bit of floating point. On top of that faithfu
 
 ## Status
 
-The first release is in preparation. Windows (64-bit) and Android are the targets; it also builds for Linux
-and macOS. Problems and questions: [Issues](../../issues). If the game crashes, attach `OpenFreestyleBMX.log`
+The first release is in preparation. Windows (64-bit) and Android are the targets; Linux builds from source
+(above), and macOS builds too. Problems and questions: [Issues](../../issues). If the game crashes, attach `OpenFreestyleBMX.log`
 from next to the program (on Android, from the app's files folder).
 
 ## For developers
@@ -101,9 +109,41 @@ How the port works, the verification harness and the build: [docs/NATIVE.md](doc
 
 ```sh
 cmake --preset native64 && cmake --build --preset native64   # Windows x64 (llvm-mingw, SDL3)
+cmake --preset linux && cmake --build --preset linux         # Linux x86-64 (clang, the distribution's SDL3)
 android/build.sh                                             # Android (NDK r29, SDL3 source)
 tools/check.sh                                               # format, lint, differential tests
 ```
+
+### Linux
+
+The build needs **clang** (GCC is not supported: the sources use clang's pragmas and warning names; CMake stops
+with a message if it finds another compiler), **CMake 3.28 or newer**, **Ninja**, **Python 3** and the
+**SDL3 development package**:
+
+| Distribution | Packages |
+|---|---|
+| Arch, CachyOS, Omarchy | `sudo pacman -S clang cmake ninja python sdl3` |
+| Fedora 42 or newer | `sudo dnf install clang cmake ninja-build python3 SDL3-devel` |
+| Debian 13, Ubuntu 25.04 or newer | `sudo apt install clang cmake ninja-build python3 libsdl3-dev` |
+| NixOS or Nix | `nix develop` in the repository (everything, SDL3 included) |
+
+Older Debian and Ubuntu releases have no SDL3 package: build [SDL3](https://github.com/libsdl-org/SDL/releases)
+from source and pass its prefix with `-DSDL3_DIR=<prefix>/lib/cmake/SDL3`. Nix users on a distribution other
+than NixOS: a build from `nix develop` links nix's SDL3 and Vulkan loader, which cannot use the system's GPU
+driver, so the game stops with "No supported SDL_GPU backend found"; to play, build with the distribution's
+packages instead (on NixOS the nix build runs as is). Then:
+
+```sh
+git clone https://github.com/DenzoNL/open-freestyle-bmx.git && cd open-freestyle-bmx
+cmake --preset linux && cmake --build --preset linux    # build/linux/OpenFreestyleBMX
+build/linux/OpenFreestyleBMX                             # asks for the game folder; or start it from the game folder
+```
+
+The preset builds with `-Werror`, like the release builds. If a newer clang stops the build on a warning,
+add `-DBMX_WERROR=OFF` to the configure command; a plain `cmake -B build` (no preset) also builds the native
+executable, without `-Werror`, as long as `CC=clang`. A game folder taken from a Windows install has the right
+layout; the CD's `data1.cab` extracted with `unshield` does not (its levels sit in `Level_-_XX` folders): see
+"Game folder layout" in [docs/PORTING.md](docs/PORTING.md).
 
 ## Legal
 
