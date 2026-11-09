@@ -20,6 +20,40 @@ Dated session logs that used to be here are in the git history (before the relea
 - No CI: run `tools/check.sh` locally before pushing (the differential cases need the exe in `work/`; without
   the game folder the asset cases are skipped).
 
+## Next up (2026-11-09): the Linux build from a plain distro, then v0.1.0
+
+**Release status.** docs/RELEASE-PLAN.md is current: every decision is taken, the owner's 64-bit play session was
+clean, the Thor's pad works, the Android release key exists (on the owner's Windows machine, outside the repo). Left:
+build the release exe / APK / zip, check them on a clean Windows account and a fresh Thor install, tag `v0.1.0`,
+publish on GitHub. Those steps run on Windows (the key and the Thor live there).
+
+**Open from the Windows session:**
+- The 2D filter fix (tl.hlsl `insideBox`, docs/WIDESCREEN.md `ui_filter`, 2026-11-09) changed the UI shader. Its
+  DXIL and SPIR-V in src/driver/shaders/ui_ps.h are regenerated; the **MSL (Metal) array is still the old one**,
+  because the Windows machine has no spirv-cross. On Linux (Arch: `pacman -S spirv-cross`, or `nix develop`):
+  `tools/shaders.sh --msl-only` and commit ui_ps.h. Until then macOS samples the 2D as before (no box clamp; the
+  extra uniform is ignored), nothing breaks.
+
+**The Linux task.** A user reports that the Linux build fails with "a lot of errors of all kinds", with clang and
+without. Until now it was built only inside `nix develop` (nixbox) and an OrbStack Fedora container. Goal: a fresh
+clone builds and runs on a plain distribution (this machine: Omarchy, i.e. Arch) with only distribution packages,
+no nix, following the README's developer section to the letter, like an outside contributor would. Then fix what
+breaks and write the exact commands into the README. Suspects, from reading the build (not yet tried):
+1. A plain `cmake -B build` configures the **hook** build: `option(BMX_HOOK ... ON)` in CMakeLists.txt, the i686
+   Windows DLL against the original exe. Only `--preset linux` gives the Linux build. Fix: default it OFF off
+   Windows (or fail with a clear message), and document the preset.
+2. **gcc**: cmake/x86_64-linux.cmake says "clang only" (clang's pragmas and warning names under -Werror), but
+   nothing stops a gcc build. Either make the sources build with gcc or stop at configure with a clear message.
+3. **-Werror with a newer compiler**: new warnings become errors. Keep -Werror for the gate (an option, on in the
+   presets) and leave it off for plain builds.
+4. SDL3 from the distro (Arch has `sdl3`), Python 3 for the generated sources, CMake >= 3.28, Ninja.
+Also: the `linux` and `macos` presets' displayName still say `bmxnative`; the README's developer section lists only
+Windows and Android commands.
+
+Test runs need the owner's game folder (copied or mounted); the hook build and differential tests additionally need
+the original exe in work/ (optional on Linux: players only need the native build). Keep the rules below: no game
+audio without the owner's permission (BMX_MUTE=1), gate before every push, push main only.
+
 ## Machine setup
 
 The toolchain is Nix. Everything (clang/lld cross compiler, CMake, Ninja, Python with unicorn/pefile/
